@@ -17,8 +17,8 @@ class GraphNode:
     edge_grid = defaultdict(set)
     # Params
     closed_range = 13  # The default value is the average value of lengths in the original network
-    closed_nodes_factor = .5
-    closed_edges_factor = .5
+    closed_nodes_factor = 1.5
+    closed_edges_factor = 1
     # Counter
     aborted_edge = 0
     merged_edge = 0
