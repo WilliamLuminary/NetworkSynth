@@ -5,7 +5,7 @@ import warnings
 import cv2
 import numpy as np
 
-from src.utils.utils import debugging
+from src.utils.debug_utils import debugging
 
 
 @debugging

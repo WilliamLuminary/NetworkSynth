@@ -1,34 +1,36 @@
 import os
+from datetime import datetime
 
 from matplotlib import pyplot as plt
 from scipy.spatial.distance import euclidean
 
 
-def calculate_edge_lengths(G):
-    return [euclidean(G.nodes[u]['pos'], G.nodes[v]['pos']) for u, v in G.edges()]
+def calculate_edge_lengths(graph):
+    return [euclidean(graph.nodes[u]['pos'], graph.nodes[v]['pos']) for u, v in graph.edges()]
 
 
-def assign_weights_to_edges(G, map_length_to_weight, length_bins, weight_baskets, y):
-    edge_lengths = calculate_edge_lengths(G)
+def assign_weights_to_edges(graph, map_length_to_weight, length_bins, weight_baskets, y):
+    edge_lengths = calculate_edge_lengths(graph)
     weights = [map_length_to_weight(length, length_bins, weight_baskets, y) for length in edge_lengths]
 
-    for (u, v), weight in zip(G.edges(), weights):
-        G[u][v]['weight'] = weight
+    for (u, v), weight in zip(graph.edges(), weights):
+        graph[u][v]['weight'] = weight
 
-    return G
+    return graph
 
 
-def plot_graph_with_positions(G, title, frame, save=False, base_path='/content/drive/MyDrive/vis/Results Yaxing/',
+def plot_graph_with_positions(graph, set_name, resolution, title, frame, save=False,
+                              base_path='/content/drive/MyDrive/vis/Results Yaxing/',
                               background=False):
     plt.figure(figsize=(10, 10))
 
-    for s, e in G.edges():
-        x1, y1 = G.nodes[s]['pos']
-        x2, y2 = G.nodes[e]['pos']
+    for s, e in graph.edges():
+        x1, y1 = graph.nodes[s]['pos']
+        x2, y2 = graph.nodes[e]['pos']
         plt.plot([x1, x2], [y1, y2], 'r-', linewidth=3, zorder=2)
 
-    for node in G.nodes():
-        x, y = G.nodes[node]['pos']
+    for node in graph.nodes():
+        x, y = graph.nodes[node]['pos']
         plt.plot(x, y, 'bo', markersize=3.5, zorder=2)
 
     if frame is not None:

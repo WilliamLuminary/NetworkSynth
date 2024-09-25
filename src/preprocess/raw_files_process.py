@@ -2,7 +2,7 @@ import os
 
 from src.preprocess.image_utils import create_graph, plot_network_with_graph
 from src.preprocess.load_files import load_positions, load_sparse_matrix, find_image_file, load_image_file
-from src.utils.utils import debugging
+from src.utils.debug_utils import debugging
 
 
 @debugging

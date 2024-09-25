@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from src.genration.network_generation import plot_and_generate_network
 from src.postprocess.assign_weight import process_weighted_graph, plot_graph_with_positions
-from src.postprocess.multifractal_analysis import wnfd_nk, nspectrum
+from src.postprocess.multifractal_analysis import wnfd_nk, n_spectrum
 from src.postprocess.reduce_node_edge import adjust_degree_distribution
 from src.preprocess.raw_files_process import load_and_plot_graph
 from src.properties.graph_matrics import prepare_graph_metrics
@@ -34,18 +34,23 @@ def delete_existing_folder(set_name, resolution, base_path='/content/drive/MyDri
 
 def calculate_graph_properties(graph, Q):
     ntau = wnfd_nk(graph, Q, weight=True, draw=False)
-    alpha_0, width, al_list, fal_list = nspectrum(ntau, Q)
+    alpha_0, width, al_list, fal_list = n_spectrum(ntau, Q)
     return alpha_0, width, al_list, fal_list
 
 
 @debugging
 @timer
-def generate_and_process_graphs(set_name, resolution, closed_nodes_factor=.5,
-                                closed_edges_factor=.5, graph_sample=10, num_iterations=300,
+def generate_and_process_graphs(set_name, resolution, closed_nodes_factor=1.5,
+                                closed_edges_factor=1, graph_sample=10, num_iterations=300,
                                 base_path='/content/drive/MyDrive/vis/Results Yaxing',
                                 view_only=False):  # view_only means only the original graph will be plotted, it will not be saved.
     """
     Generate and process graphs for a given set and resolution.
+    :param base_path:
+    :param closed_edges_factor:
+    :param closed_nodes_factor:
+    :param resolution:
+    :param set_name:
     :param view_only: When this value is True, only the original graph will be plotted without saving. For debugging!
     :param graph_sample: When this value is greater than 0, graph_sample graphs will be generated, plotted, and saved.
     :param num_iterations: When this value is greater than 0, num_iterations graphs will be generated and saved.

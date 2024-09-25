@@ -1,63 +1,72 @@
-def keep_largest_connected_component(G):
-    if G.number_of_nodes() == 0:
-        return G
-    largest_cc = max(nx.connected_components(G), key=len)
-    G = G.subgraph(largest_cc).copy()
-    return G
+import os
+import warnings
+from datetime import datetime
+
+import networkx as nx
+import numpy as np
+from matplotlib import pyplot as plt
+
+from src.utils.debug_utils import debugging
+
+
+def keep_largest_connected_component(graph):
+    if graph.number_of_nodes() == 0:
+        return graph
+    largest_cc = max(nx.connected_components(graph), key=len)
+    graph = graph.subgraph(largest_cc).copy()
+    return graph
 
 
 @debugging
-def adjust_degree_distribution(G, ori_graph_metrics: dict, enable_closeness_centrality: bool = False):
+def adjust_degree_distribution(graph, ori_graph_metrics: dict, enable_closeness_centrality: bool = False):
     target_num_nodes = ori_graph_metrics['mean_num_nodes']
     target_num_edges = ori_graph_metrics['mean_num_edges']
     target_avg_deg = ori_graph_metrics['avg_degree']
+    target_avg_closeness_centrality = ori_graph_metrics['avg_closeness_centrality']
 
-    if enable_closeness_centrality:
-        target_avg_closeness_centrality = ori_graph_metrics['avg_closeness_centrality']
+    graph = graph.copy()
 
-    G = G.copy()
-
-    while 2 * G.number_of_edges() / G.number_of_nodes() > 1.1 * target_avg_deg:
+    while 2 * graph.number_of_edges() / graph.number_of_nodes() > 1.1 * target_avg_deg:
         if enable_closeness_centrality:
-            current_avg_closeness_centrality = np.mean(list(nx.closeness_centrality(G).values()))
+            current_avg_closeness_centrality = np.mean(list(nx.closeness_centrality(graph).values()))
             if current_avg_closeness_centrality <= target_avg_closeness_centrality:
                 break
 
-        if G.number_of_nodes() < 0.8 * target_num_nodes:
+        if graph.number_of_nodes() < 0.8 * target_num_nodes:
             warnings.warn(
-                f"Low Nodes. Current: N: {G.number_of_nodes()} E: {G.number_of_edges()}, Target: {target_num_nodes}")
+                f"Low Nodes. Current: N: {graph.number_of_nodes()} E: {graph.number_of_edges()}, Target: {target_num_nodes}")
             break
 
-        highest_degree_node = max(G.degree, key=lambda x: x[1])[0]
-        print(f"Reducing degree of node {highest_degree_node}, current degree: {G.degree[highest_degree_node]}",
+        highest_degree_node = max(graph.degree, key=lambda x: x[1])[0]
+        print(f"Reducing degree of node {highest_degree_node}, current degree: {graph.degree[highest_degree_node]}",
               debug=True)
 
-        neighbors = list(G.neighbors(highest_degree_node))
+        neighbors = list(graph.neighbors(highest_degree_node))
         if neighbors:
-            G.remove_edge(highest_degree_node, neighbors[0])
+            graph.remove_edge(highest_degree_node, neighbors[0])
 
-        print(f"Remaining nodes: {G.number_of_nodes()}, Remaining edges: {G.number_of_edges()}", debug=True)
+        print(f"Remaining nodes: {graph.number_of_nodes()}, Remaining edges: {graph.number_of_edges()}", debug=True)
 
-    G = keep_largest_connected_component(G)
+    graph = keep_largest_connected_component(graph)
 
-    if G.number_of_nodes() > target_num_nodes:
-        print(f"High Nodes. Current: N: {G.number_of_nodes()} E: {G.number_of_edges()}, TN: {target_num_edges}",
+    if graph.number_of_nodes() > target_num_nodes:
+        print(f"High Nodes. Current: N: {graph.number_of_nodes()} E: {graph.number_of_edges()}, TN: {target_num_edges}",
               debug=True)
 
-    if G.number_of_edges() > target_num_edges:
-        print(f"High Edges. Current: N: {G.number_of_nodes()} E: {G.number_of_edges()}, TE: {target_num_edges}",
+    if graph.number_of_edges() > target_num_edges:
+        print(f"High Edges. Current: N: {graph.number_of_nodes()} E: {graph.number_of_edges()}, TE: {target_num_edges}",
               debug=True)
-    print(f"AVG DEG: {2 * G.number_of_edges() / G.number_of_nodes()}", debug=True)
-    return G
+    print(f"AVG DEG: {2 * graph.number_of_edges() / graph.number_of_nodes()}", debug=True)
+    return graph
 
 
-def plot_reduced_graph(G_reduced, title, set_name, resolution, save, frame,
+def plot_reduced_graph(reduced_graph, title, set_name, resolution, save, frame,
                        base_path='/content/drive/MyDrive/vis/Results Yaxing/', background=False):
     plt.figure(figsize=(10, 10))
 
-    positions = nx.get_node_attributes(G_reduced, 'pos')
-    filtered_nodes = list(G_reduced.nodes)
-    filtered_edges = list(G_reduced.edges)
+    positions = nx.get_node_attributes(reduced_graph, 'pos')
+    filtered_nodes = list(reduced_graph.nodes)
+    filtered_edges = list(reduced_graph.edges)
 
     for s, e in filtered_edges:
         pos_s = positions.get(s)
@@ -101,14 +110,14 @@ def plot_reduced_graph(G_reduced, title, set_name, resolution, save, frame,
         plt.show()
 
     # Calculate crucial graph metrics
-    degrees = list(dict(G_reduced.degree()).values())
+    degrees = list(dict(reduced_graph.degree()).values())
     unique_degrees, counts = np.unique(degrees, return_counts=True)
     degree_distribution = dict(zip(unique_degrees, counts / sum(counts)))
 
-    mean_num_nodes = G_reduced.number_of_nodes()
-    mean_num_edges = G_reduced.number_of_edges()
+    mean_num_nodes = reduced_graph.number_of_nodes()
+    mean_num_edges = reduced_graph.number_of_edges()
     avg_degree = np.mean(degrees)
-    avg_closeness_centrality = np.mean(list(nx.closeness_centrality(G_reduced).values()))
+    avg_closeness_centrality = np.mean(list(nx.closeness_centrality(reduced_graph).values()))
 
     return {
         "degree_distribution": degree_distribution,

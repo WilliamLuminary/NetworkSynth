@@ -12,7 +12,6 @@ def wnfd_nk(graph, Q, weight: bool = True, draw: bool = False, fdigi=0):
     N_list = []
     r_g_all_set = set()
     graph = nx.convert_node_labels_to_integers(graph)
-    G_nk = None
     if weight:
         G_nk = nk.nxadapter.nx2nk(graph, weightAttr='weight')
     else:
@@ -72,7 +71,7 @@ def wnfd_nk(graph, Q, weight: bool = True, draw: bool = False, fdigi=0):
     return tau_list
 
 
-def nspectrum(tau_list, q_list):
+def n_spectrum(tau_list, q_list):
     al_list = []
     fal_list = []
     for i in range(1, len(q_list)):
