@@ -1,3 +1,10 @@
+import random
+from collections import defaultdict
+from typing import Dict
+
+import numpy as np
+
+
 class GraphNode:
     # Must provide
     degree_distribution = {}
@@ -23,12 +30,11 @@ class GraphNode:
     enable_degree_transition_probs = True
     enable_merge_edges = True
 
-
     def __init__(self, position, *, parent=None, parent_angle=None):
-        '''
+        """
         PRE: param parent and parent_angle must be provided together or not at all.
-        POST: The first children of a non-root node is the parent.
-        '''
+        POST: The first child of a non-root node is the parent.
+        """
         self.id = GraphNode.id_counter
         GraphNode.id_counter += 1
         self.position = position
@@ -37,17 +43,21 @@ class GraphNode:
         self.children = []
 
         if parent is not None and parent_angle is not None:  # Non-root Node
-            self.degree = self.choose_degree_based_on_parent(parent.degree) if GraphNode.enable_degree_transition_probs else np.random.choice(list(GraphNode.degree_distribution.keys()), p=list(GraphNode.degree_distribution.values()))
+            self.degree = self.choose_degree_based_on_parent(
+                parent.degree) if GraphNode.enable_degree_transition_probs else np.random.choice(
+                list(GraphNode.degree_distribution.keys()), p=list(GraphNode.degree_distribution.values()))
             self.base_angle = (parent_angle + 180) % 360
             self.add_child(self.parent)
         elif parent is None and parent_angle is None:  # Root Node
-            self.degree = np.random.choice(list(GraphNode.degree_distribution.keys()), p=list(GraphNode.degree_distribution.values()))
+            self.degree = np.random.choice(list(GraphNode.degree_distribution.keys()),
+                                           p=list(GraphNode.degree_distribution.values()))
             self.base_angle = random.uniform(0, 360)
             self.initialize_root_node()
         else:
             raise ValueError("Both parent and parent_angle must be provided together or not at all.")
 
-    def choose_degree_based_on_parent(self, parent_degree):
+    @staticmethod
+    def choose_degree_based_on_parent(parent_degree):
         degrees = list(GraphNode.degree_transition_probs[parent_degree].keys())
         probabilities = list(GraphNode.degree_transition_probs[parent_degree].values())
         return np.random.choice(degrees, p=probabilities)
@@ -64,7 +74,8 @@ class GraphNode:
 
     def add_child(self, child):
         if len(self.children) >= self.degree:
-            raise Exception(f"Node {self} cannot have more than {self.degree} children, current children {self.children}")
+            raise Exception(
+                f"Node {self} cannot have more than {self.degree} children, current children {self.children}")
         self.children.append(child)
         self.add_to_grid(child.position)
 
@@ -113,7 +124,7 @@ class GraphNode:
     #     return True
 
     def generate_children(self) -> bool:
-        if len(self.children) > 1 or self.degree == 1: # Skip visited nodes or Endpoint has no other child
+        if len(self.children) > 1 or self.degree == 1:  # Skip visited nodes or Endpoint has no other child
             return False
         angles, lengths = self.generate_angles_and_lengths()
         children_positions = self.polar_to_cartesian(lengths, angles)
@@ -171,11 +182,11 @@ class GraphNode:
         if self.degree == 1:
             return [], []
 
-        angles = random.choices(list(GraphNode.degree_angles[self.degree]), k=self.degree-1)
+        angles = random.choices(list(GraphNode.degree_angles[self.degree]), k=self.degree - 1)
         angles = np.cumsum(angles) if self.clockwise else np.cumsum([-angle for angle in angles])
         angles = (angles + self.base_angle).tolist()
 
-        lengths = random.choices(list(GraphNode.degree_edge_lengths[self.degree]), k=self.degree-1)
+        lengths = random.choices(list(GraphNode.degree_edge_lengths[self.degree]), k=self.degree - 1)
 
         return angles, lengths
 
@@ -230,7 +241,7 @@ class GraphNode:
     @staticmethod
     def spatial_hash(position, grid_size=None):
         grid_size = grid_size or GraphNode.grid_size
-        return (int(position[0] // grid_size), int(position[1] // grid_size))
+        return int(position[0] // grid_size), int(position[1] // grid_size)
 
     @staticmethod
     def edge_spatial_hash(p1, p2, grid_size=None):
@@ -251,8 +262,11 @@ class GraphNode:
         def on_segment(p, q, r):
             return min(p[0], r[0]) <= q[0] <= max(p[0], r[0]) and min(p[1], r[1]) <= q[1] <= max(p[1], r[1])
 
-        o1, o2, o3, o4 = orientation(p1, q1, p2), orientation(p1, q1, q2), orientation(p2, q2, p1), orientation(p2, q2, q1)
-        return (o1 != o2 and o3 != o4) or (o1 == 0 and on_segment(p1, p2, q1)) or (o2 == 0 and on_segment(p1, q2, q1)) or (o3 == 0 and on_segment(p2, p1, q2)) or (o4 == 0 and on_segment(p2, q1, q2))
+        o1, o2, o3, o4 = orientation(p1, q1, p2), orientation(p1, q1, q2), orientation(p2, q2, p1), orientation(p2, q2,
+                                                                                                                q1)
+        return (o1 != o2 and o3 != o4) or (o1 == 0 and on_segment(p1, p2, q1)) or (
+                o2 == 0 and on_segment(p1, q2, q1)) or (o3 == 0 and on_segment(p2, p1, q2)) or (
+                o4 == 0 and on_segment(p2, q1, q2))
 
     @staticmethod
     def print_attributes():
@@ -295,13 +309,15 @@ class GraphNode:
 
     # Since we use the coordinates of nodes to deal with hashing, no need to overwrite __eq__ and __hash__
 
+
 def set_graph_node_attribute(**kwargs):
     for attr, value in kwargs.items():
         if hasattr(GraphNode, attr):
             setattr(GraphNode, attr, value)
     GraphNode.reset()
 
-def init_graph_node(degree_distribution:Dict, degree_transition_probs, degree_angles, degree_edge_lengths, **kwargs):
+
+def init_graph_node(degree_distribution: Dict, degree_transition_probs, degree_angles, degree_edge_lengths, **kwargs):
     GraphNode.degree_distribution = degree_distribution.copy()
     GraphNode.degree_transition_probs = degree_transition_probs.copy()
     GraphNode.degree_angles = degree_angles.copy()
@@ -312,6 +328,7 @@ def init_graph_node(degree_distribution:Dict, degree_transition_probs, degree_an
     )
     kwargs['grid_size'] = grid_size if 'grid_size' not in kwargs else kwargs['grid_size']
     set_graph_node_attribute(**kwargs)
+
 
 def reset_graph_node(if_init=False, **kwargs):
     if if_init:
@@ -325,15 +342,18 @@ def reset_graph_node(if_init=False, **kwargs):
     else:
         set_graph_node_attribute(**kwargs)
 
+
 def round_to_int(value) -> int:
     return int(round(value, 0))
+
 
 def determine_grid_size(**kwargs):
     if 'average_length' in kwargs:
         grid_size = kwargs['average_length']
     elif 'degree_edge_lengths' in kwargs:
         all_edge_lengths = [length for lengths in kwargs['degree_edge_lengths'].values() for length in lengths]
-        grid_size = np.mean(all_edge_lengths) if all_edge_lengths else GraphNode.grid_size  # Default to GraphNode's grid size if empty
+        grid_size = np.mean(
+            all_edge_lengths) if all_edge_lengths else GraphNode.grid_size  # Default to GraphNode's grid size if empty
     else:
         grid_size = GraphNode.grid_size  # Use the existing default grid size if no length info is provided
     return round_to_int(kwargs.get('regen_factor', 1) * grid_size)

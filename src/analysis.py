@@ -1,6 +1,7 @@
+from collections import defaultdict
+
 import numpy as np
-import random
-import matplotlib.pyplot as plt
+
 
 def create_bins_and_baskets(edge_lengths, edge_weights, num_bins=100):
     length_bins = np.linspace(edge_lengths.min(), edge_lengths.max(), num_bins + 1)
@@ -11,8 +12,10 @@ def create_bins_and_baskets(edge_lengths, edge_weights, num_bins=100):
         weight_baskets[bin_idx].append(weight)
     return length_bins, weight_baskets
 
+
 def mapping(G, plot=False):
     edge_lengths, edge_weights = compute_edge_lengths_and_weights_from_graph(G)
     length_bins, weight_baskets = create_bins_and_baskets(edge_lengths, edge_weights)
-    mapped_weights = [map_length_to_weight(length, length_bins, weight_baskets, edge_weights) for length in edge_lengths]
+    mapped_weights = [map_length_to_weight(length, length_bins, weight_baskets, edge_weights) for length in
+                      edge_lengths]
     # Plotting and other functionalities...
