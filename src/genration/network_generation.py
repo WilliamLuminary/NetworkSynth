@@ -116,12 +116,9 @@ def plot_and_generate_network(frame_range: int = 510, regenerate_times: int = 10
     else:
         raise Exception(f"Too many attempts to generate graphs. Abort...")
 
-    # GraphNode.print_attributes()
-
     raw_graph = build_graph_from_nodes_and_edges(raw_nodes, raw_edges)
     raw_positions = np.array(list(nx.get_node_attributes(raw_graph, 'pos').values()))
     center_x, center_y = raw_positions[:, 0].mean(), raw_positions[:, 1].mean()
-    # print(f"Center of graph: ({center_x}, {center_y})", debug=True)
     # print(f"x: {np.min(raw_positions[:, 0])} ~ {np.max(raw_positions[:, 0])}; y: {np.min(raw_positions[:, 1])} ~ {np.max(raw_positions[:, 1])}", debug=True)
     frame = calculate_frame(center_x, center_y, frame_range)
     # frame = calculate_frame(0, 0, frame_range)
@@ -175,8 +172,6 @@ def plot_and_generate_network(frame_range: int = 510, regenerate_times: int = 10
     ax.spines['right'].set_visible(False)
     ax.spines['bottom'].set_visible(False)
     ax.spines['left'].set_visible(False)
-
-    # plt.title('Generated Graph')
     if save_plot:
         graph_title = kwargs.get('graph_title', "")
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
