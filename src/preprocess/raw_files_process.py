@@ -10,7 +10,7 @@ def load_and_plot_graph(set_name, resolution, file_path='/content/drive/MyDrive/
                         save_path='/content/drive/MyDrive/vis/Results Yaxing', load_image=True, save=False,
                         background=True, alpha: float = 1):
     positions = load_positions(set_name, resolution, file_path)
-    sparse_matrix = load_sparse_matrix(resolution, file_path, set_name)
+    sparse_matrix = load_sparse_matrix(set_name, resolution, file_path)
 
     num_positions = len(positions)
     num_nodes = sparse_matrix.shape[0]

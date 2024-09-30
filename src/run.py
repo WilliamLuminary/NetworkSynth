@@ -4,7 +4,7 @@ import shutil
 import warnings
 
 from scipy.spatial.distance import euclidean
-from tqdm import tqdm
+from tqdm.notebook import tqdm
 
 from src.genration.network_generation import plot_and_generate_network
 from src.postprocess.assign_weight import process_weighted_graph, plot_graph_with_positions
@@ -81,8 +81,7 @@ def generate_and_process_graphs(set_name, resolution, closed_nodes_factor=1.5,
 
     total_iterations = max(graph_sample, num_iterations)
     G_weighted_list, G_reduced_weighted_list, errors = [], [], []
-    for i in tqdm(range(total_iterations), desc="Generating Graphs", leave=False, ncols=50,
-                  bar_format="{l_bar}{bar} | {n_fmt}/{total_fmt}", mininterval=100):
+    for i in tqdm(range(total_iterations)):
 
         max_attempts = 1000
         for attempt in range(max_attempts):
@@ -98,8 +97,7 @@ def generate_and_process_graphs(set_name, resolution, closed_nodes_factor=1.5,
             )
 
             weighted_graph = process_weighted_graph(syn_G, frame, map_length_to_weight, length_bins, weight_baskets, y,
-                                                    "",
-                                                    save=False, skip_plotting=True)
+                                                    "", save=False, skip_plotting=True)
 
             reduced_graph = adjust_degree_distribution(syn_G, ori_graph_metrics)
             reduced_weighted_graph = process_weighted_graph(reduced_graph, frame, map_length_to_weight, length_bins,

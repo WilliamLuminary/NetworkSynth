@@ -36,7 +36,7 @@ def load_positions(set_name, resolution, base_path='/content/drive/MyDrive/vis')
                    allow_pickle=True)
 
 
-def load_sparse_matrix(resolution, base_path='/content/drive/MyDrive/vis', set_name=None):
+def load_sparse_matrix(set_name, resolution, base_path='/content/drive/MyDrive/vis'):
     sparse_matrices_path = os.path.join(base_path, 'sparse_matrices')
     pattern = re.compile(rf"sparse_matrices_{re.escape(resolution)}.*\.npz", re.IGNORECASE)
     matrix_file = find_file_with_pattern(sparse_matrices_path, pattern, details='sparse matrix')
@@ -66,11 +66,10 @@ def find_image_file(set_name, resolution, base_path='/content/drive/MyDrive/vis/
         directory_path = os.path.join(directory_path, '1811')
         warnings.warn("For set B, using the 1811 subdirectory for images.")
     pattern = re.compile(rf"\b{re.escape(resolution)}\b.*\.(tif|png|jpg)", re.IGNORECASE)
-    return find_file_with_pattern(directory_path, pattern, details=f'image file for {set_name}')
-
-
-def load_image_file(image_file):
+    image_file = find_file_with_pattern(directory_path, pattern, details=f'image file for {set_name}')
     image = cv2.imread(image_file, cv2.IMREAD_GRAYSCALE)
+
     if image is None:
         raise ValueError(f"Failed to load image from file: {image_file}")
+
     return image
