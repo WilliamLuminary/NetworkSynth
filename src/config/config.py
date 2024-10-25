@@ -6,13 +6,14 @@ import os
 class Config:
     def __init__(self):
         self.BASE_DATA_PATH = 'data'
-        self.BASE_RESULTS_PATH = os.path.join(self.BASE_DATA_PATH, 'Results')
 
-        self.POSITIONS_DIR = os.path.join(self.BASE_DATA_PATH, 'position')
-        self.SPARSE_MATRICES_DIR = os.path.join(self.BASE_DATA_PATH, 'sparse_matrices')
-        self.IMAGES_DIR = os.path.join(self.BASE_DATA_PATH, 'Original Graphs')
+        self.BASE_INPUT_PATH = os.path.join(self.BASE_DATA_PATH, 'input')
+        self.POSITIONS_DIR = os.path.join(self.BASE_INPUT_PATH, 'position')
+        self.SPARSE_MATRICES_DIR = os.path.join(self.BASE_INPUT_PATH, 'sparse_matrices')
+        self.IMAGES_DIR = os.path.join(self.BASE_INPUT_PATH, 'Original Graphs')
 
-        self.OUTPUT_DIR = self.BASE_RESULTS_PATH
+        self.BASE_OUTPUT_PATH = os.path.join(self.BASE_DATA_PATH, 'output')
+        self.OUTPUT_DIR = os.path.join(self.BASE_OUTPUT_PATH, 'Results')
         self.SYNTHETIC_GRAPH_PATH = os.path.join(self.OUTPUT_DIR, 'Synthetic Graphs')
         self.ORIGINAL_GRAPH_PATH = os.path.join(self.OUTPUT_DIR, 'Original Graphs')
 
