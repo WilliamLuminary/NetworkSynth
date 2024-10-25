@@ -1,7 +1,7 @@
+# utils/debug_utils.py
 import builtins
 import functools
 import time
-
 from rich import print as rich_print
 
 DEBUG = False
@@ -13,15 +13,10 @@ def debugging(func):
         original_print = builtins.print
 
         def debug_print(*print_args, debug=True, **print_kwargs):
-            if DEBUG:
-                if debug:
-                    rich_print(f"[DEBUG] \"{func.__name__}\"", *print_args, **print_kwargs)
-                else:
-                    original_print(*print_args, **print_kwargs)
-            else:
-                if not debug:
-                    original_print(*print_args, **print_kwargs)
-                # If debug=True and DEBUG=False, do nothing (suppress print)
+            if DEBUG and debug:
+                rich_print(f"[DEBUG] \"{func.__name__}\":", *print_args, **print_kwargs)
+            elif not debug:
+                original_print(*print_args, **print_kwargs)
 
         builtins.print = debug_print
         try:
@@ -39,7 +34,7 @@ def timer(func):
             start = time.time()
             result = func(*args, **kwargs)
             end = time.time()
-            rich_print(f"[DEBUG] Time taken by func \"{func.__name__}\" : {round(end - start, 2)} seconds")
+            rich_print(f"[DEBUG] Time taken by \"{func.__name__}\": {round(end - start, 2)} seconds")
             return result
         else:
             return func(*args, **kwargs)

@@ -1,34 +1,79 @@
-import traceback
-
+# main.py
+import os
+import pickle
+from data_loader import GraphDataLoader
+from graph_properties import GraphProperties
+from graph_generator import GraphGenerator
+from graph_postprocessor import GraphPostProcessor
+from graph_analyzer import GraphAnalyzer
+from utils.plotting_utils import plot_graph
+from utils.debug_utils import DEBUG, debugging, timer
+from properties.weight_length_mapping import mapping
 from tqdm import tqdm
 
-from src.run import generate_and_process_graphs
 
-set_names = ['A']
-resolutions = ['10kX']
-# resolutions = ['10kX', '15kX', '20kX', '30kX', '40kX', '50kX', '60kX', '80kX', '100kX']
-# set_names = ['C', 'D']
-view = False  # False by default
-sample = 10
-network_num = 300
-base_path = '/content/drive/MyDrive/vis/Results0925'
+@debugging
+@timer
+def generate_and_process_graphs(set_name, resolution, base_path='data', num_iterations=10, save_plots=False):
+    data_loader = GraphDataLoader(base_path)
+    original_graph = data_loader.load_and_create_graph(set_name, resolution)
+    image = data_loader.load_image(set_name, resolution)
 
-total_combinations = len(set_names) * len(resolutions)
+    properties = GraphProperties(original_graph)
+    properties.compute_properties()
 
-failure = []
-failure_details = []
-with tqdm(total=total_combinations, desc="Processing Sets and Resolutions", ncols=50,
-          bar_format="{l_bar}{bar} | {n_fmt}/{total_fmt}") as pbar:
+    mapped_weights, map_length_to_weight, length_bins, weight_baskets, y = mapping(original_graph)
+
+    original_metrics = {
+        'avg_degree': properties.avg_degree,
+        'mean_num_nodes': original_graph.number_of_nodes(),
+        'mean_num_edges': original_graph.number_of_edges()
+    }
+
+    synthetic_graphs = []
+    for _ in tqdm(range(num_iterations)):
+        generator = GraphGenerator(properties)
+        synthetic_graph, frame = generator.generate_graph()
+
+        postprocessor = GraphPostProcessor(synthetic_graph, original_metrics)
+        postprocessor.adjust_degree_distribution()
+        postprocessor.assign_weights(map_length_to_weight, length_bins, weight_baskets, y)
+
+        analyzer = GraphAnalyzer(postprocessor.graph)
+        Q = [q / 100 for q in range(-300, 301, 10)]
+        tau_list = analyzer.calculate_multifractal_spectrum(Q)
+        alpha_0, width, al_list, fal_list = analyzer.n_spectrum(tau_list, Q)
+
+        synthetic_graphs.append(postprocessor.graph)
+
+        if save_plots:
+            plot_graph(
+                graph=postprocessor.graph,
+                set_name=set_name,
+                resolution=resolution,
+                frame=frame,
+                save=True,
+                base_path=os.path.join(base_path, 'Results'),
+                linewidth=2,
+                node_size=2.5
+            )
+
+    # Save synthetic graphs
+    save_dir = os.path.join(base_path, 'Results', f'Set {set_name} Res {resolution}')
+    os.makedirs(save_dir, exist_ok=True)
+    save_path = os.path.join(save_dir, f'synthetic_graphs.pkl')
+    with open(save_path, 'wb') as f:
+        pickle.dump(synthetic_graphs, f)
+
+
+if __name__ == '__main__':
+    set_names = ['A']
+    resolutions = ['10kX']
+    base_path = 'data'
+    num_iterations = 10
+    save_plots = False
+
     for set_name in set_names:
         for resolution in resolutions:
-            print(f"\n{'-' * 20} Processing {set_name}-{resolution} {'-' * 20}")
-            try:
-                generate_and_process_graphs(set_name, resolution, view, base_path=base_path, graph_sample=sample,
-                                            num_iterations=network_num)
-            except Exception as e:
-                error_message = traceback.format_exc()
-                print(f"\nSkipping {set_name}-{resolution} due to: {e}\nDetails:\n{error_message}")
-                failure_details.append((set_name, resolution, error_message))
-                failure.append((set_name, resolution))
-                continue
-            pbar.update(1)
+            generate_and_process_graphs(set_name, resolution, base_path=base_path, num_iterations=num_iterations,
+                                        save_plots=save_plots)

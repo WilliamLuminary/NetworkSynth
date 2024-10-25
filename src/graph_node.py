@@ -317,22 +317,23 @@ def set_graph_node_attribute(**kwargs):
     GraphNode.reset()
 
 
-def init_graph_node(degree_distribution: Dict, degree_transition_probs, degree_angles, degree_edge_lengths, **kwargs):
-    GraphNode.degree_distribution = degree_distribution.copy()
-    GraphNode.degree_transition_probs = degree_transition_probs.copy()
-    GraphNode.degree_angles = degree_angles.copy()
-    GraphNode.degree_edge_lengths = degree_edge_lengths.copy()
-
-    grid_size = determine_grid_size(
-        degree_edge_lengths=degree_edge_lengths, **kwargs
-    )
-    kwargs['grid_size'] = grid_size if 'grid_size' not in kwargs else kwargs['grid_size']
-    set_graph_node_attribute(**kwargs)
+# def initialize_graph_node(degree_distribution: Dict, degree_transition_probs, degree_angles, degree_edge_lengths,
+#                           **kwargs):
+#     GraphNode.degree_distribution = degree_distribution.copy()
+#     GraphNode.degree_transition_probs = degree_transition_probs.copy()
+#     GraphNode.degree_angles = degree_angles.copy()
+#     GraphNode.degree_edge_lengths = degree_edge_lengths.copy()
+#
+#     grid_size = determine_grid_size(
+#         degree_edge_lengths=degree_edge_lengths, **kwargs
+#     )
+#     kwargs['grid_size'] = grid_size if 'grid_size' not in kwargs else kwargs['grid_size']
+#     set_graph_node_attribute(**kwargs)
 
 
 def reset_graph_node(if_init=False, **kwargs):
     if if_init:
-        init_graph_node(
+        initialize_graph_node(
             degree_distribution=kwargs.pop('degree_distribution', None),
             degree_transition_probs=kwargs.pop('degree_transition_probs', None),
             degree_angles=kwargs.pop('degree_angles', None),
@@ -357,3 +358,17 @@ def determine_grid_size(**kwargs):
     else:
         grid_size = GraphNode.grid_size  # Use the existing default grid size if no length info is provided
     return round_to_int(kwargs.get('regen_factor', 1) * grid_size)
+
+
+def initialize_graph_node(degree_distribution, degree_transition_probs, degree_angles, degree_edge_lengths,
+                          average_length):
+    # Initialize or reset the GraphNode class with provided parameters
+    GraphNode.degree_distribution = degree_distribution
+    GraphNode.degree_transition_probs = degree_transition_probs
+    GraphNode.degree_angles = degree_angles
+    GraphNode.degree_edge_lengths = degree_edge_lengths
+    GraphNode.grid_size = average_length
+    # Reset other necessary attributes
+    GraphNode.node_grid = defaultdict(set)
+    GraphNode.edge_grid = defaultdict(set)
+    GraphNode.id_counter = 0

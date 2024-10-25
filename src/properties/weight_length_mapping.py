@@ -1,6 +1,6 @@
+# properties/weight_length_mapping.py
 import random
 from collections import defaultdict
-
 import numpy as np
 from matplotlib import pyplot as plt
 
@@ -31,7 +31,6 @@ def create_bins_and_baskets(edge_lengths, edge_weights, num_bins=100, method='th
     num_edges = len(sorted_lengths)
 
     if method == 'thirds':
-        # Binning by thirds
         one_third = num_edges // 3
         two_thirds = 2 * num_edges // 3
 
@@ -83,26 +82,3 @@ def mapping(graph, plot=False):
         plt.show()
 
     return mapped_weights, map_length_to_weight, length_bins, weight_baskets, edge_weights
-
-
-def mse_loss(mapped_weights, original_weights):
-    return np.mean((mapped_weights - original_weights) ** 2)
-
-
-def mae_loss(mapped_weights, original_weights):
-    return np.mean(np.abs(mapped_weights - original_weights))
-
-
-def weighted_loss(mapped_weights, original_weights, edge_lengths, length_bins):
-    small_bin_weight = 3.0
-    middle_bin_weight = 2.0
-    large_bin_weight = 1.0
-
-    bin_idx = np.digitize(edge_lengths, length_bins) - 1
-    bin_weights = np.where(bin_idx < 1000, small_bin_weight,
-                           np.where(bin_idx < 1100, middle_bin_weight, large_bin_weight))
-
-    squared_errors = (mapped_weights - original_weights) ** 2
-    weighted_errors = bin_weights * squared_errors
-
-    return np.mean(weighted_errors)
