@@ -1,4 +1,4 @@
-# graph_plotter.py
+# src/plotting/graph_plotter.py
 
 from utils.plotting_utils import plot_graph
 

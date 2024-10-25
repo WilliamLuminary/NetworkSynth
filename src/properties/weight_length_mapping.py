@@ -1,4 +1,4 @@
-# properties/weight_length_mapping.py
+# src/properties/weight_length_mapping.py
 
 import random
 from collections import defaultdict

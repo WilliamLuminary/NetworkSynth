@@ -1,15 +1,13 @@
-# graph_postprocessor.py
+# src/graph/graph_postprocessor.py
 
 import networkx as nx
 import numpy as np
 from scipy.spatial.distance import euclidean
-
-from GraphAttributes import GraphAttributes
 from utils.debug_utils import debugging
 
 
 class GraphPostProcessor:
-    def __init__(self, graph, original_graph_attributes: GraphAttributes):
+    def __init__(self, graph, original_graph_attributes):
         self.graph = graph
         self.original_graph_attributes = original_graph_attributes
 

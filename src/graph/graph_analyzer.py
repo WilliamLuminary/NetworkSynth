@@ -1,4 +1,4 @@
-# graph_analyzer.py
+# src/graph/graph_analyzer.py
 
 import math
 import numpy as np

@@ -1,4 +1,4 @@
-# data_loader.py
+# src/data/data_loader.py
 
 import os
 import re
@@ -8,26 +8,45 @@ import networkx as nx
 from utils.debug_utils import debugging
 
 
-class GraphDataLoader:
-    def __init__(self, config):
+class DataLoader:
+    def __init__(self, config, set_name, resolution):
         self.config = config
-        self.positions_dir = self.config.POSITIONS_DIR
-        self.sparse_matrices_dir = self.config.SPARSE_MATRICES_DIR
-        self.images_dir = self.config.IMAGES_DIR
+        self.set_name = set_name
+        self.resolution = resolution
+        self.positions = None
+        self.sparse_matrix = None
+        self.image = None
+        self.graph = None
 
     @debugging
-    def load_positions(self, set_name, resolution):
-        pattern = re.compile(rf"{re.escape(set_name)}_{re.escape(resolution)}.*(pos|position)\.npy", re.IGNORECASE)
-        file_path = self._find_file_with_pattern(self.positions_dir, pattern, f'positions for {set_name}')
+    def load_data(self):
+        self.positions = self._load_positions()
+        self.sparse_matrix = self._load_sparse_matrix()
+        self.image = self._load_image()
+        self.graph = self._create_graph()
+
+    def _load_positions(self):
+        pattern = re.compile(
+            rf"{re.escape(self.set_name)}_{re.escape(self.resolution)}.*(pos|position)\.npy",
+            re.IGNORECASE
+        )
+        file_path = self._find_file_with_pattern(
+            self.config.POSITIONS_DIR, pattern, f'positions for {self.set_name}'
+        )
         positions = np.load(file_path, allow_pickle=True)
         return positions
 
-    @debugging
-    def load_sparse_matrix(self, set_name, resolution):
-        pattern = re.compile(rf"sparse_matrices_{re.escape(resolution)}.*\.npz", re.IGNORECASE)
-        file_path = self._find_file_with_pattern(self.sparse_matrices_dir, pattern, 'sparse matrix')
+    def _load_sparse_matrix(self):
+        pattern = re.compile(
+            rf"sparse_matrices_{re.escape(self.resolution)}.*\.npz",
+            re.IGNORECASE
+        )
+        file_path = self._find_file_with_pattern(
+            self.config.SPARSE_MATRICES_DIR, pattern, 'sparse matrix'
+        )
         matrix_data = np.load(file_path, allow_pickle=True)
 
+        set_name = self.set_name
         if set_name == 'C':
             if 'C1' in matrix_data:
                 set_name = 'C1'
@@ -43,36 +62,32 @@ class GraphDataLoader:
 
         return matrix_data[set_name].item()
 
-    @debugging
-    def load_image(self, set_name, resolution):
-        images_path = os.path.join(self.images_dir, set_name)
-        if set_name == 'B':
+    def _load_image(self):
+        images_path = os.path.join(self.config.IMAGES_DIR, self.set_name)
+        if self.set_name == 'B':
             images_path = os.path.join(images_path, '1811')
-        pattern = re.compile(rf"\b{re.escape(resolution)}\b.*\.(tif|png|jpg)", re.IGNORECASE)
-        file_path = self._find_file_with_pattern(images_path, pattern, f'image for {set_name}')
+        pattern = re.compile(
+            rf"\b{re.escape(self.resolution)}\b.*\.(tif|png|jpg)",
+            re.IGNORECASE
+        )
+        file_path = self._find_file_with_pattern(
+            images_path, pattern, f'image for {self.set_name}'
+        )
         image = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
         if image is None:
             raise ValueError(f"Failed to load image from file: {file_path}")
         return image
 
-    @debugging
-    def create_graph(self, positions, sparse_matrix):
-        graph = nx.from_scipy_sparse_array(sparse_matrix, edge_attribute='weight')
-        for i, pos in enumerate(positions):
+    def _create_graph(self):
+        if self.positions is None or self.sparse_matrix is None:
+            raise ValueError("Positions or sparse matrix not loaded.")
+        graph = nx.from_scipy_sparse_array(self.sparse_matrix, edge_attribute='weight')
+        for i, pos in enumerate(self.positions):
             graph.nodes[i]['pos'] = pos.astype(np.float64)
 
         largest_cc = max(nx.connected_components(graph), key=len)
         graph = graph.subgraph(largest_cc).copy()
         graph = nx.convert_node_labels_to_integers(graph, label_attribute='old_label')
-        return graph
-
-    @debugging
-    def load_and_create_graph(self, set_name, resolution):
-        positions = self.load_positions(set_name, resolution)
-        sparse_matrix = self.load_sparse_matrix(set_name, resolution)
-        if len(positions) != sparse_matrix.shape[0]:
-            raise ValueError("Mismatch between positions and sparse matrix size.")
-        graph = self.create_graph(positions, sparse_matrix)
         return graph
 
     def _find_file_with_pattern(self, directory_path, pattern, details=''):

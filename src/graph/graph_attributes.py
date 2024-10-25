@@ -1,4 +1,4 @@
-# graph_attributes.py
+# src/graph/graph_attributes.py
 
 from collections import defaultdict, Counter
 import numpy as np
@@ -84,5 +84,3 @@ class GraphAttributes:
     def compute_average_degree(self):
         degrees = [d for n, d in self.graph.degree()]
         self.avg_degree = np.mean(degrees)
-
-    # Additional methods can be added here as needed

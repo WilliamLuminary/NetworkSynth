@@ -1,10 +1,8 @@
-# graph_node.py
+# src/graph/graph_node.py
 
 import random
 import numpy as np
 from collections import defaultdict
-
-from src.GraphAttributes import GraphAttributes
 
 
 class GraphNode:
@@ -36,7 +34,7 @@ class GraphNode:
         cls.merged_edge = 0
 
     @classmethod
-    def initialize(cls, graph_attributes: GraphAttributes, config):
+    def initialize(cls, graph_attributes, config):
         cls.degree_distribution = graph_attributes.degree_distribution
         cls.degree_transition_probs = graph_attributes.degree_transition_probs
         cls.degree_angles = graph_attributes.degree_angles

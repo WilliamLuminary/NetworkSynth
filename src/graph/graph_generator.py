@@ -1,15 +1,15 @@
-# graph_generator.py
+# src/graph/graph_generator.py
 
 import numpy as np
 import networkx as nx
 from collections import deque
 from utils.debug_utils import debugging
-from graph_node import GraphNode
+from .graph_node import GraphNode
 
 
 class GraphGenerator:
-    def __init__(self, properties, config):
-        self.properties = properties
+    def __init__(self, graph_attributes, config):
+        self.graph_attributes = graph_attributes
         self.config = config
 
     @debugging
@@ -30,7 +30,7 @@ class GraphGenerator:
 
     def _generate_nodes_and_edges(self, frame_range):
         GraphNode.reset()
-        GraphNode.initialize(self.properties, self.config)
+        GraphNode.initialize(self.graph_attributes, self.config)
         root_node = GraphNode((0, 0))
         node_set, edge_set = {root_node}, set()
         frame = self._calculate_frame(root_node.position[0], root_node.position[1], frame_range)
