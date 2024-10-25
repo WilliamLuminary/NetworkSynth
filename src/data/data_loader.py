@@ -32,7 +32,7 @@ class DataLoader(BaseConfig):
 
     def _load_positions(self):
         pattern = re.compile(
-            rf"{re.escape(self.set_name)}_{re.escape(self.resolution)}.*(pos|position)\.npy",
+            rf"{re.escape(self.set_name)}_{re.escape(self.resolution)}.*\.npy",
             re.IGNORECASE
         )
         file_path = self._find_file_with_pattern(
