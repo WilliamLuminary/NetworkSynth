@@ -24,6 +24,7 @@ class Config:
         self._ensure_directories()
 
     def _ensure_directories(self):
+        os.makedirs(self.BASE_INPUT_PATH, exist_ok=True)
         os.makedirs(self.OUTPUT_DIR, exist_ok=True)
         os.makedirs(self.SYNTHETIC_GRAPH_PATH, exist_ok=True)
         os.makedirs(self.ORIGINAL_GRAPH_PATH, exist_ok=True)
