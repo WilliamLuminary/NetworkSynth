@@ -1,31 +1,18 @@
-# utils/plotting_utils.py
+# src/utils/plotting_utils.py
 
-import os
 import datetime
+import os
+
 import matplotlib.pyplot as plt
-import numpy as np
 import networkx as nx
+import numpy as np
+
+from utils.output_handler import OutputHandler
 
 
-def plot_graph(
-        graph,
-        positions=None,
-        set_name=None,
-        resolution=None,
-        title=None,
-        frame=None,
-        save=False,
-        output_path=None,
-        background=False,
-        image=None,
-        alpha=1.0,
-        adjust_positions=False,
-        show=True,
-        linewidth=2,
-        node_size=2.5,
-        plot_in_frame=True,
-        **kwargs
-):
+def plot_graph(graph, positions=None, title=None, frame=None, save=False, output_path=None, background=False,
+               image=None, alpha=1.0, adjust_positions=False, show=True, linewidth=2, node_size=2.5,
+               plot_in_frame=True):
     fig, ax = plt.subplots(figsize=(10, 10))
 
     if positions is None:
@@ -86,11 +73,22 @@ def plot_graph(
     plt.tight_layout()
 
     if save:
+        if output_path is None:
+            raise ValueError("Output path must be specified when save=True.")
+
+        output_handler = OutputHandler()
+        output_handler.ensure_directory(output_path)
+
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{title} Time {timestamp}.png" if title else f"Graph_{timestamp}.png"
         filepath = os.path.join(output_path, filename)
+
+        # Archive existing file if it exists
+        output_handler.archive_if_exists(filepath)
+
         plt.savefig(filepath, dpi=600)
         plt.close()
+        print(f"Saved plot: {filepath}")
     else:
         if show:
             plt.show()

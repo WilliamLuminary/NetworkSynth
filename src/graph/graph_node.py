@@ -64,12 +64,14 @@ class GraphNode:
         else:
             raise ValueError("Parent and parent_angle must be provided together or not at all.")
 
-    def choose_degree(self):
+    @staticmethod
+    def choose_degree():
         degrees = list(GraphNode.degree_distribution.keys())
         probabilities = list(GraphNode.degree_distribution.values())
         return np.random.choice(degrees, p=probabilities)
 
-    def choose_degree_based_on_parent(self, parent_degree):
+    @staticmethod
+    def choose_degree_based_on_parent(parent_degree):
         degrees = list(GraphNode.degree_transition_probs[parent_degree].keys())
         probabilities = list(GraphNode.degree_transition_probs[parent_degree].values())
         return np.random.choice(degrees, p=probabilities)
@@ -127,7 +129,7 @@ class GraphNode:
         angle_rad = np.deg2rad(angle)
         new_x = x + length * np.cos(angle_rad)
         new_y = y + length * np.sin(angle_rad)
-        return (new_x, new_y)
+        return new_x, new_y
 
     def check_intersection(self, new_edge):
         keys = self.edge_spatial_hash(*new_edge)

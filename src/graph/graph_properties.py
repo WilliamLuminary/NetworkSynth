@@ -1,9 +1,9 @@
 # graph_properties.py
 
-import numpy as np
 from collections import defaultdict, Counter
+
+import numpy as np
 from scipy.spatial.distance import euclidean
-import networkx as nx
 
 
 class GraphProperties:

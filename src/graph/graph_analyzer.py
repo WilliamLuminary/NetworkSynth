@@ -52,7 +52,8 @@ class GraphAnalyzer:
 
         return tau_list
 
-    def n_spectrum(self, tau_list, Q):
+    @staticmethod
+    def n_spectrum(tau_list, Q):
         al_list = []
         fal_list = []
         for i in range(1, len(Q)):

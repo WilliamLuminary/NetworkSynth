@@ -54,7 +54,8 @@ class GraphGenerator(BaseConfig):
         bfs(root_node)
         return node_set, edge_set
 
-    def _build_graph_from_nodes_and_edges(self, nodes, edges):
+    @staticmethod
+    def _build_graph_from_nodes_and_edges(nodes, edges):
         graph = nx.Graph()
         position_map = {node.position: node for node in nodes}
         for node in nodes:
@@ -89,6 +90,7 @@ class GraphGenerator(BaseConfig):
         ]
         return frame
 
-    def _within_frame(self, position, frame):
+    @staticmethod
+    def _within_frame(position, frame):
         x, y = position
         return frame[0][0] <= x <= frame[0][1] and frame[1][0] <= y <= frame[1][1]

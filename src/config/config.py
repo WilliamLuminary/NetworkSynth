@@ -25,11 +25,9 @@ class Config:
         self._ensure_directories()
 
     def _ensure_directories(self):
-        os.makedirs(self.BASE_INPUT_PATH, exist_ok=True)
-        os.makedirs(self.POSITIONS_DIR, exist_ok=True)
-        os.makedirs(self.SPARSE_MATRICES_DIR, exist_ok=True)
-        os.makedirs(self.IMAGES_DIR, exist_ok=True)
         os.makedirs(self.BASE_OUTPUT_PATH, exist_ok=True)
-        os.makedirs(self.OUTPUT_DIR, exist_ok=True)
+        os.makedirs(self.OUTPUT_DIR,
+                    exist_ok=True)
         os.makedirs(self.SYNTHETIC_GRAPH_PATH, exist_ok=True)
+        print(f"{self.SYNTHETIC_GRAPH_PATH} has been created")
         os.makedirs(self.ORIGINAL_GRAPH_PATH, exist_ok=True)

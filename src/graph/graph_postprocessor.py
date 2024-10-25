@@ -33,7 +33,8 @@ class GraphPostProcessor(BaseConfig):
         for (u, v), weight in zip(self.graph.edges(), weights):
             self.graph[u][v]['weight'] = weight
 
-    def _keep_largest_connected_component(self, graph):
+    @staticmethod
+    def _keep_largest_connected_component(graph):
         if graph.number_of_nodes() == 0:
             return graph
         largest_cc = max(nx.connected_components(graph), key=len)

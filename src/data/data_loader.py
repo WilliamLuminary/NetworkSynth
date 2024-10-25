@@ -95,7 +95,8 @@ class DataLoader(BaseConfig):
         graph = nx.convert_node_labels_to_integers(graph, label_attribute='old_label')
         return graph
 
-    def _find_file_with_pattern(self, directory_path, pattern, details=''):
+    @staticmethod
+    def _find_file_with_pattern(directory_path, pattern, details=''):
         if not os.path.exists(directory_path):
             raise FileNotFoundError(f"Directory not found: {directory_path}")
 
