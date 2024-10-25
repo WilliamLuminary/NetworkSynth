@@ -1,11 +1,12 @@
-# src/config/config.py
-
 import os
 
 
 class Config:
     def __init__(self):
-        self.BASE_DATA_PATH = 'data'
+        script_dir = os.path.dirname(os.path.realpath(__file__))
+        project_root = os.path.abspath(os.path.join(script_dir, '..', '..'))
+
+        self.BASE_DATA_PATH = os.path.join(project_root, 'data')
 
         self.BASE_INPUT_PATH = os.path.join(self.BASE_DATA_PATH, 'input')
         self.POSITIONS_DIR = os.path.join(self.BASE_INPUT_PATH, 'position')
@@ -25,6 +26,10 @@ class Config:
 
     def _ensure_directories(self):
         os.makedirs(self.BASE_INPUT_PATH, exist_ok=True)
+        os.makedirs(self.POSITIONS_DIR, exist_ok=True)
+        os.makedirs(self.SPARSE_MATRICES_DIR, exist_ok=True)
+        os.makedirs(self.IMAGES_DIR, exist_ok=True)
+        os.makedirs(self.BASE_OUTPUT_PATH, exist_ok=True)
         os.makedirs(self.OUTPUT_DIR, exist_ok=True)
         os.makedirs(self.SYNTHETIC_GRAPH_PATH, exist_ok=True)
         os.makedirs(self.ORIGINAL_GRAPH_PATH, exist_ok=True)
