@@ -2,10 +2,10 @@
 
 import os
 import warnings
-
 from scipy.spatial.distance import euclidean
 from tqdm import tqdm
 
+from config.config import Config
 from data.data_loader import DataLoader
 from graph.graph_analyzer import GraphAnalyzer
 from graph.graph_attributes import GraphAttributes
@@ -13,8 +13,8 @@ from graph.graph_generator import GraphGenerator
 from graph.graph_postprocessor import GraphPostProcessor
 from properties.weight_length_mapping import mapping
 from utils.debug_utils import debugging, timer
-from utils.output_handler import OutputHandler  # Import OutputHandler
 from utils.plotting_utils import plot_graph
+from utils.output_handler import OutputHandler  # Import OutputHandler
 
 
 @debugging
@@ -77,8 +77,16 @@ def generate_and_process_graphs(
 
     # Plot original graph
     if view_only or save_plots:
-        plot_graph(graph=original_graph, title='Original Graph', frame=frame, save=save_plots and not view_only,
-                   output_path=original_graph_output_path, background=True)
+        plot_graph(
+            graph=original_graph,
+            set_name=set_name,
+            resolution=resolution,
+            frame=frame,
+            save=save_plots and not view_only,
+            output_path=original_graph_output_path,
+            background=True,
+            title='Original Graph'
+        )
         if view_only:
             return
 
@@ -121,8 +129,15 @@ def generate_and_process_graphs(
 
         # Plot and save a sample of graphs
         if save_plots and i < graph_sample:
-            plot_graph(graph=processed_graph, title=f"Synthetic Graph {i + 1}", frame=frame, save=True,
-                       output_path=synthetic_graph_output_path)
+            plot_graph(
+                graph=processed_graph,
+                set_name=set_name,
+                resolution=resolution,
+                frame=frame,
+                save=True,
+                output_path=synthetic_graph_output_path,
+                title=f"Synthetic Graph {i + 1}"
+            )
             print(f"Plotted and saved synthetic graph {i + 1} with error {error:.4f}")
         else:
             print(f"Generated synthetic graph {i + 1} with error {error:.4f}")
@@ -137,3 +152,27 @@ def generate_and_process_graphs(
     # Save errors
     errors_path = os.path.join(save_dir, 'synthetic_graph_errors.pkl')
     output_handler.save_pickle(errors, errors_path)
+
+    print(f"Synthetic graphs and errors saved to {save_dir}")
+
+
+if __name__ == '__main__':
+    config = Config()
+    set_names = ['A']  # Add more set names as needed
+    resolutions = ['10kX']  # Add more resolutions as needed
+    num_iterations = 2  # Total synthetic graphs to generate
+    graph_sample = 2  # Number of synthetic graphs to plot and save
+    save_plots = True
+    view_only = False  # Set to True to only plot the original graph
+
+    for set_name in set_names:
+        for resolution in resolutions:
+            generate_and_process_graphs(
+                set_name,
+                resolution,
+                config=config,
+                num_iterations=num_iterations,
+                graph_sample=graph_sample,
+                save_plots=save_plots,
+                view_only=view_only
+            )
