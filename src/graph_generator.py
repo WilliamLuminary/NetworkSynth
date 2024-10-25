@@ -1,18 +1,21 @@
 # graph_generator.py
+
 import numpy as np
 import networkx as nx
 from collections import deque
 from utils.debug_utils import debugging
-from .graph_properties import GraphProperties
-from .graphnode import GraphNode
+from graph_node import GraphNode
 
 
 class GraphGenerator:
-    def __init__(self, properties: GraphProperties):
+    def __init__(self, properties, config):
         self.properties = properties
+        self.config = config
 
     @debugging
-    def generate_graph(self, frame_range=510, regenerate_times=100):
+    def generate_graph(self, frame_range=None, regenerate_times=100):
+        if frame_range is None:
+            frame_range = self.config.DEFAULT_FRAME_RANGE
         for _ in range(regenerate_times):
             nodes, edges = self._generate_nodes_and_edges(frame_range)
             if nodes and len(nodes) > 100:
@@ -27,13 +30,7 @@ class GraphGenerator:
 
     def _generate_nodes_and_edges(self, frame_range):
         GraphNode.reset()
-        GraphNode.initialize(
-            degree_distribution=self.properties.degree_distribution,
-            degree_transition_probs=self.properties.degree_transition_probs,
-            degree_angles=self.properties.degree_angles,
-            degree_edge_lengths=self.properties.degree_edge_lengths,
-            avg_length=self.properties.avg_length
-        )
+        GraphNode.initialize(self.properties, self.config)
         root_node = GraphNode((0, 0))
         node_set, edge_set = {root_node}, set()
         frame = self._calculate_frame(root_node.position[0], root_node.position[1], frame_range)
@@ -74,7 +71,14 @@ class GraphGenerator:
             filtered_graph = filtered_graph.subgraph(largest_cc).copy()
         return filtered_graph
 
-    def _calculate_frame(self, center_x, center_y, frame_range):
+    def _calculate_frame(self, graph_or_x, y=None, frame_range=None):
+        if frame_range is None:
+            frame_range = self.config.DEFAULT_FRAME_RANGE
+        if isinstance(graph_or_x, nx.Graph):
+            positions = np.array(list(nx.get_node_attributes(graph_or_x, 'pos').values()))
+            center_x, center_y = positions[:, 0].mean(), positions[:, 1].mean()
+        else:
+            center_x, center_y = graph_or_x, y
         half_range = frame_range / 2
         frame = [
             [round(center_x - half_range, 2), round(center_x + half_range, 2)],

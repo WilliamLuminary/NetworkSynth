@@ -1,4 +1,5 @@
 # data_loader.py
+
 import os
 import re
 import cv2
@@ -8,22 +9,23 @@ from utils.debug_utils import debugging
 
 
 class GraphDataLoader:
-    def __init__(self, base_path='data'):
-        self.base_path = base_path
+    def __init__(self, config):
+        self.config = config
+        self.positions_dir = self.config.POSITIONS_DIR
+        self.sparse_matrices_dir = self.config.SPARSE_MATRICES_DIR
+        self.images_dir = self.config.IMAGES_DIR
 
     @debugging
     def load_positions(self, set_name, resolution):
-        positions_path = os.path.join(self.base_path, 'position')
         pattern = re.compile(rf"{re.escape(set_name)}_{re.escape(resolution)}.*(pos|position)\.npy", re.IGNORECASE)
-        file_path = self._find_file_with_pattern(positions_path, pattern, f'positions for {set_name}')
+        file_path = self._find_file_with_pattern(self.positions_dir, pattern, f'positions for {set_name}')
         positions = np.load(file_path, allow_pickle=True)
         return positions
 
     @debugging
     def load_sparse_matrix(self, set_name, resolution):
-        sparse_matrices_path = os.path.join(self.base_path, 'sparse_matrices')
         pattern = re.compile(rf"sparse_matrices_{re.escape(resolution)}.*\.npz", re.IGNORECASE)
-        file_path = self._find_file_with_pattern(sparse_matrices_path, pattern, 'sparse matrix')
+        file_path = self._find_file_with_pattern(self.sparse_matrices_dir, pattern, 'sparse matrix')
         matrix_data = np.load(file_path, allow_pickle=True)
 
         if set_name == 'C':
@@ -43,7 +45,7 @@ class GraphDataLoader:
 
     @debugging
     def load_image(self, set_name, resolution):
-        images_path = os.path.join(self.base_path, 'Original Graphs', set_name)
+        images_path = os.path.join(self.images_dir, set_name)
         if set_name == 'B':
             images_path = os.path.join(images_path, '1811')
         pattern = re.compile(rf"\b{re.escape(resolution)}\b.*\.(tif|png|jpg)", re.IGNORECASE)

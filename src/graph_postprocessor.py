@@ -1,4 +1,5 @@
 # graph_postprocessor.py
+
 import networkx as nx
 import numpy as np
 from scipy.spatial.distance import euclidean
@@ -24,14 +25,9 @@ class GraphPostProcessor:
         self.graph = graph
 
     def assign_weights(self, map_length_to_weight, length_bins, weight_baskets, y):
-        edge_lengths = [
-            euclidean(self.graph.nodes[u]['pos'], self.graph.nodes[v]['pos'])
-            for u, v in self.graph.edges()
-        ]
-        weights = [
-            map_length_to_weight(length, length_bins, weight_baskets, y)
-            for length in edge_lengths
-        ]
+        edge_lengths = [euclidean(self.graph.nodes[u]['pos'], self.graph.nodes[v]['pos']) for u, v in
+                        self.graph.edges()]
+        weights = [map_length_to_weight(length, length_bins, weight_baskets, y) for length in edge_lengths]
         for (u, v), weight in zip(self.graph.edges(), weights):
             self.graph[u][v]['weight'] = weight
 

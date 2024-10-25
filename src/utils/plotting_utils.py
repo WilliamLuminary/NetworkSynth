@@ -1,9 +1,11 @@
 # utils/plotting_utils.py
+
 import os
 import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 import networkx as nx
+
 
 def plot_graph(
         graph,

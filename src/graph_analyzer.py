@@ -1,10 +1,12 @@
 # graph_analyzer.py
+
 import math
 import numpy as np
 import networkx as nx
 import networkit as nk
 from collections import Counter
 from scipy.stats import linregress
+
 
 class GraphAnalyzer:
     def __init__(self, graph):

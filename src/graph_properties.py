@@ -1,4 +1,5 @@
 # graph_properties.py
+
 import numpy as np
 from collections import defaultdict, Counter
 from scipy.spatial.distance import euclidean
@@ -69,8 +70,9 @@ class GraphProperties:
             count += len(lengths)
 
             if len(angles) > 1:
-                angles_diff = np.diff(np.sort(angles))
-                angles_diff = np.append(angles_diff, 360 + angles[0] - angles[-1])
+                sorted_angles = np.sort(angles)
+                angles_diff = np.diff(sorted_angles)
+                angles_diff = np.append(angles_diff, 360 + sorted_angles[0] - sorted_angles[-1])
                 self.degree_angles[degree].extend(angles_diff)
 
         self.avg_length = total_length / count if count > 0 else 0
