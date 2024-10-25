@@ -13,6 +13,8 @@ class Config:
         self.IMAGES_DIR = os.path.join(self.BASE_DATA_PATH, 'Original Graphs')
 
         self.OUTPUT_DIR = self.BASE_RESULTS_PATH
+        self.SYNTHETIC_GRAPH_PATH = os.path.join(self.OUTPUT_DIR, 'Synthetic Graphs')
+        self.ORIGINAL_GRAPH_PATH = os.path.join(self.OUTPUT_DIR, 'Original Graphs')
 
         self.DEFAULT_FRAME_RANGE = 510
         self.CLOSED_NODES_FACTOR = 1.5
@@ -21,7 +23,6 @@ class Config:
         self._ensure_directories()
 
     def _ensure_directories(self):
-        os.makedirs(self.POSITIONS_DIR, exist_ok=True)
-        os.makedirs(self.SPARSE_MATRICES_DIR, exist_ok=True)
-        os.makedirs(self.IMAGES_DIR, exist_ok=True)
         os.makedirs(self.OUTPUT_DIR, exist_ok=True)
+        os.makedirs(self.SYNTHETIC_GRAPH_PATH, exist_ok=True)
+        os.makedirs(self.ORIGINAL_GRAPH_PATH, exist_ok=True)

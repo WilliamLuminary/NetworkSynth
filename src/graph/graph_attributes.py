@@ -19,7 +19,7 @@ class GraphAttributes(BaseConfig):
         self.degree_edge_lengths = None
         self.avg_degree = None
         self.avg_length = None
-        self.positions = None  # Node positions
+        self.positions = None
 
         if graph is not None:
             self.compute_attributes()

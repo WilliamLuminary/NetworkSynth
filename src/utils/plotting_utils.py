@@ -1,4 +1,4 @@
-# src/utils/plotting_utils.py
+# utils/plotting_utils.py
 
 import os
 import datetime
@@ -6,8 +6,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import networkx as nx
 
-
-# src/utils/plotting_utils.py
 
 def plot_graph(
         graph,
@@ -17,7 +15,7 @@ def plot_graph(
         title=None,
         frame=None,
         save=False,
-        base_path=None,  # Default to None
+        output_path=None,
         background=False,
         image=None,
         alpha=1.0,
@@ -28,9 +26,6 @@ def plot_graph(
         plot_in_frame=True,
         **kwargs
 ):
-    if base_path is None:
-        raise ValueError("Base path must be provided.")
-
     fig, ax = plt.subplots(figsize=(10, 10))
 
     if positions is None:
@@ -92,17 +87,9 @@ def plot_graph(
 
     if save:
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        if set_name is not None and resolution is not None:
-            folder_name = f"Set {set_name} Res {resolution}"
-            folder_path = os.path.join(base_path, folder_name)
-            os.makedirs(folder_path, exist_ok=True)
-            filename = f"{title} Time {timestamp}.png" if title else f"Graph_{timestamp}.png"
-            filepath = os.path.join(folder_path, filename)
-            plt.savefig(filepath, dpi=600)
-        else:
-            filename = f"Graph_{timestamp}.png"
-            filepath = os.path.join(base_path, filename)
-            plt.savefig(filepath, dpi=600)
+        filename = f"{title} Time {timestamp}.png" if title else f"Graph_{timestamp}.png"
+        filepath = os.path.join(output_path, filename)
+        plt.savefig(filepath, dpi=600)
         plt.close()
     else:
         if show:

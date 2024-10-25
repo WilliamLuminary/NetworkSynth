@@ -17,13 +17,13 @@ class GraphNode:
     degree_transition_probs = {}
     degree_angles = {}
     degree_edge_lengths = {}
-    avg_length = 13  # Default value
+    avg_length = None
 
     # Parameters
-    closed_range = 13  # Default value
-    closed_nodes_factor = 1.5
-    closed_edges_factor = 1.0
-    grid_size = 13  # Default value
+    closed_range = None
+    closed_nodes_factor = None
+    closed_edges_factor = None
+    grid_size = None
 
     @classmethod
     def reset(cls):
