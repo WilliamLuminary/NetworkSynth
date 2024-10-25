@@ -65,15 +65,14 @@ def generate_and_process_graphs(
 
     # Plot original graph
     if view_only or save_plots:
-        output_path = config.get_original_graph_output_path(set_name, resolution)
         plot_graph(
             graph=original_graph,
             set_name=set_name,
             resolution=resolution,
             frame=frame,
             save=save_plots and not view_only,
-            output_path=output_path,
-            background=True,
+            output_path=config.OUTPUT_DIR,
+            background=True
         )
         if view_only:
             return
