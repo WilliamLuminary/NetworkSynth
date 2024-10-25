@@ -1,16 +1,19 @@
 # src/graph/graph_generator.py
 
-import numpy as np
-import networkx as nx
 from collections import deque
+
+import networkx as nx
+import numpy as np
+
+from graph.graph_node import GraphNode
+from utils.base import BaseConfig
 from utils.debug_utils import debugging
-from .graph_node import GraphNode
 
 
-class GraphGenerator:
-    def __init__(self, graph_attributes, config):
+class GraphGenerator(BaseConfig):
+    def __init__(self, graph_attributes):
+        super().__init__(graph_attributes.config)
         self.graph_attributes = graph_attributes
-        self.config = config
 
     @debugging
     def generate_graph(self, frame_range=None, regenerate_times=100):

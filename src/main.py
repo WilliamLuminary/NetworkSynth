@@ -2,16 +2,18 @@
 
 import os
 import pickle
+
+from tqdm import tqdm
+
 from config.config import Config
 from data.data_loader import DataLoader
+from graph.graph_analyzer import GraphAnalyzer
 from graph.graph_attributes import GraphAttributes
 from graph.graph_generator import GraphGenerator
 from graph.graph_postprocessor import GraphPostProcessor
-from graph.graph_analyzer import GraphAnalyzer
+from plotting.graph_plotter import GraphPlotter
 from properties.weight_length_mapping import mapping
-from plotting.graph_plotter import plot_graph_with_positions
-from utils.debug_utils import DEBUG, debugging, timer
-from tqdm import tqdm
+from utils.debug_utils import debugging, timer
 
 
 @debugging
@@ -23,22 +25,23 @@ def generate_and_process_graphs(set_name, resolution, config, num_iterations=10,
     image = data_loader.image
 
     # Create GraphAttributes instance for the original graph
-    original_graph_attributes = GraphAttributes(original_graph)
+    original_graph_attributes = GraphAttributes(original_graph, config=config)
 
     # Mapping edge lengths to weights
     mapped_weights, map_length_to_weight, length_bins, weight_baskets, y = mapping(original_graph)
 
     # Plot original graph
     frame = [[0, config.DEFAULT_FRAME_RANGE], [0, config.DEFAULT_FRAME_RANGE]]
-    plot_graph_with_positions(
+    plotter = GraphPlotter(config)
+    plotter.plot_graph_with_positions(
         original_graph, frame, set_name=set_name, resolution=resolution,
-        save=save_plots, base_path=config.OUTPUT_DIR, background=True
+        save=save_plots, background=True
     )
 
     # Generate synthetic graphs
     synthetic_graphs = []
     for _ in tqdm(range(num_iterations)):
-        generator = GraphGenerator(original_graph_attributes, config)
+        generator = GraphGenerator(original_graph_attributes)
         synthetic_graph, frame = generator.generate_graph()
 
         postprocessor = GraphPostProcessor(synthetic_graph, original_graph_attributes)
@@ -54,9 +57,9 @@ def generate_and_process_graphs(set_name, resolution, config, num_iterations=10,
         synthetic_graphs.append(postprocessor.graph)
 
         if save_plots:
-            plot_graph_with_positions(
+            plotter.plot_graph_with_positions(
                 postprocessor.graph, frame, set_name=set_name, resolution=resolution,
-                save=True, base_path=config.OUTPUT_DIR
+                save=True
             )
 
     # Save synthetic graphs

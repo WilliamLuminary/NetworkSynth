@@ -5,18 +5,23 @@ import re
 import cv2
 import numpy as np
 import networkx as nx
+from utils.base import BaseConfig
 from utils.debug_utils import debugging
 
 
-class DataLoader:
+class DataLoader(BaseConfig):
     def __init__(self, config, set_name, resolution):
-        self.config = config
+        super().__init__(config)
         self.set_name = set_name
         self.resolution = resolution
         self.positions = None
         self.sparse_matrix = None
         self.image = None
         self.graph = None
+
+        self.positions_dir = self.config.POSITIONS_DIR
+        self.sparse_matrices_dir = self.config.SPARSE_MATRICES_DIR
+        self.images_dir = self.config.IMAGES_DIR
 
     @debugging
     def load_data(self):

@@ -1,13 +1,17 @@
 # src/graph/graph_attributes.py
 
 from collections import defaultdict, Counter
-import numpy as np
+
 import networkx as nx
+import numpy as np
 from scipy.spatial.distance import euclidean
 
+from utils.base import BaseConfig
 
-class GraphAttributes:
-    def __init__(self, graph=None):
+
+class GraphAttributes(BaseConfig):
+    def __init__(self, graph=None, config=None):
+        super().__init__(config)
         self.graph = graph
         self.degree_distribution = None
         self.degree_transition_probs = None

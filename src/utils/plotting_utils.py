@@ -7,6 +7,8 @@ import numpy as np
 import networkx as nx
 
 
+# src/utils/plotting_utils.py
+
 def plot_graph(
         graph,
         positions=None,
@@ -15,7 +17,7 @@ def plot_graph(
         title=None,
         frame=None,
         save=False,
-        base_path='data/Results',
+        base_path=None,  # Default to None
         background=False,
         image=None,
         alpha=1.0,
@@ -26,6 +28,9 @@ def plot_graph(
         plot_in_frame=True,
         **kwargs
 ):
+    if base_path is None:
+        raise ValueError("Base path must be provided.")
+
     fig, ax = plt.subplots(figsize=(10, 10))
 
     if positions is None:
