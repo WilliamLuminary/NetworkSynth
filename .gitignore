@@ -163,8 +163,4 @@ cython_debug/
 
 # Private files
 credentials/
-notebooks/A_Graph_Network_Visualization.ipynb
-notebooks/B_Graph_Network_Visualization.ipynb
-notebooks/C_Graph_Network_Visualization.ipynb
-notebooks/D_Graph_Network_Visualization.ipynb
 
