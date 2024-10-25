@@ -112,17 +112,17 @@ def generate_and_process_graphs(
             postprocessor.assign_weights(map_length_to_weight, length_bins, weight_baskets, y)
             processed_graph = postprocessor.graph
 
-            # Calculate multifractal properties
-            analyzer = GraphAnalyzer(processed_graph)
-            tau_list = analyzer.calculate_multifractal_spectrum(Q)
-            alpha_0, width, al_list, fal_list = analyzer.n_spectrum(tau_list, Q)
+            # # Calculate multifractal properties
+            # analyzer = GraphAnalyzer(processed_graph)
+            # tau_list = analyzer.calculate_multifractal_spectrum(Q)
+            # alpha_0, width, al_list, fal_list = analyzer.n_spectrum(tau_list, Q)
+            #
+            # # Calculate error
+            # error = euclidean([ori_alpha_0, ori_width], [alpha_0, width])
 
-            # Calculate error
-            error = euclidean([ori_alpha_0, ori_width], [alpha_0, width])
-
-        if attempt == max_attempts and error > error_threshold:
-            print(f"Failed to generate a valid graph after {max_attempts} attempts.")
-            continue  # Skip this iteration
+        # if attempt == max_attempts and error > error_threshold:
+        #     print(f"Failed to generate a valid graph after {max_attempts} attempts.")
+        #     continue  # Skip this iteration
 
         synthetic_graphs.append(processed_graph)
         errors.append(error)
