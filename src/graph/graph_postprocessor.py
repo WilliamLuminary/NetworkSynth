@@ -3,17 +3,19 @@
 import networkx as nx
 import numpy as np
 from scipy.spatial.distance import euclidean
+
+from GraphAttributes import GraphAttributes
 from utils.debug_utils import debugging
 
 
 class GraphPostProcessor:
-    def __init__(self, graph, original_metrics):
+    def __init__(self, graph, original_graph_attributes: GraphAttributes):
         self.graph = graph
-        self.original_metrics = original_metrics
+        self.original_graph_attributes = original_graph_attributes
 
     @debugging
     def adjust_degree_distribution(self):
-        target_avg_degree = self.original_metrics['avg_degree']
+        target_avg_degree = self.original_graph_attributes.avg_degree
         graph = self.graph.copy()
 
         while 2 * graph.number_of_edges() / graph.number_of_nodes() > 1.1 * target_avg_degree:

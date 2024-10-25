@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def adjust_positions(positions, flip_axes=False, invert_y=False, scale_factor=None):
     positions_array = np.array([positions[node] for node in positions])
 

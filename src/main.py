@@ -3,20 +3,20 @@
 import os
 import pickle
 from config.config import Config
-from data_loader import GraphDataLoader
-from graph_properties import GraphProperties
-from graph_generator import GraphGenerator
-from graph_postprocessor import GraphPostProcessor
-from graph_analyzer import GraphAnalyzer
+from data.data_loader import GraphDataLoader
+from graph.graph_properties import GraphProperties
+from graph.graph_generator import GraphGenerator
+from graph.graph_postprocessor import GraphPostProcessor
+from graph.graph_analyzer import GraphAnalyzer
 from properties.weight_length_mapping import mapping
-from graph_plotter import plot_graph_with_positions
-from utils.debug_utils import DEBUG, debugging, timer
+from plotting.graph_plotter import plot_graph_with_positions
+from utils.debug_utils import debugging, timer
 from tqdm import tqdm
 
 
 @debugging
 @timer
-def generate_and_process_graphs(set_name, resolution, config, num_iterations=10, save_plots=False):
+def generate_and_process_graphs(set_name, resolution, config: Config, num_iterations=10, save_plots=False):
     data_loader = GraphDataLoader(config)
     original_graph = data_loader.load_and_create_graph(set_name, resolution)
     image = data_loader.load_image(set_name, resolution)

@@ -4,6 +4,8 @@ import random
 import numpy as np
 from collections import defaultdict
 
+from src.GraphAttributes import GraphAttributes
+
 
 class GraphNode:
     id_counter = 0
@@ -34,14 +36,14 @@ class GraphNode:
         cls.merged_edge = 0
 
     @classmethod
-    def initialize(cls, properties, config):
-        cls.degree_distribution = properties.degree_distribution
-        cls.degree_transition_probs = properties.degree_transition_probs
-        cls.degree_angles = properties.degree_angles
-        cls.degree_edge_lengths = properties.degree_edge_lengths
-        cls.avg_length = properties.avg_length
-        cls.grid_size = properties.avg_length
-        cls.closed_range = properties.avg_length
+    def initialize(cls, graph_attributes: GraphAttributes, config):
+        cls.degree_distribution = graph_attributes.degree_distribution
+        cls.degree_transition_probs = graph_attributes.degree_transition_probs
+        cls.degree_angles = graph_attributes.degree_angles
+        cls.degree_edge_lengths = graph_attributes.degree_edge_lengths
+        cls.avg_length = graph_attributes.avg_length
+        cls.grid_size = graph_attributes.avg_length
+        cls.closed_range = graph_attributes.avg_length
         cls.closed_nodes_factor = config.CLOSED_NODES_FACTOR
         cls.closed_edges_factor = config.CLOSED_EDGES_FACTOR
 
