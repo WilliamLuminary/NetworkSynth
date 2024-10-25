@@ -140,7 +140,7 @@ if __name__ == '__main__':
     config = Config()
     set_names = ['A']
     resolutions = ['10kX']
-    num_iterations = 300  # Total synthetic graphs to generate
+    num_iterations = 10  # Total synthetic graphs to generate
     graph_sample = 10  # Number of synthetic graphs to plot and save
     save_plots = True
     view_only = False  # Set to True to only plot the original graph
