@@ -10,6 +10,6 @@ mkdir -p ~/.emacs.d
 cp -r /content/emacs-config/* ~/.emacs.d/ || { echo "Failed to copy configuration files"; exit 1; }
 
 echo -e "${BLUE}Running Emacs setup to install packages...${RESET}"
-bash "$SCRIPT_DIR/colab_git_setup_run_emacs.sh" || { echo "Emacs package installation failed"; exit 1; }
+bash "$SCRIPT_DIR/setup_run_emacs.sh" || { echo "Emacs package installation failed"; exit 1; }
 
 echo -e "${BLUE}Emacs setup complete!${RESET}"

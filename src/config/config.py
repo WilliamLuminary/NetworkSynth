@@ -19,8 +19,8 @@ class Config:
         self.ORIGINAL_GRAPH_PATH = os.path.join(self.OUTPUT_DIR, 'Original Graphs')
 
         self.DEFAULT_FRAME_RANGE = 510
-        self.CLOSED_NODES_FACTOR = 1.5
-        self.CLOSED_EDGES_FACTOR = 1.0
+        self.CLOSED_NODES_FACTOR = 1.2
+        self.CLOSED_EDGES_FACTOR = 0.8
 
         self._ensure_directories()
 
@@ -29,5 +29,4 @@ class Config:
         os.makedirs(self.OUTPUT_DIR,
                     exist_ok=True)
         os.makedirs(self.SYNTHETIC_GRAPH_PATH, exist_ok=True)
-        print(f"{self.SYNTHETIC_GRAPH_PATH} has been created")
         os.makedirs(self.ORIGINAL_GRAPH_PATH, exist_ok=True)

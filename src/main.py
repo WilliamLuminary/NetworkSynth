@@ -28,14 +28,13 @@ def generate_and_process_graphs(
         save_plots=True,
         view_only=False,
         error_threshold=1.5,
-        max_attempts=1000
+        max_attempts=10
 ):
     output_handler = OutputHandler()  # Create an instance of OutputHandler
 
     if view_only:
         warnings.warn("[DEBUG] Only the original graph will be shown WITHOUT SAVING")
     else:
-        # Archive existing output directories
         save_dir = config.OUTPUT_DIR
         output_handler.archive_if_exists(save_dir)
         output_handler.ensure_directory(save_dir)
@@ -43,35 +42,26 @@ def generate_and_process_graphs(
 
     print(f"{'-' * 20} Processing {set_name}-{resolution} with {num_iterations} iterations {'-' * 20}")
 
-    # Load original graph
     data_loader = DataLoader(config, set_name, resolution)
     data_loader.load_data()
     original_graph = data_loader.graph
 
-    # Create GraphAttributes instance for the original graph
     original_graph_attributes = GraphAttributes(original_graph, config=config)
 
-    # Mapping edge lengths to weights
     mapped_weights, map_length_to_weight, length_bins, weight_baskets, y = mapping(original_graph)
 
-    # Calculate multifractal properties of the original graph
     analyzer = GraphAnalyzer(original_graph)
     Q = [q / 100 for q in range(-300, 301, 10)]
     ori_tau_list = analyzer.calculate_multifractal_spectrum(Q)
     ori_alpha_0, ori_width, ori_al_list, ori_fal_list = analyzer.n_spectrum(ori_tau_list, Q)
 
-    # Prepare frame for plotting
     frame = [[0, config.DEFAULT_FRAME_RANGE], [0, config.DEFAULT_FRAME_RANGE]]
 
-    # Create output paths with subdirectories
     original_graph_output_path = os.path.join(config.ORIGINAL_GRAPH_PATH, f"Set {set_name} Res {resolution}")
     synthetic_graph_output_path = os.path.join(config.SYNTHETIC_GRAPH_PATH, f"Set {set_name} Res {resolution}")
 
-    # Archive existing directories if they exist
     output_handler.archive_if_exists(original_graph_output_path)
     output_handler.archive_if_exists(synthetic_graph_output_path)
-
-    # Ensure directories exist
     output_handler.ensure_directory(original_graph_output_path)
     output_handler.ensure_directory(synthetic_graph_output_path)
 
@@ -112,17 +102,17 @@ def generate_and_process_graphs(
             postprocessor.assign_weights(map_length_to_weight, length_bins, weight_baskets, y)
             processed_graph = postprocessor.graph
 
-            # # Calculate multifractal properties
-            # analyzer = GraphAnalyzer(processed_graph)
-            # tau_list = analyzer.calculate_multifractal_spectrum(Q)
-            # alpha_0, width, al_list, fal_list = analyzer.n_spectrum(tau_list, Q)
-            #
-            # # Calculate error
-            # error = euclidean([ori_alpha_0, ori_width], [alpha_0, width])
+            # Calculate multifractal properties
+            analyzer = GraphAnalyzer(processed_graph)
+            tau_list = analyzer.calculate_multifractal_spectrum(Q)
+            alpha_0, width, al_list, fal_list = analyzer.n_spectrum(tau_list, Q)
 
-        # if attempt == max_attempts and error > error_threshold:
-        #     print(f"Failed to generate a valid graph after {max_attempts} attempts.")
-        #     continue  # Skip this iteration
+            # Calculate error
+            error = euclidean([ori_alpha_0, ori_width], [alpha_0, width])
+
+        if attempt == max_attempts and error > error_threshold:
+            print(f"Failed to generate a valid graph after {max_attempts} attempts.")
+            continue  # Skip this iteration
 
         synthetic_graphs.append(processed_graph)
         errors.append(error)
@@ -158,10 +148,10 @@ def generate_and_process_graphs(
 
 if __name__ == '__main__':
     config = Config()
-    set_names = ['A']  # Add more set names as needed
-    resolutions = ['10kX']  # Add more resolutions as needed
-    num_iterations = 2  # Total synthetic graphs to generate
-    graph_sample = 2  # Number of synthetic graphs to plot and save
+    set_names = ['D']  # Add more set names as needed
+    resolutions = ['20kX']  # Add more resolutions as needed
+    graph_sample = 10  # Number of synthetic graphs to plot and save
+    num_iterations = 300  # Total synthetic graphs to generate
     save_plots = True
     view_only = False  # Set to True to only plot the original graph
 
