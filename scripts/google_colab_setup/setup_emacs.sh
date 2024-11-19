@@ -5,6 +5,8 @@ SCRIPT_DIR="$(dirname "$0")"
 BLUE='\033[38;5;33m'
 RESET='\033[0m'
 
+"$SCRIPT_DIR/setup_clone.sh" || { echo "Failed to clone Emacs config repository"; exit 1; }
+
 echo -e "${BLUE}Setting up Emacs configuration...${RESET}"
 mkdir -p ~/.emacs.d
 cp -r /content/emacs-config/* ~/.emacs.d/ || { echo "Failed to copy configuration files"; exit 1; }
