@@ -165,5 +165,6 @@ cython_debug/
 credentials/
 /data/
 
-archieved/
+archieved/*
+!archieved/
 !archieved/*.ipynb
