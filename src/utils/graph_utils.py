@@ -22,4 +22,4 @@ def resize_image_to_fit_positions(image, target_size=510):
     new_width = int(original_width * scaling_factor)
     new_height = int(original_height * scaling_factor)
     resized_image = cv2.resize(image, (new_width, new_height))
-    return resized_image, scaling_factor
+    return resized_image
