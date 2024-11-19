@@ -19,8 +19,8 @@ class Config:
         self.ORIGINAL_GRAPH_PATH = os.path.join(self.OUTPUT_DIR, 'Original Graphs')
 
         self.DEFAULT_FRAME_RANGE = 510
-        self.CLOSED_NODES_FACTOR = 1.2
-        self.CLOSED_EDGES_FACTOR = 0.8
+        self.CLOSED_NODES_FACTOR = 1
+        self.CLOSED_EDGES_FACTOR = 1.5
 
         self._ensure_directories()
 

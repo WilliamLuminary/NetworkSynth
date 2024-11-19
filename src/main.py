@@ -2,6 +2,8 @@
 
 import os
 import warnings
+
+import cv2
 from scipy.spatial.distance import euclidean
 from tqdm import tqdm
 
@@ -11,8 +13,9 @@ from graph.graph_analyzer import GraphAnalyzer
 from graph.graph_attributes import GraphAttributes
 from graph.graph_generator import GraphGenerator
 from graph.graph_postprocessor import GraphPostProcessor
-from properties.weight_length_mapping import mapping
+from graph.weight_length_mapping import mapping
 from utils.debug_utils import debugging, timer
+from utils.graph_utils import resize_image_to_fit_positions
 from utils.plotting_utils import plot_graph
 from utils.output_handler import OutputHandler  # Import OutputHandler
 
@@ -45,7 +48,7 @@ def generate_and_process_graphs(
     data_loader = DataLoader(config, set_name, resolution)
     data_loader.load_data()
     original_graph = data_loader.graph
-
+    data_loader.image = resize_image_to_fit_positions(data_loader.image)
     original_graph_attributes = GraphAttributes(original_graph, config=config)
 
     mapped_weights, map_length_to_weight, length_bins, weight_baskets, y = mapping(original_graph)
@@ -75,8 +78,12 @@ def generate_and_process_graphs(
             save=save_plots and not view_only,
             output_path=original_graph_output_path,
             background=True,
+            image=data_loader.image,
+            alpha=0.6,
             title='Original Graph'
         )
+        cv2.imwrite(os.path.join(original_graph_output_path, f'Original Image - Set {set_name} Res {resolution}.png'),
+                    data_loader.image)
         if view_only:
             return
 
@@ -149,7 +156,7 @@ def generate_and_process_graphs(
 if __name__ == '__main__':
     config = Config()
     set_names = ['D']  # Add more set names as needed
-    resolutions = ['20kX']  # Add more resolutions as needed
+    resolutions = ['10kX']  # Add more resolutions as needed
     graph_sample = 10  # Number of synthetic graphs to plot and save
     num_iterations = 300  # Total synthetic graphs to generate
     save_plots = True
