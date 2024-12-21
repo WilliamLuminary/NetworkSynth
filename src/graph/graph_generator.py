@@ -1,44 +1,43 @@
-# src/graph/graph_generator.py
+# src/original_graph/graph_generator.py
 
 from collections import deque
 
 import networkx as nx
 import numpy as np
 
+from data.graph_data_agent import GraphDataAgent
 from graph.graph_node import GraphNode
-from utils.base import BaseConfig
+from config.base import BaseConfig
 from utils.debug_utils import debugging
 
 
 class GraphGenerator(BaseConfig):
-    def __init__(self, graph_attributes):
-        super().__init__(graph_attributes.config)
-        self.graph_attributes = graph_attributes
+    def __init__(self, graph_agent: GraphDataAgent):
+        self.graph_agent = graph_agent
+        self.graph_attributes = graph_agent.attributes
 
     @debugging
-    def generate_graph(self, frame_range=None, regenerate_times=100):
-        if frame_range is None:
-            frame_range = self.config.DEFAULT_FRAME_RANGE
+    def generate_network(self, frame_range: int = BaseConfig.DEFAULT_FRAME_RANGE, regenerate_times=100):
         for _ in range(regenerate_times):
-            nodes, edges = self._generate_nodes_and_edges(frame_range)
+            nodes, edges = self._generate_graph_by_nodes_and_edges(frame_range)
             if nodes and len(nodes) > 100:
                 break
         else:
-            raise Exception("Failed to generate a graph within the specified attempts.")
+            raise Exception("Failed to generate a original_graph within the specified attempts.")
 
-        graph = self._build_graph_from_nodes_and_edges(nodes, edges)
-        frame = self._calculate_frame(graph, frame_range)
-        synthetic_graph = self._filter_graph(graph, frame)
-        return synthetic_graph, frame
+        _synthetic_network = self._build_network_from_nodes_and_edges(nodes, edges)
+        frame = self._calculate_frame(graph=_synthetic_network, frame_range=frame_range)
+        synthetic_network = self._filter_graph(_synthetic_network, frame)
+        return synthetic_network, frame
 
-    def _generate_nodes_and_edges(self, frame_range):
+    def _generate_graph_by_nodes_and_edges(self, frame_range: int = BaseConfig.DEFAULT_FRAME_RANGE):
         GraphNode.reset()
-        GraphNode.initialize(self.graph_attributes, self.config)
+        GraphNode.initialize(self.graph_attributes)
         root_node = GraphNode((0, 0))
         node_set, edge_set = {root_node}, set()
-        frame = self._calculate_frame(root_node.position[0], root_node.position[1], frame_range)
+        frame = self._calculate_frame(position=root_node.position, frame_range=frame_range * 1.1)
 
-        def bfs(root):
+        def __bfs(root):
             node_queue = deque([root])
             while node_queue:
                 current_node = node_queue.popleft()
@@ -51,11 +50,11 @@ class GraphGenerator(BaseConfig):
                             edge_set.add((current_node.position, child.position))
                             node_queue.append(child)
 
-        bfs(root_node)
+        __bfs(root_node)
         return node_set, edge_set
 
     @staticmethod
-    def _build_graph_from_nodes_and_edges(nodes, edges):
+    def _build_network_from_nodes_and_edges(nodes, edges):
         graph = nx.Graph()
         position_map = {node.position: node for node in nodes}
         for node in nodes:
@@ -75,14 +74,17 @@ class GraphGenerator(BaseConfig):
             filtered_graph = filtered_graph.subgraph(largest_cc).copy()
         return filtered_graph
 
-    def _calculate_frame(self, graph_or_x, y=None, frame_range=None):
-        if frame_range is None:
-            frame_range = self.config.DEFAULT_FRAME_RANGE
-        if isinstance(graph_or_x, nx.Graph):
-            positions = np.array(list(nx.get_node_attributes(graph_or_x, 'pos').values()))
+    @staticmethod
+    def _calculate_frame(graph=None, position=None, frame_range=BaseConfig.DEFAULT_FRAME_RANGE):
+        if graph is None and position is None:
+            raise ValueError("Either synthetic_graph or position must be provided.")
+        if graph is not None and position is not None:
+            raise ValueError("Only one of synthetic_graph or position must be provided.")
+        if graph is not None:
+            positions = np.array(list(nx.get_node_attributes(graph, 'pos').values()))
             center_x, center_y = positions[:, 0].mean(), positions[:, 1].mean()
         else:
-            center_x, center_y = graph_or_x, y
+            [center_x, center_y] = position
         half_range = frame_range / 2
         frame = [
             [round(center_x - half_range, 2), round(center_x + half_range, 2)],
