@@ -14,7 +14,7 @@ class GraphPostProcessor(BaseConfig):
         self.original_graph_attributes = data_agent.attributes
 
     @debugging
-    def adjust_degree_distribution(self):
+    def remove_nodes_and_edges_by_degree_distribution(self):
         target_avg_degree = self.original_graph_attributes.avg_degree
         graph = self.synthetic_graph.copy()
 
