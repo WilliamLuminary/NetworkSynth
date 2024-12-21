@@ -7,10 +7,10 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 
-from utils.output_handler import OutputHandler
+from config.output_handler import OutputHandler
 
 
-def plot_graph(graph, positions=None, title=None, frame=None, save=False, output_path=None, background=False,
+def plot_graph(graph, positions=None, detail=None, frame:bool=True, save=False, output_path=None, background=False,
                image=None, alpha=1.0, adjust_positions=False, show=True, linewidth=2, node_size=2.5,
                plot_in_frame=True, **kwargs):
     fig, ax = plt.subplots(figsize=(10, 10))
