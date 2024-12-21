@@ -1,34 +1,43 @@
-# src/data/data_loader.py
-
+# src/data/graph_data_agent.py
+import logging
 import os
 import re
+from typing import Optional
+
 import cv2
-import numpy as np
 import networkx as nx
-from utils.base import BaseConfig
-from utils.debug_utils import debugging
+import numpy as np
+
+from config.base import BaseConfig
+from config.name_resolution_set import NameResolutionSet
+
+logger = logging.getLogger(__name__)
 
 
-class DataLoader(BaseConfig):
-    def __init__(self, config, set_name, resolution):
-        super().__init__(config)
-        self.set_name = set_name
-        self.resolution = resolution
-        self.positions = None
-        self.sparse_matrix = None
-        self.image = None
-        self.graph = None
+class GraphDataAgent(BaseConfig):
+    def __init__(self, name_res_set: NameResolutionSet):
+        self.name_res_set = name_res_set
+        self.set_name, self.resolution = str(self.name_res_set.set_name), str(self.name_res_set.resolution)
 
-        self.positions_dir = self.config.POSITIONS_DIR
-        self.sparse_matrices_dir = self.config.SPARSE_MATRICES_DIR
-        self.images_dir = self.config.IMAGES_DIR
+        self.positions_of_nodes = None
+        self.adjacency_matrix = None
+        self.original_image = None
+        self.original_graph = None
 
-    @debugging
+        self.attributes = None
+
+        self.synthetic_graphs: Optional[list] = None
+
     def load_data(self):
-        self.positions = self._load_positions()
-        self.sparse_matrix = self._load_sparse_matrix()
-        self.image = self._load_image()
-        self.graph = self._create_graph()
+        logger.info(f"Loading data for {self.name_res_set}")
+        self.positions_of_nodes = self._load_positions()
+        self.adjacency_matrix = self._load_sparse_matrix()
+        self.original_image = self._load_image()
+        self.original_graph = self._create_graph()
+        logger.info(f"Data successfully loaded for {self.name_res_set}")
+
+    def set_attributes(self, attributes):
+        self.attributes = attributes
 
     def _load_positions(self):
         pattern = re.compile(
@@ -36,8 +45,9 @@ class DataLoader(BaseConfig):
             re.IGNORECASE
         )
         file_path = self._find_file_with_pattern(
-            self.config.POSITIONS_DIR, pattern, f'positions for {self.set_name}'
+            self.POSITION_DATA_DIR, pattern, f'positions_of_nodes for {self.set_name}'
         )
+        logger.info(f"Positions file loaded: {file_path}")
         positions = np.load(file_path, allow_pickle=True)
         return positions
 
@@ -47,8 +57,9 @@ class DataLoader(BaseConfig):
             re.IGNORECASE
         )
         file_path = self._find_file_with_pattern(
-            self.config.SPARSE_MATRICES_DIR, pattern, 'sparse matrix'
+            self.ADJ_MATRIX_DATA_DIR, pattern, 'sparse matrix'
         )
+        logger.info(f"Sparse matrix file loaded: {file_path}")
         matrix_data = np.load(file_path, allow_pickle=True)
 
         set_name = self.set_name
@@ -59,17 +70,22 @@ class DataLoader(BaseConfig):
                 set_name = 'C'
             else:
                 available_keys = list(matrix_data.keys())
-                raise KeyError(f"Neither 'C' nor 'C1' is found. Available sets: {available_keys}")
+                err_msg = f"Neither 'C' nor 'C1' is found in sparse matrix data. Available sets: {available_keys}"
+                logger.error(err_msg)
+                raise KeyError(err_msg)
 
         if set_name not in matrix_data:
             available_keys = list(matrix_data.keys())
-            raise KeyError(f"Set '{set_name}' not found. Available sets: {available_keys}")
+            err_msg = f"Set '{set_name}' not found in sparse matrix data. Available sets: {available_keys}"
+            logger.error(err_msg)
+            raise KeyError(err_msg)
 
         return matrix_data[set_name].item()
 
     def _load_image(self):
-        images_path = os.path.join(self.config.IMAGES_DIR, self.set_name)
+        images_path = os.path.join(self.IMAGES_DIR, self.set_name)
         if self.set_name == 'B':
+            # noinspection PyTypeChecker
             images_path = os.path.join(images_path, '1811')
         pattern = re.compile(
             rf"\b{re.escape(self.resolution)}\b.*\.(tif|png|jpg)",
@@ -78,21 +94,27 @@ class DataLoader(BaseConfig):
         file_path = self._find_file_with_pattern(
             images_path, pattern, f'image for {self.set_name}'
         )
+        logger.info(f"Image file loaded: {file_path}")
         image = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
         if image is None:
-            raise ValueError(f"Failed to load image from file: {file_path}")
+            err_msg = f"Failed to load image from file: {file_path}"
+            logger.error(err_msg)
+            raise ValueError(err_msg)
         return image
 
     def _create_graph(self):
-        if self.positions is None or self.sparse_matrix is None:
-            raise ValueError("Positions or sparse matrix not loaded.")
-        graph = nx.from_scipy_sparse_array(self.sparse_matrix, edge_attribute='weight')
-        for i, pos in enumerate(self.positions):
+        if self.positions_of_nodes is None or self.adjacency_matrix is None:
+            err_msg = "Positions or sparse matrix not loaded before original_graph creation."
+            logger.error(err_msg)
+            raise ValueError(err_msg)
+        graph = nx.from_scipy_sparse_array(self.adjacency_matrix, edge_attribute='weight')
+        for i, pos in enumerate(self.positions_of_nodes):
             graph.nodes[i]['pos'] = pos.astype(np.float64)
 
         largest_cc = max(nx.connected_components(graph), key=len)
         graph = graph.subgraph(largest_cc).copy()
         graph = nx.convert_node_labels_to_integers(graph, label_attribute='old_label')
+        logger.info(f"Graph created with {graph.number_of_nodes()} nodes and {graph.number_of_edges()} edges.")
         return graph
 
     @staticmethod
