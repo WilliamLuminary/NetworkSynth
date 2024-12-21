@@ -1,8 +1,10 @@
-# src/graph/graph_node.py
+# src/original_graph/graph_node.py
 
 import random
 import numpy as np
 from collections import defaultdict
+
+from config.base import BaseConfig
 
 
 class GraphNode:
@@ -34,7 +36,7 @@ class GraphNode:
         cls.merged_edge = 0
 
     @classmethod
-    def initialize(cls, graph_attributes, config):
+    def initialize(cls, graph_attributes):
         cls.degree_distribution = graph_attributes.degree_distribution
         cls.degree_transition_probs = graph_attributes.degree_transition_probs
         cls.degree_angles = graph_attributes.degree_angles
@@ -42,13 +44,14 @@ class GraphNode:
         cls.avg_length = graph_attributes.avg_length
         cls.grid_size = graph_attributes.avg_length
         cls.closed_range = graph_attributes.avg_length
-        cls.closed_nodes_factor = config.CLOSED_NODES_FACTOR
-        cls.closed_edges_factor = config.CLOSED_EDGES_FACTOR
+
+        cls.closed_nodes_factor = BaseConfig.CLOSED_NODES_FACTOR
+        cls.closed_edges_factor = BaseConfig.CLOSED_EDGES_FACTOR
 
     def __init__(self, position, parent=None, parent_angle=None):
         self.id = GraphNode.id_counter
         GraphNode.id_counter += 1
-        self.position = position
+        self.position = position  # position <- (x, y)
         self.parent = parent
         self.children = []
         self.degree = None
