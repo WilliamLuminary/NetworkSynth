@@ -1,4 +1,4 @@
-# src/graph/graph_analyzer.py
+# src/original_graph/graph_analysis.py
 
 import math
 import numpy as np
@@ -9,8 +9,18 @@ from scipy.stats import linregress
 
 
 class GraphAnalyzer:
+    Q = [q / 100 for q in range(-300, 301, 10)]
+
     def __init__(self, graph):
         self.graph = graph
+        self.alpha_0 = None
+        self.width = None
+
+    def multi_analysis(self):
+        tau_list = self.calculate_multifractal_spectrum(GraphAnalyzer.Q)
+        alpha_0, width, al_list, fal_list = self.n_spectrum(tau_list, GraphAnalyzer.Q)
+        self.alpha_0 = alpha_0
+        self.width = width
 
     def calculate_multifractal_spectrum(self, Q, weight=True, fdigi=0):
         N_list = []
