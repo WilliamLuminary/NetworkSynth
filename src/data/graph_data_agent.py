@@ -2,7 +2,7 @@
 import logging
 import os
 import re
-from typing import Optional
+from queue import Queue
 
 import cv2
 import networkx as nx
@@ -26,7 +26,13 @@ class GraphDataAgent(BaseConfig):
 
         self.attributes = None
 
-        self.synthetic_graphs: Optional[list] = None
+        self.synthetic_graphs = Queue()
+
+    def add_synthetic_graph(self, graph):
+        self.synthetic_graphs.put(graph)
+
+    def get_synthetic_graph(self):
+        return self.synthetic_graphs.get() if not self.synthetic_graphs.empty() else None
 
     def load_data(self):
         logger.info(f"Loading data for {self.name_res_set}")
