@@ -1,22 +1,22 @@
-# src/graph/graph_postprocessor.py
+# src/original_graph/graph_postprocessor.py
 
 import networkx as nx
 from scipy.spatial.distance import euclidean
 
-from utils.base import BaseConfig
+from config.base import BaseConfig
+from data.graph_data_agent import GraphDataAgent
 from utils.debug_utils import debugging
 
 
 class GraphPostProcessor(BaseConfig):
-    def __init__(self, graph, original_graph_attributes):
-        super().__init__(original_graph_attributes.config)
-        self.graph = graph
-        self.original_graph_attributes = original_graph_attributes
+    def __init__(self, synthethic_graph, data_agent: GraphDataAgent):
+        self.synthetic_graph = synthethic_graph
+        self.original_graph_attributes = data_agent.attributes
 
     @debugging
     def adjust_degree_distribution(self):
         target_avg_degree = self.original_graph_attributes.avg_degree
-        graph = self.graph.copy()
+        graph = self.synthetic_graph.copy()
 
         while 2 * graph.number_of_edges() / graph.number_of_nodes() > 1.1 * target_avg_degree:
             highest_degree_node = max(graph.degree, key=lambda x: x[1])[0]
@@ -24,14 +24,16 @@ class GraphPostProcessor(BaseConfig):
             if neighbors:
                 graph.remove_edge(highest_degree_node, neighbors[0])
             graph = self._keep_largest_connected_component(graph)
-        self.graph = graph
+        self.synthetic_graph = graph
 
-    def assign_weights(self, map_length_to_weight, length_bins, weight_baskets, y):
-        edge_lengths = [euclidean(self.graph.nodes[u]['pos'], self.graph.nodes[v]['pos']) for u, v in
-                        self.graph.edges()]
+    def assign_weights(self):
+        [_, map_length_to_weight, length_bins, weight_baskets, _] = self.original_graph_attributes.mapping_params
+        edge_lengths = [euclidean(self.synthetic_graph.nodes[u]['pos'], self.synthetic_graph.nodes[v]['pos']) for u, v
+                        in
+                        self.synthetic_graph.edges()]
         weights = [map_length_to_weight(length, length_bins, weight_baskets, y) for length in edge_lengths]
-        for (u, v), weight in zip(self.graph.edges(), weights):
-            self.graph[u][v]['weight'] = weight
+        for (u, v), weight in zip(self.synthetic_graph.edges(), weights):
+            self.synthetic_graph[u][v]['weight'] = weight
 
     @staticmethod
     def _keep_largest_connected_component(graph):
