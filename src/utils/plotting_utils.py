@@ -1,96 +1,112 @@
 # src/utils/plotting_utils.py
 
-import datetime
-import os
+from typing import Union
 
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from numpy import ndarray
 
-from config.output_handler import OutputHandler
+from config.base import BaseConfig
+from config.enums import DataType, FileTag
+from data.graph_data_agent import GraphDataAgent
+from utils.network_utils import build_graph_pos_and_adj_mat, calculate_frame
 
 
-def plot_graph(graph, positions=None, detail=None, frame:bool=True, save=False, output_path=None, background=False,
-               image=None, alpha=1.0, adjust_positions=False, show=True, linewidth=2, node_size=2.5,
-               plot_in_frame=True, **kwargs):
-    fig, ax = plt.subplots(figsize=(10, 10))
+class PlotAgent(BaseConfig):
+    def __init__(self, graph_data_agent: GraphDataAgent):
+        self.graph_data_agent = graph_data_agent
 
-    if positions is None:
-        positions = nx.get_node_attributes(graph, 'pos')
+    def plot_graph(self, data_type: DataType, graph: nx.Graph = None,
+                   pos_and_adj_mat: Union[tuple, list, ndarray] = None,
+                   adjust_axis: bool = False, **kwargs) -> ndarray:
+        """
+        :param data_type:
+        :param graph: If provided, plot the graph directly.
+        :param pos_and_adj_mat: Only used if `graph` is not provided.
+        Tuple / List / Ndarray of positions and adjacency matrix.
+        :param adjust_axis:
+        :param kwargs: Title, frame, plot_in_frame, background, image, alpha, line_width, node_size, output_path
+        """
+        if not data_type.has_tag(FileTag.PLOT):
+            raise ValueError(f"Invalid data type: {data_type}, only graphs can be passed to this method.")
+        if graph is None:
+            if pos_and_adj_mat is None:
+                if data_type is DataType.SYNTHETIC_GRAPH:
+                    raise ValueError("Either `graph` or `position and adj matrix` must be provided.")
+                else:
+                    graph = self.graph_data_agent.original_graph
+            else:
+                graph = build_graph_pos_and_adj_mat(pos_and_adj_mat)
 
-    if adjust_positions:
-        positions_array = np.array([positions[node] for node in graph.nodes()])
-        positions_array[:, [1, 0]] = positions_array[:, [0, 1]]
-        positions_array[:, 1] = 510 - positions_array[:, 1]
-        positions = {node: pos for node, pos in zip(graph.nodes(), positions_array)}
+        _file_config = BaseConfig.FILE_CONFIGURATIONS.get(data_type)
+        _fig, _ax = plt.subplots(figsize=(10, 10))
 
-    if image is not None and background:
-        image_extent = [0, image.shape[1], 0, image.shape[0]]
-        ax.imshow(image, cmap='gray', extent=image_extent, alpha=alpha)
+        _position_dict = nx.get_node_attributes(graph, 'pos')
+        if adjust_axis and _position_dict is not None:
+            __positions_array = np.array([_position_dict[node] for node in graph.nodes()])
+            __positions_array[:, [1, 0]] = __positions_array[:, [0, 1]]
+            __positions_array[:, 1] = BaseConfig.DEFAULT_FRAME_RANGE - __positions_array[:, 1]
+            _position_dict = {node: pos for node, pos in zip(graph.nodes(), __positions_array)}
 
-    for u, v in graph.edges():
-        pos_u = positions.get(u)
-        pos_v = positions.get(v)
-        if pos_u is not None and pos_v is not None:
-            x_values = [pos_u[0], pos_v[0]]
-            y_values = [pos_u[1], pos_v[1]]
-            ax.plot(x_values, y_values, 'r-', linewidth=linewidth, zorder=2)
+        _line_width = _file_config.line_width
+        for u, v in graph.edges():
+            pos_u = _position_dict.get(u)
+            pos_v = _position_dict.get(v)
+            if pos_u is not None and pos_v is not None:
+                __x_values = [pos_u[0], pos_v[0]]
+                __y_values = [pos_u[1], pos_v[1]]
+                _ax.plot(__x_values, __y_values, 'r-', linewidth=_line_width, zorder=2)
 
-    for node in graph.nodes():
-        pos = positions.get(node)
-        if pos is not None:
-            ax.plot(pos[0], pos[1], 'bo', markersize=node_size, zorder=2)
+        _node_size = _file_config.node_size
+        for node in graph.nodes():
+            pos = _position_dict.get(node)
+            if pos is not None:
+                _ax.plot(pos[0], pos[1], 'bo', markersize=_node_size, zorder=2)
 
-    if frame is not None and plot_in_frame:
-        ax.set_xlim(frame[0])
-        ax.set_ylim(frame[1])
+        _frame = calculate_frame(graph)
+        if 'frame' in kwargs:
+            _frame = kwargs['frame']
+        _ax.set_xlim(_frame[0])
+        _ax.set_ylim(_frame[1])
 
-    if frame is not None:
-        if background:
-            facecolor = (0, 0, 0, 0.3)
-            edgecolor = 'none'
+        if data_type is DataType.ORIGINAL_GRAPH:
+            _image = self.graph_data_agent.original_image
+            _image_extent = (0, _image.shape[1], 0, _image.shape[0])
+            _alpha = kwargs['alpha'] if 'alpha' in kwargs else 1
+            _ax.imshow(_image, cmap='gray', extent=_image_extent, alpha=_alpha)
         else:
-            facecolor = 'none'
-            edgecolor = (0, 0, 0, 0.8)
-        background_rect = plt.Rectangle(
-            (frame[0][0], frame[1][0]),
-            frame[0][1] - frame[0][0],
-            frame[1][1] - frame[1][0],
-            facecolor=facecolor,
-            edgecolor=edgecolor,
-            linewidth=2,
-            zorder=1
-        )
-        ax.add_patch(background_rect)
+            _ax.add_patch(
+                plt.Rectangle(
+                    (_frame[0][0], _frame[1][0]),
+                    _frame[0][1] - _frame[0][0],
+                    _frame[1][1] - _frame[1][0],
+                    facecolor='none',
+                    edgecolor=(0, 0, 0, 0.8),
+                    linewidth=2,
+                    zorder=1
+                ))
 
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.axis('off')
+        if 'title' in kwargs:
+            plt.title(kwargs['title'])
 
-    if title:
-        plt.title(title)
+        _ax.set_xticks([])
+        _ax.set_yticks([])
+        _ax.axis('off')
 
-    plt.tight_layout()
+        plt.tight_layout()
 
-    if save:
-        if output_path is None:
-            raise ValueError("Output path must be specified when save=True.")
-
-        output_handler = OutputHandler()
-        output_handler.ensure_directory(output_path)
-
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{title} Time {timestamp}.png" if title else f"Graph_{timestamp}.png"
-        filepath = os.path.join(output_path, filename)
-
-        # Archive existing file if it exists
-        output_handler.archive_if_exists(filepath)
-
-        plt.savefig(filepath, dpi=600)
-        plt.close()
-        print(f"Saved plot: {filepath}")
-    else:
-        if show:
+        if 'show' in kwargs and kwargs['show']:
             plt.show()
-        else:
-            plt.close()
+        _graph = self._figure_to_ndarray_direct(plt)
+        plt.close()
+        return _graph
+
+    @staticmethod
+    def _figure_to_ndarray_direct(fig: plt) -> ndarray:
+        _canvas = FigureCanvas(fig)
+        _canvas.draw()
+        _buf = _canvas.buffer_rgba()
+        _image = np.asarray(_buf)
+        return _image
