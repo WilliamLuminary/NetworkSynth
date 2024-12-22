@@ -1,35 +1,33 @@
-# src/utils/config.py
+# src/config/config.py
 import logging
 import os
 
-from enums import DataType
-from plot_config import *
+from .enums import DataType
+from .config_objects import FileConfig, ImageConfig, PlotConfig
 
 
 class Config:
     FILE_CONFIGURATIONS = {
         DataType.ORIGINAL_IMAGE: ImageConfig(
             relative_dir="origin",
-            file_tags=DataType.ORIGINAL_IMAGE.tags,
-            detail_prefix=None
+            data_type=DataType.ORIGINAL_IMAGE,
+            alpha=0.6
         ),
         DataType.ORIGINAL_GRAPH: PlotConfig(
             relative_dir="origin",
-            node_size=3.0,
-            line_width=1.5,
-            file_tags=DataType.ORIGINAL_GRAPH.tags,
-            detail_prefix=None
+            node_size=4.0,
+            line_width=2.0,
+            data_type=DataType.ORIGINAL_GRAPH,
         ),
         DataType.SYNTHETIC_GRAPH: PlotConfig(
             relative_dir="synthetic",
-            node_size=3.0,
-            line_width=1.5,
-            file_tags=DataType.SYNTHETIC_GRAPH.tags,
-            detail_prefix=None
+            node_size=4.0,
+            line_width=2.0,
+            data_type=DataType.SYNTHETIC_GRAPH,
         ),
         DataType.SYNTHETIC_NETWORK: FileConfig(
             relative_dir="synthetic",
-            file_tags=DataType.SYNTHETIC_NETWORK.tags,
+            data_type=DataType.SYNTHETIC_NETWORK,
         )
     }
 
@@ -38,8 +36,8 @@ class Config:
     CLOSED_NODES_FACTOR = 1
     CLOSED_EDGES_FACTOR = 1.5
 
-    SYNTHETIC_GRAPH_NUMBER = 10
-    SYNTHETIC_NETWORK_NUMBER = 300
+    SYNTHETIC_GRAPH_NUMBER = 1
+    SYNTHETIC_NETWORK_NUMBER = 1
     MAX_ATTEMPTS = 10
     ERROR_TOLERANCE = 0.15
 
