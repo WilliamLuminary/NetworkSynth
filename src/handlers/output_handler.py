@@ -12,6 +12,8 @@ from numpy import ndarray
 
 from config import Config, DataType, FileTag, NameResolutionSet
 
+logger = logging.getLogger(__name__)
+
 
 class OutputHandler(Config):
 
@@ -45,8 +47,12 @@ class OutputHandler(Config):
 
     @staticmethod
     def ensure_directory(path: str, exist_ok=False) -> None:
+        flag = False
+        if not exist_ok and not os.path.exists(path):
+            flag = True
         os.makedirs(path, exist_ok=exist_ok)
-        logging.info(f"Ensured directory exists: {path}")
+        if flag:
+            logging.info(f"Created new directory: {path}")
 
     @staticmethod
     def delete_file(filepath: str) -> None:
@@ -71,6 +77,8 @@ class OutputHandler(Config):
             OutputHandler._save_pickle(content, abs_path)
         else:
             raise ValueError(f"Unsupported DataType for saving: {data_type}")
+
+        logging.info(f"Saved file: {abs_path}")
 
     @staticmethod
     def _save_pickle(obj: Any, filepath: str) -> None:
