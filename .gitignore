@@ -162,8 +162,8 @@ cython_debug/
 .idea/
 
 # Private files
-credentials/
-/data/
+/data/input/*
+/data/output/*
 
 archieved/*
 !archieved/
