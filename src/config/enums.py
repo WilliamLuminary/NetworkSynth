@@ -22,11 +22,12 @@ class Resolution(Enum):
         return self.value
 
 
-class ResultType(Enum):
-    ORIGINAL_IMAGE = "Original Image"
-    ORIGINAL_GRAPH = "Original Graph"
-    SYNTHETIC_GRAPH = "Synthetic Graph"
-    SYNTHETIC_NETWORK = "Synthetic Network"
+class FileTag(Enum):
+    FIG = "figure"
+    PKL = "pickle"
+    PLOT = "plot"
+    ORI = "original"
+    SYN = "synthetic"
 
     def __str__(self):
         return self.value
