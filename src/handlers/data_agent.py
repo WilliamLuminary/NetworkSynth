@@ -33,6 +33,7 @@ class DataAgent(Config):
     def load_data(self):
         logger.info(f"Loading data for {self.name_res_set}")
         self.positions_of_nodes = self._load_positions()
+        self.positions_of_nodes = self._adjust_positions(self.positions_of_nodes)
         self.adjacency_matrix = self._load_sparse_matrix()
         self.original_image = self._resize_image(self._load_image())
         self.original_graph = build_graph_pos_and_adj_mat((self.positions_of_nodes,
@@ -136,3 +137,18 @@ class DataAgent(Config):
         _new_height = int(_height * _scaling_factor)
         resized_image = cv2.resize(image, (_new_width, _new_height))
         return resized_image
+
+    @staticmethod
+    def _adjust_positions(positions, flip_axes=False, invert_y=False, scale_factor=None):
+        positions_array = np.array([positions[node] for node in positions])
+
+        if flip_axes:
+            positions_array[:, [1, 0]] = positions_array[:, [0, 1]]
+
+        if invert_y:
+            positions_array[:, 1] = scale_factor - positions_array[:, 1] if scale_factor else -positions_array[:, 1]
+
+        adjusted_positions = {node: pos for node, pos in zip(positions.keys(), positions_array)}
+        return adjusted_positions
+
+
