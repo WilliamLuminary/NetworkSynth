@@ -4,6 +4,7 @@ import datetime
 import logging
 import os
 import pickle
+import time
 from typing import Any, Union
 
 import cv2
@@ -12,11 +13,9 @@ from numpy import ndarray
 from config.base import BaseConfig
 from config.enums import DataType, FileTag
 from config.name_resolution_set import NameResolutionSet
-from utils.debug_utils import time_id
 
 
 class OutputHandler(BaseConfig):
-    base_output_dir = os.path.join(BaseConfig.BASE_OUTPUT_PATH, f'results_{time_id()}')
 
     def __init__(self, name_res_set: NameResolutionSet):
         self.name_res_set = name_res_set
@@ -26,7 +25,7 @@ class OutputHandler(BaseConfig):
 
     @classmethod
     def initialize(cls):
-        # cls.archive_if_exists(cls.OUTPUT_DIR)
+        cls.base_output_dir = os.path.join(BaseConfig.BASE_OUTPUT_PATH, f'results_{OutputHandler._time_id()}')
         cls.ensure_directory(cls.base_output_dir)
         print(f"Created new directory: {cls.base_output_dir}")
 
@@ -64,7 +63,7 @@ class OutputHandler(BaseConfig):
     def save_file(self, content: Any, data_type: DataType) -> None:
         file_config = BaseConfig.FILE_CONFIGURATIONS[data_type]
         rel_path = file_config.relative_dir
-        file_name = f"{time_id()}.{file_config.file_type}"
+        file_name = f"{self._time_id()}.{file_config.file_type}"
         abs_path = os.path.join(self.name_res_output_dir, rel_path, file_name)
         self.ensure_directory(os.path.dirname(abs_path))
 
@@ -89,3 +88,7 @@ class OutputHandler(BaseConfig):
 
         cv2.imwrite(filepath, image)
         logging.info(f"Saved image: {filepath}")
+
+    @staticmethod
+    def _time_id() -> str:
+        return time.strftime("%Y%m%d_%H%M%S")
