@@ -6,10 +6,10 @@ from typing import Union
 import networkx as nx
 from numpy import ndarray
 
-from config.config import Config
-from handlers.data_agent import DataAgent
-from graph.graph_node import GraphNode
-from utils.network_utils import calculate_frame, build_graph_nodes_and_edges
+from config import Config
+from handlers import DataAgent
+from .graph_node import GraphNode
+from utils import calculate_frame, build_graph_nodes_and_edges
 
 
 class GraphGenerator(Config):
@@ -42,7 +42,7 @@ class GraphGenerator(Config):
                 current_node = node_queue.popleft()
                 if not self._within_frame(current_node.position, frame):
                     continue
-                if current_node.generate_children():
+                if current_node._generate_children():
                     for child in current_node.children:
                         if child != current_node:
                             node_set.add(child)
@@ -62,6 +62,7 @@ class GraphGenerator(Config):
         return filtered_graph
 
     @staticmethod
-    def _within_frame(position: Union[list, tuple, ndarray], frame: Union[list, tuple, ndarray]) -> bool:
+    def _within_frame(position: Union[list, tuple, ndarray],
+                      frame: Union[list[float, float], tuple[float, float], ndarray[float, float]]) -> bool:
         x, y = position
         return frame[0][0] <= x <= frame[0][1] and frame[1][0] <= y <= frame[1][1]

@@ -8,11 +8,13 @@ import time
 from typing import Any, Union
 
 import cv2
+from jupyter_server.serverapp import flags
 from numpy import ndarray
 
 from config.config import Config
 from config.enums import DataType, FileTag
 from config.name_resolution_set import NameResolutionSet
+from config import Config, DataType, FileTag, NameResolutionSet
 
 
 class OutputHandler(Config):
@@ -21,13 +23,12 @@ class OutputHandler(Config):
         self.name_res_set = name_res_set
         self.name_res_output_dir = os.path.join(self.base_output_dir, str(name_res_set.set_name),
                                                 str(name_res_set.resolution))
-        self.ensure_directory(self.name_res_output_dir)
+        self.ensure_directory(self.name_res_output_dir, exist_ok=True)
 
     @classmethod
     def initialize(cls):
         cls.base_output_dir = os.path.join(Config.BASE_OUTPUT_PATH, f'results_{OutputHandler._time_id()}')
         cls.ensure_directory(cls.base_output_dir)
-        print(f"Created new directory: {cls.base_output_dir}")
 
     @staticmethod
     def archive_if_exists(path: str) -> None:
@@ -63,13 +64,13 @@ class OutputHandler(Config):
     def save_file(self, content: Any, data_type: DataType) -> None:
         file_config = Config.FILE_CONFIGURATIONS[data_type]
         rel_path = file_config.relative_dir
-        file_name = f"{self._time_id()}.{file_config.file_type}"
+        file_name = f"{data_type}_{self._time_id()}.{data_type.file_extension}"
         abs_path = os.path.join(self.name_res_output_dir, rel_path, file_name)
-        self.ensure_directory(os.path.dirname(abs_path))
+        self.ensure_directory(os.path.dirname(abs_path), exist_ok=True)
 
         if FileTag.FIG in data_type.tags:
             OutputHandler._save_image(content, abs_path)
-        elif FileTag.PKL in data_type.tags:
+        elif FileTag.DATA in data_type.tags:
             OutputHandler._save_pickle(content, abs_path)
         else:
             raise ValueError(f"Unsupported DataType for saving: {data_type}")
@@ -79,15 +80,10 @@ class OutputHandler(Config):
         with open(filepath, 'wb') as f:
             # noinspection PyTypeChecker
             pickle.dump(obj, f)
-        logging.info(f"Saved pickle file: {filepath}")
 
     @staticmethod
-    def _save_image(image: Union[ndarray], filepath: str) -> None:
-        if not isinstance(image, ndarray):
-            raise ValueError("Unsupported image format. Expected ndarray or plt.Figure.")
-
+    def _save_image(image: ndarray, filepath: str) -> None:
         cv2.imwrite(filepath, image)
-        logging.info(f"Saved image: {filepath}")
 
     @staticmethod
     def _time_id() -> str:

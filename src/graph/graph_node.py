@@ -4,7 +4,7 @@ import random
 import numpy as np
 from collections import defaultdict
 
-from config.config import Config
+from config import Config
 
 
 class GraphNode:
@@ -57,68 +57,68 @@ class GraphNode:
         self.degree = None
         self.base_angle = None
         if parent is not None and parent_angle is not None:
-            self.degree = self.choose_degree_based_on_parent(parent.degree)
+            self.degree = self._choose_degree_by_parent(parent.degree)
             self.base_angle = (parent_angle + 180) % 360
-            self.add_child(self.parent)
+            self._add_child(self.parent)
         elif parent is None and parent_angle is None:
-            self.degree = self.choose_degree()
+            self.degree = self._choose_degree_random()
             self.base_angle = random.uniform(0, 360)
-            self.initialize_root_node()
+            self._initialize_root_node()
         else:
             raise ValueError("Parent and parent_angle must be provided together or not at all.")
 
     @staticmethod
-    def choose_degree():
+    def _choose_degree_random():
         degrees = list(GraphNode.degree_distribution.keys())
         probabilities = list(GraphNode.degree_distribution.values())
         return np.random.choice(degrees, p=probabilities)
 
     @staticmethod
-    def choose_degree_based_on_parent(parent_degree):
+    def _choose_degree_by_parent(parent_degree):
         degrees = list(GraphNode.degree_transition_probs[parent_degree].keys())
         probabilities = list(GraphNode.degree_transition_probs[parent_degree].values())
         return np.random.choice(degrees, p=probabilities)
 
-    def initialize_root_node(self):
+    def _initialize_root_node(self):
         length = random.choice(GraphNode.degree_edge_lengths[self.degree])
-        child_position = self.polar_to_cartesian(length, self.base_angle)
+        child_position = self._polar_to_cartesian(length, self.base_angle)
         child = GraphNode(child_position, parent=self, parent_angle=self.base_angle)
-        self.add_child(child)
-        self.add_to_grid(self.position)
-        self.add_to_grid(child.position)
-        self.add_edge_to_grid((self.position, child_position))
+        self._add_child(child)
+        self._add_to_grid(self.position)
+        self._add_to_grid(child.position)
+        self._add_edge_to_grid((self.position, child_position))
 
-    def add_child(self, child):
+    def _add_child(self, child):
         if len(self.children) >= self.degree:
             raise Exception(f"Node {self.id} cannot have more than {self.degree} children.")
         self.children.append(child)
-        self.add_to_grid(child.position)
+        self._add_to_grid(child.position)
 
-    def add_to_grid(self, position):
-        key = self.spatial_hash(position)
+    def _add_to_grid(self, position):
+        key = self._spatial_hash(position)
         GraphNode.node_grid[key].add(self)
 
-    def add_edge_to_grid(self, edge):
-        keys = self.edge_spatial_hash(*edge)
+    def _add_edge_to_grid(self, edge):
+        keys = self._edge_spatial_hash(*edge)
         for key in keys:
             GraphNode.edge_grid[key].add(edge)
 
-    def generate_children(self):
+    def _generate_children(self):
         if len(self.children) > 1 or self.degree == 1:
             return False
-        angles, lengths = self.generate_angles_and_lengths()
+        angles, lengths = self._generate_angles_and_lengths()
         for angle, length in zip(angles, lengths):
-            child_position = self.polar_to_cartesian(length, angle)
+            child_position = self._polar_to_cartesian(length, angle)
             new_edge = (self.position, child_position)
-            if not self.check_intersection(new_edge):
+            if not self._check_intersection(new_edge):
                 child_node = GraphNode(child_position, parent=self, parent_angle=angle)
-                self.add_child(child_node)
-                self.add_edge_to_grid(new_edge)
+                self._add_child(child_node)
+                self._add_edge_to_grid(new_edge)
             else:
                 GraphNode.aborted_edge += 1
         return True
 
-    def generate_angles_and_lengths(self):
+    def _generate_angles_and_lengths(self):
         if self.degree == 1:
             return [], []
         angles = random.choices(GraphNode.degree_angles[self.degree], k=self.degree - 1)
@@ -127,30 +127,30 @@ class GraphNode:
         lengths = random.choices(GraphNode.degree_edge_lengths[self.degree], k=self.degree - 1)
         return angles, lengths
 
-    def polar_to_cartesian(self, length, angle):
+    def _polar_to_cartesian(self, length, angle):
         x, y = self.position
         angle_rad = np.deg2rad(angle)
         new_x = x + length * np.cos(angle_rad)
         new_y = y + length * np.sin(angle_rad)
         return new_x, new_y
 
-    def check_intersection(self, new_edge):
-        keys = self.edge_spatial_hash(*new_edge)
+    def _check_intersection(self, new_edge):
+        keys = self._edge_spatial_hash(*new_edge)
         for key in keys:
             for edge in GraphNode.edge_grid[key]:
                 if new_edge[0] in edge or new_edge[1] in edge:
                     continue
-                if self.do_intersect(new_edge[0], new_edge[1], edge[0], edge[1]):
+                if self._do_intersect(new_edge[0], new_edge[1], edge[0], edge[1]):
                     return True
         return False
 
     @staticmethod
-    def spatial_hash(position):
+    def _spatial_hash(position):
         grid_size = GraphNode.grid_size
         return int(position[0] // grid_size), int(position[1] // grid_size)
 
     @staticmethod
-    def edge_spatial_hash(p1, p2):
+    def _edge_spatial_hash(p1, p2):
         grid_size = GraphNode.grid_size
         x_min, x_max = sorted([p1[0], p2[0]])
         y_min, y_max = sorted([p1[1], p2[1]])
@@ -160,7 +160,7 @@ class GraphNode:
         return keys
 
     @staticmethod
-    def do_intersect(p1, q1, p2, q2):
+    def _do_intersect(p1, q1, p2, q2):
         def orientation(p, q, r):
             val = (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1])
             return 0 if val == 0 else 1 if val > 0 else 2
@@ -172,8 +172,14 @@ class GraphNode:
         o2 = orientation(p1, q1, q2)
         o3 = orientation(p2, q2, p1)
         o4 = orientation(p2, q2, q1)
-        return (o1 != o2 and o3 != o4) or \
-            (o1 == 0 and on_segment(p1, p2, q1)) or \
-            (o2 == 0 and on_segment(p1, q2, q1)) or \
-            (o3 == 0 and on_segment(p2, p1, q2)) or \
-            (o4 == 0 and on_segment(p2, q1, q2))
+        return ((o1 != o2 and o3 != o4) or
+                (o1 == 0 and on_segment(p1, p2, q1)) or
+                (o2 == 0 and on_segment(p1, q2, q1)) or
+                (o3 == 0 and on_segment(p2, p1, q2)) or
+                (o4 == 0 and on_segment(p2, q1, q2)))
+
+    def __repr__(self):
+        return f"GraphNode(id_counter={self.id})"
+
+    def __str__(self):
+        return f"Node No. {self.id}"

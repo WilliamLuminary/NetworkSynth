@@ -6,12 +6,12 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from matplotlib.figure import Figure
 from numpy import ndarray
 
-from config.config import Config
-from config.enums import DataType, FileTag
-from handlers.data_agent import DataAgent
-from utils.network_utils import build_graph_pos_and_adj_mat, calculate_frame
+from config import Config, DataType, FileTag
+from utils import build_graph_pos_and_adj_mat, calculate_frame
+from .data_agent import DataAgent
 
 
 class PlotAgent(Config):
@@ -41,7 +41,7 @@ class PlotAgent(Config):
                 graph = build_graph_pos_and_adj_mat(pos_and_adj_mat)
 
         _file_config = Config.FILE_CONFIGURATIONS.get(data_type)
-        _fig, _ax = plt.subplots(figsize=(10, 10))
+        _fig, _ax = plt.subplots(figsize=(10, 10), dpi=260)
 
         _position_dict = nx.get_node_attributes(graph, 'pos')
         if adjust_axis and _position_dict is not None:
@@ -95,7 +95,7 @@ class PlotAgent(Config):
         _ax.set_yticks([])
         _ax.axis('off')
 
-        plt.tight_layout()
+        plt.tight_layout(pad=0)
 
         if 'show' in kwargs and kwargs['show']:
             plt.show()

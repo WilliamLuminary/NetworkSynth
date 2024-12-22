@@ -9,7 +9,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from numpy import ndarray
 
-from config.config import Config
+from config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -139,3 +139,4 @@ def build_graph_nodes_and_edges(nodes: Union[list, set], edges: Union[list, set]
         u, v = position_map[edge[0]].id, position_map[edge[1]].id
         graph.add_edge(u, v)
     return graph
+
