@@ -1,5 +1,6 @@
 # src/enums.py
 from enum import Enum
+from typing import Set, Union
 
 
 class SetName(Enum):
@@ -31,3 +32,22 @@ class FileTag(Enum):
 
     def __str__(self):
         return self.value
+
+
+class DataType(Enum):
+    ORIGINAL_IMAGE = ("Original Image", {FileTag.FIG, FileTag.ORI})
+    ORIGINAL_GRAPH = ("Original Graph", {FileTag.FIG, FileTag.PLOT, FileTag.ORI})
+    SYNTHETIC_GRAPH = ("Synthetic Graph", {FileTag.FIG, FileTag.PLOT, FileTag.SYN})
+    SYNTHETIC_NETWORK = ("Synthetic Network", {FileTag.PKL, FileTag.SYN})
+
+    def __init__(self, description: str, tags: Set[FileTag]):
+        self.description = description
+        self.tags = tags
+
+    def __str__(self):
+        return self.description
+
+    def has_tag(self, tags: Union[FileTag, tuple[FileTag], list[FileTag]]) -> bool:
+        if isinstance(tags, FileTag):
+            return tags in self.tags
+        return set(tags).issubset(self.tags)
