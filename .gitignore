@@ -162,6 +162,7 @@ cython_debug/
 .idea/
 
 # Private files
+/credentials/
 /data/input/*
 /data/output/*
 
