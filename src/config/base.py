@@ -2,8 +2,37 @@
 import logging
 import os
 
+from config.enums import DataType
+from config.plot_config import *
+
 
 class BaseConfig:
+    FILE_CONFIGURATIONS = {
+        DataType.ORIGINAL_IMAGE: ImageConfig(
+            relative_dir="origin",
+            file_tags=DataType.ORIGINAL_IMAGE.tags,
+            detail_prefix=None
+        ),
+        DataType.ORIGINAL_GRAPH: PlotConfig(
+            relative_dir="origin",
+            node_size=3.0,
+            line_width=1.5,
+            file_tags=DataType.ORIGINAL_GRAPH.tags,
+            detail_prefix=None
+        ),
+        DataType.SYNTHETIC_GRAPH: PlotConfig(
+            relative_dir="synthetic",
+            node_size=3.0,
+            line_width=1.5,
+            file_tags=DataType.SYNTHETIC_GRAPH.tags,
+            detail_prefix=None
+        ),
+        DataType.SYNTHETIC_NETWORK: FileConfig(
+            relative_dir="synthetic",
+            file_tags=DataType.SYNTHETIC_NETWORK.tags,
+        )
+    }
+
     # Define base paths, this config file must be in the subdirectory of the project root
     DEFAULT_FRAME_RANGE = 510
     CLOSED_NODES_FACTOR = 1
@@ -12,6 +41,7 @@ class BaseConfig:
     SYNTHETIC_GRAPH_NUMBER = 10
     SYNTHETIC_NETWORK_NUMBER = 300
     MAX_ATTEMPTS = 10
+    ERROR_TOLERANCE = 0.15
 
     SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
     PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '..', '..'))
