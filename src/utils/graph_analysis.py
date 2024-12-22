@@ -13,16 +13,13 @@ class GraphAnalyzer:
 
     def __init__(self, graph):
         self.graph = graph
-        self.alpha_0 = None
-        self.width = None
 
-    def multi_analysis(self):
-        tau_list = self.calculate_multifractal_spectrum(GraphAnalyzer.Q)
-        alpha_0, width, al_list, fal_list = self.n_spectrum(tau_list, GraphAnalyzer.Q)
-        self.alpha_0 = alpha_0
-        self.width = width
+    def multifractal_analysis(self):
+        tau_list = self.calculate_multifractal_spectrum()
+        alpha_0, width, al_list, fal_list = self.n_spectrum(tau_list)
+        return alpha_0, width
 
-    def calculate_multifractal_spectrum(self, Q, weight=True, fdigi=0):
+    def calculate_multifractal_spectrum(self, weight=True, f_digi=0):
         N_list = []
         r_g_all_set = set()
         graph = nx.convert_node_labels_to_integers(self.graph)
@@ -34,10 +31,10 @@ class GraphAnalyzer:
         for node in graph.nodes():
             distances = (nk.distance.Dijkstra(G_nk, node, storePaths=False)).run().getDistances()
             grow = [d for d in distances if 0 < d < 99999]
-            if fdigi == 0:
+            if f_digi == 0:
                 grow = [math.ceil(d) for d in grow]
             else:
-                grow = [round(d, fdigi) for d in grow if round(d, fdigi) != 0]
+                grow = [round(d, f_digi) for d in grow if round(d, f_digi) != 0]
             num = Counter(grow)
             r_g_all_set.update(num.keys())
             N_list.append(num)
@@ -46,7 +43,7 @@ class GraphAnalyzer:
         diameter = r_g_all[-1]
         Zq_list = []
 
-        for q in Q:
+        for q in GraphAnalyzer.Q:
             Zq = np.zeros(len(r_g_all))
             for idx, num in enumerate(N_list):
                 N_vals = np.array([sum([count for radius, count in num.items() if radius <= r]) for r in r_g_all])
@@ -54,7 +51,7 @@ class GraphAnalyzer:
             Zq_list.append(Zq)
 
         tau_list = []
-        for idx, q in enumerate(Q):
+        for idx, q in enumerate(GraphAnalyzer.Q):
             x = np.log(r_g_all / diameter)
             y = np.log(Zq_list[idx])
             slope, _, _, _, _ = linregress(x, y)
@@ -63,14 +60,14 @@ class GraphAnalyzer:
         return tau_list
 
     @staticmethod
-    def n_spectrum(tau_list, Q):
+    def n_spectrum(tau_list):
         al_list = []
         fal_list = []
-        for i in range(1, len(Q)):
-            al = (tau_list[i] - tau_list[i - 1]) / (Q[i] - Q[i - 1])
+        for i in range(1, len(GraphAnalyzer.Q)):
+            al = (tau_list[i] - tau_list[i - 1]) / (GraphAnalyzer.Q[i] - GraphAnalyzer.Q[i - 1])
             al_list.append(al)
-        for j in range(len(Q) - 1):
-            fal = Q[j] * al_list[j] - tau_list[j]
+        for j in range(len(GraphAnalyzer.Q) - 1):
+            fal = GraphAnalyzer.Q[j] * al_list[j] - tau_list[j]
             fal_list.append(fal)
         alpha_0 = al_list[np.argmax(fal_list)]
         width = np.max(al_list) - np.min(al_list)
