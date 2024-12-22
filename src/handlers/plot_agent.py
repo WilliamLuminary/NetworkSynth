@@ -65,16 +65,19 @@ class PlotAgent(Config):
             if pos is not None:
                 _ax.plot(pos[0], pos[1], 'bo', markersize=_node_size, zorder=2)
 
-        _frame = calculate_frame(graph)
-        if 'frame' in kwargs:
-            _frame = kwargs['frame']
+        # _frame = calculate_frame(graph)
+        if data_type is DataType.ORIGINAL_GRAPH:
+            _frame = getattr(_file_config, 'frame', ((0, Config.DEFAULT_FRAME_RANGE), (0, Config.DEFAULT_FRAME_RANGE)))
+        else:
+            _frame = calculate_frame(graph)
+
         _ax.set_xlim(_frame[0])
         _ax.set_ylim(_frame[1])
 
         if data_type is DataType.ORIGINAL_GRAPH:
             _image = self.graph_data_agent.original_image
             _image_extent = (0, _image.shape[1], 0, _image.shape[0])
-            _alpha = kwargs['alpha'] if 'alpha' in kwargs else 1
+            _alpha = getattr(_file_config, 'alpha', 1.0)
             _ax.imshow(_image, cmap='gray', extent=_image_extent, alpha=_alpha)
         else:
             _ax.add_patch(
