@@ -1,4 +1,3 @@
-import cv2
 import numpy as np
 
 
@@ -15,11 +14,3 @@ def adjust_positions(positions, flip_axes=False, invert_y=False, scale_factor=No
     return adjusted_positions
 
 
-def resize_image_to_fit_positions(image, target_size=510):
-    original_height, original_width = image.shape
-    scaling_factor = target_size / max(original_width, original_height)
-
-    new_width = int(original_width * scaling_factor)
-    new_height = int(original_height * scaling_factor)
-    resized_image = cv2.resize(image, (new_width, new_height))
-    return resized_image

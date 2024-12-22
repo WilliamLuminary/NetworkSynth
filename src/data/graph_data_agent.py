@@ -3,13 +3,15 @@ import logging
 import os
 import re
 from queue import Queue
+from typing import Optional
 
 import cv2
-import networkx as nx
 import numpy as np
 
 from config.base import BaseConfig
 from config.name_resolution_set import NameResolutionSet
+from graph.graph_attributes import GraphAttributes
+from utils.network_utils import build_graph_pos_and_adj_mat
 
 logger = logging.getLogger(__name__)
 
@@ -24,23 +26,24 @@ class GraphDataAgent(BaseConfig):
         self.original_image = None
         self.original_graph = None
 
-        self.attributes = None
+        self.attributes: Optional[GraphAttributes] = None
 
         self.synthetic_graphs = Queue()
+
+    def load_data(self):
+        logger.info(f"Loading data for {self.name_res_set}")
+        self.positions_of_nodes = self._load_positions()
+        self.adjacency_matrix = self._load_sparse_matrix()
+        self.original_image = self._resize_image(self._load_image())
+        self.original_graph = build_graph_pos_and_adj_mat((self.positions_of_nodes,
+                                                           self.adjacency_matrix))
+        logger.info(f"Data successfully loaded for {self.name_res_set}")
 
     def add_synthetic_graph(self, graph):
         self.synthetic_graphs.put(graph)
 
     def get_synthetic_graph(self):
         return self.synthetic_graphs.get() if not self.synthetic_graphs.empty() else None
-
-    def load_data(self):
-        logger.info(f"Loading data for {self.name_res_set}")
-        self.positions_of_nodes = self._load_positions()
-        self.adjacency_matrix = self._load_sparse_matrix()
-        self.original_image = self._load_image()
-        self.original_graph = self._create_graph()
-        logger.info(f"Data successfully loaded for {self.name_res_set}")
 
     def set_attributes(self, attributes):
         self.attributes = attributes
@@ -108,21 +111,6 @@ class GraphDataAgent(BaseConfig):
             raise ValueError(err_msg)
         return image
 
-    def _create_graph(self):
-        if self.positions_of_nodes is None or self.adjacency_matrix is None:
-            err_msg = "Positions or sparse matrix not loaded before original_graph creation."
-            logger.error(err_msg)
-            raise ValueError(err_msg)
-        graph = nx.from_scipy_sparse_array(self.adjacency_matrix, edge_attribute='weight')
-        for i, pos in enumerate(self.positions_of_nodes):
-            graph.nodes[i]['pos'] = pos.astype(np.float64)
-
-        largest_cc = max(nx.connected_components(graph), key=len)
-        graph = graph.subgraph(largest_cc).copy()
-        graph = nx.convert_node_labels_to_integers(graph, label_attribute='old_label')
-        logger.info(f"Graph created with {graph.number_of_nodes()} nodes and {graph.number_of_edges()} edges.")
-        return graph
-
     @staticmethod
     def _find_file_with_pattern(directory_path, pattern, details=''):
         if not os.path.exists(directory_path):
@@ -138,3 +126,13 @@ class GraphDataAgent(BaseConfig):
             raise FileExistsError(f"Multiple {details} files found: {matched_files}.")
         else:
             raise FileNotFoundError(f"No {details} file found in {directory_path}.")
+
+    @staticmethod
+    def _resize_image(image, target_size=BaseConfig.DEFAULT_FRAME_RANGE):
+        _height, _width = image.shape
+        _scaling_factor = target_size / max(_width, _height)
+
+        _new_width = int(_width * _scaling_factor)
+        _new_height = int(_height * _scaling_factor)
+        resized_image = cv2.resize(image, (_new_width, _new_height))
+        return resized_image
