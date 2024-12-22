@@ -16,19 +16,19 @@ class GraphProperties:
         self.avg_degree = None
         self.avg_length = None
 
-    def compute_properties(self):
-        self.compute_degree_distribution()
-        self.compute_degree_transition_probs()
-        self.compute_edge_lengths_and_angles()
-        self.compute_average_degree()
+    def get_properties(self):
+        self._calculate_degree_distribution()
+        self._calculate_degree_transition_probs()
+        self._calculate_lengths_and_angles()
+        self._calculate_average_degree()
 
-    def compute_degree_distribution(self):
+    def _calculate_degree_distribution(self):
         degrees = [d for n, d in self.graph.degree()]
         degree_counts = Counter(degrees)
         total_nodes = self.graph.number_of_nodes()
         self.degree_distribution = {k: v / total_nodes for k, v in degree_counts.items()}
 
-    def compute_degree_transition_probs(self):
+    def _calculate_degree_transition_probs(self):
         degree_neighbors = defaultdict(list)
         degrees = dict(self.graph.degree())
         for node, neighbors in self.graph.adjacency():
@@ -42,7 +42,7 @@ class GraphProperties:
             total = sum(counts.values())
             self.degree_transition_probs[degree] = {k: v / total for k, v in counts.items()}
 
-    def compute_edge_lengths_and_angles(self):
+    def _calculate_lengths_and_angles(self):
         self.degree_edge_lengths = defaultdict(list)
         self.degree_angles = defaultdict(list)
         total_length = 0
@@ -77,6 +77,6 @@ class GraphProperties:
 
         self.avg_length = total_length / count if count > 0 else 0
 
-    def compute_average_degree(self):
+    def _calculate_average_degree(self):
         degrees = [d for n, d in self.graph.degree()]
         self.avg_degree = np.mean(degrees)
