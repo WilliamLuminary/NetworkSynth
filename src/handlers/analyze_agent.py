@@ -1,4 +1,4 @@
-# src/original_graph/graph_analysis.py
+# src/original_graph/analyze_agent.py
 
 import math
 import numpy as np
@@ -8,7 +8,7 @@ from collections import Counter
 from scipy.stats import linregress
 
 
-class GraphAnalyzer:
+class AnalyzeAgent:
     Q = [q / 100 for q in range(-300, 301, 10)]
 
     def __init__(self, graph):
@@ -43,7 +43,7 @@ class GraphAnalyzer:
         diameter = r_g_all[-1]
         Zq_list = []
 
-        for q in GraphAnalyzer.Q:
+        for q in AnalyzeAgent.Q:
             Zq = np.zeros(len(r_g_all))
             for idx, num in enumerate(N_list):
                 N_vals = np.array([sum([count for radius, count in num.items() if radius <= r]) for r in r_g_all])
@@ -51,7 +51,7 @@ class GraphAnalyzer:
             Zq_list.append(Zq)
 
         tau_list = []
-        for idx, q in enumerate(GraphAnalyzer.Q):
+        for idx, q in enumerate(AnalyzeAgent.Q):
             x = np.log(r_g_all / diameter)
             y = np.log(Zq_list[idx])
             slope, _, _, _, _ = linregress(x, y)
@@ -63,11 +63,11 @@ class GraphAnalyzer:
     def n_spectrum(tau_list):
         al_list = []
         fal_list = []
-        for i in range(1, len(GraphAnalyzer.Q)):
-            al = (tau_list[i] - tau_list[i - 1]) / (GraphAnalyzer.Q[i] - GraphAnalyzer.Q[i - 1])
+        for i in range(1, len(AnalyzeAgent.Q)):
+            al = (tau_list[i] - tau_list[i - 1]) / (AnalyzeAgent.Q[i] - AnalyzeAgent.Q[i - 1])
             al_list.append(al)
-        for j in range(len(GraphAnalyzer.Q) - 1):
-            fal = GraphAnalyzer.Q[j] * al_list[j] - tau_list[j]
+        for j in range(len(AnalyzeAgent.Q) - 1):
+            fal = AnalyzeAgent.Q[j] * al_list[j] - tau_list[j]
             fal_list.append(fal)
         alpha_0 = al_list[np.argmax(fal_list)]
         width = np.max(al_list) - np.min(al_list)

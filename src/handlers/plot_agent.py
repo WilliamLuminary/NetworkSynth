@@ -1,4 +1,4 @@
-# src/utils/plotting_utils.py
+# src/utils/plot_agent.py
 
 from typing import Union
 
@@ -8,14 +8,14 @@ import numpy as np
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from numpy import ndarray
 
-from config.base import BaseConfig
+from config.config import Config
 from config.enums import DataType, FileTag
-from data.graph_data_agent import GraphDataAgent
+from handlers.data_agent import DataAgent
 from utils.network_utils import build_graph_pos_and_adj_mat, calculate_frame
 
 
-class PlotAgent(BaseConfig):
-    def __init__(self, graph_data_agent: GraphDataAgent):
+class PlotAgent(Config):
+    def __init__(self, graph_data_agent: DataAgent):
         self.graph_data_agent = graph_data_agent
 
     def plot_graph(self, data_type: DataType, graph: nx.Graph = None,
@@ -40,14 +40,14 @@ class PlotAgent(BaseConfig):
             else:
                 graph = build_graph_pos_and_adj_mat(pos_and_adj_mat)
 
-        _file_config = BaseConfig.FILE_CONFIGURATIONS.get(data_type)
+        _file_config = Config.FILE_CONFIGURATIONS.get(data_type)
         _fig, _ax = plt.subplots(figsize=(10, 10))
 
         _position_dict = nx.get_node_attributes(graph, 'pos')
         if adjust_axis and _position_dict is not None:
             __positions_array = np.array([_position_dict[node] for node in graph.nodes()])
             __positions_array[:, [1, 0]] = __positions_array[:, [0, 1]]
-            __positions_array[:, 1] = BaseConfig.DEFAULT_FRAME_RANGE - __positions_array[:, 1]
+            __positions_array[:, 1] = Config.DEFAULT_FRAME_RANGE - __positions_array[:, 1]
             _position_dict = {node: pos for node, pos in zip(graph.nodes(), __positions_array)}
 
         _line_width = _file_config.line_width

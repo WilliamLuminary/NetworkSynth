@@ -4,7 +4,7 @@ import random
 import numpy as np
 from collections import defaultdict
 
-from config.base import BaseConfig
+from config.config import Config
 
 
 class GraphNode:
@@ -45,8 +45,8 @@ class GraphNode:
         cls.grid_size = graph_attributes.avg_length
         cls.closed_range = graph_attributes.avg_length
 
-        cls.closed_nodes_factor = BaseConfig.CLOSED_NODES_FACTOR
-        cls.closed_edges_factor = BaseConfig.CLOSED_EDGES_FACTOR
+        cls.closed_nodes_factor = Config.CLOSED_NODES_FACTOR
+        cls.closed_edges_factor = Config.CLOSED_EDGES_FACTOR
 
     def __init__(self, position, parent=None, parent_angle=None):
         self.id = GraphNode.id_counter

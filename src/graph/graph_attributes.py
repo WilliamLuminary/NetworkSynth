@@ -6,11 +6,11 @@ import networkx as nx
 import numpy as np
 from scipy.spatial.distance import euclidean
 
-from config.base import BaseConfig
+from config.config import Config
 from utils.network_utils import mapping
 
 
-class GraphAttributes(BaseConfig):
+class GraphAttributes(Config):
     def __init__(self, graph=None):
         self.graph = graph
         self.degree_distribution = None

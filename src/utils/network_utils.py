@@ -9,7 +9,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from numpy import ndarray
 
-from config.base import BaseConfig
+from config.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ def mapping(graph: nx.Graph, plot: bool = False) -> tuple:
 
 
 def calculate_frame(graph: nx.Graph = None, center_position: Union[tuple, list, ndarray] = None,
-                    frame_range: int = BaseConfig.DEFAULT_FRAME_RANGE) -> list:
+                    frame_range: int = Config.DEFAULT_FRAME_RANGE) -> list:
     if graph is None:
         if not center_position:
             raise ValueError("Either synthetic_graph or center_position must be provided.")

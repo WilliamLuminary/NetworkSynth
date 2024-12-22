@@ -10,12 +10,12 @@ from typing import Any, Union
 import cv2
 from numpy import ndarray
 
-from config.base import BaseConfig
+from config.config import Config
 from config.enums import DataType, FileTag
 from config.name_resolution_set import NameResolutionSet
 
 
-class OutputHandler(BaseConfig):
+class OutputHandler(Config):
 
     def __init__(self, name_res_set: NameResolutionSet):
         self.name_res_set = name_res_set
@@ -25,7 +25,7 @@ class OutputHandler(BaseConfig):
 
     @classmethod
     def initialize(cls):
-        cls.base_output_dir = os.path.join(BaseConfig.BASE_OUTPUT_PATH, f'results_{OutputHandler._time_id()}')
+        cls.base_output_dir = os.path.join(Config.BASE_OUTPUT_PATH, f'results_{OutputHandler._time_id()}')
         cls.ensure_directory(cls.base_output_dir)
         print(f"Created new directory: {cls.base_output_dir}")
 
@@ -61,7 +61,7 @@ class OutputHandler(BaseConfig):
             logging.debug(f"No existing file to delete at: {filepath}")
 
     def save_file(self, content: Any, data_type: DataType) -> None:
-        file_config = BaseConfig.FILE_CONFIGURATIONS[data_type]
+        file_config = Config.FILE_CONFIGURATIONS[data_type]
         rel_path = file_config.relative_dir
         file_name = f"{self._time_id()}.{file_config.file_type}"
         abs_path = os.path.join(self.name_res_output_dir, rel_path, file_name)

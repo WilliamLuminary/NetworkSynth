@@ -1,12 +1,12 @@
-# src/utils/base.py
+# src/utils/config.py
 import logging
 import os
 
-from config.enums import DataType
-from config.plot_config import *
+from enums import DataType
+from plot_config import *
 
 
-class BaseConfig:
+class Config:
     FILE_CONFIGURATIONS = {
         DataType.ORIGINAL_IMAGE: ImageConfig(
             relative_dir="origin",
@@ -67,7 +67,7 @@ class BaseConfig:
             console_handler = logging.StreamHandler()
             console_handler.setLevel(log_level)
 
-            logs_dir = os.path.join(BaseConfig.BASE_OUTPUT_PATH, 'logs')
+            logs_dir = os.path.join(Config.BASE_OUTPUT_PATH, 'logs')
             os.makedirs(logs_dir, exist_ok=True)
             file_handler = logging.FileHandler(os.path.join(logs_dir, 'project.log'))
             file_handler.setLevel(log_level)

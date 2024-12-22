@@ -1,4 +1,4 @@
-# src/data/graph_data_agent.py
+# src/data/data_agent.py
 import logging
 import os
 import re
@@ -8,7 +8,7 @@ from typing import Optional
 import cv2
 import numpy as np
 
-from config.base import BaseConfig
+from config.config import Config
 from config.name_resolution_set import NameResolutionSet
 from graph.graph_attributes import GraphAttributes
 from utils.network_utils import build_graph_pos_and_adj_mat
@@ -16,7 +16,7 @@ from utils.network_utils import build_graph_pos_and_adj_mat
 logger = logging.getLogger(__name__)
 
 
-class GraphDataAgent(BaseConfig):
+class DataAgent(Config):
     def __init__(self, name_res_set: NameResolutionSet):
         self.name_res_set = name_res_set
         self.set_name, self.resolution = str(self.name_res_set.set_name), str(self.name_res_set.resolution)
@@ -128,7 +128,7 @@ class GraphDataAgent(BaseConfig):
             raise FileNotFoundError(f"No {details} file found in {directory_path}.")
 
     @staticmethod
-    def _resize_image(image, target_size=BaseConfig.DEFAULT_FRAME_RANGE):
+    def _resize_image(image, target_size=Config.DEFAULT_FRAME_RANGE):
         _height, _width = image.shape
         _scaling_factor = target_size / max(_width, _height)
 

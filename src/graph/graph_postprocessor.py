@@ -3,12 +3,12 @@
 import networkx as nx
 from scipy.spatial.distance import euclidean
 
-from config.base import BaseConfig
-from data.graph_data_agent import GraphDataAgent
+from config.config import Config
+from handlers.data_agent import DataAgent
 
 
-class GraphPostProcessor(BaseConfig):
-    def __init__(self, synthetic_graph, data_agent: GraphDataAgent):
+class GraphPostProcessor(Config):
+    def __init__(self, synthetic_graph, data_agent: DataAgent):
         self.synthetic_graph = synthetic_graph
         self.original_graph_attributes = data_agent.attributes
 

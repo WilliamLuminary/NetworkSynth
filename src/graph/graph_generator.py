@@ -6,17 +6,17 @@ from typing import Union
 import networkx as nx
 from numpy import ndarray
 
-from config.base import BaseConfig
-from data.graph_data_agent import GraphDataAgent
+from config.config import Config
+from handlers.data_agent import DataAgent
 from graph.graph_node import GraphNode
 from utils.network_utils import calculate_frame, build_graph_nodes_and_edges
 
 
-class GraphGenerator(BaseConfig):
-    def __init__(self, graph_agent: GraphDataAgent):
+class GraphGenerator(Config):
+    def __init__(self, graph_agent: DataAgent):
         self.graph_agent = graph_agent
 
-    def generate_network(self, frame_range: int = BaseConfig.DEFAULT_FRAME_RANGE, regenerate_times: int = 100):
+    def generate_network(self, frame_range: int = Config.DEFAULT_FRAME_RANGE, regenerate_times: int = 100):
         for _ in range(regenerate_times):
             nodes, edges = self._generate_graph_by_nodes_and_edges(frame_range)
             if nodes and len(nodes) > 100:
@@ -29,7 +29,7 @@ class GraphGenerator(BaseConfig):
         synthetic_network = self._filter_graph(_synthetic_network, frame)
         return synthetic_network
 
-    def _generate_graph_by_nodes_and_edges(self, frame_range: int = BaseConfig.DEFAULT_FRAME_RANGE):
+    def _generate_graph_by_nodes_and_edges(self, frame_range: int = Config.DEFAULT_FRAME_RANGE):
         GraphNode.reset()
         GraphNode.initialize(self.graph_agent.attributes)
         root_node = GraphNode((0, 0))
