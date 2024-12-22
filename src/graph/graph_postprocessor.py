@@ -5,15 +5,13 @@ from scipy.spatial.distance import euclidean
 
 from config.base import BaseConfig
 from data.graph_data_agent import GraphDataAgent
-from utils.debug_utils import debugging
 
 
 class GraphPostProcessor(BaseConfig):
-    def __init__(self, synthethic_graph, data_agent: GraphDataAgent):
-        self.synthetic_graph = synthethic_graph
+    def __init__(self, synthetic_graph, data_agent: GraphDataAgent):
+        self.synthetic_graph = synthetic_graph
         self.original_graph_attributes = data_agent.attributes
 
-    @debugging
     def remove_nodes_and_edges_by_degree_distribution(self):
         target_avg_degree = self.original_graph_attributes.avg_degree
         graph = self.synthetic_graph.copy()
@@ -27,11 +25,11 @@ class GraphPostProcessor(BaseConfig):
         self.synthetic_graph = graph
 
     def assign_weights(self):
-        [_, map_length_to_weight, length_bins, weight_baskets, _] = self.original_graph_attributes.mapping_params
+        [_, map_length_to_weight, length_bins, weight_baskets, edge_weights] = self.original_graph_attributes.mapping_params
         edge_lengths = [euclidean(self.synthetic_graph.nodes[u]['pos'], self.synthetic_graph.nodes[v]['pos']) for u, v
                         in
                         self.synthetic_graph.edges()]
-        weights = [map_length_to_weight(length, length_bins, weight_baskets, y) for length in edge_lengths]
+        weights = [map_length_to_weight(length, length_bins, weight_baskets, edge_weights) for length in edge_lengths]
         for (u, v), weight in zip(self.synthetic_graph.edges(), weights):
             self.synthetic_graph[u][v]['weight'] = weight
 
