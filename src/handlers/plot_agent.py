@@ -102,14 +102,14 @@ class PlotAgent(Config):
 
         if 'show' in kwargs and kwargs['show']:
             plt.show()
-        _graph = self._figure_to_ndarray_direct(plt)
+        _graph = self._figure_to_ndarray_direct(_fig)
         plt.close()
         return _graph
 
     @staticmethod
-    def _figure_to_ndarray_direct(fig: plt) -> ndarray:
-        _canvas = FigureCanvas(fig)
-        _canvas.draw()
-        _buf = _canvas.buffer_rgba()
-        _image = np.asarray(_buf)
-        return _image
+    def _figure_to_ndarray_direct(fig: Figure) -> ndarray:
+        canvas = FigureCanvas(fig)
+        canvas.draw()
+        buf = canvas.buffer_rgba()
+        image_array = np.asarray(buf)
+        return image_array
