@@ -6,12 +6,13 @@ from queue import Queue
 from typing import Optional
 
 import cv2
+import networkx as nx
 import numpy as np
+from numpy import ndarray
 
-from config.config import Config
-from config.name_resolution_set import NameResolutionSet
-from graph.graph_attributes import GraphAttributes
-from utils.network_utils import build_graph_pos_and_adj_mat
+from config import Config, NameResolutionSet
+from graph import GraphAttributes
+from utils import build_graph_pos_and_adj_mat
 
 logger = logging.getLogger(__name__)
 
@@ -33,11 +34,11 @@ class DataAgent(Config):
     def load_data(self):
         logger.info(f"Loading data for {self.name_res_set}")
         self.positions_of_nodes = self._load_positions()
-        self.positions_of_nodes = self._adjust_positions(self.positions_of_nodes)
         self.adjacency_matrix = self._load_sparse_matrix()
         self.original_image = self._resize_image(self._load_image())
         self.original_graph = build_graph_pos_and_adj_mat((self.positions_of_nodes,
                                                            self.adjacency_matrix))
+        self._transform_graph_positions(self.original_graph, rotation_deg=270)
         logger.info(f"Data successfully loaded for {self.name_res_set}")
 
     def add_synthetic_graph(self, graph):
@@ -139,16 +140,45 @@ class DataAgent(Config):
         return resized_image
 
     @staticmethod
-    def _adjust_positions(positions, flip_axes=False, invert_y=False, scale_factor=None):
-        positions_array = np.array([positions[node] for node in positions])
+    def _transform_positions(positions, flip_x=False, flip_y=False, rotation_deg=0):
+        c = Config.DEFAULT_FRAME_RANGE / 2
+        positions -= c
+        if flip_x:
+            positions[:, 0] = -positions[:, 0]
+        if flip_y:
+            positions[:, 1] = -positions[:, 1]
+        if rotation_deg == 90:
+            x = -positions[:, 1].copy()
+            positions[:, 1] = positions[:, 0]
+            positions[:, 0] = x
+        elif rotation_deg == 180:
+            positions = -positions
+        elif rotation_deg == 270:
+            x = positions[:, 1].copy()
+            positions[:, 1] = -positions[:, 0]
+            positions[:, 0] = x
+        positions += c
+        return positions
 
-        if flip_axes:
-            positions_array[:, [1, 0]] = positions_array[:, [0, 1]]
-
-        if invert_y:
-            positions_array[:, 1] = scale_factor - positions_array[:, 1] if scale_factor else -positions_array[:, 1]
-
-        adjusted_positions = {node: pos for node, pos in zip(positions.keys(), positions_array)}
-        return adjusted_positions
-
-
+    @staticmethod
+    def _transform_graph_positions(graph, flip_x=False, flip_y=False, rotation_deg=0):
+        c = Config.DEFAULT_FRAME_RANGE / 2
+        for node, d in graph.nodes(data=True):
+            p = np.array(d.get('pos', [0, 0]), dtype=np.float64)
+            p -= c
+            if flip_x:
+                p[0] = -p[0]
+            if flip_y:
+                p[1] = -p[1]
+            if rotation_deg == 90:
+                px = -p[1]
+                py = p[0]
+                p[0], p[1] = px, py
+            elif rotation_deg == 180:
+                p = -p
+            elif rotation_deg == 270:
+                px = p[1]
+                py = -p[0]
+                p[0], p[1] = px, py
+            p += c
+            d['pos'] = p
