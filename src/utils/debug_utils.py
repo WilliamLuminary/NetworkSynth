@@ -1,8 +1,8 @@
 # src/utils/debug_utils.py
 
-import builtins
 import functools
 import time
+
 from rich import print as rich_print
 
 DEBUG = False
@@ -21,3 +21,4 @@ def timer(func):
             return func(*args, **kwargs)
 
     return wrapper
+
