@@ -3,22 +3,22 @@
 import networkx as nx
 
 from config import Config
-from handlers import DataAgent
+from handlers import Mapper
 
 
 class GraphPostProcessor(Config):
-    def __init__(self, synthetic_graph, data_agent: DataAgent):
+    def __init__(self, synthetic_graph: nx.Graph, mapper: Mapper, tar_avg_deg: float):
         self.synthetic_graph = synthetic_graph
-        self.data_agent = data_agent
+        self.map_handler = mapper
+        self.tar_avg_deg = tar_avg_deg
 
     def trim_graph(self):
         """
         Trim the synthetic graph to have an average degree close to the original graph.
         """
         _graph = self.synthetic_graph
-        target_avg_degree = self.data_agent.attributes.avg_degree
 
-        while 2 * _graph.number_of_edges() / _graph.number_of_nodes() > 1.1 * target_avg_degree:
+        while 2 * _graph.number_of_edges() / _graph.number_of_nodes() > 1.1 * self.tar_avg_deg:
             highest_degree_node = max(_graph.degree, key=lambda x: x[1])[0]
             neighbors = list(_graph.neighbors(highest_degree_node))
             if neighbors:
@@ -28,7 +28,7 @@ class GraphPostProcessor(Config):
         self.synthetic_graph = _graph
 
     def assign_weights(self):
-        self.data_agent.map_handler.assign_weights(self.synthetic_graph)
+        self.map_handler.assign_weights(self.synthetic_graph)
 
     @staticmethod
     def _keep_largest_connected_component(graph):

@@ -12,44 +12,49 @@ from config import Config
 
 class GraphNode:
     id_counter: int = 0
-    node_grid: DefaultDict[tuple[float, float], set] = defaultdict(set)
-    edge_grid: DefaultDict[Tuple[int, int], Set[Tuple[Tuple[float, float], Tuple[float, float]]]] = defaultdict(set)
-    aborted_edge: int = 0
-    merged_edge: int = 0
+    node_grid: DefaultDict[tuple[float, float], set] = None
+    edge_grid: DefaultDict[Tuple[int, int], Set[Tuple[Tuple[float, float], Tuple[float, float]]]] = None
+    _aborted_edge: int = 0
+    _merged_edge: int = 0
 
     # Class-level properties
-    degree_distribution = {}
-    degree_transition_probs = {}
-    degree_angles = {}
-    degree_edge_lengths = {}
-    avg_length: float = 0
+    _degree_dist = {}
+    _degree_trans_probs = {}
+    _degree_angles = {}
+    _degree_edge_lengths = {}
+    _avg_length: float = 0
 
-    # Parameters
-    closed_range = 0
-    closed_nodes_factor = 0
-    closed_edges_factor = 0
-    grid_size = 0
+    # Class-level Parameters
+    _closed_nodes_thr = 0
+    _closed_edges_thr = 0
+    _closed_nodes_factor = 0
+    _closed_edges_factor = 0
+    _grid_size = 0
 
     @classmethod
     def reset(cls):
         cls.id_counter = 0
         cls.node_grid.clear()
         cls.edge_grid.clear()
-        cls.aborted_edge = 0
-        cls.merged_edge = 0
+        cls._aborted_edge = 0
+        cls._merged_edge = 0
 
     @classmethod
     def initialize(cls, graph_attributes):
-        cls.degree_distribution = graph_attributes.degree_distribution
-        cls.degree_transition_probs = graph_attributes.degree_transition_probs
-        cls.degree_angles = graph_attributes.degree_angles
-        cls.degree_edge_lengths = graph_attributes.degree_edge_lengths
-        cls.avg_length = graph_attributes.avg_length
-        cls.grid_size = graph_attributes.avg_length
-        cls.closed_range = graph_attributes.avg_length
+        cls._degree_dist = graph_attributes.degree_dist
+        cls._degree_trans_probs = graph_attributes.degree_trans_probs
+        cls._degree_angles = graph_attributes.degree_angles
+        cls._degree_edge_lengths = graph_attributes.degree_edge_lengths
+        cls._avg_length = graph_attributes.avg_length
 
-        cls.closed_nodes_factor = Config.CLOSED_NODES_FACTOR
-        cls.closed_edges_factor = Config.CLOSED_EDGES_FACTOR
+        cls._closed_nodes_factor = Config.CLOSED_NODES_FACTOR
+        cls._closed_edges_factor = Config.CLOSED_EDGES_FACTOR
+        cls._closed_nodes_thr = graph_attributes.avg_length * Config.CLOSED_NODES_FACTOR
+        cls._closed_edges_thr = graph_attributes.avg_length * Config.CLOSED_EDGES_FACTOR
+        cls._grid_size = graph_attributes.avg_length
+
+        cls.node_grid = defaultdict(set)
+        cls.edge_grid = defaultdict(set)
 
     def __init__(self, position, parent=None, parent_angle=None):
         """
@@ -58,7 +63,9 @@ class GraphNode:
         """
         self.id: int = GraphNode.id_counter
         GraphNode.id_counter += 1
+
         self.position: Tuple[float, float] = position  # position <- (x, y)
+        self.clockwise = random.choice([True, False])
         self.parent: GraphNode = parent
         self.children: List[GraphNode] = []
         if parent is not None and parent_angle is not None:
@@ -74,18 +81,18 @@ class GraphNode:
 
     @staticmethod
     def _choose_degree_random() -> int:
-        degrees = list(GraphNode.degree_distribution.keys())
-        probabilities = list(GraphNode.degree_distribution.values())
+        degrees = list(GraphNode._degree_dist.keys())
+        probabilities = list(GraphNode._degree_dist.values())
         return np.random.choice(degrees, p=probabilities)
 
     @staticmethod
     def _choose_degree_by_parent(parent_degree) -> int:
-        degrees = list(GraphNode.degree_transition_probs[parent_degree].keys())
-        probabilities = list(GraphNode.degree_transition_probs[parent_degree].values())
+        degrees = list(GraphNode._degree_trans_probs[parent_degree].keys())
+        probabilities = list(GraphNode._degree_trans_probs[parent_degree].values())
         return np.random.choice(degrees, p=probabilities)
 
     def _initialize_root_node(self) -> None:
-        length = random.choice(GraphNode.degree_edge_lengths[self.degree])
+        length = random.choice(GraphNode._degree_edge_lengths[self.degree])
         child_position = self._polar_to_cartesian([length], [self.base_angle])[0]
         child = GraphNode(child_position, parent=self, parent_angle=self.base_angle)
         self._add_child(child)
@@ -121,7 +128,7 @@ class GraphNode:
 
         for child_position, angle in zip(children_positions, angles):
             if self._find_close_edge(child_position):  # Avoid closed edges
-                GraphNode.aborted_edge += 1
+                GraphNode._aborted_edge += 1
                 continue
             close_node = self._get_closest_valid_node(child_position)
             new_edge = (self.position, child_position)
@@ -130,9 +137,9 @@ class GraphNode:
                 if not self._check_intersection(new_edge):
                     self._add_child(close_node)
                     self._add_edge_to_grid(new_edge)
-                    GraphNode.merged_edge += 1
+                    GraphNode._merged_edge += 1
                 else:
-                    GraphNode.aborted_edge += 1
+                    GraphNode._aborted_edge += 1
             else:
                 if not self._check_intersection(new_edge):
                     child_node = GraphNode(child_position, parent=self, parent_angle=angle)
@@ -140,7 +147,7 @@ class GraphNode:
                     self._add_edge_to_grid(new_edge)
                     self._add_to_grid(child_node.position)
                 else:
-                    GraphNode.aborted_edge += 1
+                    GraphNode._aborted_edge += 1
         return True
 
     def _get_closest_valid_node(self, position):
@@ -150,7 +157,6 @@ class GraphNode:
         return None
 
     def _find_close_node(self, position):
-        threshold = GraphNode.grid_size * GraphNode.closed_nodes_factor
         key = self._spatial_hash(position)
         neighboring_keys = [
             (key[0] + dx, key[1] + dy)
@@ -162,7 +168,7 @@ class GraphNode:
             for node in GraphNode.node_grid[neighbor_key]:
                 if node != self and node not in self.children:
                     distance = np.linalg.norm(np.array(node.position) - np.array(position))
-                    if distance < threshold:
+                    if distance < self._closed_nodes_thr:
                         close_nodes_with_distances.append((node, distance))
         return close_nodes_with_distances
 
@@ -180,7 +186,6 @@ class GraphNode:
         return False
 
     def _is_non_sibling_edge(self, edge, position):
-        _threshold = GraphNode.grid_size * GraphNode.closed_edges_factor
         if self.parent and (self.parent.position in edge or self.position in edge):
             return False  # Skip edges from the same parent
         p1, p2 = edge
@@ -188,15 +193,15 @@ class GraphNode:
             euclidean(position, p1),
             euclidean(position, p2)
         ]
-        return any(_distance < _threshold for _distance in _distances)
+        return any(_distance < self._closed_edges_thr for _distance in _distances)
 
     def _generate_angles_and_lengths(self) -> Tuple[list[float], list[float]]:
         if self.degree == 1:
             return [], []
-        angles = random.choices(GraphNode.degree_angles[self.degree], k=self.degree - 1)
-        angles = np.cumsum(angles)
+        angles = random.choices(GraphNode._degree_angles[self.degree], k=self.degree - 1)
+        angles = np.cumsum(angles) if self.clockwise else np.cumsum([-angle for angle in angles])
         angles = (angles + self.base_angle).tolist()
-        lengths = random.choices(GraphNode.degree_edge_lengths[self.degree], k=self.degree - 1)
+        lengths = random.choices(GraphNode._degree_edge_lengths[self.degree], k=self.degree - 1)
         return angles, lengths
 
     def _polar_to_cartesian(self, lengths: List[float], angles: List[float]) -> List[Tuple[float, float]]:
@@ -222,12 +227,12 @@ class GraphNode:
 
     @staticmethod
     def _spatial_hash(position: Tuple[float, float]) -> Tuple[int, int]:
-        grid_size = GraphNode.grid_size
+        grid_size = GraphNode._grid_size
         return int(position[0] // grid_size), int(position[1] // grid_size)
 
     @staticmethod
     def _edge_spatial_hash(p1: Tuple[float, float], p2: Tuple[float, float]) -> Set[Tuple[int, int]]:
-        grid_size = GraphNode.grid_size
+        grid_size = GraphNode._grid_size
         x_min, x_max = sorted([p1[0], p2[0]])
         y_min, y_max = sorted([p1[1], p2[1]])
         keys = {(int(x // grid_size), int(y // grid_size))

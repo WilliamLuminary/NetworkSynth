@@ -2,16 +2,16 @@
 import logging
 import os
 import re
-from queue import Queue
 from typing import Optional
 
 import cv2
+import networkx as nx
 import numpy as np
 
 from config import Config, NameResolutionSet
-from graph import GraphAttributes
+from graph import GraphAttrAgent
+from handlers.mapper import Mapper
 from utils import build_graph_pos_and_adj_mat
-from handlers.mapper import MapHandler
 
 logger = logging.getLogger(__name__)
 
@@ -26,10 +26,10 @@ class DataAgent(Config):
         self.original_image = None
         self.original_graph = None
 
-        self.attributes: Optional[GraphAttributes] = None
-        self.map_handler = None
+        self.attributes: Optional[GraphAttrAgent] = None
+        self.mapper = None
 
-        self.synthetic_graphs = Queue()
+        self.synthetic_graphs = []
 
     def load_data(self):
         logger.info(f"Loading data for {self.name_res_set}")
@@ -39,14 +39,22 @@ class DataAgent(Config):
         self.original_graph = build_graph_pos_and_adj_mat((self.positions_of_nodes,
                                                            self.adjacency_matrix))
         self._transform_graph_positions(self.original_graph, rotation_deg=270)
-        self.map_handler = MapHandler(self.original_graph)
+        self.mapper = Mapper(self.original_graph)
         logger.info(f"Data successfully loaded for {self.name_res_set}")
 
-    def add_synthetic_graph(self, graph):
-        self.synthetic_graphs.put(graph)
+    def add_synthetic_graph(self, graph: nx.Graph):
+        """
+        Add a synthetic graph to the list of synthetic graphs.
+        NOT THREAD-SAFE.
+        """
+        # warn_mesg = 'Adding synthetic graphs is not thread-safe.
+        # Use with caution.'
+        # warnings.warn(warn_mesg)
+        # logger.warning(warn_mesg)
+        self.synthetic_graphs.extend(graph)
 
-    def get_synthetic_graph(self):
-        return self.synthetic_graphs.get() if not self.synthetic_graphs.empty() else None
+    # def get_synthetic_graph(self):
+    #     return self.synthetic_graphs.get() if not self.synthetic_graphs.empty() else None
 
     def set_attributes(self, attributes):
         self.attributes = attributes

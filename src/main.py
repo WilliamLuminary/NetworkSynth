@@ -6,8 +6,8 @@ from scipy.spatial.distance import euclidean
 from tqdm import tqdm
 
 from config import NameResolutionSet, Config, DataType, Resolution, SetName
-from graph import GraphAttributes, GraphGenerator, GraphPostProcessor
-from handlers import DataAgent, MultifractalAnalyzer, Saver, PlotAgent
+from graph import GraphAttrAgent, GraphGenerator, GraphPostProcessor
+from handlers import DataAgent, MultifractalAnalyzer, Saver, Plotter
 
 Config.initialize()
 logger = logging.getLogger(__name__)
@@ -22,14 +22,11 @@ def generate_and_process_graphs(data_agent: DataAgent):
     org_analyzer = MultifractalAnalyzer(data_agent.original_graph)
     org_alpha_0, org_width = org_analyzer.multifractal_analysis()
 
-    plot_agent = PlotAgent(data_agent)
-
+    plot_agent = Plotter(data_agent.original_image, data_agent.original_graph)
     graph = plot_agent.plot_graph(
         data_type=DataType.ORIGINAL_GRAPH,
         show=True,
-        alpha=0.6
     )
-
     output_handler.save_file(graph, DataType.ORIGINAL_GRAPH)
 
     # Generate synthetic graphs
@@ -38,9 +35,11 @@ def generate_and_process_graphs(data_agent: DataAgent):
     num_syn_graph = Config.SYNTHETIC_GRAPH_NUMBER
     error_threshold = Config.ERROR_TOLERANCE
 
+    _errors = []
+
     synthetic_graph = None
-    generator = GraphGenerator(data_agent)
-    for _ in tqdm(range(num_syn_nw), desc="Generating Graphs", ncols=80):
+    generator = GraphGenerator(data_agent.attributes)
+    for _ in tqdm(range(num_syn_nw), desc="Generating Graphs"):
 
         error = float('inf')
         attempt = 0
@@ -49,7 +48,8 @@ def generate_and_process_graphs(data_agent: DataAgent):
 
             _synthetic_graph = generator.generate_network()
 
-            postprocessor = GraphPostProcessor(_synthetic_graph, data_agent)
+            postprocessor = GraphPostProcessor(_synthetic_graph, data_agent.mapper,
+                                               data_agent.attributes.avg_degree)
             postprocessor.trim_graph()
             postprocessor.assign_weights()
             synthetic_graph = postprocessor.synthetic_graph
@@ -72,9 +72,11 @@ def generate_and_process_graphs(data_agent: DataAgent):
 
         if preview:
             return
+        _errors.extend(error)
         data_agent.add_synthetic_graph(synthetic_graph)
 
-    output_handler.save_file(list(data_agent.synthetic_graphs.queue), DataType.SYNTHETIC_NETWORK)
+    output_handler.save_file(data_agent.synthetic_graphs, DataType.SYNTHETIC_NETWORK,
+                             file_name_prefix=f'error:{errors.mean():.2f}')
 
 
 save_plots = True
@@ -94,6 +96,6 @@ if __name__ == '__main__':
             logger.info(f"Processing {name_res_set}")
             data_loader = DataAgent(name_res_set)
             data_loader.load_data()
-            graph_attr = GraphAttributes(data_loader.original_graph)
+            graph_attr = GraphAttrAgent(data_loader.original_graph)
             data_loader.set_attributes(graph_attr)
             generate_and_process_graphs(data_loader)

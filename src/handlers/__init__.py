@@ -3,5 +3,5 @@
 from .data_agent import DataAgent
 from .multifractal_analyzer import MultifractalAnalyzer
 from .saver import Saver
-from .plot_agent import PlotAgent
-from .mapper import MapHandler
+from .plotter import Plotter
+from .mapper import Mapper

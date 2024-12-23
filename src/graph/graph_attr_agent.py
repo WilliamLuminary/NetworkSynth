@@ -1,4 +1,4 @@
-# src/original_graph/graph_attributes.py
+# src/original_graph/graph_attr_agent.py
 
 from collections import Counter, defaultdict
 
@@ -9,11 +9,11 @@ from scipy.spatial.distance import euclidean
 from config.config import Config
 
 
-class GraphAttributes(Config):
+class GraphAttrAgent(Config):
     def __init__(self, graph=None):
         self.graph = graph
-        self.degree_distribution = None
-        self.degree_transition_probs = None
+        self.degree_dist = None
+        self.degree_trans_probs = None
         self.degree_angles = None
         self.degree_edge_lengths = None
         self.avg_degree = None
@@ -35,7 +35,7 @@ class GraphAttributes(Config):
         degrees = [d for n, d in self.graph.degree()]
         degree_counts = Counter(degrees)
         total_nodes = self.graph.number_of_nodes()
-        self.degree_distribution = {k: v / total_nodes for k, v in degree_counts.items()}
+        self.degree_dist = {k: v / total_nodes for k, v in degree_counts.items()}
 
     def compute_degree_transition_probs(self):
         degree_neighbors = defaultdict(list)
@@ -45,11 +45,11 @@ class GraphAttributes(Config):
             neighbor_degrees = [degrees[neighbor] for neighbor in neighbors]
             degree_neighbors[node_degree].extend(neighbor_degrees)
 
-        self.degree_transition_probs = {}
+        self.degree_trans_probs = {}
         for degree, neighbor_degrees in degree_neighbors.items():
             counts = Counter(neighbor_degrees)
             total = sum(counts.values())
-            self.degree_transition_probs[degree] = {k: v / total for k, v in counts.items()}
+            self.degree_trans_probs[degree] = {k: v / total for k, v in counts.items()}
 
     def compute_edge_lengths_and_angles(self):
         self.degree_edge_lengths = defaultdict(list)

@@ -10,12 +10,12 @@ from scipy.spatial.distance import euclidean
 logger = logging.getLogger(__name__)
 
 
-class MapHandler:
     mapped_weights = None
     length_bins = None
     weight_baskets = None
     edge_weights = None
 
+class Mapper:
     def __init__(self, graph: nx.Graph):
         self._initialize_mapper(graph)
         self.assign_weights(graph)

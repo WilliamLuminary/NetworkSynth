@@ -7,14 +7,14 @@ import networkx as nx
 from numpy import ndarray
 
 from config import Config
-from handlers import DataAgent
+from utils import build_graph_nodes_and_edges, calculate_frame
+from . import GraphAttrAgent
 from .graph_node import GraphNode
-from utils import calculate_frame, build_graph_nodes_and_edges
 
 
 class GraphGenerator(Config):
-    def __init__(self, graph_agent: DataAgent):
-        self.graph_agent = graph_agent
+    def __init__(self, attributes: GraphAttrAgent):
+        GraphNode.initialize(attributes)
 
     def generate_network(self, frame_range: int = Config.DEFAULT_FRAME_RANGE, regenerate_times: int = 100):
         for _ in range(regenerate_times):
@@ -31,7 +31,6 @@ class GraphGenerator(Config):
 
     def _generate_graph_by_nodes_and_edges(self, frame_range: int = Config.DEFAULT_FRAME_RANGE):
         GraphNode.reset()
-        GraphNode.initialize(self.graph_agent.attributes)
         root_node = GraphNode((0, 0))
         node_set, edge_set = {root_node}, set()
         frame = calculate_frame(center_position=root_node.position, frame_range=round(frame_range * 1.1))

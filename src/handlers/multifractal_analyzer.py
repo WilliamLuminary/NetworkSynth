@@ -11,7 +11,7 @@ from scipy.stats import linregress
 class MultifractalAnalyzer:
     Q = [q / 100 for q in range(-300, 301, 10)]
 
-    def __init__(self, graph):
+    def __init__(self, graph: nx.Graph):
         self.graph = graph
 
     def multifractal_analysis(self):
