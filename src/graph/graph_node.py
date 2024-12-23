@@ -120,12 +120,12 @@ class GraphNode:
         assert len(children_positions) == self.degree - 1
 
         for child_position, angle in zip(children_positions, angles):
-            if self._find_close_edge(child_position):  # Avoid closed edges if close to existing edges
+            if self._find_close_edge(child_position):  # Avoid closed edges
                 GraphNode.aborted_edge += 1
                 continue
             close_node = self._get_closest_valid_node(child_position)
             new_edge = (self.position, child_position)
-            if close_node is not None:
+            if close_node is not None:  # Merge closed nodes
                 new_edge = (self.position, close_node.position)
                 if not self._check_intersection(new_edge):
                     self._add_child(close_node)
