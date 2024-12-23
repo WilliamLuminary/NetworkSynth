@@ -40,7 +40,9 @@ class Config:
     SYNTHETIC_GRAPH_NUMBER = 1
     SYNTHETIC_NETWORK_NUMBER = 1
     MAX_ATTEMPTS = 10
-    ERROR_TOLERANCE = 0.15
+    ERROR_TOLERANCE = 1  # Generally should be 0.15
+
+    LOG_LEVEL = logging.INFO
 
     SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
     PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '..', '..'))
@@ -80,4 +82,14 @@ class Config:
 
     @classmethod
     def initialize(cls):
-        cls._setup_logger()
+        cls._setup_logger(cls.LOG_LEVEL)
+
+    @classmethod
+    def set_node_factor(cls, factor: float):
+        cls.CLOSED_NODES_FACTOR = factor
+        logging.info(f"Set CLOSED_NODES_FACTOR to {factor}")
+
+    @classmethod
+    def set_edge_factor(cls, factor: float):
+        cls.CLOSED_EDGES_FACTOR = factor
+        logging.info(f"Set CLOSED_EDGES_FACTOR to {factor}")
