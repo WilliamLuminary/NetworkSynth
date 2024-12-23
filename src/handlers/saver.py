@@ -21,7 +21,7 @@ class Saver(Config):
         self.name_res_set = name_res_set
         self.name_res_output_dir = os.path.join(self.base_output_dir, str(name_res_set.set_name),
                                                 str(name_res_set.resolution))
-        self.ensure_directory(self.name_res_output_dir)
+        self.ensure_directory(self.name_res_output_dir, exist_ok=True)
 
     @classmethod
     def initialize(cls):
@@ -67,11 +67,13 @@ class Saver(Config):
     def save_file(self, content: Any, data_type: DataType, file_name_prefix: Optional[str] = None) -> None:
         file_config = Config.FILE_CONFIGURATIONS[data_type]
         rel_path = file_config.relative_dir
-        if file_name_prefix and file_name_prefix[-1] is not '_':
-            file_name_prefix += '_'
-        if file_config.detail and file_config.detail[-1] is not '_':
-            file_config.detail += '_'
-        file_name = f"{file_name_prefix}{file_config.detail}{self._time_id()}.{file_config.file_extension}"
+
+        file_name_prefix = (file_name_prefix + '_') if file_name_prefix and file_name_prefix[-1] != '_' else (
+                file_name_prefix or '')
+        file_detail = (file_config.detail + '_') if file_config.detail and file_config.detail[-1] != '_' else (
+                file_config.detail or '')
+        file_name = f"{file_name_prefix}{file_detail}{self._time_id()}.{file_config.file_extension}"
+
         abs_path = os.path.join(self.name_res_output_dir, rel_path, file_name)
         self.ensure_directory(os.path.dirname(abs_path), exist_ok=True)
 
