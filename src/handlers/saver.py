@@ -1,4 +1,4 @@
-# src/utils/output_handler.py
+# src/utils/saver.py
 
 import datetime
 import logging
@@ -15,7 +15,7 @@ from config import Config, DataType, FileTag, NameResolutionSet
 logger = logging.getLogger(__name__)
 
 
-class OutputHandler(Config):
+class Saver(Config):
 
     def __init__(self, name_res_set: NameResolutionSet):
         self.name_res_set = name_res_set
@@ -25,7 +25,7 @@ class OutputHandler(Config):
 
     @classmethod
     def initialize(cls):
-        cls.base_output_dir = os.path.join(Config.BASE_OUTPUT_PATH, f'results_{OutputHandler._time_id()}')
+        cls.base_output_dir = os.path.join(Config.BASE_OUTPUT_PATH, f'results_{Saver._time_id()}')
         cls.ensure_directory(cls.base_output_dir)
         logger.info(f"Created new directory: {cls.base_output_dir}")
 
@@ -72,9 +72,9 @@ class OutputHandler(Config):
         self.ensure_directory(os.path.dirname(abs_path), exist_ok=True)
 
         if FileTag.FIG in data_type.tags:
-            OutputHandler._save_image(content, abs_path)
+            Saver._save_image(content, abs_path)
         elif FileTag.DATA in data_type.tags:
-            OutputHandler._save_pickle(content, abs_path)
+            Saver._save_pickle(content, abs_path)
         else:
             raise ValueError(f"Unsupported DataType for saving: {data_type}")
 
