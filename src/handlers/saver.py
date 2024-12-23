@@ -67,6 +67,7 @@ class Saver(Config):
     def save_file(self, content: Any, data_type: DataType, file_name_prefix: Optional[str] = None) -> None:
         if Config.DISABLE_SAVING:
             logger.warning(f"{Config.REASON}. Saving is disabled. ")
+            return
 
         file_config = Config.FILE_CONFIGURATIONS[data_type]
         rel_path = file_config.relative_dir

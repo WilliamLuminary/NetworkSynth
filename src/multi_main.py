@@ -94,6 +94,7 @@ def run(name_res_set: NameResolutionSet) -> None:
 def exp_hyper_tuning(data_agent, plotter, saver, mult_ans_res):
     closed_nodes_factors = [round(0.1 + 0.1 * i, 1) for i in range(20)]
     closed_edges_factors = [round(0.1 + 0.1 * i, 1) for i in range(20)]
+    Config.disable_saving()
     for _nod_fac, _edg_fac in product(closed_nodes_factors, closed_edges_factors):
         Config.disable_saving()
         Config.set_node_factor(_nod_fac)
