@@ -1,13 +1,12 @@
 # src/original_graph/graph_attributes.py
 
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
 
 import networkx as nx
 import numpy as np
 from scipy.spatial.distance import euclidean
 
 from config.config import Config
-from utils.network_utils import mapping
 
 
 class GraphAttributes(Config):
@@ -31,7 +30,6 @@ class GraphAttributes(Config):
         self.compute_degree_transition_probs()
         self.compute_edge_lengths_and_angles()
         self.compute_average_degree()
-        self.mapping_params = mapping(self.graph)
 
     def compute_degree_distribution(self):
         degrees = [d for n, d in self.graph.degree()]

@@ -6,13 +6,12 @@ from queue import Queue
 from typing import Optional
 
 import cv2
-import networkx as nx
 import numpy as np
-from numpy import ndarray
 
 from config import Config, NameResolutionSet
 from graph import GraphAttributes
 from utils import build_graph_pos_and_adj_mat
+from utils.network_utils import MapHandler
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +27,7 @@ class DataAgent(Config):
         self.original_graph = None
 
         self.attributes: Optional[GraphAttributes] = None
+        self.map_handler = None
 
         self.synthetic_graphs = Queue()
 
@@ -39,6 +39,7 @@ class DataAgent(Config):
         self.original_graph = build_graph_pos_and_adj_mat((self.positions_of_nodes,
                                                            self.adjacency_matrix))
         self._transform_graph_positions(self.original_graph, rotation_deg=270)
+        self.map_handler = MapHandler(self.original_graph)
         logger.info(f"Data successfully loaded for {self.name_res_set}")
 
     def add_synthetic_graph(self, graph):
