@@ -65,6 +65,9 @@ class Saver(Config):
             logger.debug(f"No existing file to delete at: {filepath}")
 
     def save_file(self, content: Any, data_type: DataType, file_name_prefix: Optional[str] = None) -> None:
+        if Config.DISABLE_SAVING:
+            logger.warning(f"{Config.REASON}. Saving is disabled. ")
+
         file_config = Config.FILE_CONFIGURATIONS[data_type]
         rel_path = file_config.relative_dir
 

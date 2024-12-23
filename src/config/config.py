@@ -49,6 +49,9 @@ class Config:
         )
     }
 
+    DISABLE_SAVING: bool = False
+    REASON: str = ""
+
     SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
     PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '..', '..'))
     BASE_DATA_PATH = os.path.join(PROJECT_ROOT, 'data')
@@ -98,6 +101,16 @@ class Config:
     def set_edge_factor(cls, factor: float):
         cls.CLOSED_EDGES_FACTOR = factor
         logging.info(f"Set CLOSED_EDGES_FACTOR to {factor}")
+
+    @classmethod
+    def disable_saving(cls, reason: str = ""):
+        Config.DISABLE_SAVING = True
+        Config.REASON = reason
+
+    @classmethod
+    def enable_saving(cls, reason: str = ""):
+        Config.DISABLE_SAVING = False
+        Config.REASON = reason
 
     def __str__(self):
         _config = {
