@@ -163,10 +163,19 @@ cython_debug/
 
 # Private files
 /credentials/
-/data/input/*
-!/data/input/.keep
-/data/output/*
-!/data/output/.keep
+
+# Ignore everything in the data/input and data/output directories
+data/input/*
+data/output/*
+
+# Do not ignore the directories themselves
+!data/input/
+!data/output/
+
+# Ensure .keep files inside these directories are not ignored
+!data/input/.keep
+!data/output/.keep
+
 
 archieved/*
 !archieved/

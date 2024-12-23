@@ -86,7 +86,7 @@ def generate_and_process_graphs(data_agent: DataAgent, preview: bool = False):
 save_plots = True
 preview = False  # Set to True to only plot the original original_graph
 set_names = [SetName.D]
-resolutions = [Resolution.X10K]
+resolutions = [Resolution.X20K]
 
 if __name__ == '__main__':
     if preview:

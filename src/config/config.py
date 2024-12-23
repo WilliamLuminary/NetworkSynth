@@ -15,14 +15,14 @@ class Config:
         ),
         DataType.ORIGINAL_GRAPH: PlotConfig(
             relative_dir="origin",
-            node_size=4.0,
-            line_width=2.0,
+            node_size=6.0,
+            line_width=3.0,
             data_type=DataType.ORIGINAL_GRAPH,
         ),
         DataType.SYNTHETIC_GRAPH: PlotConfig(
             relative_dir="synthetic",
-            node_size=4.0,
-            line_width=2.0,
+            node_size=6.0,
+            line_width=3.0,
             data_type=DataType.SYNTHETIC_GRAPH,
         ),
         DataType.SYNTHETIC_NETWORK: FileConfig(
@@ -33,8 +33,8 @@ class Config:
 
     # Define base paths, this config file must be in the subdirectory of the project root
     DEFAULT_FRAME_RANGE = 510
-    CLOSED_NODES_FACTOR = 1
-    CLOSED_EDGES_FACTOR = 1.5
+    CLOSED_NODES_FACTOR = 0.6
+    CLOSED_EDGES_FACTOR = 0.8
 
     SYNTHETIC_GRAPH_NUMBER = 1
     SYNTHETIC_NETWORK_NUMBER = 1
