@@ -1,4 +1,4 @@
-# src/utils/plot_agent.py
+# src/utils/plotter.py
 
 from typing import Union
 
@@ -11,12 +11,12 @@ from numpy import ndarray
 
 from config import Config, DataType, FileTag
 from utils import build_graph_pos_and_adj_mat, calculate_frame
-from .data_agent import DataAgent
 
 
-class PlotAgent(Config):
-    def __init__(self, graph_data_agent: DataAgent):
-        self.graph_data_agent = graph_data_agent
+class Plotter(Config):
+    def __init__(self, original_image: ndarray, original_graph: nx.Graph):
+        self.original_graph = original_graph
+        self.original_image = original_image
 
     def plot_graph(self, data_type: DataType, graph: nx.Graph = None,
                    pos_and_adj_mat: Union[tuple, list, ndarray] = None,
@@ -36,7 +36,7 @@ class PlotAgent(Config):
                 if data_type is DataType.SYNTHETIC_GRAPH:
                     raise ValueError("Either `graph` or `position and adj matrix` must be provided.")
                 else:
-                    graph = self.graph_data_agent.original_graph
+                    graph = self.original_graph
             else:
                 graph = build_graph_pos_and_adj_mat(pos_and_adj_mat)
 
@@ -75,7 +75,7 @@ class PlotAgent(Config):
         _ax.set_ylim(_frame[1])
 
         if data_type is DataType.ORIGINAL_GRAPH:
-            _image = self.graph_data_agent.original_image
+            _image = self.original_image
             _image_extent = (0, _image.shape[1], 0, _image.shape[0])
             _alpha = getattr(_file_config, 'alpha', 1.0)
             _ax.imshow(_image, cmap='gray', extent=_image_extent, alpha=_alpha)
