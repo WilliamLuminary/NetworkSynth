@@ -51,7 +51,7 @@ class DataAgent(Config):
         # Use with caution.'
         # warnings.warn(warn_mesg)
         # logger.warning(warn_mesg)
-        self.synthetic_graphs.extend(graph)
+        self.synthetic_graphs.append(graph)
 
     # def get_synthetic_graph(self):
     #     return self.synthetic_graphs.get() if not self.synthetic_graphs.empty() else None

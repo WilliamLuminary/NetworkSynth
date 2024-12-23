@@ -2,6 +2,7 @@
 import logging
 import warnings
 
+import numpy as np
 from scipy.spatial.distance import euclidean
 from tqdm import tqdm
 
@@ -72,11 +73,11 @@ def generate_and_process_graphs(data_agent: DataAgent):
 
         if preview:
             return
-        _errors.extend(error)
+        _errors.append(error)
         data_agent.add_synthetic_graph(synthetic_graph)
 
     output_handler.save_file(data_agent.synthetic_graphs, DataType.SYNTHETIC_NETWORK,
-                             file_name_prefix=f'error:{errors.mean():.2f}')
+                             file_name_prefix=f'error:{np.mean(_errors):.2f}')
 
 
 save_plots = True
