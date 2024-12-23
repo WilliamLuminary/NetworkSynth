@@ -7,6 +7,19 @@ from .config_objects import FileConfig, ImageConfig, PlotConfig
 
 
 class Config:
+    # Define base paths, this config file must be in the subdirectory of the project root
+    DEFAULT_FRAME_RANGE = 510
+    CLOSED_NODES_FACTOR = 1.2
+    CLOSED_EDGES_FACTOR = 0.8
+    # For 10_kx image, node fac should be 1.5, and edge fac should be 1
+
+    SYNTHETIC_GRAPH_NUMBER = 3
+    SYNTHETIC_NETWORK_NUMBER = 100
+    MAX_ATTEMPTS = 10
+    ERROR_TOLERANCE = 1  # Generally should be 0.15
+
+    LOG_LEVEL = logging.INFO
+
     FILE_CONFIGURATIONS = {
         DataType.ORIGINAL_IMAGE: ImageConfig(
             relative_dir="origin",
@@ -28,21 +41,13 @@ class Config:
         DataType.SYNTHETIC_NETWORK: FileConfig(
             relative_dir="synthetic",
             data_type=DataType.SYNTHETIC_NETWORK,
+            detail=f"no_syn_nw_{SYNTHETIC_NETWORK_NUMBER}",
+        ),
+        DataType.DEFAULT_DATA: FileConfig(
+            relative_dir="",
+            data_type=DataType.DEFAULT_DATA,
         )
     }
-
-    # Define base paths, this config file must be in the subdirectory of the project root
-    DEFAULT_FRAME_RANGE = 510
-    CLOSED_NODES_FACTOR = 1.2
-    CLOSED_EDGES_FACTOR = 0.8
-    # For 10_kx image, node fac should be 1.5, and edge fac should be 1
-
-    SYNTHETIC_GRAPH_NUMBER = 1
-    SYNTHETIC_NETWORK_NUMBER = 1
-    MAX_ATTEMPTS = 10
-    ERROR_TOLERANCE = 1  # Generally should be 0.15
-
-    LOG_LEVEL = logging.INFO
 
     SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
     PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '..', '..'))
@@ -93,3 +98,14 @@ class Config:
     def set_edge_factor(cls, factor: float):
         cls.CLOSED_EDGES_FACTOR = factor
         logging.info(f"Set CLOSED_EDGES_FACTOR to {factor}")
+
+    def __str__(self):
+        _config = {
+            'frame_range': self.DEFAULT_FRAME_RANGE,
+            'closed_nodes_factor': self.CLOSED_NODES_FACTOR,
+            'closed_edges_factor': self.CLOSED_EDGES_FACTOR,
+            'no_syn_graph': self.SYNTHETIC_GRAPH_NUMBER,
+            'no_syn_network': self.SYNTHETIC_NETWORK_NUMBER,
+            'error_tolerance': self.ERROR_TOLERANCE,
+        }
+        return f"Config: {_config})"
