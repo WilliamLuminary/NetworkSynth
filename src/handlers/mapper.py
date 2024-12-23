@@ -1,5 +1,6 @@
 import logging
 import random
+import warnings
 from collections import defaultdict
 
 import networkx as nx
@@ -10,13 +11,11 @@ from scipy.spatial.distance import euclidean
 logger = logging.getLogger(__name__)
 
 
-    mapped_weights = None
-    length_bins = None
-    weight_baskets = None
-    edge_weights = None
-
 class Mapper:
     def __init__(self, graph: nx.Graph):
+        self.length_bins = None
+        self.weight_baskets = None
+        self.edge_weights = None
         self._initialize_mapper(graph)
         self.assign_weights(graph)
 
@@ -33,6 +32,9 @@ class Mapper:
         self.length_bins, self.weight_baskets = self._bins_and_baskets(edge_lengths, self.edge_weights, num_bins)
 
         if plot:
+            warn_mesg = 'Plotting is not thread-safe. Use with caution.'
+            warnings.warn(warn_mesg)
+            logger.warning(warn_mesg)
             mapped_weights = [self._map_weight_by_length(length)
                               for length in edge_lengths]
             plt.figure(figsize=(8, 6))
