@@ -3,12 +3,31 @@
 SCRIPT_DIR="$(dirname "$0")"
 
 BLUE='\033[38;5;33m'
+RED='\033[38;5;196m'
 RESET='\033[0m'
 
 echo -e "${BLUE}Starting full setup for Git and Emacs deployment on Colab...${RESET}"
 
-"$SCRIPT_DIR/setup_git.sh" || { echo "Git setup failed"; exit 1; }
-"$SCRIPT_DIR/setup_install.sh" || { echo "Failed to update and install"; exit 1; }
-"$SCRIPT_DIR/setup_emacs.sh" || { echo "Emacs config setup failed"; exit 1; }
+if ! "$SCRIPT_DIR/setup_git.sh"; then
+  echo -e "${RED}Git setup failed. Aborting.${RESET}"
+  exit 1
+fi
+
+if ! "$SCRIPT_DIR/setup_install.sh"; then
+  echo -e "${RED}Failed to update and install required packages. Aborting.${RESET}"
+  exit 1
+fi
+
+echo -e "${BLUE}Running Emacs config setup in the background...${RESET}"
+"$SCRIPT_DIR/setup_emacs.sh" &
+EMACS_PID=$!
+
+wait $EMACS_PID
+EMACS_EXIT_CODE=$?
+
+if [ $EMACS_EXIT_CODE -ne 0 ]; then
+  echo -e "${RED}Emacs config setup failed with exit code $EMACS_EXIT_CODE. Aborting.${RESET}"
+  exit 1
+fi
 
 echo -e "${BLUE}Full setup complete!${RESET}"

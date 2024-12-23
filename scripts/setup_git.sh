@@ -1,6 +1,7 @@
 #!/bin/bash
 
 BLUE='\033[38;5;33m'
+RED='\033[38;5;196m'
 RESET='\033[0m'
 
 echo -e "${BLUE}Setting up global Git configurations...${RESET}"
@@ -24,11 +25,15 @@ echo -e "${BLUE}Validating GitHub token...${RESET}"
 RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: token $TOKEN" $REPO_URL)
 
 if [ "$RESPONSE" -ne 200 ]; then
-  echo -e "${BLUE}Invalid GitHub token. Please check the token and try again.${RESET}"
+  echo -e "${RED}Invalid GitHub token. Please check the token and try again.${RESET}"
   exit 1
 fi
 
 echo -e "${BLUE}GitHub token is valid. Proceeding to set remote URL...${RESET}"
 
-git remote set-url origin https://$TOKEN@github.com/WilliamLuminary/NetworkSynth.git
+git remote set-url origin https://$TOKEN@github.com/WilliamLuminary/NetworkSynth.git || {
+  echo -e "${RED}Failed to set remote URL. Please check your repository and token.${RESET}"
+  exit 1
+}
+
 echo -e "${BLUE}GitHub remote URL set successfully!${RESET}"
