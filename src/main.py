@@ -9,11 +9,13 @@ from tqdm import tqdm
 from config import NameResolutionSet, Config, DataType, Resolution, SetName
 from graph import GraphAttrAgent, GraphGenerator, GraphPostProcessor
 from handlers import DataAgent, MultifractalAnalyzer, Saver, Plotter
+from utils import timer
 
 Config.initialize()
 logger = logging.getLogger(__name__)
 
 
+@timer
 def generate_and_process_graphs(data_agent: DataAgent):
     output_handler = None
     if not preview:
@@ -59,7 +61,7 @@ def generate_and_process_graphs(data_agent: DataAgent):
             alpha_0, width = analyzer.multifractal_analysis()
             error = euclidean([org_alpha_0, org_width], [alpha_0, width])
 
-        if attempt == max_attempts and error > error_threshold:
+        if error > error_threshold:
             logger.warning(f"Failed to generate a valid synthetic graph after {max_attempts} attempts.")
             continue  # Skip this synthetic graph
 
