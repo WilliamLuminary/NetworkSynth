@@ -42,7 +42,7 @@ class GraphGenerator(Config):
                 current_node = node_queue.popleft()
                 if not self._within_frame(current_node.position, frame):
                     continue
-                if current_node._generate_children():
+                if current_node.generate_children():
                     for child in current_node.children:
                         if child != current_node:
                             node_set.add(child)
@@ -63,6 +63,6 @@ class GraphGenerator(Config):
 
     @staticmethod
     def _within_frame(position: Union[list, tuple, ndarray],
-                      frame: Union[list[float, float], tuple[float, float], ndarray[float, float]]) -> bool:
+                      frame: Union[list[any, any], tuple[any, any], ndarray[any, any]]) -> bool:
         x, y = position
         return frame[0][0] <= x <= frame[0][1] and frame[1][0] <= y <= frame[1][1]
