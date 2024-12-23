@@ -6,16 +6,16 @@ BLUE='\033[38;5;33m'
 RED='\033[38;5;196m'
 RESET='\033[0m'
 
-if [ -z "$TOKEN" ]; then
+if [ -z "$GITHUB_TOKEN" ]; then
   echo -e "${RED}Error: TOKEN is not set. Please run setup_git.sh first.${RESET}"
   exit 1
 fi
 
-EMACS_REPO_URL="https://$TOKEN@github.com/WilliamLuminary/emacs-gui-config.git"
+EMACS_REPO_URL="https://$GITHUB_TOKEN@github.com/WilliamLuminary/emacs-gui-config.git"
 CLONE_DIR="/content/emacs-config"
 
 echo -e "${BLUE}Cloning Emacs configuration repository...${RESET}"
-git clone $EMACS_REPO_URL $CLONE_DIR || {
+git clone "$EMACS_REPO_URL" $CLONE_DIR || {
   echo -e "${RED}Failed to clone Emacs configuration repository.${RESET}"
   exit 1
 }
