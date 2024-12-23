@@ -8,8 +8,8 @@ from .enums import DataType, Resolution, SetName
 @dataclass
 class FileConfig:
     relative_dir: str
-    detail: Optional[str]
     data_type: DataType
+    detail: Optional[str] = None
 
     def __post_init__(self):
         self.file_tags = self.data_type.tags
@@ -18,13 +18,13 @@ class FileConfig:
 
 @dataclass
 class ImageConfig(FileConfig):
-    alpha: Optional[float]
+    alpha: Optional[float] = 0.6
 
 
 @dataclass
 class PlotConfig(FileConfig):
-    node_size: float
-    line_width: float
+    node_size: float = 6.0
+    line_width: float = 3.0
 
 
 @dataclass(frozen=True)
