@@ -5,7 +5,7 @@ import logging
 import os
 import pickle
 import time
-from typing import Any, Union
+from typing import Any, Optional, Union
 
 import cv2
 from numpy import ndarray
@@ -64,10 +64,14 @@ class Saver(Config):
         else:
             logger.debug(f"No existing file to delete at: {filepath}")
 
-    def save_file(self, content: Any, data_type: DataType) -> None:
+    def save_file(self, content: Any, data_type: DataType, file_name_prefix: Optional[str] = None) -> None:
         file_config = Config.FILE_CONFIGURATIONS[data_type]
         rel_path = file_config.relative_dir
-        file_name = f"{self._time_id()}.{file_config.file_extension}"
+        if file_name_prefix and file_name_prefix[-1] is not '_':
+            file_name_prefix += '_'
+        if file_config.detail and file_config.detail[-1] is not '_':
+            file_config.detail += '_'
+        file_name = f"{file_name_prefix}{file_config.detail}{self._time_id()}.{file_config.file_extension}"
         abs_path = os.path.join(self.name_res_output_dir, rel_path, file_name)
         self.ensure_directory(os.path.dirname(abs_path), exist_ok=True)
 
