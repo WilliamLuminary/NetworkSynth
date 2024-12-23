@@ -1,12 +1,12 @@
 # src/main.py
 import logging
-import warnings
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from itertools import product
 from typing import Optional, Tuple
 
 import numpy as np
+import wandb
 from scipy.spatial.distance import euclidean
 from tqdm import tqdm
 
@@ -22,7 +22,7 @@ error_threshold = Config.ERROR_TOLERANCE
 max_attempts = Config.MAX_ATTEMPTS
 
 
-def attempt_generate_graph(org_alpha_0_and_width: tuple[float, float], attributes, map_handler, avg_degree: float):
+def multi_generate_synthetic(org_alpha_0_and_width: tuple[float, float], attributes, map_handler, avg_degree: float):
     """
     Worker function for generating a SINGLE synthetic graph that meets the
     (alpha_0, width) error threshold. Returns (synthetic_graph, error).
@@ -78,7 +78,7 @@ def run(name_res_set: NameResolutionSet) -> None:
         saver.save_file(data_agent.original_image, DataType.ORIGINAL_IMAGE)
 
     org_analyzer = MultifractalAnalyzer(data_agent.original_graph)
-    org_alpha_0, org_width = org_analyzer.multifractal_analysis()
+    mult_ans_res = org_analyzer.multifractal_analysis()
 
     plotter = Plotter(data_agent.original_image, data_agent.original_graph)
     graph = plotter.plot_graph(
@@ -88,7 +88,10 @@ def run(name_res_set: NameResolutionSet) -> None:
     if not preview:
         saver.save_file(graph, DataType.ORIGINAL_GRAPH)
 
-    _error_dict = defaultdict(list)
+    exp_hyper_tuning(data_agent, plotter, saver, mult_ans_res)
+
+
+def exp_hyper_tuning(data_agent, plotter, saver, mult_ans_res):
     closed_nodes_factors = [round(0.1 + 0.1 * i, 1) for i in range(20)]
     closed_edges_factors = [round(0.1 + 0.1 * i, 1) for i in range(20)]
     for _nod_fac, _edg_fac in product(closed_nodes_factors, closed_edges_factors):
@@ -96,11 +99,10 @@ def run(name_res_set: NameResolutionSet) -> None:
         Config.set_edge_factor(_edg_fac)
         logger.info(Config())
 
-        result = generate_synthetic(data_agent, plotter, saver, (org_alpha_0, org_width))
+        _error = generate_synthetic(data_agent, plotter, saver, mult_ans_res)
         if preview:
             return
-        _error_dict[(_nod_fac, _edg_fac)].append(result)
-        saver.save_file(_error_dict, DataType.DEFAULT_DATA, file_name_prefix='error_dict')
+        wandb.log({"node_factor": _nod_fac, "edge_factor": _edg_fac, "error": _error})
 
 
 def generate_synthetic(data_agent: DataAgent, plotter: Plotter, saver, org_alpha_0_width: Tuple[float, float]) -> \
@@ -117,7 +119,7 @@ def generate_synthetic(data_agent: DataAgent, plotter: Plotter, saver, org_alpha
     with ProcessPoolExecutor() as executor:
         for _ in range(num_syn_nw):
             future = executor.submit(
-                attempt_generate_graph,
+                multi_generate_synthetic,
                 org_alpha_0_width,
                 attributes,  # from data_agent.attributes
                 map_handler,  # from data_agent
@@ -166,10 +168,17 @@ set_names = [SetName.D]
 resolutions = [Resolution.X20K]
 
 if __name__ == '__main__':
-    if preview:
-        warnings.warn("Only the original graph will be shown WITHOUT SAVING")
-    else:
-        Saver.initialize()
+    wandb.login()
+    wandb.init(project="graph-hyperparam-tuning", name="hyperparam_exp")
+    try:
+        if preview:
+            warn_mesg = "Preview Mode: Only the original image and graph and 1 synthetic graph will be shown WITHOUT SAVING"
+            logger.warning(warn_mesg)
+        else:
+            Saver.initialize()
 
-    for _set_name, _resolution in product(set_names, resolutions):
-        run(NameResolutionSet(_set_name, _resolution))
+        for _set_name, _resolution in product(set_names, resolutions):
+            run(NameResolutionSet(_set_name, _resolution))
+    except Exception as e:
+        logger.exception(e)
+        raise
