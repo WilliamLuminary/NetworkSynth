@@ -18,7 +18,7 @@ Config.initialize()
 logger = logging.getLogger(__name__)
 
 
-def generate_and_process_graphs(data_agent: DataAgent, preview: bool = False):
+def generate_and_process_graphs(data_agent: DataAgent):
     output_handler = None
     if not preview:
         output_handler = OutputHandler(data_agent.name_res_set)
@@ -29,14 +29,11 @@ def generate_and_process_graphs(data_agent: DataAgent, preview: bool = False):
 
     plot_agent = PlotAgent(data_agent)
 
-    # Plot original original_graph
     graph = plot_agent.plot_graph(
         data_type=DataType.ORIGINAL_GRAPH,
         show=True,
         alpha=0.6
     )
-    if preview:
-        return
 
     output_handler.save_file(graph, DataType.ORIGINAL_GRAPH)
 
@@ -67,7 +64,7 @@ def generate_and_process_graphs(data_agent: DataAgent, preview: bool = False):
             error = euclidean([org_alpha_0, org_width], [alpha_0, width])
 
         if attempt == max_attempts and error > error_threshold:
-            print(f"Failed to generate a valid original_graph after {max_attempts} attempts.")
+            logger.warning(f"Failed to generate a valid synthetic graph after {max_attempts} attempts.")
             continue  # Skip this synthetic graph
 
         if num_syn_graph > 0:
@@ -78,9 +75,11 @@ def generate_and_process_graphs(data_agent: DataAgent, preview: bool = False):
             output_handler.save_file(graph, DataType.SYNTHETIC_GRAPH)
             num_syn_graph -= 1
 
+        if preview:
+            return
         data_agent.add_synthetic_graph(synthetic_graph)
 
-    output_handler.save_file(list(data_agent.synthetic_graphs), DataType.SYNTHETIC_NETWORK)
+    output_handler.save_file(list(data_agent.synthetic_graphs.queue), DataType.SYNTHETIC_NETWORK)
 
 
 save_plots = True
@@ -97,9 +96,9 @@ if __name__ == '__main__':
     for set_name in set_names:
         for resolution in resolutions:
             name_res_set = NameResolutionSet(set_name, resolution)
+            logger.info(f"Processing {name_res_set}")
             data_loader = DataAgent(name_res_set)
             data_loader.load_data()
             graph_attr = GraphAttributes(data_loader.original_graph)
             data_loader.set_attributes(graph_attr)
-            logger.info(f"Processing {name_res_set}")
-            generate_and_process_graphs(data_loader, preview=preview)
+            generate_and_process_graphs(data_loader)
