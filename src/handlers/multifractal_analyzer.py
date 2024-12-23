@@ -1,4 +1,5 @@
 # src/original_graph/multifractal_analyzer.py
+from typing import Tuple
 
 import math
 import numpy as np
@@ -14,7 +15,7 @@ class MultifractalAnalyzer:
     def __init__(self, graph: nx.Graph):
         self.graph = graph
 
-    def multifractal_analysis(self):
+    def multifractal_analysis(self) -> Tuple[float, float]:
         tau_list = self.calculate_multifractal_spectrum()
         alpha_0, width, al_list, fal_list = self.n_spectrum(tau_list)
         return alpha_0, width

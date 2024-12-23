@@ -1,4 +1,7 @@
-# src/properties/network_utils.py
+# src/properties/utils.py
+import functools
+import logging
+import time
 from typing import Union
 
 import networkx as nx
@@ -54,3 +57,15 @@ def build_graph_nodes_and_edges(nodes: Union[list, set], edges: Union[list, set]
         u, v = position_map[edge[0]].id, position_map[edge[1]].id
         graph.add_edge(u, v)
     return graph
+
+
+def timer(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        end = time.time()
+        logging.info(f"Time taken by func \"{func.__name__}\" : {round(end - start, 2)} seconds")
+        return result
+
+    return wrapper

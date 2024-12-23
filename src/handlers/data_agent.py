@@ -191,3 +191,4 @@ class DataAgent(Config):
                 p[0], p[1] = px, py
             p += c
             d['pos'] = p
+
