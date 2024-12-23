@@ -11,7 +11,7 @@ import numpy as np
 from config import Config, NameResolutionSet
 from graph import GraphAttributes
 from utils import build_graph_pos_and_adj_mat
-from utils.network_utils import MapHandler
+from handlers.mapper import MapHandler
 
 logger = logging.getLogger(__name__)
 
