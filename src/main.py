@@ -165,13 +165,13 @@ def exp_hyper_tuning(data_agent, plotter, saver, mult_ans_res):
 
 
 preview = False
-exp = True
+exp = False  # Set to True to run the hyperparameter tuning experiment
 set_names = [SetName.A, SetName.B, SetName.C, SetName.D]
 resolutions = [Resolution.X20K]
 Config.disable_saving("Debugging")
 
 if __name__ == '__main__':
-    if not preview and not exp:
+    if not preview and exp:
         wandb.login()
         wandb.init(project="graph-hyperparam-tuning", name="hyperparam_exp")
     try:
@@ -189,6 +189,7 @@ if __name__ == '__main__':
             error = run(NameResolutionSet(__set_name, __resolution))
             if error is not None:
                 summary.add_result(__set_name.value, __resolution.value, error)
+        summary.summarize()
 
     except Exception as e:
         logger.exception(e)
