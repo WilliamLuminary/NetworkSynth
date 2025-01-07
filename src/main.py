@@ -73,8 +73,9 @@ def generate_synthetic(data_agent: DataAgent, plotter: Plotter, saver, org_alpha
             )
             futures.append(future)
 
-        for future in tqdm(as_completed(futures), total=num_syn_nw, desc="Generating Graphs"):
+        for idx, future in enumerate(as_completed(futures), start=1):
             synthetic_graph, _error = future.result()
+            logger.info(f"[{idx}/{num_syn_nw}] Synthetic graph generation completed.")
 
             if synthetic_graph is None:
                 continue
