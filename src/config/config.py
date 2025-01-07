@@ -9,14 +9,15 @@ from .config_objects import FileConfig, ImageConfig, PlotConfig
 class Config:
     # Define base paths, this config file must be in the subdirectory of the project root
     DEFAULT_FRAME_RANGE = 510
-    CLOSED_NODES_FACTOR = 1.2
-    CLOSED_EDGES_FACTOR = 0.8
+    CLOSED_NODES_FACTOR = 1.5
+    CLOSED_EDGES_FACTOR = 1
     # For 10_kx image, node fac should be 1.5, and edge fac should be 1
 
-    SYNTHETIC_GRAPH_NUMBER = 3
-    SYNTHETIC_NETWORK_NUMBER = 100
+    SYNTHETIC_GRAPH_NUMBER = 1
+    SYNTHETIC_NETWORK_NUMBER = 1
+
     MAX_ATTEMPTS = 10
-    ERROR_TOLERANCE = 1  # Generally should be 0.15
+    ERROR_TOLERANCE = .15  # Generally should be 0.15
 
     LOG_LEVEL = logging.INFO
 

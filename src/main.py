@@ -11,8 +11,7 @@ from tqdm import tqdm
 import wandb
 from config import Config, DataType, NameResolutionSet, Resolution, SetName
 from graph import GraphAttrAgent, GraphGenerator, GraphPostProcessor
-from handlers import DataAgent, MultifractalAnalyzer, Plotter, Saver
-from utils import timer
+from handlers import DataAgent, MultifractalAnalyzer, Plotter, Saver, Summary
 
 Config.initialize()
 logger = logging.getLogger(__name__)
@@ -24,11 +23,11 @@ max_attempts = Config.MAX_ATTEMPTS
 def multi_generate_synthetic(org_alpha_0_and_width: tuple[float, float], attributes, map_handler, avg_degree: float):
     generator = GraphGenerator(attributes)
 
-    error = float('inf')
+    __error = float('inf')
     attempt = 0
     synthetic_graph = None
 
-    while error > error_threshold and attempt < max_attempts:
+    while __error > error_threshold and attempt < max_attempts:
         attempt += 1
 
         try:
@@ -42,17 +41,17 @@ def multi_generate_synthetic(org_alpha_0_and_width: tuple[float, float], attribu
             analyzer = MultifractalAnalyzer(synthetic_graph)
             alpha_0, width = analyzer.multifractal_analysis()
 
-            error = euclidean(org_alpha_0_and_width, [alpha_0, width])
+            __error = euclidean(org_alpha_0_and_width, [alpha_0, width])
 
         except Exception as exc:
             logger.error(f"Exception occurred during graph generation: {exc}. Skipping attempt {attempt}.")
             continue
 
-    if error > error_threshold:
-        logger.warning(f"Failed after {max_attempts} attempts (error={error:.4f}).")
+    if __error > error_threshold:
+        logger.warning(f"Failed after {max_attempts} attempts (error={__error:.4f}).")
         return None, float('inf')
 
-    return synthetic_graph, error
+    return synthetic_graph, __error
 
 
 def generate_synthetic(data_agent: DataAgent, plotter: Plotter, saver, org_alpha_0_width: Tuple[float, float]) -> \
@@ -76,7 +75,7 @@ def generate_synthetic(data_agent: DataAgent, plotter: Plotter, saver, org_alpha
             futures.append(future)
 
         for future in tqdm(as_completed(futures), total=num_syn_nw, desc="Generating Graphs"):
-            synthetic_graph, error = future.result()
+            synthetic_graph, _error = future.result()
 
             if synthetic_graph is None:
                 continue
@@ -95,10 +94,10 @@ def generate_synthetic(data_agent: DataAgent, plotter: Plotter, saver, org_alpha
                 print(
                     f'Node Factor {Config.CLOSED_NODES_FACTOR}. '
                     f'Edge Factor {Config.CLOSED_EDGES_FACTOR}. '
-                    f'Error: {error:.4f}')
+                    f'Error: {_error:.4f}')
                 return None
 
-            _errors.append(error)
+            _errors.append(_error)
             data_agent.add_synthetic_graph(synthetic_graph)
     if _errors:
         _avg_err = np.mean(_errors)
@@ -114,8 +113,8 @@ def generate_synthetic(data_agent: DataAgent, plotter: Plotter, saver, org_alpha
     return float(_avg_err)
 
 
-@timer
-def run(name_res_set: NameResolutionSet) -> None:
+# @timer
+def run(name_res_set: NameResolutionSet) -> Optional[float]:
     logger.info(f"Processing {name_res_set}")
     data_agent = DataAgent(name_res_set)
     data_agent.load_data()
@@ -137,8 +136,12 @@ def run(name_res_set: NameResolutionSet) -> None:
     if not preview:
         saver.save_file(graph, DataType.ORIGINAL_GRAPH)
 
-    generate_synthetic(data_agent, plotter, saver, mult_ans_res)
-    # exp_hyper_tuning(data_agent, plotter, saver, mult_ans_res)
+    if exp:
+        exp_hyper_tuning(data_agent, plotter, saver, mult_ans_res)
+        return None
+    else:
+        _error = generate_synthetic(data_agent, plotter, saver, mult_ans_res)
+        return _error
 
 
 def exp_hyper_tuning(data_agent, plotter, saver, mult_ans_res):
@@ -162,24 +165,31 @@ def exp_hyper_tuning(data_agent, plotter, saver, mult_ans_res):
 
 
 preview = False
-set_names = [SetName.A]
-resolutions = [Resolution.X10K]
+exp = True
+set_names = [SetName.A, SetName.B, SetName.C, SetName.D]
+resolutions = [Resolution.X20K]
 Config.disable_saving("Debugging")
 
 if __name__ == '__main__':
-    if not preview:
+    if not preview and not exp:
         wandb.login()
         wandb.init(project="graph-hyperparam-tuning", name="hyperparam_exp")
     try:
         if preview:
-            warn_mesg = ("Preview Mode: Only the original image and graph and 1 synthetic graph "
-                         "will be shown WITHOUT SAVING")
+            warn_mesg = (
+                "Preview Mode: Only the original image and graph "
+                "and 1 synthetic graph will be shown WITHOUT SAVING"
+            )
             logger.warning(warn_mesg)
         else:
             Saver.initialize()
 
-        for _set_name, _resolution in product(set_names, resolutions):
-            run(NameResolutionSet(_set_name, _resolution))
+        summary = Summary()
+        for __set_name, __resolution in product(set_names, resolutions):
+            error = run(NameResolutionSet(__set_name, __resolution))
+            if error is not None:
+                summary.add_result(__set_name.value, __resolution.value, error)
+
     except Exception as e:
         logger.exception(e)
         raise
