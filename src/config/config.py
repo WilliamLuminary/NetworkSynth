@@ -37,6 +37,7 @@ class Config:
             node_size=6.0,
             line_width=3.0,
             data_type=DataType.SYNTHETIC_GRAPH,
+            show_on_the_fly=False
         ),
         DataType.SYNTHETIC_NETWORK: FileConfig(
             relative_dir="synthetic",
@@ -95,12 +96,12 @@ class Config:
     @classmethod
     def set_node_factor(cls, factor: float):
         cls.CLOSED_NODES_FACTOR = factor
-        logging.info(f"Set CLOSED_NODES_FACTOR to {factor}")
+        logging.info(f"CLOSED_NODES_FACTOR has been overwritten! Current value: {factor}")
 
     @classmethod
     def set_edge_factor(cls, factor: float):
         cls.CLOSED_EDGES_FACTOR = factor
-        logging.info(f"Set CLOSED_EDGES_FACTOR to {factor}")
+        logging.info(f"CLOSED_EDGES_FACTOR has been overwritten! Current value; {factor}")
 
     @classmethod
     def disable_saving(cls, reason: str = ""):

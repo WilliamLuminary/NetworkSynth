@@ -100,7 +100,7 @@ class Plotter(Config):
 
         plt.tight_layout(pad=0)
 
-        if 'show' in kwargs and kwargs['show']:
+        if getattr(_file_config, 'show_on_the_fly', False):
             plt.show()
         _graph = self._figure_to_ndarray_direct(_fig)
         plt.close()

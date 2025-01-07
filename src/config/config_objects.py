@@ -25,6 +25,7 @@ class ImageConfig(FileConfig):
 class PlotConfig(FileConfig):
     node_size: float = 6.0
     line_width: float = 3.0
+    show_on_the_fly: bool = True
 
 
 @dataclass(frozen=True)

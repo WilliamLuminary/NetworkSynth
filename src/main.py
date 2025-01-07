@@ -85,8 +85,7 @@ def generate_synthetic(data_agent: DataAgent, plotter: Plotter, saver, org_alpha
             if num_syn_graph > 0:
                 graph = plotter.plot_graph(
                     data_type=DataType.SYNTHETIC_GRAPH,
-                    graph=synthetic_graph,
-                    show=not save_plots
+                    graph=synthetic_graph
                 )
                 if saver:
                     saver.save_file(graph, DataType.SYNTHETIC_GRAPH)
