@@ -7,7 +7,8 @@ from .config_objects import FileConfig, ImageConfig, PlotConfig
 
 
 class Config:
-    # Define base paths, this config file must be in the subdirectory of the project root
+    """ Define base paths, this config file must be in the subdirectory of the project root"""
+
     DEFAULT_FRAME_RANGE = 510
     CLOSED_NODES_FACTOR = 1.5
     CLOSED_EDGES_FACTOR = 1

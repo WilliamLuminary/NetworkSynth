@@ -6,7 +6,6 @@ from typing import Optional, Tuple
 
 import numpy as np
 from scipy.spatial.distance import euclidean
-from tqdm import tqdm
 
 import wandb
 from config import Config, DataType, NameResolutionSet, Resolution, SetName
@@ -99,10 +98,22 @@ def generate_synthetic(data_agent: DataAgent, plotter: Plotter, saver, org_alpha
 
             _errors.append(_error)
             data_agent.add_synthetic_graph(synthetic_graph)
-    if _errors:
-        _avg_err = np.mean(_errors)
-    else:
+
+    if not _errors:
         return float('inf')
+
+    __non_inf_errors = [__e for __e in _errors if not np.isinf(__e)]
+    if not __non_inf_errors:
+        return float('inf')
+
+    __mean_e = np.mean(__non_inf_errors)
+    __std_e = np.std(__non_inf_errors)
+    __threshold = 2.0
+    __non_outlier_errors = [__e for __e in __non_inf_errors if abs(__e - __mean_e) <= __threshold * __std_e]
+    if not __non_outlier_errors:
+        return float('inf')
+
+    _avg_err = float(np.mean(__non_outlier_errors))
 
     if saver:
         saver.save_file(
@@ -110,7 +121,7 @@ def generate_synthetic(data_agent: DataAgent, plotter: Plotter, saver, org_alpha
             DataType.SYNTHETIC_NETWORK,
             file_name_prefix=f'error:{_avg_err:.2f}'
         )
-    return float(_avg_err)
+    return _avg_err
 
 
 # @timer
@@ -149,9 +160,10 @@ def exp_hyper_tuning(data_agent, plotter, saver, mult_ans_res):
     closed_nodes_factors = [round(0.1 + 0.1 * i, 1) for i in range(20)]
     closed_edges_factors = [round(0.1 + 0.1 * i, 1) for i in range(20)]
     Config.disable_saving("Hyperparameter tuning")
-    for _nod_fac, _edg_fac in product(closed_nodes_factors, closed_edges_factors):
-        Config.set_node_factor(_nod_fac)
-        Config.set_edge_factor(_edg_fac)
+    table = wandb.Table(columns=["node_factor", "edge_factor", "error"])
+    for __nf, __ef in product(closed_nodes_factors, closed_edges_factors):
+        Config.set_node_factor(__nf)
+        Config.set_edge_factor(__ef)
         logger.info(Config())
 
         _error = generate_synthetic(data_agent, plotter, saver, mult_ans_res)
@@ -159,13 +171,20 @@ def exp_hyper_tuning(data_agent, plotter, saver, mult_ans_res):
             logger.info("Preview mode enabled, skipping further iterations.")
             return
         if _error is not None:
-            wandb.log({"node_factor": _nod_fac, "edge_factor": _edg_fac, "error": _error}, step=None)
+            table.add_data(__nf, __ef, _error)
         else:
-            logger.warning(f"Error is None for node_factor {_nod_fac}, edge_factor {_edg_fac}")
+            logger.warning(f"Error is None for node_factor {__nf}, edge_factor {__ef}")
+
+    heatmap_plot = wandb.plot_table(
+        vega_spec_name="heatmap",
+        data_table=table,
+        fields={"x": "node_factor", "y": "edge_factor", "value": "error"}
+    )
+    wandb.log({"my_heatmap": heatmap_plot})
 
 
 preview = False
-exp = False  # Set to True to run the hyperparameter tuning experiment
+exp = True  # Set to True to run the hyperparameter tuning experiment
 set_names = [SetName.A, SetName.B, SetName.C, SetName.D]
 resolutions = [Resolution.X20K]
 Config.disable_saving("Debugging")
