@@ -117,7 +117,7 @@ class GraphNode:
 
     def generate_children(self) -> bool:
         """
-        :return: Return true f the node has generated children successfully, vice versa.
+        :return: Return true iff the node has generated children successfully, vice versa.
         """
         if len(self.children) > 1 or self.degree == 1:  # Skip visited nodes or Endpoint has no other child
             return False
@@ -149,6 +149,37 @@ class GraphNode:
                 else:
                     GraphNode._aborted_edge += 1
         return True
+
+    # def generate_children(self) -> bool:
+    #     if len(self.children) > 1 or self.degree == 1:  # Skip visited nodes or Endpoint has no other child
+    #         return False
+    #     angles, lengths = self._generate_angles_and_lengths()
+    #     children_positions = self._polar_to_cartesian(lengths, angles)
+    #     assert len(children_positions) == self.degree - 1
+    #
+    #     for child_position, angle in zip(children_positions, angles):
+    #         close_node = self._get_closest_valid_node(child_position)
+    #         if close_node is not None:
+    #             new_edge = (self.position, close_node.position)
+    #             if not self._check_intersection(new_edge):
+    #                 self._add_child(close_node)
+    #                 self._add_edge_to_grid(new_edge)
+    #                 GraphNode._merged_edge += 1
+    #             else:
+    #                 GraphNode._aborted_edge += 1
+    #         else:
+    #             if self._find_close_edge(child_position):
+    #                 GraphNode._aborted_edge += 1
+    #                 continue
+    #             new_edge = (self.position, child_position)
+    #             if not self._check_intersection(new_edge):
+    #                 child_node = GraphNode(child_position, parent=self, parent_angle=angle)
+    #                 self._add_child(child_node)
+    #                 self._add_edge_to_grid(new_edge)
+    #                 self._add_to_grid(child_node.position)
+    #             else:
+    #                 GraphNode._aborted_edge += 1
+    #     return True
 
     def _get_closest_valid_node(self, position):
         close_nodes_with_distances = self._find_close_node(position)
