@@ -51,7 +51,7 @@ class Config:
     }
 
     DISABLE_SAVING: bool = False
-    REASON: str = ""
+    DISABLE_SAVING_NOTE: str = ""
 
     SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
     PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '..', '..'))
@@ -106,12 +106,12 @@ class Config:
     @classmethod
     def disable_saving(cls, reason: str = ""):
         Config.DISABLE_SAVING = True
-        Config.REASON = reason
+        Config.DISABLE_SAVING_NOTE = reason
 
     @classmethod
     def enable_saving(cls, reason: str = ""):
         Config.DISABLE_SAVING = False
-        Config.REASON = reason
+        Config.DISABLE_SAVING_NOTE = reason
 
     def __str__(self):
         _config = {
