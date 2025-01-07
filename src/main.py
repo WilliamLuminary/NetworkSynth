@@ -161,10 +161,10 @@ def exp_hyper_tuning(data_agent, plotter, saver, mult_ans_res):
             logger.warning(f"Error is None for node_factor {_nod_fac}, edge_factor {_edg_fac}")
 
 
-save_plots = False
 preview = False
 set_names = [SetName.A]
 resolutions = [Resolution.X10K]
+Config.disable_saving("Debugging")
 
 if __name__ == '__main__':
     if not preview:
