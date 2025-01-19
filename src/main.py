@@ -38,9 +38,9 @@ def multi_generate_synthetic(org_alpha_0_and_width: tuple[float, float], attribu
             synthetic_graph = postprocessor.synthetic_graph
 
             analyzer = MultifractalAnalyzer(synthetic_graph)
-            alpha_0, width = analyzer.multifractal_analysis()
+            alpha_0_and_width = analyzer.multifractal_analysis()
 
-            __error = euclidean(org_alpha_0_and_width, [alpha_0, width])
+            __error = euclidean(org_alpha_0_and_width, alpha_0_and_width)
 
         except Exception as exc:
             logger.error(f"Exception occurred during graph generation: {exc}. Skipping attempt {attempt}.")
@@ -137,14 +137,18 @@ def run(name_res_set: NameResolutionSet) -> Optional[float]:
         saver = Saver(data_agent.name_res_set)
         saver.save_file(data_agent.original_image, DataType.ORIGINAL_IMAGE)
 
-    org_analyzer = MultifractalAnalyzer(data_agent.original_graph)
-    mult_ans_res = org_analyzer.multifractal_analysis()
-
     plotter = Plotter(data_agent.original_image, data_agent.original_graph)
     graph = plotter.plot_graph(
         data_type=DataType.ORIGINAL_GRAPH,
         show=True,
     )
+
+    if Config.SYNTHETIC_NETWORK_NUMBER != 0:
+        org_analyzer = MultifractalAnalyzer(data_agent.original_graph)
+        mult_ans_res = org_analyzer.multifractal_analysis()
+    else:
+        mult_ans_res = [0, 0]
+
     if not preview:
         saver.save_file(graph, DataType.ORIGINAL_GRAPH)
 
@@ -185,10 +189,12 @@ def exp_hyper_tuning(data_agent, plotter, saver, mult_ans_res):
 
 
 preview = False
-exp = True  # Set to True to run the hyperparameter tuning experiment
-set_names = [SetName.A, SetName.B, SetName.C, SetName.D]
+exp = False  # Set to True to run the hyperparameter tuning experiment
+set_names = [SetName.S4, SetName.S8, SetName.S11, SetName.S14, SetName.S17, SetName.S20, SetName.S23, SetName.S26,
+             SetName.S29, SetName.S32]
+# set_names = [SetName.A]
 resolutions = [Resolution.X20K]
-Config.disable_saving("Debugging")
+# Config.disable_saving("Debugging")
 
 if __name__ == '__main__':
     if not preview and exp:
