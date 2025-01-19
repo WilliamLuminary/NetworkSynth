@@ -35,7 +35,10 @@ class DataAgent(Config):
         logger.info(f"Loading data for {self.name_res_set}")
         self.positions_of_nodes = self._load_positions()
         self.adjacency_matrix = self._load_sparse_matrix()
-        self.original_image = self._resize_image(self._load_image())
+
+        self._load_image()
+        self._resize_image()
+
         self.original_graph = build_graph_pos_and_adj_mat((self.positions_of_nodes,
                                                            self.adjacency_matrix))
         self._transform_graph_positions(self.original_graph, rotation_deg=270)
@@ -118,9 +121,8 @@ class DataAgent(Config):
         image = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
         if image is None:
             err_msg = f"Failed to load image from file: {file_path}"
-            logger.error(err_msg)
-            raise ValueError(err_msg)
-        return image
+            logger.warning(err_msg)
+        self.original_image = image
 
     @staticmethod
     def _find_file_with_pattern(directory_path, pattern, details=''):
@@ -138,15 +140,17 @@ class DataAgent(Config):
         else:
             raise FileNotFoundError(f"No {details} file found in {directory_path}.")
 
-    @staticmethod
-    def _resize_image(image, target_size=Config.DEFAULT_FRAME_RANGE):
-        _height, _width = image.shape
+    def _resize_image(self, target_size=Config.DEFAULT_FRAME_RANGE):
+        if self.original_image is None:
+            return
+        _image = self.original_image
+        _height, _width = _image.shape
         _scaling_factor = target_size / max(_width, _height)
 
         _new_width = int(_width * _scaling_factor)
         _new_height = int(_height * _scaling_factor)
-        resized_image = cv2.resize(image, (_new_width, _new_height))
-        return resized_image
+        resized_image = cv2.resize(_image, (_new_width, _new_height))
+        self.original_image = resized_image
 
     @staticmethod
     def _transform_positions(positions, flip_x=False, flip_y=False, rotation_deg=0):
@@ -191,4 +195,3 @@ class DataAgent(Config):
                 p[0], p[1] = px, py
             p += c
             d['pos'] = p
-
