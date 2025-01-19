@@ -14,8 +14,8 @@ class Config:
     CLOSED_EDGES_FACTOR = 0.8
     # For 10_kx image, node fac should be 1.5, and edge fac should be 1
 
-    SYNTHETIC_GRAPH_NUMBER = 1
-    SYNTHETIC_NETWORK_NUMBER = 1
+    SYNTHETIC_GRAPH_NUMBER = 0
+    SYNTHETIC_NETWORK_NUMBER = 0
 
     MAX_ATTEMPTS = 10
     ERROR_TOLERANCE = .15  # Generally should be 0.15
@@ -59,7 +59,7 @@ class Config:
     PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '..', '..'))
     BASE_DATA_PATH = os.path.join(PROJECT_ROOT, 'data')
 
-    BASE_INPUT_PATH = os.path.join(BASE_DATA_PATH, 'input')
+    BASE_INPUT_PATH = os.path.join(BASE_DATA_PATH, 'input', 'new_input')
     POSITION_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'position')
     ADJ_MATRIX_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'sparse_matrices')
     IMAGES_DIR = os.path.join(BASE_INPUT_PATH, 'Original Graphs')
