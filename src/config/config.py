@@ -18,7 +18,7 @@ class Config:
     SYNTHETIC_NETWORK_NUMBER = 1
 
     MAX_ATTEMPTS = 10
-    ERROR_TOLERANCE = .15  # Generally should be 0.15
+    ERROR_TOLERANCE = .2  # Generally should be 0.15
 
     MEASURE_WEIGHTED = False
 

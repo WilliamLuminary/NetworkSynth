@@ -1,22 +1,25 @@
 # src/original_graph/multifractal_analyzer.py
+from collections import Counter
 from typing import Tuple
 
 import math
-import numpy as np
-import networkx as nx
 import networkit as nk
-from collections import Counter
+import networkx as nx
+import numpy as np
 from scipy.stats import linregress
+
+from config import Config
 
 
 class MultifractalAnalyzer:
     Q = [q / 100 for q in range(-300, 301, 10)]
+    use_weighted_property = Config.MEASURE_WEIGHTED
 
     def __init__(self, graph: nx.Graph):
         self.graph = graph
 
     def multifractal_analysis(self) -> Tuple[float, float]:
-        tau_list = self.calculate_multifractal_spectrum()
+        tau_list = self.calculate_multifractal_spectrum(self.use_weighted_property)
         alpha_0, width, al_list, fal_list = self.n_spectrum(tau_list)
         return alpha_0, width
 
