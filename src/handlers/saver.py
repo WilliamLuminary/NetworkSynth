@@ -65,6 +65,10 @@ class Saver(Config):
             logger.debug(f"No existing file to delete at: {filepath}")
 
     def save_file(self, content: Any, data_type: DataType, file_name_prefix: Optional[str] = None) -> None:
+        if content is None:
+            logger.warning("Content is None.")
+            return
+
         if Config.DISABLE_SAVING:
             logger.warning(f"{Config.DISABLE_SAVING_NOTE} Saving is disabled. ")
             return
@@ -99,7 +103,7 @@ class Saver(Config):
     @staticmethod
     def _save_image(image: Union[ndarray], filepath: str) -> None:
         if not isinstance(image, ndarray):
-            raise ValueError("Unsupported image format. Expected ndarray or plt.Figure.")
+            raise ValueError("Unsupported image format. Expected ndarray.")
 
         cv2.imwrite(filepath, image)
 
