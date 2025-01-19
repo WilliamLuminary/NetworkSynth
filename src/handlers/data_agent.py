@@ -63,47 +63,100 @@ class DataAgent(Config):
         self.attributes = attributes
 
     def _load_positions(self):
+        """
+        Load a single position file matching the new pattern, based on the resolution and set name.
+        """
+        directory_path = os.path.join(self.POSITION_DATA_DIR, self.resolution)
+        set_name_value = str(self.name_res_set.set_name)  # Convert SetName enum to its string value
         pattern = re.compile(
-            rf"{re.escape(self.set_name)}_{re.escape(self.resolution)}.*\.npy",
+            rf"W-\d+-\d+-\d+_{re.escape(set_name_value)}_postion\.npy",
             re.IGNORECASE
         )
+
+        # Ensure a single file is returned
         file_path = self._find_file_with_pattern(
-            self.POSITION_DATA_DIR, pattern, f'positions_of_nodes for {self.set_name}'
+            directory_path, pattern, f'positions_of_nodes for {self.set_name}'
         )
+        if isinstance(file_path, list):
+            file_path = file_path[0]  # Get the first file (it should always be a single match)
+
         logger.info(f"Positions file loaded: {file_path}")
         positions = np.load(file_path, allow_pickle=True)
         return positions
 
     def _load_sparse_matrix(self):
-        pattern = re.compile(
-            rf"sparse_matrices_{re.escape(self.resolution)}.*\.npz",
-            re.IGNORECASE
-        )
-        file_path = self._find_file_with_pattern(
-            self.ADJ_MATRIX_DATA_DIR, pattern, 'sparse matrix'
-        )
-        logger.info(f"Sparse matrix file loaded: {file_path}")
+        """
+        Load the specific sparse matrix from the `sparse_matrices.npz` file, supporting both current files
+        and `SetName` enum types.
+        """
+        directory_path = os.path.join(self.ADJ_MATRIX_DATA_DIR, self.resolution)
+        file_name = "sparse_matrices.npz"
+        file_path = os.path.join(directory_path, file_name)
+
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Sparse matrix file not found: {file_path}")
+
+        # Load the .npz archive
         matrix_data = np.load(file_path, allow_pickle=True)
 
-        set_name = self.set_name
-        if set_name == 'C':
-            if 'C1' in matrix_data:
-                set_name = 'C1'
-            elif 'C' in matrix_data:
-                set_name = 'C'
-            else:
-                available_keys = list(matrix_data.keys())
-                err_msg = f"Neither 'C' nor 'C1' is found in sparse matrix data. Available sets: {available_keys}"
-                logger.error(err_msg)
-                raise KeyError(err_msg)
+        # Match the key based on the SetName enum value
+        set_name_value = str(self.name_res_set.set_name)  # Convert SetName enum to its string value
+        key_pattern = rf"W-\d+-\d+-\d+_{re.escape(set_name_value)}_EL"
 
-        if set_name not in matrix_data:
+        matching_keys = [key for key in matrix_data.keys() if re.fullmatch(key_pattern, key)]
+
+        if len(matching_keys) == 1:
+            logger.info(f"Sparse matrix loaded: {matching_keys[0]}")
+            return matrix_data[matching_keys[0]].item()
+        elif len(matching_keys) > 1:
+            raise FileExistsError(f"Multiple matching sparse matrices found: {matching_keys}")
+        else:
             available_keys = list(matrix_data.keys())
-            err_msg = f"Set '{set_name}' not found in sparse matrix data. Available sets: {available_keys}"
-            logger.error(err_msg)
-            raise KeyError(err_msg)
+            raise KeyError(f"No matching sparse matrix found for set '{self.name_res_set.set_name}'. "
+                           f"Available keys: {available_keys}")
 
-        return matrix_data[set_name].item()
+    # def _load_positions(self):
+    #     pattern = re.compile(
+    #         rf"{re.escape(self.set_name)}_{re.escape(self.resolution)}.*\.npy",
+    #         re.IGNORECASE
+    #     )
+    #     file_path = self._find_file_with_pattern(
+    #         self.POSITION_DATA_DIR, pattern, f'positions_of_nodes for {self.set_name}'
+    #     )
+    #     logger.info(f"Positions file loaded: {file_path}")
+    #     positions = np.load(file_path, allow_pickle=True)
+    #     return positions
+    #
+    # def _load_sparse_matrix(self):
+    #     pattern = re.compile(
+    #         rf"sparse_matrices_{re.escape(self.resolution)}.*\.npz",
+    #         re.IGNORECASE
+    #     )
+    #     file_path = self._find_file_with_pattern(
+    #         self.ADJ_MATRIX_DATA_DIR, pattern, 'sparse matrix'
+    #     )
+    #     logger.info(f"Sparse matrix file loaded: {file_path}")
+    #     matrix_data = np.load(file_path, allow_pickle=True)
+    #
+    #     set_name = self.set_name
+    #     if set_name == 'C':
+    #         if 'C1' in matrix_data:
+    #             set_name = 'C1'
+    #         elif 'C' in matrix_data:
+    #             set_name = 'C'
+    #         else:
+    #             available_keys = list(matrix_data.keys())
+    #             err_msg = f"Neither 'C' nor 'C1' is found in sparse matrix data. Available sets: {available_keys}"
+    #             logger.error(err_msg)
+    #             raise KeyError(err_msg)
+    #
+    #     if set_name not in matrix_data:
+    #         available_keys = list(matrix_data.keys())
+    #         err_msg = f"Set '{set_name}' not found in sparse matrix data. Available sets: {available_keys}"
+    #         logger.error(err_msg)
+    #         raise KeyError(err_msg)
+    #
+    #     return matrix_data[set_name].item()
 
     def _load_image(self):
         images_path = os.path.join(self.IMAGES_DIR, self.set_name)
@@ -114,9 +167,15 @@ class DataAgent(Config):
             rf"\b{re.escape(self.resolution)}\b.*\.(tif|png|jpg)",
             re.IGNORECASE
         )
-        file_path = self._find_file_with_pattern(
-            images_path, pattern, f'image for {self.set_name}'
-        )
+        try:
+            file_path = self._find_file_with_pattern(
+                images_path, pattern, f'image for {self.set_name}'
+            )
+        except FileNotFoundError:
+            logger.warning(f"No image found for {self.set_name} at {images_path}. ")
+            self.original_image = None
+            return
+
         logger.info(f"Image file loaded: {file_path}")
         image = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
         if image is None:

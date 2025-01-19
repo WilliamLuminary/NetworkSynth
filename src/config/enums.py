@@ -9,6 +9,18 @@ class SetName(Enum):
     C = "C"
     D = "D"
 
+    S4  = "W-2-89-1_004"
+    S8  = "W-2-89-1_008"
+    S11 = "W-2-89-1_011"
+    S14 = "W-2-89-1_014"
+    S17 = "W-2-89-1_017"
+    S20 = "W-2-89-1_020"
+    S23 = "W-2-89-1_023"
+    S26 = "W-2-89-1_026"
+    S29 = "W-2-89-1_029"
+    S32 = "W-2-89-1_032"
+    NA = ""
+
     def __str__(self):
         return self.value
 
@@ -18,6 +30,7 @@ class Resolution(Enum):
     X15K = "15kX"
     X20K = "20kX"
     X30K = "30kX"
+    NA = ""
 
     def __str__(self):
         return self.value
