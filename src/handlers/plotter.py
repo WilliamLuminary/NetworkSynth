@@ -1,5 +1,5 @@
 # src/utils/plotter.py
-
+import logging
 from typing import Union
 
 import matplotlib.pyplot as plt
@@ -11,6 +11,8 @@ from numpy import ndarray
 
 from config import Config, DataType, FileTag
 from utils import build_graph_pos_and_adj_mat, calculate_frame
+
+logger = logging.getLogger(__name__)
 
 
 class Plotter(Config):
@@ -75,10 +77,13 @@ class Plotter(Config):
         _ax.set_ylim(_frame[1])
 
         if data_type is DataType.ORIGINAL_GRAPH:
-            _image = self.original_image
-            _image_extent = (0, _image.shape[1], 0, _image.shape[0])
-            _alpha = getattr(_file_config, 'alpha', 1.0)
-            _ax.imshow(_image, cmap='gray', extent=_image_extent, alpha=_alpha)
+            if self.original_image is None:
+                logger.info("No background has been provided.")
+            else:
+                _image = self.original_image
+                _image_extent = (0, _image.shape[1], 0, _image.shape[0])
+                _alpha = getattr(_file_config, 'alpha', 1.0)
+                _ax.imshow(_image, cmap='gray', extent=_image_extent, alpha=_alpha)
         else:
             _ax.add_patch(
                 plt.Rectangle(
