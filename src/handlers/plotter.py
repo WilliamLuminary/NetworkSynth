@@ -49,7 +49,7 @@ class Plotter(Config):
         if adjust_axis and _position_dict is not None:
             __positions_array = np.array([_position_dict[node] for node in graph.nodes()])
             __positions_array[:, [1, 0]] = __positions_array[:, [0, 1]]
-            __positions_array[:, 1] = Config.DEFAULT_FRAME_RANGE - __positions_array[:, 1]
+            __positions_array[:, 1] = Config.DEFAULT_FRAME_SIZE - __positions_array[:, 1]
             _position_dict = {node: pos for node, pos in zip(graph.nodes(), __positions_array)}
 
         _line_width = _file_config.line_width
@@ -69,7 +69,7 @@ class Plotter(Config):
 
         # _frame = calculate_frame(graph)
         if data_type is DataType.ORIGINAL_GRAPH:
-            _frame = getattr(_file_config, 'frame', ((0, Config.DEFAULT_FRAME_RANGE), (0, Config.DEFAULT_FRAME_RANGE)))
+            _frame = getattr(_file_config, 'frame', ((0, Config.DEFAULT_FRAME_SIZE[0]), (0, Config.DEFAULT_FRAME_SIZE[1])))
         else:
             _frame = calculate_frame(graph)
 

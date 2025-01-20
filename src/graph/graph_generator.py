@@ -1,7 +1,7 @@
 # src/original_graph/graph_generator.py
 
 from collections import deque
-from typing import Union
+from typing import Tuple, Union
 
 import networkx as nx
 from numpy import ndarray
@@ -16,7 +16,7 @@ class GraphGenerator(Config):
     def __init__(self, attributes: GraphAttrAgent):
         GraphNode.initialize(attributes)
 
-    def generate_network(self, frame_range: int = Config.DEFAULT_FRAME_RANGE, regenerate_times: int = 100):
+    def generate_network(self, frame_range: Tuple[int, int] = Config.DEFAULT_FRAME_SIZE, regenerate_times: int = 100):
         for _ in range(regenerate_times):
             nodes, edges = self._generate_graph_by_nodes_and_edges(frame_range)
             if nodes and len(nodes) > 100:
@@ -29,11 +29,12 @@ class GraphGenerator(Config):
         synthetic_network = self._filter_graph(_synthetic_network, frame)
         return synthetic_network
 
-    def _generate_graph_by_nodes_and_edges(self, frame_range: int = Config.DEFAULT_FRAME_RANGE):
+    def _generate_graph_by_nodes_and_edges(self, frame_range: Tuple[int, int] = Config.DEFAULT_FRAME_SIZE):
         GraphNode.reset()
         root_node = GraphNode((0, 0))
         node_set, edge_set = {root_node}, set()
-        frame = calculate_frame(center_position=root_node.position, frame_range=round(frame_range * 1.1))
+        __scaled_frame_range = (round(frame_range[0] * 1.1), round(frame_range[1] * 1.1))
+        frame = calculate_frame(center_position=root_node.position, frame_range=__scaled_frame_range)
 
         def __bfs(root):
             node_queue = deque([root])

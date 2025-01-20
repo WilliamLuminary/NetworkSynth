@@ -2,7 +2,7 @@
 import functools
 import logging
 import time
-from typing import Union
+from typing import Tuple, Union
 
 import networkx as nx
 import numpy as np
@@ -12,7 +12,8 @@ from config import Config
 
 
 def calculate_frame(graph: nx.Graph = None, center_position: Union[tuple, list, ndarray] = None,
-                    frame_range: int = Config.DEFAULT_FRAME_RANGE) -> tuple[tuple[float, float], tuple[float, float]]:
+                    frame_range: Tuple[int, int] = Config.DEFAULT_FRAME_SIZE) -> tuple[
+    tuple[float, float], tuple[float, float]]:
     if graph is None:
         if not center_position:
             raise ValueError("Either synthetic_graph or center_position must be provided.")
@@ -23,10 +24,12 @@ def calculate_frame(graph: nx.Graph = None, center_position: Union[tuple, list, 
         _positions = np.array(list(nx.get_node_attributes(graph, 'pos').values()))
         _center_x, _center_y = _positions[:, 0].mean(), _positions[:, 1].mean()
 
-    _half_range = frame_range / 2
+    _half_range = (frame_range[0] / 2, frame_range[1] / 2)
+    _width, _height = _half_range
+
     frame = (
-        (round(_center_x - _half_range, 2), round(_center_x + _half_range, 2)),
-        (round(_center_y - _half_range, 2), round(_center_y + _half_range, 2))
+        (round(_center_x - _width, 2), round(_center_x + _width, 2)),  # Horizontal range (width)
+        (round(_center_y - _height, 2), round(_center_y + _height, 2))  # Vertical range (height)
     )
     return frame
 

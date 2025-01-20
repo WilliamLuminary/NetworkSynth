@@ -1,6 +1,7 @@
 # src/config/config.py
 import logging
 import os
+from typing import Tuple
 
 from .enums import DataType
 from .config_objects import FileConfig, ImageConfig, PlotConfig
@@ -9,13 +10,13 @@ from .config_objects import FileConfig, ImageConfig, PlotConfig
 class Config:
     """ Define base paths, this config file must be in the subdirectory of the project root"""
 
-    DEFAULT_FRAME_RANGE = 510
+    DEFAULT_FRAME_SIZE: Tuple[int, int] = (470, 470)  # General (510, 510) # (width, height)
     CLOSED_NODES_FACTOR = 1.2
     CLOSED_EDGES_FACTOR = 0.8
     # For 10_kx image, node fac should be 1.5, and edge fac should be 1
 
-    SYNTHETIC_GRAPH_NUMBER = 0
-    SYNTHETIC_NETWORK_NUMBER = 0
+    SYNTHETIC_GRAPH_NUMBER = 10
+    SYNTHETIC_NETWORK_NUMBER = 300
 
     MAX_ATTEMPTS = 10
     ERROR_TOLERANCE = .15  # Generally should be 0.15
@@ -117,7 +118,7 @@ class Config:
 
     def __str__(self):
         _config = {
-            'frame_range': self.DEFAULT_FRAME_RANGE,
+            'frame_range': self.DEFAULT_FRAME_SIZE,
             'closed_nodes_factor': self.CLOSED_NODES_FACTOR,
             'closed_edges_factor': self.CLOSED_EDGES_FACTOR,
             'no_syn_graph': self.SYNTHETIC_GRAPH_NUMBER,
