@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 
 class Saver(Config):
-
     def __init__(self, name_res_set: NameResolutionSet):
         self.name_res_set = name_res_set
         self.name_res_output_dir = os.path.join(self.base_output_dir, str(name_res_set.set_name),
@@ -28,6 +27,25 @@ class Saver(Config):
         cls.base_output_dir = os.path.join(Config.BASE_OUTPUT_PATH, f'results_{Saver._time_id()}')
         cls.ensure_directory(cls.base_output_dir)
         logger.info(f"Created new directory: {cls.base_output_dir}")
+
+        cls.latest_link_path = os.path.join(Config.BASE_OUTPUT_PATH, 'latest_result')
+        Saver._update_soft_link(cls.latest_link_path, cls.base_output_dir)
+
+    @staticmethod
+    def _update_soft_link(link_path: str, target_path: str) -> None:
+        if os.path.exists(link_path) or os.path.islink(link_path):
+            try:
+                os.unlink(link_path)
+                logger.info(f"Removed existing soft link: {link_path}")
+            except OSError as e:
+                logger.error(f"Failed to remove existing soft link: {link_path}. Error: {e}")
+                raise
+        try:
+            os.symlink(target_path, link_path)
+            logger.info(f"Created new soft link: {link_path} -> {target_path}")
+        except OSError as e:
+            logger.error(f"Failed to create soft link: {link_path}. Error: {e}")
+            raise
 
     @staticmethod
     def archive_if_exists(path: str) -> None:

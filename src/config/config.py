@@ -66,7 +66,6 @@ class Config:
     IMAGES_DIR = os.path.join(BASE_INPUT_PATH, 'Original Graphs')
 
     BASE_OUTPUT_PATH = os.path.join(BASE_DATA_PATH, 'output')
-    OUTPUT_DIR = os.path.join(BASE_OUTPUT_PATH, 'results')
 
     SYNTHETIC_GRAPH_DIRECTORY_NAME = 'synthetic_graphs'
     ORIGINAL_GRAPH_DIRECTORY_NAME = 'original_graphs'
