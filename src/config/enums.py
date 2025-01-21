@@ -19,6 +19,7 @@ class SetName(Enum):
     S26 = "026"
     S29 = "029"
     S32 = "032"
+
     NA = ""
 
     def __str__(self):

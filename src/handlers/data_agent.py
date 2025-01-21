@@ -43,7 +43,6 @@ class DataAgent(Config):
         self.original_graph = build_graph_pos_and_adj_mat((self.positions_of_nodes,
                                                            self.adjacency_matrix))
         self._transform_original_positions(rotation_deg=270)
-        # self._transform_original_positions(rotation_deg=270)
         self.mapper = Mapper(self.original_graph)
         logger.info(f"Data successfully loaded for {self.name_res_set}")
 
