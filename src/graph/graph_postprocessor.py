@@ -2,11 +2,10 @@
 
 import networkx as nx
 
-from config import Config
 from handlers import Mapper
 
 
-class GraphPostProcessor(Config):
+class GraphPostProcessor:
     def __init__(self, synthetic_graph: nx.Graph, mapper: Mapper, tar_avg_deg: float):
         self.synthetic_graph = synthetic_graph
         self.map_handler = mapper

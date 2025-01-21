@@ -15,7 +15,7 @@ from utils import build_graph_pos_and_adj_mat, calculate_frame
 logger = logging.getLogger(__name__)
 
 
-class Plotter(Config):
+class Plotter:
     def __init__(self, original_image: ndarray, original_graph: nx.Graph):
         self.original_graph = original_graph
         self.original_image = original_image

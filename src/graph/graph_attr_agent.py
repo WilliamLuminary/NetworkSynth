@@ -6,10 +6,8 @@ import networkx as nx
 import numpy as np
 from scipy.spatial.distance import euclidean
 
-from config.config import Config
 
-
-class GraphAttrAgent(Config):
+class GraphAttrAgent:
     def __init__(self, graph=None):
         self.graph = graph
         self.degree_dist = None

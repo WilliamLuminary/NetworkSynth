@@ -12,7 +12,7 @@ from . import GraphAttrAgent
 from .graph_node import GraphNode
 
 
-class GraphGenerator(Config):
+class GraphGenerator:
     def __init__(self, attributes: GraphAttrAgent):
         GraphNode.initialize(attributes)
 

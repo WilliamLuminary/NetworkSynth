@@ -15,7 +15,7 @@ from config import Config, DataType, FileTag, NameResolutionSet
 logger = logging.getLogger(__name__)
 
 
-class Saver(Config):
+class Saver:
     def __init__(self, name_res_set: NameResolutionSet):
         self.name_res_set = name_res_set
         self.name_res_output_dir = os.path.join(self.base_output_dir, str(name_res_set.set_name),
