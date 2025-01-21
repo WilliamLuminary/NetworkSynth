@@ -6,9 +6,9 @@ import numpy as np
 from scipy.spatial.distance import euclidean
 from tqdm import tqdm
 
-from config import NameResolutionSet, Config, DataType, Resolution, SetName
+from config import Config, DataType, NameResolutionSet, Resolution, SetName
 from graph import GraphAttrAgent, GraphGenerator, GraphPostProcessor
-from handlers import DataAgent, MultifractalAnalyzer, Saver, Plotter
+from handlers import DataAgent, MultifractalAnalyzer, Plotter, Saver
 from utils import timer
 
 Config.initialize()
