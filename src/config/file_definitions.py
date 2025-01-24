@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from .enums import DataType, Resolution, SetName
+from .enums import DataType
 
 
 @dataclass
