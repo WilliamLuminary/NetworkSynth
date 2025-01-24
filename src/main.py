@@ -8,11 +8,11 @@ import numpy as np
 from scipy.spatial.distance import euclidean
 
 import wandb
-from config import Config, ConfigOld, DataType, NameResolutionSet
+from config import Config, ConfigNew, ConfigOld, DataType, NameResolutionSet
 from graph import GraphAttrAgent, GraphGenerator, GraphPostProcessor
 from handlers import DataAgent, MultifractalAnalyzer, Plotter, Saver, Summary
 
-Config.initialize()
+ConfigNew.initialize()
 logger = logging.getLogger(__name__)
 
 error_threshold = Config.ERROR_TOLERANCE
@@ -193,8 +193,8 @@ exp = False  # Set to True to run the hyperparameter tuning experiment
 # Config.disable_saving("Debugging")
 
 if __name__ == '__main__':
-    set_names = ConfigOld.SETS
-    resolutions = ConfigOld.RESOLUTIONS
+    set_names = Config.SETS
+    resolutions = Config.RESOLUTIONS
     if not preview and exp:
         wandb.login()
         wandb.init(project="graph-hyperparam-tuning", name="hyperparam_exp")
@@ -209,10 +209,12 @@ if __name__ == '__main__':
             Saver.initialize()
 
         summary = Summary()
+
         for (__set_name), __resolution in product(set_names, resolutions):
             error = run(NameResolutionSet(__set_name, __resolution))
             if error is not None:
                 summary.add_result(__set_name.value, __resolution.value, error)
+
         summary.summarize()
 
     except Exception as e:

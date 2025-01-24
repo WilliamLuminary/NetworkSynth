@@ -1,6 +1,15 @@
+# src/config/config_old.py
+import logging
 import os
+import re
 
-from . import Config, Resolution, SetName
+import cv2
+import numpy as np
+
+from .config import Config
+from .enums import Resolution, SetName
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigOld(Config):
@@ -24,4 +33,91 @@ class ConfigOld(Config):
 
     @classmethod
     def initialize(cls):
+        Config.RESOLUTIONS = cls.RESOLUTIONS
+        Config.SETS = cls.SETS
+        Config.DEFAULT_FRAME_SIZE = cls.DEFAULT_FRAME_SIZE
+        Config.CLOSED_NODES_FACTOR = cls.CLOSED_NODES_FACTOR
+        Config.CLASSES_FACTOR = cls.CLASSES_FACTOR
+        Config.SYNTHETIC_GRAPH_NUMBER = cls.SYNTHETIC_GRAPH_NUMBER
+        Config.SYNTHETIC_NETWORK_NUMBER = cls.SYNTHETIC_NETWORK_NUMBER
+        Config.MEASURE_WEIGHTED = cls.MEASURE_WEIGHTED
+        Config.BASE_INPUT_PATH = cls.BASE_INPUT_PATH
+        Config.POSITION_DATA_DIR = cls.POSITION_DATA_DIR
+        Config.ADJ_MATRIX_DATA_DIR = cls.ADJ_MATRIX_DATA_DIR
+        Config.IMAGES_DIR = cls.IMAGES_DIR
+
         cls._setup_logger(details="old")
+        cls.POSITION_DATA_FUNC = cls._load_positions
+        cls.ADJ_MATRIX_DATA_FUNC = cls._load_sparse_matrix
+        cls.IMAGES_FUNC = cls._load_image
+
+    @staticmethod
+    def _load_positions(set_name, resolution):
+        directory_path = os.path.join(ConfigOld.POSITION_DATA_DIR, resolution)
+        pattern = re.compile(
+            rf"{re.escape(set_name)}_{re.escape(resolution)}.*\.npy",
+            re.IGNORECASE
+        )
+        file_path = Config._find_file_with_pattern(
+            directory_path, pattern, f'positions_of_nodes for {set_name}'
+        )
+        logger.info(f"Positions file loaded: {file_path}")
+        positions = np.load(file_path, allow_pickle=True)
+        return positions
+
+    @staticmethod
+    def _load_sparse_matrix(set_name, resolution):
+        directory_path = os.path.join(ConfigOld.ADJ_MATRIX_DATA_DIR, resolution)
+        pattern = re.compile(
+            rf"sparse_matrices_{re.escape(resolution)}.*\.npz",
+            re.IGNORECASE
+        )
+        file_path = Config._find_file_with_pattern(
+            directory_path, pattern, 'sparse matrix'
+        )
+        matrix_data = np.load(file_path, allow_pickle=True)
+
+        set_name = set_name
+        if set_name == 'C':
+            if 'C1' in matrix_data:
+                set_name = 'C1'
+            elif 'C' in matrix_data:
+                set_name = 'C'
+            else:
+                available_keys = list(matrix_data.keys())
+                err_msg = f"Neither 'C' nor 'C1' is found in sparse matrix data. Available sets: {available_keys}"
+                logger.error(err_msg)
+                raise KeyError(err_msg)
+
+        if set_name not in matrix_data:
+            available_keys = list(matrix_data.keys())
+            err_msg = f"Set '{set_name}' not found in sparse matrix data. Available sets: {available_keys}"
+            logger.error(err_msg)
+            raise KeyError(err_msg)
+
+        return matrix_data[set_name].item()
+
+    @staticmethod
+    def _load_image(set_name, resolution):
+        directory_path = os.path.join(ConfigOld.IMAGES_DIR, resolution)
+
+        pattern = re.compile(
+            rf"W-\d+-\d+-\d+_{re.escape(str(set_name))}_.*\.(tif|png|jpg)",
+            re.IGNORECASE
+        )
+
+        file_path = Config._find_file_with_pattern(
+            directory_path, pattern, f'image for {set_name}'
+        )
+        if file_path is None:
+            logger.warning(f"Background image is None.")
+            return None
+
+        logger.info(f"Image file loaded: {file_path}")
+
+        image = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
+        if image is None:
+            err_msg = f"Failed to load image from file: {file_path}"
+            logger.warning(err_msg)
+            return None
+        return image

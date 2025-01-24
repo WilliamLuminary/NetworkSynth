@@ -1,10 +1,18 @@
 # src/config/config.py
 import logging
 import os
-from typing import Tuple
+from typing import Optional, Tuple
 
-from .enums import DataType
 from .config_objects import FileConfig, ImageConfig, PlotConfig
+from .enums import DataType
+
+logger = logging.getLogger(__name__)
+
+
+def load_idle():
+    err_msg = "Logic of loading data is not implemented yet."
+    logging.info(err_msg)
+    raise NotImplementedError(err_msg)
 
 
 class Config:
@@ -31,19 +39,14 @@ class Config:
     ADJ_MATRIX_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'sparse_matrices')
     IMAGES_DIR = os.path.join(BASE_INPUT_PATH, 'Original Graphs')
 
-    POSITION_DATA_PATTERN = ''
-    ADJ_MATRIX_DATA_PATTERN = ''
-    IMAGES_PATTERN = ''
-    BASE_OUTPUT_PATH = os.path.join(BASE_DATA_PATH, 'output')
-
     MAX_ATTEMPTS = 10
     ERROR_TOLERANCE = .2  # Generally should be 0.15
-
     LOG_LEVEL = logging.INFO
 
     DISABLE_SAVING: bool = False
     DISABLE_SAVING_NOTE: str = ""
 
+    BASE_OUTPUT_PATH = os.path.join(BASE_DATA_PATH, 'output')
     SYNTHETIC_GRAPH_DIRECTORY_NAME = 'synthetic_graphs'
     ORIGINAL_GRAPH_DIRECTORY_NAME = 'original_graphs'
 
@@ -79,9 +82,9 @@ class Config:
 
     @staticmethod
     def _setup_logger(log_level=logging.INFO, details=""):
-        logger = logging.getLogger()
-        if not logger.hasHandlers():
-            logger.setLevel(log_level)
+        _logger = logging.getLogger()
+        if not _logger.hasHandlers():
+            _logger.setLevel(log_level)
 
             console_handler = logging.StreamHandler()
             console_handler.setLevel(log_level)
@@ -95,12 +98,15 @@ class Config:
             console_handler.setFormatter(formatter)
             file_handler.setFormatter(formatter)
 
-            logger.addHandler(console_handler)
-            logger.addHandler(file_handler)
+            _logger.addHandler(console_handler)
+            _logger.addHandler(file_handler)
 
     @classmethod
     def initialize(cls):
         cls._setup_logger(cls.LOG_LEVEL)
+        cls.POSITION_DATA_FUNC = load_idle
+        cls.ADJ_MATRIX_DATA_FUNC = load_idle
+        cls.IMAGES_FUNC = load_idle
 
     @classmethod
     def set_node_factor(cls, factor: float):
@@ -132,3 +138,24 @@ class Config:
             'error_tolerance': self.ERROR_TOLERANCE,
         }
         return f"Config: {_config})"
+
+    @staticmethod
+    def _find_file_with_pattern(directory_path, pattern, details='', must_exist=True) -> Optional[str]:
+        if not os.path.exists(directory_path):
+            raise FileNotFoundError(f"Directory not found: {directory_path}")
+
+        files_in_directory = os.listdir(directory_path)
+        matched_files = [file_name for file_name in files_in_directory if pattern.search(file_name)]
+
+        if len(matched_files) == 1:
+            file_path = os.path.join(directory_path, matched_files[0])
+            logger.info(f"{details} file found: {file_path}")
+            return file_path
+        elif len(matched_files) > 1:
+            raise FileExistsError(f"Multiple {details} files found: {matched_files}.")
+        else:
+            if must_exist:
+                raise FileNotFoundError(f"No {details} file found in {directory_path}.")
+            else:
+                logger.warning(f"No {details} file found in {directory_path}.")
+                return None
