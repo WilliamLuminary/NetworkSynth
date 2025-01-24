@@ -33,7 +33,6 @@ class DataAgent:
         logger.info(f"Loading data for {self.name_res_set}")
         self.positions_of_nodes = self._load_positions()
         self.adjacency_matrix = self._load_sparse_matrix()
-
         self.original_image = self._load_image()
         self._resize_image()
         self._trim_image()
