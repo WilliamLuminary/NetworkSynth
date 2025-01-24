@@ -118,13 +118,13 @@ def generate_synthetic(data_agent: DataAgent, plotter: Plotter, saver, org_alpha
     if not __non_outlier_errors:
         return float('inf')
 
-    _avg_err = float(np.mean(__non_outlier_errors))
+    _avg_err = round(np.mean(__non_outlier_errors), 3)
 
     if saver:
         saver.save_file(
             data_agent.synthetic_networks,
             DataType.SYNTHETIC_NETWORK,
-            file_name_prefix=f'error:{_avg_err:.2f}'
+            file_name_prefix=f'nw_no_{num_syn_nw}_err_{_avg_err:.3f}'
         )
     return _avg_err
 

@@ -10,7 +10,7 @@ from typing import Any, Optional, Union
 import cv2
 from numpy import ndarray
 
-from config import Config, DataType, FileTag, NameResolutionSet
+from config import Config, DataType, FILE_CONFIGURATIONS, FileTag, NameResolutionSet
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +99,7 @@ class Saver:
             logger.warning(f"{Config.DISABLE_SAVING_NOTE} Saving is disabled. ")
             return
 
-        file_config = Config.FILE_CONFIGURATIONS[data_type]
+        file_config = FILE_CONFIGURATIONS[data_type]
         rel_path = file_config.relative_dir
 
         file_name_prefix = (file_name_prefix + '_') if file_name_prefix and file_name_prefix[-1] != '_' else (

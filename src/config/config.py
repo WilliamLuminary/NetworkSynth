@@ -52,40 +52,6 @@ class Config:
     SYNTHETIC_GRAPH_DIRECTORY_NAME = 'synthetic_networks'
     ORIGINAL_GRAPH_DIRECTORY_NAME = 'original_graphs'
 
-    FILE_CONFIGURATIONS = {
-        DataType.ORIGINAL_IMAGE: ImageConfig(
-            relative_dir="origin",
-            data_type=DataType.ORIGINAL_IMAGE,
-            alpha=0.6
-        ),
-        DataType.ORIGINAL_GRAPH: PlotConfig(
-            relative_dir="origin",
-            node_size=6.0,
-            line_width=3.0,
-            data_type=DataType.ORIGINAL_GRAPH
-        ),
-        DataType.ORIGINAL_NETWORK: FileConfig(
-            relative_dir="origin",
-            data_type=DataType.ORIGINAL_NETWORK
-        ),
-        DataType.SYNTHETIC_GRAPH: PlotConfig(
-            relative_dir="synthetic",
-            node_size=6.0,
-            line_width=3.0,
-            data_type=DataType.SYNTHETIC_GRAPH,
-            show_on_the_fly=False
-        ),
-        DataType.SYNTHETIC_NETWORK: FileConfig(
-            relative_dir="synthetic",
-            data_type=DataType.SYNTHETIC_NETWORK,
-            detail=f"total_no_{SYNTHETIC_NETWORK_NUMBER}",
-        ),
-        DataType.DEFAULT_DATA: FileConfig(
-            relative_dir="",
-            data_type=DataType.DEFAULT_DATA,
-        )
-    }
-
     @staticmethod
     def _setup_logger(log_level=logging.INFO, details=""):
         _logger = logging.getLogger()

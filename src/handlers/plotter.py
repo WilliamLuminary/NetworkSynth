@@ -9,7 +9,7 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
 from numpy import ndarray
 
-from config import Config, DataType, FileTag
+from config import Config, DataType, FILE_CONFIGURATIONS, FileTag
 from utils import build_graph_pos_and_adj_mat, calculate_frame
 
 logger = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ class Plotter:
             else:
                 graph = build_graph_pos_and_adj_mat(pos_and_adj_mat)
 
-        _file_config = Config.FILE_CONFIGURATIONS.get(data_type)
+        _file_config = FILE_CONFIGURATIONS.get(data_type)
         _fig, _ax = plt.subplots(figsize=(10, 10), dpi=260)
 
         _position_dict = nx.get_node_attributes(graph, 'pos')
