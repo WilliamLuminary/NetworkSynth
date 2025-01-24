@@ -12,8 +12,9 @@ from config import Config
 
 
 def calculate_frame(graph: nx.Graph = None, center_position: Union[tuple, list, ndarray] = None,
-                    frame_range: Tuple[int, int] = Config.DEFAULT_FRAME_SIZE) -> tuple[
+                    frame_range: Tuple[int, int] = None) -> tuple[
     tuple[float, float], tuple[float, float]]:
+    frame_range = frame_range or Config.DEFAULT_FRAME_SIZE
     if graph is None:
         if not center_position:
             raise ValueError("Either synthetic_graph or center_position must be provided.")

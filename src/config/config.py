@@ -5,7 +5,7 @@ from typing import Optional, Tuple, Union
 
 import numpy as np
 
-from .config_objects import FileConfig, ImageConfig, PlotConfig
+from .file_definitions import FileConfig, ImageConfig, PlotConfig
 from .enums import DataType
 
 logger = logging.getLogger(__name__)
