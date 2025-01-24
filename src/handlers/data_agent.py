@@ -6,7 +6,7 @@ import cv2
 import networkx as nx
 import numpy as np
 
-from config import Config, NameResolutionSet
+from config import Config
 from graph import GraphAttrAgent
 from handlers.mapper import Mapper
 from utils import build_graph_pos_and_adj_mat
@@ -15,9 +15,8 @@ logger = logging.getLogger(__name__)
 
 
 class DataAgent:
-    def __init__(self, name_res_set: NameResolutionSet):
-        self.name_res_set = name_res_set
-        self.set_name, self.resolution = str(self.name_res_set.set_name), str(self.name_res_set.resolution)
+    def __init__(self, set_name, resolution):
+        self.set_name, self.resolution = set_name, resolution
 
         self.positions_of_nodes = None
         self.adjacency_matrix = None
@@ -30,7 +29,7 @@ class DataAgent:
         self.synthetic_networks = []
 
     def load_data(self):
-        logger.info(f"Loading data for {self.name_res_set}")
+        logger.info(f"Loading data for {self.set_name}, {self.resolution}...")
         self.positions_of_nodes = self._load_positions()
         self.adjacency_matrix = self._load_sparse_matrix()
         self.original_image = self._load_image()
@@ -41,7 +40,6 @@ class DataAgent:
                                                              self.adjacency_matrix))
         self._transform_original_positions(rotation_deg=270)
         self.mapper = Mapper(self.original_network)
-        logger.info(f"Data successfully loaded for {self.name_res_set}")
 
     def _load_positions(self) -> Union[np.ndarray, list]:
         return Config.POSITION_DATA_FUNC(self.set_name, self.resolution)

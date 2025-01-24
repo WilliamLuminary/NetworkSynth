@@ -10,16 +10,15 @@ from typing import Any, Optional, Union
 import cv2
 from numpy import ndarray
 
-from config import Config, DataType, FILE_CONFIGURATIONS, FileTag, NameResolutionSet
+from config import Config, DataType, FILE_CONFIGURATIONS, FileTag, Resolution, SetName
 
 logger = logging.getLogger(__name__)
 
 
 class Saver:
-    def __init__(self, name_res_set: NameResolutionSet):
-        self.name_res_set = name_res_set
-        self.name_res_output_dir = os.path.join(self.base_output_dir, str(name_res_set.set_name),
-                                                str(name_res_set.resolution))
+    def __init__(self, set_name: SetName, resolution: Resolution):
+
+        self.name_res_output_dir = os.path.join(self.base_output_dir, str(set_name), str(resolution))
         self.ensure_directory(self.name_res_output_dir, exist_ok=True)
 
     @classmethod

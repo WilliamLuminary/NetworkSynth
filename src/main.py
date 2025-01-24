@@ -8,7 +8,7 @@ import numpy as np
 from scipy.spatial.distance import euclidean
 
 import wandb
-from config import Config, Config2, Config1, DataType, NameResolutionSet
+from config import Config, Config2, DataType, Resolution, SetName
 from graph import GraphAttrAgent, GraphGenerator, GraphPostProcessor
 from handlers import DataAgent, MultifractalAnalyzer, Plotter, Saver, Summary
 
@@ -129,15 +129,15 @@ def generate_synthetic(data_agent: DataAgent, plotter: Plotter, saver, org_alpha
     return _avg_err
 
 
-def run(name_res_set: NameResolutionSet) -> Optional[float]:
+def run(set_name: SetName, resolution: Resolution) -> Optional[float]:
     logger.info(Config())
-    data_agent = DataAgent(name_res_set)
+    data_agent = DataAgent(set_name, resolution)
     data_agent.load_data()
     graph_attr = GraphAttrAgent(data_agent.original_network)
     data_agent.set_attributes(graph_attr)
     saver = None
     if not preview:
-        saver = Saver(data_agent.name_res_set)
+        saver = Saver(data_agent.set_name, data_agent.resolution)
         saver.save_file(data_agent.original_image, DataType.ORIGINAL_IMAGE)
         saver.save_file(data_agent.original_network, DataType.ORIGINAL_NETWORK)
 
@@ -210,8 +210,8 @@ if __name__ == '__main__':
 
         summary = Summary()
 
-        for (__set_name), __resolution in product(set_names, resolutions):
-            error = run(NameResolutionSet(__set_name, __resolution))
+        for __set_name, __resolution in product(set_names, resolutions):
+            error = run(__set_name, __resolution)
             if error is not None:
                 summary.add_result(__set_name.value, __resolution.value, error)
 

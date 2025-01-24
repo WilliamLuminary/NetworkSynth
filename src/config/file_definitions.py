@@ -28,15 +28,6 @@ class PlotConfig(FileConfig):
     show_on_the_fly: bool = True
 
 
-@dataclass(frozen=True)
-class NameResolutionSet:
-    set_name: SetName
-    resolution: Resolution
-
-    def __str__(self):
-        return f"Set name: {self.set_name}, Resolution: {self.resolution}"
-
-
 FILE_CONFIGURATIONS = {
     DataType.ORIGINAL_IMAGE: ImageConfig(
         relative_dir="origin",
