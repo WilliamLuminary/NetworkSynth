@@ -1,4 +1,4 @@
-# src/original_graph/graph_attr_agent.py
+# src/original_network/graph_attr_agent.py
 
 from collections import Counter, defaultdict
 

@@ -1,4 +1,4 @@
-# src/original_graph/graph_postprocessor.py
+# src/graph/graph_postprocessor.py
 
 import networkx as nx
 

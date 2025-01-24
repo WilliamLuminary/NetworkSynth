@@ -122,7 +122,7 @@ def generate_synthetic(data_agent: DataAgent, plotter: Plotter, saver, org_alpha
 
     if saver:
         saver.save_file(
-            data_agent.synthetic_graphs,
+            data_agent.synthetic_networks,
             DataType.SYNTHETIC_NETWORK,
             file_name_prefix=f'error:{_avg_err:.2f}'
         )
@@ -134,7 +134,7 @@ def run(name_res_set: NameResolutionSet) -> Optional[float]:
     logger.info(f"Processing {name_res_set}")
     data_agent = DataAgent(name_res_set)
     data_agent.load_data()
-    graph_attr = GraphAttrAgent(data_agent.original_graph)
+    graph_attr = GraphAttrAgent(data_agent.original_network)
     data_agent.set_attributes(graph_attr)
     saver = None
     if not preview:
@@ -142,14 +142,14 @@ def run(name_res_set: NameResolutionSet) -> Optional[float]:
         saver.save_file(data_agent.original_image, DataType.ORIGINAL_IMAGE)
         saver.save_file(data_agent.original_network, DataType.ORIGINAL_NETWORK)
 
-    plotter = Plotter(data_agent.original_image, data_agent.original_graph)
+    plotter = Plotter(data_agent.original_image, data_agent.original_network)
     graph = plotter.plot_graph(
         data_type=DataType.ORIGINAL_GRAPH,
         show=True,
     )
 
     if Config.SYNTHETIC_NETWORK_NUMBER != 0:
-        org_analyzer = MultifractalAnalyzer(data_agent.original_graph)
+        org_analyzer = MultifractalAnalyzer(data_agent.original_network)
         mult_ans_res = org_analyzer.multifractal_analysis()
     else:
         mult_ans_res = [0, 0]

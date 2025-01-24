@@ -1,4 +1,4 @@
-# src/original_graph/multifractal_analyzer.py
+# src/handlers/multifractal_analyzer.py
 from typing import Tuple
 
 import math

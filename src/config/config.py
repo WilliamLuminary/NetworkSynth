@@ -49,7 +49,7 @@ class Config:
     DISABLE_SAVING_NOTE: str = ""
 
     BASE_OUTPUT_PATH = os.path.join(BASE_DATA_PATH, 'output')
-    SYNTHETIC_GRAPH_DIRECTORY_NAME = 'synthetic_graphs'
+    SYNTHETIC_GRAPH_DIRECTORY_NAME = 'synthetic_networks'
     ORIGINAL_GRAPH_DIRECTORY_NAME = 'original_graphs'
 
     FILE_CONFIGURATIONS = {
@@ -62,7 +62,7 @@ class Config:
             relative_dir="origin",
             node_size=6.0,
             line_width=3.0,
-            data_type=DataType.ORIGINAL_GRAPH,
+            data_type=DataType.ORIGINAL_GRAPH
         ),
         DataType.ORIGINAL_NETWORK: FileConfig(
             relative_dir="origin",
@@ -78,7 +78,7 @@ class Config:
         DataType.SYNTHETIC_NETWORK: FileConfig(
             relative_dir="synthetic",
             data_type=DataType.SYNTHETIC_NETWORK,
-            detail=f"no_syn_nw_{SYNTHETIC_NETWORK_NUMBER}",
+            detail=f"total_no_{SYNTHETIC_NETWORK_NUMBER}",
         ),
         DataType.DEFAULT_DATA: FileConfig(
             relative_dir="",

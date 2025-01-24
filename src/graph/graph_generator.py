@@ -1,4 +1,4 @@
-# src/original_graph/graph_generator.py
+# src/original_network/graph_generator.py
 
 from collections import deque
 from typing import Optional, Tuple, Union
@@ -24,7 +24,7 @@ class GraphGenerator:
             if nodes and len(nodes) > 100:
                 break
         else:
-            raise Exception("Failed to generate a original_graph within the specified attempts.")
+            raise Exception("Failed to generate a original_network within the specified attempts.")
 
         _synthetic_network = build_graph_nodes_and_edges(nodes, edges)
         frame = calculate_frame(graph=_synthetic_network, frame_range=frame_range)

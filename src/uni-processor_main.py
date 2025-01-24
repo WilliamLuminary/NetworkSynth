@@ -22,10 +22,10 @@ def generate_and_process_graphs(data_agent: DataAgent):
         output_handler = Saver(data_agent.name_res_set)
         output_handler.save_file(data_agent.original_image, DataType.ORIGINAL_IMAGE)
 
-    org_analyzer = MultifractalAnalyzer(data_agent.original_graph)
+    org_analyzer = MultifractalAnalyzer(data_agent.original_network)
     org_alpha_0, org_width = org_analyzer.multifractal_analysis()
 
-    plot_agent = Plotter(data_agent.original_image, data_agent.original_graph)
+    plot_agent = Plotter(data_agent.original_image, data_agent.original_network)
     graph = plot_agent.plot_graph(
         data_type=DataType.ORIGINAL_GRAPH,
         show=True,
@@ -78,18 +78,18 @@ def generate_and_process_graphs(data_agent: DataAgent):
         _errors.append(error)
         data_agent.add_synthetic_graph(synthetic_graph)
 
-    output_handler.save_file(data_agent.synthetic_graphs, DataType.SYNTHETIC_NETWORK,
+    output_handler.save_file(data_agent.synthetic_networks, DataType.SYNTHETIC_NETWORK,
                              file_name_prefix=f'error:{np.mean(_errors):.2f}')
 
 
 save_plots = True
-preview = False  # Set to True to only plot the original original_graph
+preview = False  # Set to True to only plot the original original_network
 set_names = [SetName.D]
 resolutions = [Resolution.X20K]
 
 if __name__ == '__main__':
     if preview:
-        warnings.warn("Only the original original_graph will be shown WITHOUT SAVING")
+        warnings.warn("Only the original original_network will be shown WITHOUT SAVING")
     else:
         Saver.initialize()
 
@@ -99,6 +99,6 @@ if __name__ == '__main__':
             logger.info(f"Processing {name_res_set}")
             data_loader = DataAgent(name_res_set)
             data_loader.load_data()
-            graph_attr = GraphAttrAgent(data_loader.original_graph)
+            graph_attr = GraphAttrAgent(data_loader.original_network)
             data_loader.set_attributes(graph_attr)
             generate_and_process_graphs(data_loader)

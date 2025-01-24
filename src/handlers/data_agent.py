@@ -22,12 +22,12 @@ class DataAgent:
         self.positions_of_nodes = None
         self.adjacency_matrix = None
         self.original_image = None
-        self.original_graph = None
+        self.original_network = None
 
         self.attributes: Optional[GraphAttrAgent] = None
         self.mapper = None
 
-        self.synthetic_graphs = []
+        self.synthetic_networks = []
 
     def load_data(self):
         logger.info(f"Loading data for {self.name_res_set}")
@@ -37,10 +37,10 @@ class DataAgent:
         self._resize_image()
         self._trim_image()
 
-        self.original_graph = build_graph_pos_and_adj_mat((self.positions_of_nodes,
-                                                           self.adjacency_matrix))
+        self.original_network = build_graph_pos_and_adj_mat((self.positions_of_nodes,
+                                                             self.adjacency_matrix))
         self._transform_original_positions(rotation_deg=270)
-        self.mapper = Mapper(self.original_graph)
+        self.mapper = Mapper(self.original_network)
         logger.info(f"Data successfully loaded for {self.name_res_set}")
 
     def _load_positions(self) -> Union[np.ndarray, list]:
@@ -61,10 +61,10 @@ class DataAgent:
         # Use with caution.'
         # warnings.warn(warn_mesg)
         # logger.warning(warn_mesg)
-        self.synthetic_graphs.append(graph)
+        self.synthetic_networks.append(graph)
 
     # def get_synthetic_graph(self):
-    #     return self.synthetic_graphs.get() if not self.synthetic_graphs.empty() else None
+    #     return self.synthetic_networks.get() if not self.synthetic_networks.empty() else None
 
     def set_attributes(self, attributes):
         self.attributes = attributes
@@ -94,7 +94,7 @@ class DataAgent:
     def _transform_original_positions(self, flip_x=False, flip_y=False, rotation_deg=0):
         if self.original_image is None:
             return
-        _graph = self.original_graph
+        _graph = self.original_network
         __size = self.original_image.shape
         c = (__size[0] / 2, __size[1] / 2)
 
