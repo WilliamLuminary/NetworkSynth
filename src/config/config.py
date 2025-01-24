@@ -64,6 +64,10 @@ class Config:
             line_width=3.0,
             data_type=DataType.ORIGINAL_GRAPH,
         ),
+        DataType.ORIGINAL_NETWORK: FileConfig(
+            relative_dir="origin",
+            data_type=DataType.ORIGINAL_NETWORK
+        ),
         DataType.SYNTHETIC_GRAPH: PlotConfig(
             relative_dir="synthetic",
             node_size=6.0,

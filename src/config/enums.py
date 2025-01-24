@@ -61,6 +61,7 @@ class DataType(Enum):
     DEFAULT_DATA = ("Default Data", {FileTag.DATA}, FileType.PKL)
     ORIGINAL_IMAGE = ("Original Image", {FileTag.FIG, FileTag.ORI}, FileType.PNG)
     ORIGINAL_GRAPH = ("Original Graph", {FileTag.FIG, FileTag.PLOT, FileTag.ORI}, FileType.PNG)
+    ORIGINAL_NETWORK = ("Original Network", {FileTag.DATA, FileTag.ORI}, FileType.PKL)
     SYNTHETIC_GRAPH = ("Synthetic Graph", {FileTag.FIG, FileTag.PLOT, FileTag.SYN}, FileType.PNG)
     SYNTHETIC_NETWORK = ("Synthetic Network", {FileTag.DATA, FileTag.SYN}, FileType.PKL)
 

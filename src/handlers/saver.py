@@ -83,6 +83,14 @@ class Saver:
             logger.debug(f"No existing file to delete at: {filepath}")
 
     def save_file(self, content: Any, data_type: DataType, file_name_prefix: Optional[str] = None) -> None:
+        """
+        Saves the provided content to a file based on its configuration.
+    
+        :param content: The data to be saved (e.g., image or pickled object).
+        :param data_type: Specifies the data type and related save configurations.
+        :param file_name_prefix: Optional prefix for the generated file name.
+        :return: None
+        """
         if content is None:
             logger.warning("Content is None.")
             return

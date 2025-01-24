@@ -140,6 +140,7 @@ def run(name_res_set: NameResolutionSet) -> Optional[float]:
     if not preview:
         saver = Saver(data_agent.name_res_set)
         saver.save_file(data_agent.original_image, DataType.ORIGINAL_IMAGE)
+        saver.save_file(data_agent.original_network, DataType.ORIGINAL_NETWORK)
 
     plotter = Plotter(data_agent.original_image, data_agent.original_graph)
     graph = plotter.plot_graph(
