@@ -77,7 +77,7 @@ class GraphNode:
             self.base_angle = random.uniform(0, 360)
             self._initialize_root_node()
         else:
-            raise ValueError("Parent and parent_angle must be provided together or not at all.")
+            assert (False, "Parent and parent_angle must be provided together or not at all.")
 
     @staticmethod
     def _choose_degree_random() -> int:
