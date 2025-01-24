@@ -69,7 +69,8 @@ class DataAgent:
     def set_attributes(self, attributes):
         self.attributes = attributes
 
-    def _resize_image(self, frame_range: Tuple[int, int] = Config.DEFAULT_FRAME_SIZE) -> None:
+    def _resize_image(self, frame_range: Tuple[int, int] = None) -> None:
+        frame_range = frame_range or Config.DEFAULT_FRAME_SIZE
         if self.original_image is None:
             return
         target_size = min(frame_range)
@@ -79,7 +80,8 @@ class DataAgent:
         new_height = int(height * scaling_factor)
         self.original_image = cv2.resize(self.original_image, (new_width, new_height), interpolation=cv2.INTER_LANCZOS4)
 
-    def _trim_image(self, frame_range: Tuple[int, int] = Config.DEFAULT_FRAME_SIZE) -> None:
+    def _trim_image(self, frame_range: Tuple[int, int] = None) -> None:
+        frame_range = frame_range or Config.DEFAULT_FRAME_SIZE
         if self.original_image is None:
             return
         target_size = min(frame_range)

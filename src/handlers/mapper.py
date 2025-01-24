@@ -76,7 +76,8 @@ class Mapper:
         return np.array(edge_lengths), np.array(edge_weights)
 
     @staticmethod
-    def _bins_and_baskets(edge_lengths, edge_weights, num_bins=100, method='thirds'):
+    def _bins_and_baskets(edge_lengths, edge_weights, num_bins=100, method: str = None):
+        method = method or 'thirds'
         sorted_lengths = np.sort(edge_lengths)
         num_edges = len(sorted_lengths)
 
