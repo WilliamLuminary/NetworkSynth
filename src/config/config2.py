@@ -19,13 +19,14 @@ class Config2(Config):
 
     DEFAULT_FRAME_SIZE = (470, 470)
     CLOSED_NODES_FACTOR = 1.2
-    CLASSES_FACTOR = 0.8
+    CLOSED_EDGES_FACTOR = 0.8
     # For 10_kx image, node fac should be 1.5, and edge fac should be 1
 
-    SYNTHETIC_GRAPH_NUMBER = 0
-    SYNTHETIC_NETWORK_NUMBER = 0
+    SYNTHETIC_GRAPH_NUMBER = 10
+    SYNTHETIC_NETWORK_NUMBER = 300
 
     MEASURE_WEIGHTED = False
+    ERROR_TOLERANCE = .3
 
     BASE_INPUT_PATH = os.path.join(Config.BASE_DATA_PATH, 'input', 'new_input')
     POSITION_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'position')
@@ -34,18 +35,10 @@ class Config2(Config):
 
     @classmethod
     def initialize(cls):
-        Config.RESOLUTIONS = cls.RESOLUTIONS
-        Config.SETS = cls.SETS
-        Config.DEFAULT_FRAME_SIZE = cls.DEFAULT_FRAME_SIZE
-        Config.CLOSED_NODES_FACTOR = cls.CLOSED_NODES_FACTOR
-        Config.CLASSES_FACTOR = cls.CLASSES_FACTOR
-        Config.SYNTHETIC_GRAPH_NUMBER = cls.SYNTHETIC_GRAPH_NUMBER
-        Config.SYNTHETIC_NETWORK_NUMBER = cls.SYNTHETIC_NETWORK_NUMBER
-        Config.MEASURE_WEIGHTED = cls.MEASURE_WEIGHTED
-        Config.BASE_INPUT_PATH = cls.BASE_INPUT_PATH
-        Config.POSITION_DATA_DIR = cls.POSITION_DATA_DIR
-        Config.ADJ_MATRIX_DATA_DIR = cls.ADJ_MATRIX_DATA_DIR
-        Config.IMAGES_DIR = cls.IMAGES_DIR
+        for name in dir(cls):
+            if name.isupper() and not name.startswith('__'):
+                value = getattr(cls, name)
+                setattr(Config, name, value)
 
         super()._setup_logger(details="new")
         Config.POSITION_DATA_FUNC = cls._load_positions

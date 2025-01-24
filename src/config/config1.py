@@ -33,18 +33,10 @@ class Config1(Config):
 
     @classmethod
     def initialize(cls):
-        Config.RESOLUTIONS = cls.RESOLUTIONS
-        Config.SETS = cls.SETS
-        Config.DEFAULT_FRAME_SIZE = cls.DEFAULT_FRAME_SIZE
-        Config.CLOSED_NODES_FACTOR = cls.CLOSED_NODES_FACTOR
-        Config.CLASSES_FACTOR = cls.CLASSES_FACTOR
-        Config.SYNTHETIC_GRAPH_NUMBER = cls.SYNTHETIC_GRAPH_NUMBER
-        Config.SYNTHETIC_NETWORK_NUMBER = cls.SYNTHETIC_NETWORK_NUMBER
-        Config.MEASURE_WEIGHTED = cls.MEASURE_WEIGHTED
-        Config.BASE_INPUT_PATH = cls.BASE_INPUT_PATH
-        Config.POSITION_DATA_DIR = cls.POSITION_DATA_DIR
-        Config.ADJ_MATRIX_DATA_DIR = cls.ADJ_MATRIX_DATA_DIR
-        Config.IMAGES_DIR = cls.IMAGES_DIR
+        for name in dir(cls):
+            if name.isupper() and not name.startswith('__'):
+                value = getattr(cls, name)
+                setattr(Config, name, value)
 
         cls._setup_logger(details="old")
         cls.POSITION_DATA_FUNC = cls._load_positions
