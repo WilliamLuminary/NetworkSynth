@@ -99,10 +99,19 @@ class Config:
         Config.DISABLE_SAVING_NOTE = reason
 
     def __str__(self):
-        _class_vars = {k: v for k, v in vars(self.__class__).items() if not k.startswith('__') and not callable(v)}
-        _instance_vars = {k: v for k, v in vars(self).items() if not k.startswith('__')}
-        _config_dict = {**_class_vars, **_instance_vars}
+        def is_method_like(attr_value):
+            return (inspect.isfunction(attr_value)
+                    or inspect.ismethod(attr_value)
+                    or isinstance(attr_value, staticmethod)
+                    or isinstance(attr_value, classmethod))
 
+        _class_vars = {
+            k: v
+            for k, v in vars(self.__class__).items()
+            if not k.startswith("__") and not is_method_like(v)
+        }
+        _instance_vars = {k: v for k, v in vars(self).items() if not k.startswith('__') and not callable(v)}
+        _config_dict = {**_class_vars, **_instance_vars}
         return f"{self.__class__.__name__}: {_config_dict}"
 
     @staticmethod

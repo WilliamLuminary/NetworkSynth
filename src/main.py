@@ -129,9 +129,8 @@ def generate_synthetic(data_agent: DataAgent, plotter: Plotter, saver, org_alpha
     return _avg_err
 
 
-# @timer
 def run(name_res_set: NameResolutionSet) -> Optional[float]:
-    logger.info(f"Processing {name_res_set}")
+    logger.info(Config())
     data_agent = DataAgent(name_res_set)
     data_agent.load_data()
     graph_attr = GraphAttrAgent(data_agent.original_network)
