@@ -3,5 +3,5 @@
 from .config import Config
 from .config1 import Config1
 from .config2 import Config2
-from .config_objects import FileConfig, ImageConfig, NameResolutionSet, PlotConfig
+from .file_definitions import FileConfig, ImageConfig, NameResolutionSet, PlotConfig
 from .enums import DataType, FileTag, Resolution, SetName
