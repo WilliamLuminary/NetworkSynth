@@ -12,7 +12,7 @@ from .enums import Resolution, SetName
 logger = logging.getLogger(__name__)
 
 
-class ConfigNew(Config):
+class Config2(Config):
     SETS = [SetName.S4, SetName.S8, SetName.S11, SetName.S14, SetName.S17, SetName.S20, SetName.S23, SetName.S26,
             SetName.S29, SetName.S32]
     RESOLUTIONS = [Resolution.NA]
@@ -54,7 +54,7 @@ class ConfigNew(Config):
 
     @staticmethod
     def _load_positions(set_name, resolution):
-        directory_path = os.path.join(ConfigNew.POSITION_DATA_DIR, resolution)
+        directory_path = os.path.join(Config2.POSITION_DATA_DIR, resolution)
         pattern = re.compile(
             rf"W-\d+-\d+-\d+_{re.escape(str(set_name))}_postion\.npy",
             re.IGNORECASE
@@ -68,7 +68,7 @@ class ConfigNew(Config):
 
     @staticmethod
     def _load_sparse_matrix(set_name, resolution):
-        directory_path = os.path.join(ConfigNew.ADJ_MATRIX_DATA_DIR, resolution)
+        directory_path = os.path.join(Config2.ADJ_MATRIX_DATA_DIR, resolution)
         pattern = re.compile(r"sparse_matrices\.npz", re.IGNORECASE)
 
         file_path = Config._find_file_with_pattern(
@@ -96,7 +96,7 @@ class ConfigNew(Config):
 
     @staticmethod
     def _load_image(set_name, resolution):
-        directory_path = os.path.join(ConfigNew.IMAGES_DIR, resolution)
+        directory_path = os.path.join(Config2.IMAGES_DIR, resolution)
 
         pattern = re.compile(
             rf"W-\d+-\d+-\d+_{re.escape(str(set_name))}\.(tif|png|jpg)",

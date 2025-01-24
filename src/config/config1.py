@@ -12,7 +12,7 @@ from .enums import Resolution, SetName
 logger = logging.getLogger(__name__)
 
 
-class ConfigOld(Config):
+class Config1(Config):
     SETS = [SetName.A, SetName.B, SetName.C, SetName.D]
     RESOLUTIONS = [Resolution.X10K]
 
@@ -53,7 +53,7 @@ class ConfigOld(Config):
 
     @staticmethod
     def _load_positions(set_name, resolution):
-        directory_path = os.path.join(ConfigOld.POSITION_DATA_DIR, resolution)
+        directory_path = os.path.join(Config1.POSITION_DATA_DIR, resolution)
         pattern = re.compile(
             rf"{re.escape(set_name)}_{re.escape(resolution)}.*\.npy",
             re.IGNORECASE
@@ -67,7 +67,7 @@ class ConfigOld(Config):
 
     @staticmethod
     def _load_sparse_matrix(set_name, resolution):
-        directory_path = os.path.join(ConfigOld.ADJ_MATRIX_DATA_DIR, resolution)
+        directory_path = os.path.join(Config1.ADJ_MATRIX_DATA_DIR, resolution)
         pattern = re.compile(
             rf"sparse_matrices_{re.escape(resolution)}.*\.npz",
             re.IGNORECASE
@@ -99,7 +99,7 @@ class ConfigOld(Config):
 
     @staticmethod
     def _load_image(set_name, resolution):
-        directory_path = os.path.join(ConfigOld.IMAGES_DIR, resolution)
+        directory_path = os.path.join(Config1.IMAGES_DIR, resolution)
 
         pattern = re.compile(
             rf"W-\d+-\d+-\d+_{re.escape(str(set_name))}_.*\.(tif|png|jpg)",

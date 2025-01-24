@@ -8,11 +8,15 @@ import numpy as np
 from scipy.spatial.distance import euclidean
 
 import wandb
-from config import Config, ConfigNew, ConfigOld, DataType, NameResolutionSet
+from config import Config, Config2, Config1, DataType, NameResolutionSet
 from graph import GraphAttrAgent, GraphGenerator, GraphPostProcessor
 from handlers import DataAgent, MultifractalAnalyzer, Plotter, Saver, Summary
 
-ConfigNew.initialize()
+Config2.initialize()
+preview = False
+exp = False  # Set to True to run the hyperparameter tuning experiment
+# Config.disable_saving("Debugging")
+
 logger = logging.getLogger(__name__)
 
 error_threshold = Config.ERROR_TOLERANCE
@@ -187,10 +191,6 @@ def exp_hyper_tuning(data_agent, plotter, saver, mult_ans_res):
     )
     wandb.log({"my_heatmap": heatmap_plot})
 
-
-preview = False
-exp = False  # Set to True to run the hyperparameter tuning experiment
-# Config.disable_saving("Debugging")
 
 if __name__ == '__main__':
     set_names = Config.SETS

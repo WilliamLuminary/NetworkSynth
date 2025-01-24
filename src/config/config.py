@@ -1,7 +1,9 @@
 # src/config/config.py
 import logging
 import os
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
+
+import numpy as np
 
 from .config_objects import FileConfig, ImageConfig, PlotConfig
 from .enums import DataType
@@ -18,17 +20,17 @@ def load_idle():
 class Config:
     """ Define base paths, this config file must be in the subdirectory of the project root"""
 
-    SETS = []
-    RESOLUTIONS = []
+    SETS: Union[list, np.ndarray]
+    RESOLUTIONS = Union[list, np.ndarray]
 
-    DEFAULT_FRAME_SIZE: Tuple[int, int] = (510, 510)  # General (510, 510) # (width, height)
-    CLOSED_NODES_FACTOR = 1.5
-    CLOSED_EDGES_FACTOR = 1
+    DEFAULT_FRAME_SIZE: Tuple[int, int]  # General (510, 510) # (width, height)
+    CLOSED_NODES_FACTOR: float
+    CLOSED_EDGES_FACTOR: float
 
-    SYNTHETIC_GRAPH_NUMBER = 0
-    SYNTHETIC_NETWORK_NUMBER = 0
+    MEASURE_WEIGHTED: bool
 
-    MEASURE_WEIGHTED = False
+    SYNTHETIC_GRAPH_NUMBER: int = 0
+    SYNTHETIC_NETWORK_NUMBER: int = 0
 
     SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
     PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '..', '..'))
@@ -40,7 +42,7 @@ class Config:
     IMAGES_DIR = os.path.join(BASE_INPUT_PATH, 'Original Graphs')
 
     MAX_ATTEMPTS = 10
-    ERROR_TOLERANCE = .2  # Generally should be 0.15
+    ERROR_TOLERANCE = .15  # Generally should be 0.15
     LOG_LEVEL = logging.INFO
 
     DISABLE_SAVING: bool = False
@@ -129,15 +131,11 @@ class Config:
         Config.DISABLE_SAVING_NOTE = reason
 
     def __str__(self):
-        _config = {
-            'frame_range': self.DEFAULT_FRAME_SIZE,
-            'closed_nodes_factor': self.CLOSED_NODES_FACTOR,
-            'closed_edges_factor': self.CLOSED_EDGES_FACTOR,
-            'no_syn_graph': self.SYNTHETIC_GRAPH_NUMBER,
-            'no_syn_network': self.SYNTHETIC_NETWORK_NUMBER,
-            'error_tolerance': self.ERROR_TOLERANCE,
-        }
-        return f"Config: {_config})"
+        _class_vars = {k: v for k, v in vars(self.__class__).items() if not k.startswith('__') and not callable(v)}
+        _instance_vars = {k: v for k, v in vars(self).items() if not k.startswith('__')}
+        _config_dict = {**_class_vars, **_instance_vars}
+
+        return f"{self.__class__.__name__}: {_config_dict}"
 
     @staticmethod
     def _find_file_with_pattern(directory_path, pattern, details='', must_exist=True) -> Optional[str]:
