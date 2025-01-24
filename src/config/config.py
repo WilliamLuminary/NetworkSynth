@@ -20,8 +20,6 @@ class Config:
     MAX_ATTEMPTS = 10
     ERROR_TOLERANCE = .15  # Generally should be 0.15
 
-    MEASURE_WEIGHTED = False
-
     LOG_LEVEL = logging.INFO
 
     FILE_CONFIGURATIONS = {
