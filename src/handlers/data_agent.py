@@ -42,13 +42,13 @@ class DataAgent:
         self.mapper = Mapper(self.original_network)
 
     def _load_positions(self) -> Union[np.ndarray, list]:
-        return Config.POSITION_DATA_FUNC(self.set_name, self.resolution)
+        return Config.POSITION_DATA_FUNC(str(self.set_name), str(self.resolution))
 
     def _load_sparse_matrix(self) -> Union[np.ndarray, list]:
-        return Config.ADJ_MATRIX_DATA_FUNC(self.set_name, self.resolution)
+        return Config.ADJ_MATRIX_DATA_FUNC(str(self.set_name), str(self.resolution))
 
     def _load_image(self) -> Union[np.ndarray, list]:
-        return Config.IMAGES_FUNC(self.set_name, self.resolution)
+        return Config.IMAGES_FUNC(str(self.set_name), str(self.resolution))
 
     def add_synthetic_graph(self, graph: nx.Graph):
         """
