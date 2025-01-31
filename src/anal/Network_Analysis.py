@@ -41,7 +41,6 @@ def load_pkl_files(base_dir):
     return data
 
 
-
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 result_name = 'results_full_can_use'
 base_directory = os.path.abspath(os.path.join(SCRIPT_DIR, '..', '..', 'data', 'output', result_name))
@@ -252,7 +251,10 @@ colors = ['#F14040', '#FF8000', '#37AD6B', '#B177DE']
 
 for i in range(len(wei_ntauls_list)):
     # nspectrum(wei_ntauls_list[i],Q,i,color=colors[i])
-    nspectrum(wei_ntauls_list[i][180//300:261//300], Q[180//300:261//300], i, color=colors[i])
+    if len(wei_ntauls_list[i]) < 160:
+        print("")
+    else:
+        nspectrum(wei_ntauls_list[i][:80], Q[:80], i, color=colors[i])
 print(holder_exp)
 print(widths)
 
