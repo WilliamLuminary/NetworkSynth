@@ -8,11 +8,12 @@ import numpy as np
 from scipy.spatial.distance import euclidean
 
 import wandb
-from config import Config, Config2, DataType, Resolution, SetName
+from config import Config, Config2, ConfigSample, DataType, Resolution, SetName
 from graph import GraphAttrAgent, GraphGenerator, GraphPostProcessor
 from handlers import DataAgent, MultifractalAnalyzer, Plotter, Saver, Summary
 
-Config2.initialize()
+ConfigSample.initialize()
+# Config2.initialize()
 preview = False
 exp = False  # Set to True to run the hyperparameter tuning experiment
 # Config.disable_saving("Debugging")
