@@ -20,6 +20,10 @@ class SetName(Enum):
     S29 = "029"
     S32 = "032"
 
+    Sample1 = "SampleSet1"
+    Sample2 = "SampleSet2"
+    Sample3 = "SampleSet3"
+
     NA = ""
 
     def __str__(self):
@@ -31,6 +35,11 @@ class Resolution(Enum):
     X15K = "15kX"
     X20K = "20kX"
     X30K = "30kX"
+
+    Sample1 = "SampleResolution1"
+    Sample2 = "SampleResolution2"
+    Sample3 = "SampleResolution3"
+
     NA = ""
 
     def __str__(self):
