@@ -20,9 +20,9 @@ class SetName(Enum):
     S29 = "029"
     S32 = "032"
 
-    Sample1 = "SampleSet1"
-    Sample2 = "SampleSet2"
-    Sample3 = "SampleSet3"
+    Sample1 = "sample_1"
+    Sample2 = "sample_2"
+    Sample3 = "sample_3"
 
     NA = ""
 
@@ -36,9 +36,9 @@ class Resolution(Enum):
     X20K = "20kX"
     X30K = "30kX"
 
-    Sample1 = "SampleResolution1"
-    Sample2 = "SampleResolution2"
-    Sample3 = "SampleResolution3"
+    Sample1 = "sample_1"
+    Sample2 = "sample_2"
+    Sample3 = "sample_3"
 
     NA = ""
 
@@ -46,7 +46,7 @@ class Resolution(Enum):
         return self.value
 
 
-class FileType(Enum):
+class FileExtension(Enum):
     PNG = "png"
     JPG = "jpg"
     PKL = "pkl"
@@ -67,14 +67,15 @@ class FileTag(Enum):
 
 
 class DataType(Enum):
-    DEFAULT_DATA = ("Default Data", {FileTag.DATA}, FileType.PKL)
-    ORIGINAL_IMAGE = ("Original Image", {FileTag.FIG, FileTag.ORI}, FileType.PNG)
-    ORIGINAL_GRAPH = ("Original Graph", {FileTag.FIG, FileTag.PLOT, FileTag.ORI}, FileType.PNG)
-    ORIGINAL_NETWORK = ("Original Network", {FileTag.DATA, FileTag.ORI}, FileType.PKL)
-    SYNTHETIC_GRAPH = ("Synthetic Graph", {FileTag.FIG, FileTag.PLOT, FileTag.SYN}, FileType.PNG)
-    SYNTHETIC_NETWORK = ("Synthetic Network", {FileTag.DATA, FileTag.SYN}, FileType.PKL)
+    DEFAULT_DATA = ("Default Data", {FileTag.DATA}, FileExtension.PKL)
+    ORIGINAL_IMAGE = ("Original Image", {FileTag.FIG, FileTag.ORI}, FileExtension.PNG)
+    ORIGINAL_GRAPH = ("Original Graph", {FileTag.FIG, FileTag.PLOT, FileTag.ORI}, FileExtension.PNG)
+    ORIGINAL_PROPERTY = ("Original Property", { FileTag.ORI, FileTag.DATA}, FileExtension.PKL)
+    ORIGINAL_NETWORK = ("Original Network", {FileTag.DATA, FileTag.ORI}, FileExtension.PKL)
+    SYNTHETIC_GRAPH = ("Synthetic Graph", {FileTag.FIG, FileTag.PLOT, FileTag.SYN}, FileExtension.PNG)
+    SYNTHETIC_NETWORK = ("Synthetic Network", {FileTag.DATA, FileTag.SYN}, FileExtension.PKL)
 
-    def __init__(self, description: str, tags: Set[FileTag], file_extension: FileType):
+    def __init__(self, description: str, tags: Set[FileTag], file_extension: FileExtension):
         self.description = description
         self.tags = tags
         self.file_extension = file_extension
