@@ -1,4 +1,4 @@
-# src/config/config_old.py
+# src/config/config_sample.py
 import logging
 import os
 import re
@@ -12,13 +12,13 @@ from .enums import Resolution, SetName
 logger = logging.getLogger(__name__)
 
 
-class Config1(Config):
-    SETS = [SetName.A, SetName.B, SetName.C, SetName.D]
-    RESOLUTIONS = [Resolution.X10K]
+class ConfigSample(Config):
+    SETS = [SetName.Sample1, SetName.Sample2, SetName.Sample3]
+    RESOLUTIONS = [Resolution.Sample1, Resolution.Sample2, Resolution.Sample3]
 
-    DEFAULT_FRAME_SIZE = (510, 510)
-    CLOSED_NODES_FACTOR = 1.5
-    CLASSES_FACTOR = 1
+    DEFAULT_FRAME_SIZE = (510, 510)  # For now, we need to set it manually.
+    CLOSED_NODES_FACTOR = .8
+    CLASSES_FACTOR = 1.2
     # For 10_kx image, node fac should be 1.5, and edge fac should be 1
 
     SYNTHETIC_GRAPH_NUMBER = 0
@@ -45,7 +45,7 @@ class Config1(Config):
 
     @staticmethod
     def _load_positions(set_name, resolution):
-        directory_path = os.path.join(Config1.POSITION_DATA_DIR, resolution)
+        directory_path = os.path.join(ConfigSample.POSITION_DATA_DIR, resolution)
         pattern = re.compile(
             rf"{re.escape(set_name)}_{re.escape(resolution)}.*\.npy",
             re.IGNORECASE
@@ -59,7 +59,7 @@ class Config1(Config):
 
     @staticmethod
     def _load_sparse_matrix(set_name, resolution):
-        directory_path = os.path.join(Config1.ADJ_MATRIX_DATA_DIR, resolution)
+        directory_path = os.path.join(ConfigSample.ADJ_MATRIX_DATA_DIR, resolution)
         pattern = re.compile(
             rf"sparse_matrices_{re.escape(resolution)}.*\.npz",
             re.IGNORECASE
@@ -91,7 +91,7 @@ class Config1(Config):
 
     @staticmethod
     def _load_image(set_name, resolution):
-        directory_path = os.path.join(Config1.IMAGES_DIR, resolution)
+        directory_path = os.path.join(ConfigSample.IMAGES_DIR, resolution)
 
         pattern = re.compile(
             rf"W-\d+-\d+-\d+_{re.escape(str(set_name))}_.*\.(tif|png|jpg)",
