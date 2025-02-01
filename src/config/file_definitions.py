@@ -47,6 +47,11 @@ FILE_CONFIGURATIONS = {
         data_type=DataType.ORIGINAL_NETWORK,
         detail="original_network"
     ),
+    DataType.ORIGINAL_PROPERTY: FileConfig(
+        relative_dir="origin",
+        data_type=DataType.ORIGINAL_PROPERTY,
+        detail="original_property"
+    ),
     DataType.SYNTHETIC_GRAPH: PlotConfig(
         relative_dir="synthetic",
         node_size=6.0,
