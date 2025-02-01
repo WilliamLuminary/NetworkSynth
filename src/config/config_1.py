@@ -33,11 +33,7 @@ class Config1(Config):
 
     @classmethod
     def initialize(cls):
-        for name in dir(cls):
-            if name.isupper() and not name.startswith('__'):
-                value = getattr(cls, name)
-                setattr(Config, name, value)
-
+        cls._update_attrs_in_base_config()
         cls._setup_logger(details="old")
         cls.POSITION_DATA_FUNC = cls._load_positions
         cls.ADJ_MATRIX_DATA_FUNC = cls._load_sparse_matrix

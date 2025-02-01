@@ -79,6 +79,13 @@ class Config:
         cls.IMAGES_FUNC = load_idle
 
     @classmethod
+    def _update_attrs_in_base_config(cls):
+        for name in dir(cls):
+            if name.isupper() and not name.startswith('__'):
+                value = getattr(cls, name)
+                setattr(Config, name, value)
+
+    @classmethod
     def set_node_factor(cls, factor: float):
         cls.CLOSED_NODES_FACTOR = factor
         logging.info(f"CLOSED_NODES_FACTOR has been overwritten! Current value: {factor}")
