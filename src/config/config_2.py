@@ -35,11 +35,11 @@ class Config2(Config):
 
     @classmethod
     def initialize(cls):
+        super().initialize()
+        cls.POSITION_DATA_FUNC = cls._load_positions
+        cls.ADJ_MATRIX_DATA_FUNC = cls._load_sparse_matrix
+        cls.IMAGES_FUNC = cls._load_image
         cls._update_attrs_in_base_config()
-        super()._setup_logger(details="new")
-        Config.POSITION_DATA_FUNC = cls._load_positions
-        Config.ADJ_MATRIX_DATA_FUNC = cls._load_sparse_matrix
-        Config.IMAGES_FUNC = cls._load_image
 
     @staticmethod
     def _load_positions(set_name, resolution):

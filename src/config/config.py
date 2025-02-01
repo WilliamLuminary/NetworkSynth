@@ -50,8 +50,12 @@ class Config:
     SYNTHETIC_GRAPH_DIRECTORY_NAME = 'synthetic_networks'
     ORIGINAL_GRAPH_DIRECTORY_NAME = 'original_graphs'
 
-    @staticmethod
-    def _setup_logger(log_level=logging.INFO, details=""):
+    POSITION_DATA_FUNC = ADJ_MATRIX_DATA_FUNC = IMAGES_FUNC = load_idle
+
+    @classmethod
+    def _setup_logger(cls, log_level=None, details=None):
+        log_level = log_level or logging.INFO
+        details = details or ""
         _logger = logging.getLogger()
         if not _logger.hasHandlers():
             _logger.setLevel(log_level)
@@ -63,7 +67,7 @@ class Config:
             os.makedirs(logs_dir, exist_ok=True)
             file_handler = logging.FileHandler(os.path.join(logs_dir, f'project_{details}.log'))
             file_handler.setLevel(log_level)
-
+            # noinspection SpellCheckingInspection
             formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
             console_handler.setFormatter(formatter)
             file_handler.setFormatter(formatter)
@@ -73,10 +77,7 @@ class Config:
 
     @classmethod
     def initialize(cls):
-        cls._setup_logger(cls.LOG_LEVEL)
-        cls.POSITION_DATA_FUNC = load_idle
-        cls.ADJ_MATRIX_DATA_FUNC = load_idle
-        cls.IMAGES_FUNC = load_idle
+        cls._setup_logger(details=cls.__name__)
 
     @classmethod
     def _update_attrs_in_base_config(cls):
