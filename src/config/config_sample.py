@@ -1,7 +1,6 @@
 # src/config/config_sample.py
 import logging
 import os
-import re
 
 import cv2
 import numpy as np
@@ -17,8 +16,8 @@ class ConfigSample(Config):
     RESOLUTIONS = [Resolution.Sample1, Resolution.Sample2, Resolution.Sample3]
 
     DEFAULT_FRAME_SIZE = (470, 510)  # For now, we need to set it manually.
-    CLOSED_NODES_FACTOR = .8
-    CLASSES_FACTOR = 1.2
+    CLOSED_NODES_FACTOR = 1.2
+    CLOSED_EDGES_FACTOR = .8
     # For 10_kx image, node fac should be 1.5, and edge fac should be 1
 
     SYNTHETIC_GRAPH_NUMBER = 10
@@ -38,11 +37,11 @@ class ConfigSample(Config):
 
     @classmethod
     def initialize(cls):
-        cls._update_attrs_in_base_config()
-        cls._setup_logger(details="sample")
+        super().initialize()
         cls.POSITION_DATA_FUNC = cls._load_positions
         cls.ADJ_MATRIX_DATA_FUNC = cls._load_sparse_matrix
         cls.IMAGES_FUNC = cls._load_image
+        cls._update_attrs_in_base_config()
 
     @staticmethod
     def _load_positions(set_name, resolution):
@@ -70,7 +69,7 @@ class ConfigSample(Config):
             raise FileNotFoundError(msg)
 
         logger.info(f"Loading adjacency matrix from {file_path}")
-        return np.load(file_path, allow_pickle=True)
+        return np.load(file_path, allow_pickle=True).item()
 
     @staticmethod
     def _load_image(set_name, resolution):
