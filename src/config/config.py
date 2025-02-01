@@ -9,7 +9,7 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
-def load_idle():
+def load_idle(*args, **kwargs):
     err_msg = "Logic of loading data is not implemented yet."
     logging.info(err_msg)
     raise NotImplementedError(err_msg)
@@ -41,7 +41,6 @@ class Config:
 
     MAX_ATTEMPTS = 10
     ERROR_TOLERANCE = .15  # Generally should be 0.15
-    LOG_LEVEL = logging.INFO
 
     DISABLE_SAVING: bool = False
     DISABLE_SAVING_NOTE: str = ""
