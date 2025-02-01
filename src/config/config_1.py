@@ -26,7 +26,7 @@ class Config1(Config):
 
     MEASURE_WEIGHTED = True
 
-    BASE_INPUT_PATH = os.path.join(Config.BASE_DATA_PATH, 'input', 'old_input')
+    BASE_INPUT_PATH = os.path.join(Config.BASE_INPUT_PATH, 'old_input')
     POSITION_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'position')
     ADJ_MATRIX_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'sparse_matrices')
     IMAGES_DIR = os.path.join(BASE_INPUT_PATH, 'Original Graphs')

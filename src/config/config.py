@@ -35,9 +35,9 @@ class Config:
     BASE_DATA_PATH = os.path.join(PROJECT_ROOT, 'data')
 
     BASE_INPUT_PATH = os.path.join(BASE_DATA_PATH, 'input')
-    POSITION_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'position')
-    ADJ_MATRIX_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'sparse_matrices')
-    IMAGES_DIR = os.path.join(BASE_INPUT_PATH, 'Original Graphs')
+    POSITION_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'position_data')
+    ADJ_MATRIX_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'sparse_matrices_data')
+    IMAGES_DIR = os.path.join(BASE_INPUT_PATH, 'original_images_data')
 
     MAX_ATTEMPTS = 10
     ERROR_TOLERANCE = .15  # Generally should be 0.15

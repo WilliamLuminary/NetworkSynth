@@ -26,18 +26,19 @@ class ConfigSample(Config):
 
     MEASURE_WEIGHTED = True
 
-    BASE_INPUT_PATH = os.path.join(Config.BASE_DATA_PATH, 'input', 'old_input')
+    BASE_INPUT_PATH = os.path.join(Config.BASE_INPUT_PATH, 'sample_input')
     POSITION_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'position')
     ADJ_MATRIX_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'sparse_matrices')
     IMAGES_DIR = os.path.join(BASE_INPUT_PATH, 'Original Graphs')
 
+    # BASE_INPUT_PATH
+    # ├── POSITION_DATA_DIR
+    # ├── ADJ_MATRIX_DATA_DIR
+    # └── IMAGES_DIR
+
     @classmethod
     def initialize(cls):
-        for name in dir(cls):
-            if name.isupper() and not name.startswith('__'):
-                value = getattr(cls, name)
-                setattr(Config, name, value)
-
+        cls._update_attrs_in_base_config()
         cls._setup_logger(details="old")
         cls.POSITION_DATA_FUNC = cls._load_positions
         cls.ADJ_MATRIX_DATA_FUNC = cls._load_sparse_matrix
