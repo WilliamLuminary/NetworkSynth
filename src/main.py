@@ -19,42 +19,41 @@ exp = False  # Set to True to run the hyperparameter tuning experiment
 
 logger = logging.getLogger(__name__)
 
-error_threshold = Config.ERROR_TOLERANCE
-max_attempts = Config.MAX_ATTEMPTS
 
 
 def multi_generate_synthetic(org_alpha_0_and_width: tuple[float, float], attributes, map_handler, avg_degree: float):
     generator = GraphGenerator(attributes)
 
-    __error = float('inf')
-    attempt = 0
-    synthetic_graph = None
-
-    while __error > error_threshold and attempt < max_attempts:
-        attempt += 1
+    _error = float('inf')
+    _attempt = 0
+    _synthetic_graph = None
+    _error_threshold = Config.ERROR_TOLERANCE
+    _max_attempts = Config.MAX_ATTEMPTS
+    while _error > _error_threshold and _attempt < _max_attempts:
+        _attempt += 1
 
         try:
             _synthetic_graph = generator.generate_network()
 
-            postprocessor = GraphPostProcessor(_synthetic_graph, map_handler, avg_degree)
-            postprocessor.trim_graph()
-            postprocessor.assign_weights()
-            synthetic_graph = postprocessor.synthetic_graph
+            _postprocessor = GraphPostProcessor(_synthetic_graph, map_handler, avg_degree)
+            _postprocessor.trim_graph()
+            _postprocessor.assign_weights()
+            _synthetic_graph = _postprocessor.synthetic_graph
 
-            analyzer = MultifractalAnalyzer(synthetic_graph)
-            alpha_0_and_width = analyzer.multifractal_analysis()
+            _analyzer = MultifractalAnalyzer(_synthetic_graph)
+            alpha_0_and_width = _analyzer.multifractal_analysis()
 
-            __error = euclidean(org_alpha_0_and_width, alpha_0_and_width)
+            _error = euclidean(org_alpha_0_and_width, alpha_0_and_width)
 
         except Exception as exc:
-            logger.error(f"Exception occurred during graph generation: {exc}. Skipping attempt {attempt}.")
+            logger.error(f"Exception occurred during graph generation: {exc}. Skipping attempt {_attempt}.")
             continue
 
-    if __error > error_threshold:
-        logger.warning(f"Failed after {max_attempts} attempts (error={__error:.4f}).")
+    if _error > _error_threshold:
+        logger.warning(f"Failed after {_max_attempts} attempts (error={_error:.4f}).")
         return None, float('inf')
 
-    return synthetic_graph, __error
+    return _synthetic_graph, _error
 
 
 def generate_synthetic(data_agent: DataAgent, plotter: Plotter, saver, org_alpha_0_width: Tuple[float, float]) -> \
@@ -107,18 +106,18 @@ def generate_synthetic(data_agent: DataAgent, plotter: Plotter, saver, org_alpha
     if not _errors:
         return float('inf')
 
-    __non_inf_errors = [__e for __e in _errors if not np.isinf(__e)]
-    if not __non_inf_errors:
+    _non_inf_errors = [__e for __e in _errors if not np.isinf(__e)]
+    if not _non_inf_errors:
         return float('inf')
 
-    __mean_e = np.mean(__non_inf_errors)
-    __std_e = np.std(__non_inf_errors)
-    __threshold = 2.0
-    __non_outlier_errors = [__e for __e in __non_inf_errors if abs(__e - __mean_e) <= __threshold * __std_e]
-    if not __non_outlier_errors:
+    _mean_e = np.mean(_non_inf_errors)
+    _std_e = np.std(_non_inf_errors)
+    _threshold = 2.0
+    _non_outlier_errors = [__e for __e in _non_inf_errors if abs(__e - _mean_e) <= _threshold * _std_e]
+    if not _non_outlier_errors:
         return float('inf')
 
-    _avg_err = round(np.mean(__non_outlier_errors), 3)
+    _avg_err = round(np.mean(_non_outlier_errors), 3)
 
     if saver:
         saver.save_file(
@@ -140,6 +139,7 @@ def run(set_name: SetName, resolution: Resolution) -> Optional[float]:
         saver = Saver(data_agent.set_name, data_agent.resolution)
         saver.save_file(data_agent.original_image, DataType.ORIGINAL_IMAGE)
         saver.save_file(data_agent.original_network, DataType.ORIGINAL_NETWORK)
+        saver.save_file(data_agent.attributes, DataType.ORIGINAL_PROPERTY)
 
     plotter = Plotter(data_agent.original_image, data_agent.original_network)
     graph = plotter.plot_graph(
