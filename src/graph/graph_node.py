@@ -8,6 +8,7 @@ import numpy as np
 from scipy.spatial.distance import euclidean
 
 from config import Config
+from graph import GraphAttrAgent
 
 
 class GraphNode:
@@ -40,18 +41,18 @@ class GraphNode:
         cls._merged_edge = 0
 
     @classmethod
-    def initialize(cls, graph_attributes):
+    def initialize(cls, graph_attributes: GraphAttrAgent):
         cls._degree_dist = graph_attributes.degree_distribution
         cls._degree_trans_probs = graph_attributes.degree_transition_probs
         cls._degree_angles = graph_attributes.degree_angle_diffs
         cls._degree_edge_lengths = graph_attributes.degree_edge_lengths
-        cls._avg_length = graph_attributes.average_length
+        cls._avg_length = graph_attributes.average_edge_length
 
         cls._closed_nodes_factor = Config.CLOSED_NODES_FACTOR
         cls._closed_edges_factor = Config.CLOSED_EDGES_FACTOR
-        cls._closed_nodes_thr = graph_attributes.average_length * Config.CLOSED_NODES_FACTOR
-        cls._closed_edges_thr = graph_attributes.average_length * Config.CLOSED_EDGES_FACTOR
-        cls._grid_size = graph_attributes.average_length
+        cls._closed_nodes_thr = graph_attributes.average_edge_length * Config.CLOSED_NODES_FACTOR
+        cls._closed_edges_thr = graph_attributes.average_edge_length * Config.CLOSED_EDGES_FACTOR
+        cls._grid_size = graph_attributes.average_edge_length
 
         cls.node_grid = defaultdict(set)
         cls.edge_grid = defaultdict(set)

@@ -160,8 +160,9 @@ def run(set_name: SetName, resolution: Resolution) -> Optional[float]:
     logger.info(Config())
     data_agent = DataAgent(set_name, resolution)
     data_agent.load_data()
-    graph_attr = GraphAttrAgent(data_agent.original_network)
-    data_agent.set_attributes(graph_attr)
+    attr = GraphAttrAgent()
+    attr.analyze(data_agent.original_network)
+    data_agent.set_attributes(attr)
     saver = None
     if not preview:
         saver = Saver(data_agent.set_name, data_agent.resolution)

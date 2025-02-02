@@ -105,6 +105,11 @@ class Config:
         Config.DISABLE_SAVING = False
         Config.DISABLE_SAVING_NOTE = reason
 
+    @classmethod
+    def update_frame_size(cls, frame_size: Tuple[int, int]):
+        cls.DEFAULT_FRAME_SIZE = frame_size
+        logging.info(f"DEFAULT_FRAME_SIZE has been overwritten! Current value: {frame_size}")
+
     def __str__(self):
         def is_method_like(attr_value):
             return (inspect.isfunction(attr_value)

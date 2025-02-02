@@ -33,6 +33,8 @@ class DataAgent:
         self.positions_of_nodes = self._load_positions()
         self.adjacency_matrix = self._load_sparse_matrix()
         self.original_image = self._load_image()
+        if not hasattr(Config, 'DEFAULT_FRAME_SIZE'):
+            Config.update_frame_size((self.original_image.shape[1], self.original_image.shape[0]))
         self._resize_image()
         self._trim_image()
 
