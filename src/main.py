@@ -23,8 +23,8 @@ exp = False  # Set to True to run the hyperparameter tuning experiment
 logger = logging.getLogger(__name__)
 
 
-def multi_generate_synthetic(exit_event, org_alpha_0_and_width: tuple[float, float], attributes, map_handler,
-                             avg_degree: float):
+def generate_synthetic_network(exit_event, org_alpha_0_and_width: tuple[float, float], attributes, map_handler,
+                               avg_degree: float):
     generator = GraphGenerator(attributes)
 
     _error = float('inf')
@@ -32,7 +32,9 @@ def multi_generate_synthetic(exit_event, org_alpha_0_and_width: tuple[float, flo
     _synthetic_graph = None
     _error_threshold = Config.ERROR_TOLERANCE
     _max_attempts = Config.MAX_ATTEMPTS
-    while _error > _error_threshold and _attempt < _max_attempts:
+    while (_error > _error_threshold
+           and _attempt < _max_attempts
+           and not exit_event.is_set()):
         _attempt += 1
 
         try:
@@ -63,7 +65,7 @@ def multi_generate_synthetic(exit_event, org_alpha_0_and_width: tuple[float, flo
     return _synthetic_graph, _error
 
 
-def generate_synthetic(data_agent: DataAgent, plotter: Plotter, saver, org_alpha_0_width: Tuple[float, float]) -> \
+def generate_with_multiprocessing(data_agent: DataAgent, plotter: Plotter, saver, org_alpha_0_width: Tuple[float, float]) -> \
         Optional[float]:
     num_syn_nw = Config.SYNTHETIC_NETWORK_NUMBER
     num_syn_graph = Config.SYNTHETIC_GRAPH_NUMBER
@@ -81,7 +83,7 @@ def generate_synthetic(data_agent: DataAgent, plotter: Plotter, saver, org_alpha
         with ProcessPoolExecutor() as executor:
             for _ in range(num_syn_nw):
                 future = executor.submit(
-                    multi_generate_synthetic,
+                    generate_synthetic_network,
                     exit_event,
                     org_alpha_0_width,
                     attributes,
@@ -186,7 +188,7 @@ def run(set_name: SetName, resolution: Resolution) -> Optional[float]:
         exp_hyper_tuning(data_agent, plotter, saver, mult_ans_res)
         return None
     else:
-        _error = generate_synthetic(data_agent, plotter, saver, mult_ans_res)
+        _error = generate_with_multiprocessing(data_agent, plotter, saver, mult_ans_res)
         return _error
 
 
@@ -201,7 +203,7 @@ def exp_hyper_tuning(data_agent, plotter, saver, mult_ans_res):
         Config.set_edge_factor(__ef)
         logger.info(Config())
 
-        _error = generate_synthetic(data_agent, plotter, saver, mult_ans_res)
+        _error = generate_with_multiprocessing(data_agent, plotter, saver, mult_ans_res)
         if preview:
             logger.info("Preview mode enabled, skipping further iterations.")
             return
