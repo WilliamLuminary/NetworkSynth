@@ -64,7 +64,7 @@ class DataAgent:
     # def get_synthetic_graph(self):
     #     return self.synthetic_networks.get() if not self.synthetic_networks.empty() else None
 
-    def set_attributes(self, attributes):
+    def set_attributes(self, attributes: GraphAttrAgent):
         self.attributes = attributes
 
     def _resize_image(self, frame_range: Tuple[int, int] = None) -> None:
