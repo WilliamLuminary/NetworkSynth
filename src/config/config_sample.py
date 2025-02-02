@@ -13,14 +13,14 @@ logger = logging.getLogger(__name__)
 
 class ConfigSample(Config):
     SETS = [SetName.Sample1, SetName.Sample2, SetName.Sample3]
-    RESOLUTIONS = [Resolution.Sample1, Resolution.Sample2, Resolution.Sample3]
+    RESOLUTIONS = [Resolution.NA]
 
     DEFAULT_FRAME_SIZE = (470, 510)  # For now, we need to set it manually.
     CLOSED_NODES_FACTOR = 1.2
     CLOSED_EDGES_FACTOR = .8
     # For 10_kx image, node fac should be 1.5, and edge fac should be 1
 
-    SYNTHETIC_GRAPH_NUMBER = 10
+    SYNTHETIC_GRAPH_NUMBER = 300
     SYNTHETIC_NETWORK_NUMBER = 10
 
     MEASURE_WEIGHTED = False
