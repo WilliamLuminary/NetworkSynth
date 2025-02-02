@@ -44,7 +44,7 @@ class ConfigSample(Config):
         cls._update_attrs_in_base_config()
 
     @staticmethod
-    def _load_positions(set_name, resolution):
+    def _load_positions(set_name, _):
         directory_path = ConfigSample.POSITION_DATA_DIR
         file_name = f"{str(set_name)}_pos.npy"
         file_path = os.path.join(directory_path, file_name)
@@ -58,7 +58,7 @@ class ConfigSample(Config):
         return np.load(file_path, allow_pickle=True)
 
     @staticmethod
-    def _load_sparse_matrix(set_name, resolution):
+    def _load_sparse_matrix(set_name, _):
         directory_path = ConfigSample.ADJ_MATRIX_DATA_DIR
         file_name = f"{str(set_name)}_mat.npy"
         file_path = os.path.join(directory_path, file_name)
@@ -72,7 +72,7 @@ class ConfigSample(Config):
         return np.load(file_path, allow_pickle=True).item()
 
     @staticmethod
-    def _load_image(set_name, resolution):
+    def _load_image(set_name, _):
         directory_path = ConfigSample.IMAGES_DIR
         file_name = f"{str(set_name)}_image.tif"
         file_path = os.path.join(directory_path, file_name)
