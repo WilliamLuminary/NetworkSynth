@@ -1,6 +1,7 @@
 # src/original_network/graph_attr_agent.py
 
 from collections import Counter, defaultdict
+from typing import Dict, List, Tuple
 
 import networkx as nx
 import numpy as np
@@ -8,81 +9,101 @@ from scipy.spatial.distance import euclidean
 
 
 class GraphAttrAgent:
-    def __init__(self, graph=None):
-        self.graph = graph
-        self.degree_dist = None
-        self.degree_trans_probs = None
-        self.degree_angles = None
-        self.degree_edge_lengths = None
-        self.avg_degree = None
-        self.avg_length = None
-        self.positions = None
-        self.mapping_params = None
+    def __init__(self):
+        self.node_positions: Dict[int, Tuple[float, float]] = {}
+        self.degree_distribution: Dict[int, float] = {}
+        self.degree_transition_probs: Dict[int, Dict[int, float]] = {}
+        self.degree_edge_lengths: Dict[int, List[float]] = {}
+        self.degree_angle_diffs: Dict[int, List[float]] = {}
+        self.average_edge_length: float = 0.0
+        self.average_degree: float = 0.0
 
-        if graph is not None:
-            self.compute_attributes()
+    def analyze(self, graph: nx.Graph):
+        self.node_positions = nx.get_node_attributes(graph, 'pos')
+        self.degree_distribution = self._compute_degree_distribution(graph)
+        self.degree_transition_probs = self._compute_degree_transition_probs(graph)
+        (self.degree_edge_lengths,
+         self.degree_angle_diffs,
+         self.average_edge_length) = self._compute_edge_lengths_and_angle_diffs(graph)
 
-    def compute_attributes(self):
-        self.positions = nx.get_node_attributes(self.graph, 'pos')
-        self.compute_degree_distribution()
-        self.compute_degree_transition_probs()
-        self.compute_edge_lengths_and_angles()
-        self.compute_average_degree()
+        self.average_degree = self._compute_average_degree(graph)
 
-    def compute_degree_distribution(self):
-        degrees = [d for n, d in self.graph.degree()]
+    @staticmethod
+    def _compute_degree_distribution(graph: nx.Graph) -> Dict[int, float]:
+        degrees = [deg for _, deg in graph.degree()]
+        total_nodes = graph.number_of_nodes()
         degree_counts = Counter(degrees)
-        total_nodes = self.graph.number_of_nodes()
-        self.degree_dist = {k: v / total_nodes for k, v in degree_counts.items()}
+        if total_nodes == 0:
+            return {}
+        return {int(degree): count / total_nodes for degree, count in degree_counts.items()}
 
-    def compute_degree_transition_probs(self):
+    @staticmethod
+    def _compute_degree_transition_probs(graph: nx.Graph) -> Dict[int, Dict[int, float]]:
+        degrees = dict(graph.degree())
         degree_neighbors = defaultdict(list)
-        degrees = dict(self.graph.degree())
-        for node, neighbors in self.graph.adjacency():
+        for node, adjacency_dict in graph.adjacency():
             node_degree = degrees[node]
-            neighbor_degrees = [degrees[neighbor] for neighbor in neighbors]
+            neighbor_degrees = [degrees[nbr] for nbr in adjacency_dict.keys()]
             degree_neighbors[node_degree].extend(neighbor_degrees)
 
-        self.degree_trans_probs = {}
+        transition_probs = {}
         for degree, neighbor_degrees in degree_neighbors.items():
             counts = Counter(neighbor_degrees)
             total = sum(counts.values())
-            self.degree_trans_probs[degree] = {k: v / total for k, v in counts.items()}
+            if total == 0:
+                transition_probs[degree] = {}
+            else:
+                transition_probs[degree] = {
+                    neighbor_degree: count / total for neighbor_degree, count in counts.items()
+                }
+        return transition_probs
 
-    def compute_edge_lengths_and_angles(self):
-        self.degree_edge_lengths = defaultdict(list)
-        self.degree_angles = defaultdict(list)
-        total_length = 0
-        count = 0
+    def _compute_edge_lengths_and_angle_diffs(
+            self, graph: nx.Graph
+    ) -> Tuple[Dict[int, List[float]], Dict[int, List[float]], float]:
+        degree_to_lengths = defaultdict(list)
+        degree_to_angle_diffs = defaultdict(list)
 
-        for node in self.graph.nodes():
-            neighbors = list(self.graph.neighbors(node))
+        total_length = 0.0
+        total_edges_count = 0
+
+        for node in graph.nodes():
+            neighbors = list(graph.neighbors(node))
             if not neighbors:
                 continue
 
-            node_pos = np.array(self.positions[node], dtype=np.float64)
+            node_pos = np.array(self.node_positions[node], dtype=np.float64)
+
             lengths = []
             angles = []
+
             for neighbor in neighbors:
-                neighbor_pos = np.array(self.positions[neighbor], dtype=np.float64)
+                neighbor_pos = np.array(self.node_positions[neighbor], dtype=np.float64)
+
                 length = euclidean(node_pos, neighbor_pos)
                 lengths.append(length)
+
                 angle = np.arctan2(neighbor_pos[1] - node_pos[1], neighbor_pos[0] - node_pos[0]) * 180 / np.pi
                 angles.append(angle)
 
-            degree = self.graph.degree[node]
-            self.degree_edge_lengths[degree].extend(lengths)
+            node_degree = graph.degree[node]
+            degree_to_lengths[node_degree].extend(lengths)
+
             total_length += sum(lengths)
-            count += len(lengths)
+            total_edges_count += len(lengths)
 
             if len(angles) > 1:
                 sorted_angles = np.sort(angles)
                 angles_diff = np.diff(sorted_angles)
-                angles_diff = np.append(angles_diff, 360 + sorted_angles[0] - sorted_angles[-1])
-                self.degree_angles[degree].extend(angles_diff)
+                angles_diff = np.append(angles_diff, 360.0 + sorted_angles[0] - sorted_angles[-1])
+                degree_to_angle_diffs[node_degree].extend(angles_diff)
 
-        self.avg_length = total_length / count if count > 0 else 0
+        avg_length = total_length / total_edges_count if total_edges_count > 0 else 0.0
+        return degree_to_lengths, degree_to_angle_diffs, avg_length
 
-    def compute_average_degree(self):
-        degrees = [d for n, d in self.graph.degree()]
-        self.avg_degree = np.mean(degrees)
+    @staticmethod
+    def _compute_average_degree(graph: nx.Graph):
+        if graph.number_of_nodes() == 0:
+            return 0.0
+        degrees = [deg for _, deg in graph.degree()]
+        return float(np.mean(degrees))

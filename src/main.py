@@ -71,7 +71,7 @@ def generate_synthetic(data_agent: DataAgent, plotter: Plotter, saver, org_alpha
     futures = []
     attributes = data_agent.attributes
     map_handler = data_agent.mapper
-    avg_degree = attributes.avg_degree
+    avg_degree = attributes.average_degree
 
     from multiprocessing import Manager
     manager = Manager()
