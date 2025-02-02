@@ -81,8 +81,8 @@ def generate_synthetic(data_agent: DataAgent, plotter: Plotter, saver, org_alpha
         with ProcessPoolExecutor() as executor:
             for _ in range(num_syn_nw):
                 future = executor.submit(
-                    exit_event,
                     multi_generate_synthetic,
+                    exit_event,
                     org_alpha_0_width,
                     attributes,
                     map_handler,
