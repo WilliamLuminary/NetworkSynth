@@ -25,7 +25,6 @@ class GraphAttrAgent:
         (self.degree_edge_lengths,
          self.degree_angle_diffs,
          self.average_edge_length) = self._compute_edge_lengths_and_angle_diffs(graph)
-
         self.average_degree = self._compute_average_degree(graph)
 
     @staticmethod

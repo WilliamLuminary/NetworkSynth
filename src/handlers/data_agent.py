@@ -24,7 +24,7 @@ class DataAgent:
         self.original_network = None
 
         self.attributes: Optional[GraphAttrAgent] = None
-        self.mapper = None
+        self.mapper: Optional[Mapper] = None
 
         self.synthetic_networks = []
 
@@ -92,13 +92,13 @@ class DataAgent:
     def _transform_original_positions(self, flip_x=False, flip_y=False, rotation_deg=0):
         if self.original_image is None:
             return
-        _graph = self.original_network
-        __size = self.original_image.shape
-        c = (__size[0] / 2, __size[1] / 2)
+        graph = self.original_network
+        size = self.original_image.shape
+        c = (size[0] / 2, size[1] / 2)
 
         if not flip_x and not flip_y and rotation_deg == 0:
             return
-        for node, d in _graph.nodes(data=True):
+        for node, d in graph.nodes(data=True):
             p = np.array(d.get('pos', [0, 0]), dtype=np.float64)
 
             p[0] -= c[0]
