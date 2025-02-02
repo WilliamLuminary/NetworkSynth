@@ -41,6 +41,7 @@ def build_graph_pos_and_adj_mat(pos_and_adj_mat: tuple) -> nx.Graph:
     :return:
     """
     positions_of_nodes, adjacency_matrix = pos_and_adj_mat
+    # noinspection PyUnresolvedReferences
     graph = nx.from_scipy_sparse_array(adjacency_matrix, edge_attribute='weight')
     for i, pos in enumerate(positions_of_nodes):
         graph.nodes[i]['pos'] = pos.astype(np.float64)

@@ -32,6 +32,7 @@ class MultifractalAnalyzer:
             G_nk = nk.nxadapter.nx2nk(graph)
 
         for node in graph.nodes():
+            # noinspection PyUnresolvedReferences
             distances = (nk.distance.Dijkstra(G_nk, node, storePaths=False)).run().getDistances()
             grow = [d for d in distances if 0 < d < 99999]
             if f_digi == 0:

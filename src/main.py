@@ -8,7 +8,9 @@ import numpy as np
 from scipy.spatial.distance import euclidean
 
 import wandb
-from config import Config, Config2, ConfigSample, DataType, Resolution, SetName
+from config import Config, DataType, Resolution, SetName
+# noinspection PyUnresolvedReferences
+from config import Config1, Config2, ConfigSample
 from graph import GraphAttrAgent, GraphGenerator, GraphPostProcessor
 from handlers import DataAgent, MultifractalAnalyzer, Plotter, Saver, Summary
 
