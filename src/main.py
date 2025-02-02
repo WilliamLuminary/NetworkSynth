@@ -23,8 +23,8 @@ exp = False  # Set to True to run the hyperparameter tuning experiment
 logger = logging.getLogger(__name__)
 
 
-
-def multi_generate_synthetic(org_alpha_0_and_width: tuple[float, float], attributes, map_handler, avg_degree: float):
+def multi_generate_synthetic(exit_event, org_alpha_0_and_width: tuple[float, float], attributes, map_handler,
+                             avg_degree: float):
     generator = GraphGenerator(attributes)
 
     _error = float('inf')
@@ -52,6 +52,10 @@ def multi_generate_synthetic(org_alpha_0_and_width: tuple[float, float], attribu
             logger.error(f"Exception occurred during graph generation: {exc}. Skipping attempt {_attempt}.")
             continue
 
+    if exit_event.is_set():
+        logger.debug("Child process exiting due to exit signal.")
+        return None, float('inf')
+
     if _error > _error_threshold:
         logger.warning(f"Failed after {_max_attempts} attempts (error={_error:.4f}).")
         return None, float('inf')
@@ -68,43 +72,62 @@ def generate_synthetic(data_agent: DataAgent, plotter: Plotter, saver, org_alpha
     attributes = data_agent.attributes
     map_handler = data_agent.mapper
     avg_degree = attributes.avg_degree
-    with ProcessPoolExecutor() as executor:
-        for _ in range(num_syn_nw):
-            future = executor.submit(
-                multi_generate_synthetic,
-                org_alpha_0_width,
-                attributes,
-                map_handler,
-                avg_degree
-            )
-            futures.append(future)
 
-        for idx, future in enumerate(as_completed(futures), start=1):
-            synthetic_graph, _error = future.result()
-            logger.info(f"[{idx}/{num_syn_nw}] Synthetic graph generation completed.")
+    from multiprocessing import Manager
+    manager = Manager()
+    exit_event = manager.Event()
 
-            if synthetic_graph is None:
-                continue
-
-            # Note: we do the plotting in the main process to avoid potential issues with MPL in child processes.
-            if num_syn_graph > 0:
-                graph = plotter.plot_graph(
-                    data_type=DataType.SYNTHETIC_GRAPH,
-                    graph=synthetic_graph
+    try:
+        with ProcessPoolExecutor() as executor:
+            for _ in range(num_syn_nw):
+                future = executor.submit(
+                    exit_event,
+                    multi_generate_synthetic,
+                    org_alpha_0_width,
+                    attributes,
+                    map_handler,
+                    avg_degree
                 )
-                if saver:
-                    saver.save_file(graph, DataType.SYNTHETIC_GRAPH)
-                num_syn_graph -= 1
+                futures.append(future)
 
-            if preview:
-                print(
-                    f'Node Factor {Config.CLOSED_NODES_FACTOR}. '
-                    f'Edge Factor {Config.CLOSED_EDGES_FACTOR}. '
-                    f'Error: {_error:.4f}')
-                return None
+            for idx, future in enumerate(as_completed(futures), start=1):
+                synthetic_graph, _error = future.result()
+                logger.info(f"[{idx}/{num_syn_nw}] Synthetic graph generation completed.")
 
-            _errors.append(_error)
-            data_agent.add_synthetic_graph(synthetic_graph)
+                if synthetic_graph is None:
+                    continue
+
+                # Note: we do the plotting in the main process to avoid potential issues with MPL in child processes.
+                if num_syn_graph > 0:
+                    graph = plotter.plot_graph(
+                        data_type=DataType.SYNTHETIC_GRAPH,
+                        graph=synthetic_graph
+                    )
+                    if saver:
+                        saver.save_file(graph, DataType.SYNTHETIC_GRAPH)
+                    num_syn_graph -= 1
+
+                if preview:
+                    print(
+                        f'Node Factor {Config.CLOSED_NODES_FACTOR}. '
+                        f'Edge Factor {Config.CLOSED_EDGES_FACTOR}. '
+                        f'Error: {_error:.4f}')
+                    return None
+
+                _errors.append(_error)
+                data_agent.add_synthetic_graph(synthetic_graph)
+
+    except KeyboardInterrupt:
+        logger.info("KeyboardInterrupt received. Terminating processes...")
+        exit_event.set()
+        for future in futures:
+            future.cancel()
+        executor.shutdown(wait=False)
+        raise
+    except Exception:
+        exit_event.set()
+        executor.shutdown(wait=False)
+        raise
 
     if not _errors:
         return float('inf')
