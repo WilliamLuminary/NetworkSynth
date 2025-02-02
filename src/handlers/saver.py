@@ -113,6 +113,8 @@ class Saver:
         if FileTag.FIG in data_type.tags:
             Saver._save_image(content, abs_path)
         elif FileTag.DATA in data_type.tags:
+            if hasattr(content, 'as_savable') and callable(content.as_savable):
+                content = content.as_savable()
             Saver._save_pickle(content, abs_path)
         else:
             raise ValueError(f"Unsupported DataType for saving: {data_type}")

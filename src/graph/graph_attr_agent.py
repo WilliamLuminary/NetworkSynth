@@ -27,6 +27,20 @@ class GraphAttrAgent:
          self.average_edge_length) = self._compute_edge_lengths_and_angle_diffs(graph)
         self.average_degree = self._compute_average_degree(graph)
 
+    def _to_dict(self) -> dict:
+        return {
+            'node_positions': self.node_positions,
+            'degree_distribution': self.degree_distribution,
+            'degree_transition_probs': self.degree_transition_probs,
+            'degree_edge_lengths': self.degree_edge_lengths,
+            'degree_angle_diffs': self.degree_angle_diffs,
+            'average_edge_length': self.average_edge_length,
+            'average_degree': self.average_degree
+        }
+
+    def as_savable(self):
+        return self._to_dict()
+
     @staticmethod
     def _compute_degree_distribution(graph: nx.Graph) -> Dict[int, float]:
         degrees = [deg for _, deg in graph.degree()]
