@@ -15,13 +15,16 @@ class ConfigSample(Config):
     SETS = [SetName.Sample1, SetName.Sample2, SetName.Sample3]
     RESOLUTIONS = [Resolution.NA]
 
-    DEFAULT_FRAME_SIZE = (470, 510)  # For now, we need to set it manually.
+    DEFAULT_FRAME_SIZE = (1887 // 4, 2048 // 4)
     CLOSED_NODES_FACTOR = 1.2
     CLOSED_EDGES_FACTOR = .8
     # For 10_kx image, node fac should be 1.5, and edge fac should be 1
 
-    SYNTHETIC_GRAPH_NUMBER = 300
-    SYNTHETIC_NETWORK_NUMBER = 10
+    SYNTHETIC_GRAPH_NUMBER = 0
+    SYNTHETIC_NETWORK_NUMBER = 0
+
+    MAX_ATTEMPTS = 10
+    ERROR_TOLERANCE = .15
 
     MEASURE_WEIGHTED = False
 
