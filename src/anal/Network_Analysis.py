@@ -10,9 +10,9 @@ import numpy as np
 import pandas as pd
 import scipy.stats as stats
 
-from config import Config
-
+# noinspection PyUnresolvedReferences
 import main  ## Very important
+from config import Config
 
 name = Config.SETS
 name = [str(n) for n in name]
@@ -25,7 +25,7 @@ def load_pkl_files(base_dir):
             if file.endswith(".pkl"):
                 current_dir = os.path.basename(root)
                 if current_dir != 'synthetic':
-                    continue  # Skip files not in 'synthetic' directory
+                    continue  # Skip files not in the 'synthetic' directory
 
                 set_name = os.path.basename(os.path.dirname(root))
                 file_path = os.path.join(root, file)
@@ -46,9 +46,24 @@ result_name = 'results_full_can_use'
 base_directory = os.path.abspath(os.path.join(SCRIPT_DIR, '..', '..', 'data', 'output', result_name))
 pkl_data = load_pkl_files(base_directory)
 
-sorted_values = [pkl_data[key] for key in sorted(pkl_data.keys(), key=lambda x: int(x))]
-flattened_values = [item for sublist in sorted_values for item in sublist]
-G_list = flattened_values
+sorted_keys = sorted(pkl_data.keys(), key=lambda x: int(x))
+G_list = []
+name_list = []
+
+for set_name in sorted_keys:
+    sublist = pkl_data[set_name]
+    n_sub = len(sublist)
+
+    if n_sub > 100:
+        sublist = sublist[:100]
+    elif n_sub < 100:
+        raise Exception(
+            f"Set {set_name} has only {n_sub} items instead of 100."
+        )
+
+    G_list.extend(sublist)
+    name_list.extend([set_name] * 100)
+
 
 max_dim = []
 min_dim = []
@@ -62,8 +77,6 @@ avg_clustering = []
 max_al = []
 min_al = []
 avg_eig = []
-
-from tqdm import tqdm
 
 
 def wnfd_nk(G, Q, weight=True, draw=False, fdigi=0):
