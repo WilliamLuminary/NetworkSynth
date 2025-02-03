@@ -49,79 +49,66 @@ results_YYYYMMDD_HHMM/
 
 ## Basic Customization <small>(No Code Changes)</small>
 
-### Core Enums Configuration
+### 1. Modify Key Parameters
+
+Edit `src/config/config_sample.py`:
 
 ```python
-# Defined in src/config/enums.py
+class ConfigSample(Config):
+    # Generation parameters
+    CLOSED_NODES_FACTOR = 1.5    # Original: 1.2
+    CLOSED_EDGES_FACTOR = 1.0    # Original: 0.8
+    SYNTHETIC_NETWORK_NUMBER = 50# Original: 10
+    ...
+```
+
+### 2. Common Parameters
+| Parameter              | Typical Values               | Effect on Generation                   |
+|------------------------| ---------------------------- | -------------------------------------- |
+| CLOSED_NODES_FACTOR    | 0.5-2.0                      | Controls node merging likelihood       |
+| CLOSED_EDGES_FACTOR    | 0.5-2.0                      | Affects edge proximity tolerance       |
+| ERROR_TOLERANCE        | 0.1-0.5                      | Multifractal similarity threshold      |
+| SYNTHETIC_GRAPH_NUMBER | $\leq$ SYNTHETIC_NETWORK_NUM | Visualized network generated per batch |
+| ...                    | | |
+
+## Advanced Configuration
+
+### 1. Add New Dataset Type
+```python
+# src/config/enums.py
 class SetName(Enum):
-    # Legacy microscopy sets
-    A = "A"        # 10Kx sample group A
-    B = "B"        # 10Kx sample group B
-    # New microscopy sets (W- series)
-    S4  = "004"    # W-2-89-1_004 sample
-    S8  = "008"    # W-2-89-1_008 sample
-    # Sample datasets
-    Sample1 = "sample_1"  # Demonstration set 1
-    NA = ""                # Not applicable
-
+    MY_SET = "my_set"  # Add new dataset identifier
+    
 class Resolution(Enum):
-    X10K = "10kX"   # 10,000x magnification
-    X20K = "20kX"   # 20,000x magnification
-    NA = ""          # Not applicable
+    MY_RES = "my_res"  # Add new dataset identifier
+    
+# src/config/config_custom.py
+class ConfigCustom(Config):
+    SETS = [SetName.MY_SET]
+    RESOLUTIONS = [Resolution.NA]
+    # If no need for two levels of identifiers, use NA.
+    
+    @staticmethod
+    def _load_positions(set_name, resolution):
+        return np.load(f'data/{set_name}/positions.npy')
 ```
 
-### Extending Enums for Custom Data
-
-To add new datasets/resolutions:
-
-1. **Modify SetName Enum**
-   Add new entries for your dataset identifiers:
-
-   ```python
-   class SetName(Enum):
-       EXPERIMENT1 = "exp1"  # New experimental set
-       EXPERIMENT2 = "exp2"
-       # ... existing entries
-   ```
-2. **Modify Resolution Enum** (if needed)
-   Add new microscopy resolutions:
-
-   ```python
-   class Resolution(Enum):
-       X25K = "25kX"  # New resolution level
-       # ... existing entries
-   ```
-3. **Update Configuration**
-   Use your new enums in custom configurations:
-
-   ```python
-   class ConfigExperiment(Config):
-       SETS = [SetName.EXPERIMENT1, SetName.EXPERIMENT2]
-       RESOLUTIONS = [Resolution.X25K]
-   ```
-
-## Input Data Structure
-
-### File Naming Convention
-
-
-| Component        | Pattern               | Example          |
-| ---------------- | --------------------- | ---------------- |
-| Position Data    | `{SetName}_pos.npy`   | `exp1_pos.npy`   |
-| Adjacency Matrix | `{SetName}_mat.npy`   | `exp1_mat.npy`   |
-| Base Image       | `{SetName}_image.tif` | `exp1_image.tif` |
-
-### Directory Organization
-
-```bash
-data/custom_input/
-├── exp1_pos.npy          # Node coordinates
-├── exp1_mat.npy          # Sparse adjacency matrix
-├── exp1_image.tif        # Source microscopy image
-├── exp2_pos.npy
-├── exp2_mat.npy
-└── exp2_image.tif
+### 2. Implement Data Loaders
+Required function signatures:
+```python
+def _load_positions(set_name, resolution) -> np.ndarray:  # Shape: [N,2]
+def _load_sparse_matrix(set_name, resolution) -> dict:     # {'rows':[], 'cols':[]}
+def _load_image(set_name, resolution) -> np.ndarray:       # CV2-compatible format
 ```
+
+#### Input Data Requirements
+
+| Functions             | Return Type         | Return Requirements                              |
+|-----------------------|---------------------|--------------------------------------------------|
+| _load_positions()     | list or numpy array | Shape of (N, 2)                                  |
+| _load_sparse_matrix() | (the same as above) | Recognized by networkx.from_scipy_sparse_array() |
+| _load_image()         | (the same as above) | Recognized by cv2.imread()                       |
+
 
 ## Configuration Workflow
 
@@ -135,88 +122,41 @@ ConfigSample.initialize()  # Simple template
 
 ### 2. Implement Data Loaders
 
+Copy from any `config_[NAME].py` file, then only modify the **name of the class** and **values of variables**
+(`_load_[DATA]()` functions are also required).
+
 ```python
 class ConfigCustom(Config):
     @staticmethod
     def _load_positions(set_name, resolution):
-        """Custom position loader for experimental data"""
+        """Custom position loader for your data"""
         file_path = f"data/positions/{set_name}_nodes.npy"
         return np.load(file_path)
+    ... # implement other 
 ```
+## Output Interpretation
 
-### 3. Directory Handling
-
-NA values in SetName/Resolution flatten the output structure:
-
-```
-results_20231125_1430/
-├── exp1/                # SetName.EXPERIMENT1
-│   └── graphs/          # No resolution subdirectory (Resolution.NA)
-└── exp2/
-    └── properties/
-```
-
-## Key Configuration Parameters
+### File Type Mapping
+| Pattern                     | Data Type                  | Visualization Example      |
+|-----------------------------|----------------------------|----------------------------|
+| `original_graph_*.png`      | Network topology           | [Sample Graph]             |
+| `original_property_*.pkl`   | Degree distributions       | {2: 0.6, 3: 0.3, 4: 0.1}  |
+| `synthetic_network_*.pkl`   | Generated network          | NetworkX Graph object      |
 
 
-| Parameter              | Typical Values               | Effect on Generation                   |
-| ---------------------- | ---------------------------- | -------------------------------------- |
-| CLOSED_NODES_FACTOR    | 0.5-2.0                      | Controls node merging likelihood       |
-| CLOSED_EDGES_FACTOR    | 0.5-2.0                      | Affects edge proximity tolerance       |
-| ERROR_TOLERANCE        | 0.1-0.5                      | Multifractal similarity threshold      |
-| SYNTHETIC_GRAPH_NUMBER | $\leq$ SYNTHETIC_NETWORK_NUM | Visualized network generated per batch |
+## Troubleshooting
 
-| SYNTHETIC_NETWORK_NUM | $\geq$ SYNTHETIC_GRAPH_NUMBER | Networks generated per batch        |
+### Common Issues
+1. **Missing Input Files**  
+   Ensure files follow naming convention:  
+   `{SetName}_pos.npy`, `{SetName}_mat.npy`, `{SetName}_image.tif`
 
-## Output Structure
+2. **Dimension Mismatch**  
+   Verify node positions (N,2) match adjacency matrix (N,N)
 
-### Standard Output Hierarchy
-
-```
-results_20231125_1430/               # Timestamped results
-├── Sample1/                         # SetName.Sample1
-│   └── NA/                          # Resolution.NA
-│       ├── original/
-│       │   ├── original_graph_20231125_1430.png     # Network visualization
-│       │   ├── original_image_20231125_1430.png     # Processed base image
-│       │   ├── original_network_20231125_1430.pkl   # NetworkX graph
-│       │   └── original_property_20231125_1430.pkl  # Graph attributes
-│       └── synthetic/
-│           ├── synthetic_graph_20231125_1430.png    # Generated network visual
-│           └── synthetic_network_20231125_1430.pkl  # Synthetic graph data
-└── latest_result -> results_20231125_1430           # Symlink to latest
-```
-
-### NA Resolution Handling Example
-
-When using `Resolution.NA`:
-
-```
-results_20231125_1430/
-└── Sample1/              # Skips resolution directory
-    ├── original/
-    └── synthetic/
-```
-
-### Key File Types
-
-
-| File Pattern              | Content Type               | Format |
-| ------------------------- | -------------------------- | ------ |
-| `original_graph_*.png`    | Network visualization      | PNG    |
-| `original_image_*.png`    | Processed microscopy image | PNG    |
-| `original_network_*.pkl`  | NetworkX graph object      | Pickle |
-| `original_property_*.pkl` | GraphAttrAgent analysis    | Pickle |
-| `synthetic_graph_*.png`   | Generated network visual   | PNG    |
-| `synthetic_network_*.pkl` | Synthetic graph data       | Pickle |
-
-## Configuration Parameter Clarification
-
-### Key Generation Parameters
-
-
-| Parameter                  | Relationship                | Typical Value | Description                        |
-| -------------------------- | --------------------------- | ------------- | ---------------------------------- |
-| `SYNTHETIC_GRAPH_NUMBER`   | ≤ SYNTHETIC_NETWORK_NUMBER | 50            | Number of visualized networks      |
-| `SYNTHETIC_NETWORK_NUMBER` | ≥ SYNTHETIC_GRAPH_NUMBER   | 300           | Total networks generated per batch |
-| `ERROR_TOLERANCE`          | Independent                 | 0.15          | Multifractal similarity threshold  |
+3. **Generation Failures**  
+   Adjust thresholds:
+   ```python
+   CLOSED_NODES_FACTOR *= 1.2  # Allow more node merging
+   ERROR_TOLERANCE *= 1.5       # Accept less similar networks
+   ```
