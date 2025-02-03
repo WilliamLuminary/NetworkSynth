@@ -14,9 +14,6 @@ import scipy.stats as stats
 import main  ## Very important
 from config import Config
 
-name = Config.SETS
-name = [str(n) for n in name]
-
 
 def load_pkl_files(base_dir):
     data = {}
@@ -48,7 +45,7 @@ pkl_data = load_pkl_files(base_directory)
 
 sorted_keys = sorted(pkl_data.keys(), key=lambda x: int(x))
 G_list = []
-name_list = []
+name = []
 
 for set_name in sorted_keys:
     sublist = pkl_data[set_name]
@@ -62,7 +59,7 @@ for set_name in sorted_keys:
         )
 
     G_list.extend(sublist)
-    name_list.extend([set_name] * 100)
+    name.extend([set_name] * 100)
 
 
 max_dim = []
