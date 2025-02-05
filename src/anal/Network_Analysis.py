@@ -27,11 +27,8 @@ def load_pkl_files(base_dir):
 
                 set_name_ = os.path.basename(os.path.dirname(root_))
                 file_path = os.path.join(root_, file)
-                print(file_path)
-
                 with open(file_path, 'rb') as f:
                     pkl_content = pickle.load(f)
-
                 if set_name_ in data_:
                     print(f"Duplicate entry for {set_name_}, skipping.")
                 else:
@@ -46,62 +43,21 @@ def get_script_dir():
         return os.getcwd()
 
 
-SCRIPT_DIR = get_script_dir()
-result_name = 'results_full_can_use'
-base_directory = os.path.abspath(os.path.join(SCRIPT_DIR, '..', '..', 'data', 'output', result_name))
-pkl_data = load_pkl_files(base_directory)
-
-sorted_keys = sorted(pkl_data.keys(), key=lambda x: int(x))
-G_list, name = [], []
-for set_name in sorted_keys:
-    sublist = pkl_data[set_name]
-    if len(sublist) < 100:
-        raise Exception(f"Set {set_name} has only {len(sublist)} items instead of 100.")
-    sublist = sublist[:100]
-    G_list.extend(sublist)
-    name.extend([set_name] * 100)
-
-metrics = {
-    'max_dim': [],
-    'min_dim': [],
-    'dimension': [],
-    'holder_exp': [],
-    'widths': [],
-    'max_al': [],
-    'min_al': []
-}
-
-max_dim = []
-min_dim = []
-dimension = []
-holder_exp = []
-widths = []
-avg_frac = []
-avg_closeness = []
-avg_degree = []
-avg_clustering = []
-max_al = []
-min_al = []
-avg_eig = []
-
-
-def wnfd_nk(G, Q, weight=True, draw=False, fdigi=0):
+def wnfd_network(graph, Q, weight=True, draw=False, f_digi=0):
     ## Find radius
     N_list = []
     r_g_all_set = set()
-    G = nx.convert_node_labels_to_integers(G)
-    G_nk = nk.nxadapter.nx2nk(G, weightAttr='weight') if weight else nk.nxadapter.nx2nk(G)
+    graph = nx.convert_node_labels_to_integers(graph)
+    G_nk = nk.nxadapter.nx2nk(graph, weightAttr='weight') if weight else nk.nxadapter.nx2nk(graph)
 
-    for node in G.nodes():
+    for node in graph.nodes():
         distances = nk.distance.Dijkstra(G_nk, node, storePaths=False).run().getDistances()
         grow = [d for d in distances if 0 < d < 99999]
         grow.sort()
         # upf = (1/pow(10,fdigi+1)*5)
         # grow = [round(d+upf,fdigi) for d in grow]
-        if fdigi == 0:
-            grow = [math.ceil(d) for d in grow]
-        else:
-            grow = [round(d, fdigi) for d in grow if round(d, fdigi) != 0]
+        grow = [math.ceil(d) for d in grow] if f_digi == 0 else [round(d, f_digi) for d in grow if
+                                                                 round(d, f_digi) != 0]
         #         grow = grow[1:]
         num = Counter(grow)
         r_g_all_set.update(num.keys())
@@ -137,7 +93,7 @@ def wnfd_nk(G, Q, weight=True, draw=False, fdigi=0):
     return tau_list
 
 
-def nspectrum(tau_list, q_list, idx, color):
+def n_spectrum(tau_list, q_list, idx, color):
     al_list = [(tau_list[i] - tau_list[i - 1]) / (q_list[i] - q_list[i - 1])
                for i in range(1, len(q_list))]
     fal_list = [q_list[i] * al_list[i] - tau_list[i] for i in range(len(al_list))]
@@ -159,7 +115,7 @@ def nspectrum(tau_list, q_list, idx, color):
     return alpha_0, width
 
 
-def ndimension(tau_list, q_list, idx, color):
+def n_dimension(tau_list, q_list, idx, color):
     valid_pairs = [(q, tau) for q, tau in zip(q_list, tau_list) if q != 0]
     valid_q, valid_tau = zip(*valid_pairs)
     dim_list = [tau / q for q, tau in zip(valid_q, valid_tau)]
@@ -180,13 +136,81 @@ def ndimension(tau_list, q_list, idx, color):
 
 
 def save_violin_data(metric_list, filename, columns):
-    df = pd.DataFrame(metric_list).T
-    df.columns = columns
-    df.to_csv(filename, index=False)
+    df_ = pd.DataFrame(metric_list).T
+    df_.columns = columns
+    df_.to_csv(filename, index=False)
 
+
+def node_dimension(graph, weight=True, fdigi=2):
+    node_dimensions = {}
+    graph = nx.convert_node_labels_to_integers(graph)
+    if weight:
+        for u, v, d in graph.edges(data=True):
+            if d.get('weight', 0) != 0:
+                d['weight'] = 1.0 / d['weight']
+    G_nk = nk.nxadapter.nx2nk(graph, weightAttr='weight') if weight else nk.nxadapter.nx2nk(graph)
+
+    for node in graph.nodes():
+        distances = nk.distance.Dijkstra(G_nk, node, storePaths=False).run().getDistances()
+        distances.sort()
+        if weight:
+            distances = [round(d, fdigi) for d in distances if round(d, fdigi) != 0]
+        count = Counter(distances)
+        num_nodes = 0
+        r_g, num_g = [], []
+        for dist, cnt in count.items():
+            num_nodes += cnt
+            if dist > 0:
+                r_g.append(dist)
+                num_g.append(num_nodes)
+        if len(r_g) > 2:
+            slope, _, _, _, _ = stats.linregress(np.log(r_g), np.log(num_g))
+            node_dimensions[node] = slope
+        else:
+            node_dimensions[node] = 0
+    return node_dimensions
+
+
+script_dir = get_script_dir()
+result_name = 'results_full_can_use'
+base_directory = os.path.abspath(os.path.join(script_dir, '..', '..', 'data', 'output', result_name))
+pkl_data = load_pkl_files(base_directory)
+
+sorted_keys = sorted(pkl_data.keys(), key=lambda x: int(x))
+G_list, name = [], []
+for set_name in sorted_keys:
+    sublist = pkl_data[set_name]
+    if len(sublist) < 100:
+        raise Exception(f"Set {set_name} has only {len(sublist)} items instead of 100.")
+    sublist = sublist[:100]
+    G_list.extend(sublist)
+    name.extend([set_name] * 100)
+
+metrics = {
+    'max_dim': [],
+    'min_dim': [],
+    'dimension': [],
+    'holder_exp': [],
+    'widths': [],
+    'max_al': [],
+    'min_al': []
+}
+
+max_dim = []
+min_dim = []
+dimension = []
+holder_exp = []
+widths = []
+avg_frac = []
+avg_closeness = []
+avg_degree = []
+avg_clustering = []
+max_al = []
+min_al = []
+avg_eig = []
 
 kX_index = '20kX'
-root = os.path.join(SCRIPT_DIR, "anal")
+root = os.path.join(script_dir, "anal")
 
 ##################################################### Calculate Holder Exponent and Width #####################################################
 weight_flag = 'False'
@@ -196,9 +220,9 @@ Q = [q / 100 for q in range(-2000, 2001, 10)]
 wei_ntauls_list = []
 for i in range(len(G_list)):
     if weight_flag == 'True':
-        ntau = wnfd_nk(G_list[i], Q, weight=True, draw=False, fdigi=1)  # Peiyu: weight=None
+        ntau = wnfd_network(G_list[i], Q, weight=True, draw=False, f_digi=1)  # Peiyu: weight=None
     else:
-        ntau = wnfd_nk(G_list[i], Q, weight=False, draw=False)
+        ntau = wnfd_network(G_list[i], Q, weight=False, draw=False)
     wei_ntauls_list.append(ntau)
 np.save(root + f'/div_ntauls_{kX_index}_{weight_flag}.npy', wei_ntauls_list)
 
@@ -252,7 +276,7 @@ for i in range(len(wei_ntauls_list)):
     # nspectrum(wei_ntauls_list[i],Q,i,color=colors[i])
     arg1 = wei_ntauls_list[i][:80]
     arg2 = Q[:80]
-    nspectrum(arg1, arg2, i, color=colors[i])
+    n_spectrum(arg1, arg2, i, color=colors[i])
 print(holder_exp)
 print(widths)
 
@@ -326,7 +350,7 @@ Q = [q / 100 for q in range(-2000, 2001, 10)]
 wei_ntauls_list = np.load(root + '/div_ntauls_{}_{}.npy'.format(kX_index, weight_flag), allow_pickle=True)
 for i in range(len(wei_ntauls_list)):
     print(name[i])
-    ndimension(wei_ntauls_list[i], Q, i, color=colors[i])
+    n_dimension(wei_ntauls_list[i], Q, i, color=colors[i])
 print(dimension)
 
 ax = plt.gca()
@@ -348,100 +372,68 @@ plt.grid(False)
 #     spine.set_color('black')
 plt.savefig(root + 'weighted_{}_ndimension.svg'.format(kX_index), bbox_inches='tight', dpi=600)
 
-##################################################### Calculate NFD #####################################################
 from copy import deepcopy
 
 
-def node_dimension(G, weight=True, fdigi=2):
-    node_dimensions = {}
-    G = nx.convert_node_labels_to_integers(G)
-    if weight:
-        for u, v, d in G.edges(data=True):
-            if d.get('weight', 0) != 0:
-                d['weight'] = 1.0 / d['weight']
-    G_nk = nk.nxadapter.nx2nk(G, weightAttr='weight') if weight else nk.nxadapter.nx2nk(G)
+def compute_centralities(G_list, weight_flag):
+    nfd_centrality_list = []
+    avg_frac = []
+    closeness_centrality_list = []
+    avg_closeness = []
+    degree_centrality_list = []
+    avg_degree = []
+    cluster_coef_list = []
+    avg_clustering = []
 
-    for node in G.nodes():
-        distances = nk.distance.Dijkstra(G_nk, node, storePaths=False).run().getDistances()
-        distances.sort()
-        if weight:
-            distances = [round(d, fdigi) for d in distances if round(d, fdigi) != 0]
-        count = Counter(distances)
-        num_nodes = 0
-        r_g, num_g = [], []
-        for dist, cnt in count.items():
-            num_nodes += cnt
-            if dist > 0:
-                r_g.append(dist)
-                num_g.append(num_nodes)
-        if len(r_g) > 2:
-            slope, _, _, _, _ = stats.linregress(np.log(r_g), np.log(num_g))
-            node_dimensions[node] = slope
+    for G in G_list:
+        if weight_flag == 'True':
+            nfd_centrality = node_dimension(G, weight=True).values()
         else:
-            node_dimensions[node] = 0
-    return node_dimensions
+            nfd_centrality = node_dimension(G, weight=None).values()  # Peiyu: weight=None
+        nfd_centrality_list.append(list(nfd_centrality))
+        avg_frac.append(np.mean(np.array(nfd_centrality_list[-1])))
 
+    for G in tqdm(G_list):
+        if weight_flag == 'True':
+            closeness_centrality = nx.closeness_centrality(G, distance=lambda u, v, d: 1 / d['weight']).values()
+        else:
+            closeness_centrality = nx.closeness_centrality(G, distance=None).values()
+        closeness_centrality_list.append(list(closeness_centrality))
+        avg_closeness.append(np.mean(np.array(closeness_centrality_list[-1])))
 
-nfd_centrality_list = []
-avg_frac = []
-for G in G_list:
-    if weight_flag == 'True':
-        nfd_centrality = node_dimension(G, weight=True).values()
-    else:
-        nfd_centrality = node_dimension(G, weight=None).values()  # Peiyu: weight=None
-    nfd_centrality_list.append(list(nfd_centrality))
-    avg_frac.append(np.mean(np.array(nfd_centrality_list[-1])))
+    for G in tqdm(G_list):
+        if weight_flag == 'True':
+            degree_centrality = dict(G.degree(weight='weight')).values()
+        else:
+            degree_centrality = dict(G.degree(weight=None)).values()
+        degree_centrality_list.append(list(degree_centrality))
+        avg_degree.append(np.mean(np.array(degree_centrality_list[-1])))
 
-# 将 nfd_centrality_list 转换为 DataFrame, violinplot 数据
-df = pd.DataFrame(nfd_centrality_list).T
-df.columns = name
-df.to_csv(root + '/{}_nfd_violin.csv'.format(kX_index), index=False)
+    for G in tqdm(G_list):
+        if weight_flag == 'True':
+            cluster_coef = nx.clustering(G, weight='weight').values()
+        else:
+            cluster_coef = nx.clustering(G, weight=None).values()
+        cluster_coef_list.append(list(cluster_coef))
+        avg_clustering.append(np.mean(np.array(cluster_coef_list[-1])))
 
-##################################################### Calculate Closeness centrality #####################################################
-closeness_centrality_list = []
-avg_closeness = []
-for G in tqdm(G_list):
-    if weight_flag == 'True':
-        closeness_centrality = nx.closeness_centrality(G, distance=lambda u, v, d: 1 / d['weight']).values()
-    else:
-        closeness_centrality = nx.closeness_centrality(G, distance=None).values()
-    closeness_centrality_list.append(list(closeness_centrality))
-    avg_closeness.append(np.mean(np.array(closeness_centrality_list[-1])))
+    # 将 nfd_centrality_list 转换为 DataFrame, violinplot 数据
+    df = pd.DataFrame(nfd_centrality_list).T
+    df.columns = name
+    df.to_csv(root + '/{}_nfd_violin.csv'.format(kX_index), index=False)
 
-df = pd.DataFrame(closeness_centrality_list).T
-df.columns = name
-df.to_csv(root + '/{}_closeness_violin.csv'.format(kX_index), index=False)
+    df = pd.DataFrame(closeness_centrality_list).T
+    df.columns = name
+    df.to_csv(root + '/{}_closeness_violin.csv'.format(kX_index), index=False)
 
-##################################################### Calculate Degree centrality#####################################################
-degree_centrality_list = []
-avg_degree = []
+    df = pd.DataFrame(degree_centrality_list).T
+    df.columns = name
+    df.to_csv(root + '/{}_degree_violin.csv'.format(kX_index), index=False)
 
-for G in tqdm(G_list):
-    if weight_flag == 'True':
-        degree_centrality = dict(G.degree(weight='weight')).values()
-    else:
-        degree_centrality = dict(G.degree(weight=None)).values()
-    degree_centrality_list.append(list(degree_centrality))
-    avg_degree.append(np.mean(np.array(degree_centrality_list[-1])))
+    df = pd.DataFrame(cluster_coef_list).T
+    df.columns = name
+    df.to_csv(root + '/{}_clustering_violin.csv'.format(kX_index), index=False)
 
-df = pd.DataFrame(degree_centrality_list).T
-df.columns = name
-df.to_csv(root + '/{}_degree_violin.csv'.format(kX_index), index=False)
-
-##################################################### Calculate cluster_coef #####################################################
-cluster_coef_list = []
-avg_clustering = []
-
-for G in tqdm(G_list):
-    if weight_flag == 'True':
-        cluster_coef = nx.clustering(G, weight='weight').values()
-    else:
-        cluster_coef = nx.clustering(G, weight=None).values()
-    cluster_coef_list.append(list(cluster_coef))
-    avg_clustering.append(np.mean(np.array(cluster_coef_list[-1])))
-df = pd.DataFrame(cluster_coef_list).T
-df.columns = name
-df.to_csv(root + '/{}_clustering_violin.csv'.format(kX_index), index=False)
 
 ##################################################### Calculate betweenness centrality #####################################################
 betweenness_list = []
