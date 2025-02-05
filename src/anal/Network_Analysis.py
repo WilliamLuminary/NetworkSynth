@@ -10,34 +10,40 @@ import numpy as np
 import pandas as pd
 import scipy.stats as stats
 
+from tqdm import tqdm
+
 # noinspection PyUnresolvedReferences
 import main  ## Very important
 
 
 def load_pkl_files(base_dir):
-    data = {}
-    for root, dirs, files in os.walk(base_dir):
+    data_ = {}
+    for root_, dirs, files in os.walk(base_dir):
         for file in files:
             if file.endswith(".pkl"):
-                current_dir = os.path.basename(root)
+                current_dir = os.path.basename(root_)
                 if current_dir != 'synthetic':
                     continue  # Skip files not in the 'synthetic' directory
 
-                set_name = os.path.basename(os.path.dirname(root))
-                file_path = os.path.join(root, file)
+                set_name_ = os.path.basename(os.path.dirname(root_))
+                file_path = os.path.join(root_, file)
                 print(file_path)
 
                 with open(file_path, 'rb') as f:
                     pkl_content = pickle.load(f)
 
-                if set_name in data:
-                    print(f"Duplicate entry for {set_name}, skipping.")
+                if set_name_ in data_:
+                    print(f"Duplicate entry for {set_name_}, skipping.")
                 else:
-                    data[set_name] = pkl_content
-    return data
+                    data_[set_name_] = pkl_content
+    return data_
 
 
-SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+try:
+    SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+except NameError:
+    SCRIPT_DIR = os.getcwd()
+
 result_name = 'results_full_can_use'
 base_directory = os.path.abspath(os.path.join(SCRIPT_DIR, '..', '..', 'data', 'output', result_name))
 pkl_data = load_pkl_files(base_directory)
@@ -60,7 +66,6 @@ for set_name in sorted_keys:
     G_list.extend(sublist)
     name.extend([set_name] * 100)
 
-
 max_dim = []
 min_dim = []
 dimension = []
@@ -73,8 +78,6 @@ avg_clustering = []
 max_al = []
 min_al = []
 avg_eig = []
-
-
 def wnfd_nk(G, Q, weight=True, draw=False, fdigi=0):
     ## Find radius
     N_list = []
@@ -85,7 +88,8 @@ def wnfd_nk(G, Q, weight=True, draw=False, fdigi=0):
         G_nk = nk.nxadapter.nx2nk(G, weightAttr='weight')
     else:
         G_nk = nk.nxadapter.nx2nk(G)
-    for node in tqdm(G.nodes(), total=num_nodes_all):
+
+    for node in G.nodes():
         grow = []
         grow_ori = nk.distance.Dijkstra(G_nk, node, storePaths=False).run().getDistances()
         for s in grow_ori:
@@ -199,10 +203,7 @@ def ndimension(tau_list, q_list, k, color):
 
 
 kX_index = '20kX'
-root = SCRIPT_DIR
-num_colors = len(G_list)
-cmap = plt.get_cmap('RdBu')
-colors = [cmap(i / (num_colors - 1)) for i in range(num_colors)]
+root = os.path.join(SCRIPT_DIR, "anal")
 
 ##################################################### Calculate Holder Exponent and Width #####################################################
 weight_flag = 'False'
@@ -216,12 +217,13 @@ for i in range(len(G_list)):
     else:
         ntau = wnfd_nk(G_list[i], Q, weight=False, draw=False)
     wei_ntauls_list.append(ntau)
-np.save(root + '/div_ntauls_{}_{}.npy'.format(kX_index, weight_flag), wei_ntauls_list)
+np.save(root + f'/div_ntauls_{kX_index}_{weight_flag}.npy', wei_ntauls_list)
 
 plt.rcParams.update({'font.size': 30})
 plt.figure(figsize=(10, 10))
+
+from matplotlib import rcParams, colormaps
 from matplotlib.ticker import AutoMinorLocator
-from matplotlib import rcParams
 
 rcParams['font.family'] = 'sans-serif'
 rcParams['font.sans-serif'] = ['Arial']
@@ -259,14 +261,15 @@ ax.spines['top'].set_visible(False)
 for spine in ax.spines.values():
     spine.set_edgecolor('black')
 
-colors = ['#F14040', '#FF8000', '#37AD6B', '#B177DE']
+num_colors = len(wei_ntauls_list)
+cmap = plt.get_cmap('RdBu')
+colors = [cmap(i / (num_colors - 1)) for i in range(num_colors)]
 
 for i in range(len(wei_ntauls_list)):
     # nspectrum(wei_ntauls_list[i],Q,i,color=colors[i])
-    if len(wei_ntauls_list[i]) < 160:
-        print("")
-    else:
-        nspectrum(wei_ntauls_list[i][:80], Q[:80], i, color=colors[i])
+    arg1 = wei_ntauls_list[i][:80]
+    arg2 = Q[:80]
+    nspectrum(arg1, arg2, i, color=colors[i])
 print(holder_exp)
 print(widths)
 
@@ -363,7 +366,6 @@ plt.grid(False)
 plt.savefig(root + 'weighted_{}_ndimension.svg'.format(kX_index), bbox_inches='tight', dpi=600)
 
 ##################################################### Calculate NFD #####################################################
-from tqdm import tqdm
 from copy import deepcopy
 
 
@@ -528,15 +530,27 @@ print("Degree Assortativity Coefficient:", avg_assortativity)
 eigen_centrality_list = []
 avg_eigen_centrality = []
 for G in tqdm(G_list):
-    # 计算特征向量中心性
-    if weight_flag == 'True':
-        eigen_centrality = nx.eigenvector_centrality(G, max_iter=1000, weight='weight')
-    else:
-        eigen_centrality = nx.eigenvector_centrality(G, max_iter=1000, weight=None)
-    eigen_centrality_dict = dict(eigen_centrality)
-    nx.set_node_attributes(G, eigen_centrality_dict, 'eigen_centrality')
-    eigen_centrality_list.append(list(eigen_centrality.values()))
-    avg_eigen_centrality.append(np.mean(np.array(eigen_centrality_list[-1])))
+    if not nx.is_connected(G):
+        raise ValueError(
+            "Graph must contain only the largest connected component before computing eigenvector centrality."
+        )
+
+    try:
+        if weight_flag == 'True':
+            eigen_centrality = nx.eigenvector_centrality(G, max_iter=1000, weight='weight')
+        else:
+            eigen_centrality = nx.eigenvector_centrality(G, max_iter=1000, weight=None)
+
+        eigen_centrality_dict = dict(eigen_centrality)
+        nx.set_node_attributes(G, eigen_centrality_dict, 'eigen_centrality')
+        eigen_centrality_list.append(list(eigen_centrality.values()))
+        avg_eigen_centrality.append(np.mean(np.array(eigen_centrality_list[-1])))
+
+    except nx.PowerIterationFailedConvergence:
+        print("Skipping a graph due to eigenvector centrality convergence failure.")
+        eigen_centrality_list.append([np.nan] * len(G.nodes))  # Maintain alignment
+        avg_eigen_centrality.append(np.nan)  # Keep lists aligned
+
 print("Average Eigenvector Centrality:", avg_eigen_centrality)
 
 ##################################################### Calculate diameter #####################################################
@@ -573,7 +587,7 @@ data = {
 if weight_flag == 'True':
     data['diameter'] = diameter_list
 
-df = pd.DataFrame(data, index=['A', 'B', 'C', 'D'])
+df = pd.DataFrame(data, index=[n for n in name])
 df = df.transpose()
 if weight_flag == 'True':
     df.to_csv(root + '/{}_output.csv'.format(kX_index))
