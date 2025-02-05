@@ -12,7 +12,6 @@ import scipy.stats as stats
 
 # noinspection PyUnresolvedReferences
 import main  ## Very important
-from config import Config
 
 
 def load_pkl_files(base_dir):
@@ -201,6 +200,9 @@ def ndimension(tau_list, q_list, k, color):
 
 kX_index = '20kX'
 root = SCRIPT_DIR
+num_colors = len(G_list)
+cmap = plt.get_cmap('RdBu')
+colors = [cmap(i / (num_colors - 1)) for i in range(num_colors)]
 
 ##################################################### Calculate Holder Exponent and Width #####################################################
 weight_flag = 'False'
@@ -336,7 +338,6 @@ for spine in ax.spines.values():
 
 Q = [q / 100 for q in range(-2000, 2001, 10)]
 wei_ntauls_list = np.load(root + '/div_ntauls_{}_{}.npy'.format(kX_index, weight_flag), allow_pickle=True)
-colors = ['#F14040', '#FF8000', '#37AD6B', '#B177DE']
 for i in range(len(wei_ntauls_list)):
     print(name[i])
     ndimension(wei_ntauls_list[i], Q, i, color=colors[i])
