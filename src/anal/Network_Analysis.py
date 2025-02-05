@@ -39,32 +39,37 @@ def load_pkl_files(base_dir):
     return data_
 
 
-try:
-    SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
-except NameError:
-    SCRIPT_DIR = os.getcwd()
+def get_script_dir():
+    try:
+        return os.path.dirname(os.path.realpath(__file__))
+    except NameError:
+        return os.getcwd()
 
+
+SCRIPT_DIR = get_script_dir()
 result_name = 'results_full_can_use'
 base_directory = os.path.abspath(os.path.join(SCRIPT_DIR, '..', '..', 'data', 'output', result_name))
 pkl_data = load_pkl_files(base_directory)
 
 sorted_keys = sorted(pkl_data.keys(), key=lambda x: int(x))
-G_list = []
-name = []
-
+G_list, name = [], []
 for set_name in sorted_keys:
     sublist = pkl_data[set_name]
-    n_sub = len(sublist)
-
-    if n_sub > 100:
-        sublist = sublist[:100]
-    elif n_sub < 100:
-        raise Exception(
-            f"Set {set_name} has only {n_sub} items instead of 100."
-        )
-
+    if len(sublist) < 100:
+        raise Exception(f"Set {set_name} has only {len(sublist)} items instead of 100.")
+    sublist = sublist[:100]
     G_list.extend(sublist)
     name.extend([set_name] * 100)
+
+metrics = {
+    'max_dim': [],
+    'min_dim': [],
+    'dimension': [],
+    'holder_exp': [],
+    'widths': [],
+    'max_al': [],
+    'min_al': []
+}
 
 max_dim = []
 min_dim = []
@@ -78,23 +83,18 @@ avg_clustering = []
 max_al = []
 min_al = []
 avg_eig = []
+
+
 def wnfd_nk(G, Q, weight=True, draw=False, fdigi=0):
     ## Find radius
     N_list = []
     r_g_all_set = set()
-    num_nodes_all = nx.number_of_nodes(G)
     G = nx.convert_node_labels_to_integers(G)
-    if weight:
-        G_nk = nk.nxadapter.nx2nk(G, weightAttr='weight')
-    else:
-        G_nk = nk.nxadapter.nx2nk(G)
+    G_nk = nk.nxadapter.nx2nk(G, weightAttr='weight') if weight else nk.nxadapter.nx2nk(G)
 
     for node in G.nodes():
-        grow = []
-        grow_ori = nk.distance.Dijkstra(G_nk, node, storePaths=False).run().getDistances()
-        for s in grow_ori:
-            if 0 < s < 99999:
-                grow.append(s)
+        distances = nk.distance.Dijkstra(G_nk, node, storePaths=False).run().getDistances()
+        grow = [d for d in distances if 0 < d < 99999]
         grow.sort()
         # upf = (1/pow(10,fdigi+1)*5)
         # grow = [round(d+upf,fdigi) for d in grow]
@@ -113,57 +113,36 @@ def wnfd_nk(G, Q, weight=True, draw=False, fdigi=0):
     for i, num in enumerate(N_list):
         for j, r in enumerate(r_g_all):
             Nw_mat[i, j] += sum(count for radius, count in num.items() if radius <= r)
+    # for i, j in product(range(len(N_list)), range(len(r_g_all))):
+    #     Nw_mat[i, j] += sum(count for radius, count in N_list[i].items() if radius <= r_g_all[j])
 
     ## Distortion factor q: get Zq_mat
     diameter = r_g_all[-1]
-    # print('diameter:',diameter)
-
     Zq_list = []
-
     for q in Q:
         Zq_mat = np.power(Nw_mat / Nw_mat[:, -1, None], q)
         Zq_list.append(np.sum(Zq_mat, axis=0))
 
     ## Get tau(slope)
     tau_list = []
-    if draw == True:
-        plt.figure(figsize=(7, 7))
-        for idx, q in enumerate(Q):
-            r_g_all_np = np.array(r_g_all)
-            x = np.log(r_g_all_np / diameter)
-            y = np.log(Zq_list[idx])
-            q = format(q, '.0f')
-            plt.plot(x, y, '*', label='q=' + str(q))
-            #         # plt.plot(x,y,'*',label='q='+str(q))
-            #         # plt.legend(fontsize=10)
-            slope, intercept, _, _, _ = stats.linregress(x, y)
-            #             plt.plot(x,intercept + slope*x,alpha=0.5)
-            tau_list.append(slope)
+    for idx, q in enumerate(Q):
+        x = np.log(r_g_all / diameter)
+        y = np.log(Zq_list[idx])
+        slope, _, _, _, _ = stats.linregress(x, y)
+        tau_list.append(slope)
+        if draw:
+            plt.plot(x, y, '*', label=f'q={q:.0f}')
             plt.xlabel('ln(r/d)')
             plt.ylabel('ln(sum function)')
-    else:
-        for idx, q in enumerate(Q):
-            r_g_all_np = np.array(r_g_all)
-            x = np.log(r_g_all_np / diameter)
-            # print('x:',x)
-            y = np.log(Zq_list[idx])
-            slope, intercept, _, _, _ = stats.linregress(x, y)
-            tau_list.append(slope)
-    # print('tau_list:',tau_list)
-
     return tau_list
 
 
-def nspectrum(tau_list, q_list, k, color):
-    al_list = []
-    fal_list = []
-    for i in range(1, len(q_list)):
-        al = (tau_list[i] - tau_list[i - 1]) / (q_list[i] - q_list[i - 1])
-        al_list.append(al)
-    for j in range(len(q_list) - 1):
-        fal = q_list[j] * al_list[j] - tau_list[j]
-        fal_list.append(fal)
-    plt.plot(al_list, fal_list, label=name[k], linewidth=3, color=color)
+def nspectrum(tau_list, q_list, idx, color):
+    al_list = [(tau_list[i] - tau_list[i - 1]) / (q_list[i] - q_list[i - 1])
+               for i in range(1, len(q_list))]
+    fal_list = [q_list[i] * al_list[i] - tau_list[i] for i in range(len(al_list))]
+
+    plt.plot(al_list, fal_list, label=name[idx], linewidth=3, color=color)
     plt.xlabel('Lipschitz-Hölder exponent, 'r'$\alpha$')
     plt.ylabel('Multi-fractal spectrum, 'r'$f(\alpha)$')
     # plt.legend()
@@ -172,34 +151,38 @@ def nspectrum(tau_list, q_list, k, color):
     width = np.max(al_list) - np.min(al_list)
     print('Holder Exponent:', alpha_0)
     print('width:', width)
-    holder_exp.append(alpha_0)
-    widths.append(width)
-    max_al.append(np.max(al_list))
-    min_al.append(np.min(al_list))
+
+    metrics['holder_exp'].append(alpha_0)
+    metrics['widths'].append(width)
+    metrics['max_al'].append(np.max(al_list))
+    metrics['min_al'].append(np.min(al_list))
     return alpha_0, width
 
 
-def ndimension(tau_list, q_list, k, color):
-    dim_list = []
-    qd_list = []
-    for i in range(len(q_list)):
-        if q_list[i] != 0:
-            dim = tau_list[i] / q_list[i]
-            dim_list.append(dim)
-            qd_list.append(q_list[i])
+def ndimension(tau_list, q_list, idx, color):
+    valid_pairs = [(q, tau) for q, tau in zip(q_list, tau_list) if q != 0]
+    valid_q, valid_tau = zip(*valid_pairs)
+    dim_list = [tau / q for q, tau in zip(valid_q, valid_tau)]
 
-    plt.plot(qd_list, dim_list, label=name[k], linewidth=3, color=color)
+    plt.plot(valid_q, dim_list, label=name[idx], linewidth=3, color=color)
     plt.xlabel('Distorting exponent, 'r'$q$')
     plt.ylabel('Generalized fractal dimension, 'r'$D(q)$')
     # plt.legend()
-    print('Dim_max: ', np.max(dim_list))
-    print('Dim_min: ', np.min(dim_list))
-    print('Dim_max-min: ', np.max(dim_list) - np.min(dim_list))
-    max_dim.append(np.max(dim_list))
-    min_dim.append(np.min(dim_list))
-    dimension.append(np.max(dim_list) - np.min(dim_list))
+    print('Dim_max:', np.max(dim_list))
+    print('Dim_min:', np.min(dim_list))
+    diff = np.max(dim_list) - np.min(dim_list)
+    print('Dim_max - Dim_min:', diff)
+    metrics['max_dim'].append(np.max(dim_list))
+    metrics['min_dim'].append(np.min(dim_list))
+    metrics['dimension'].append(diff)
     return dim_list
     # plt.savefig('/Users/xiongyex/Downloads'+'/Spec_{}.png'.format(k),bbox_inches = 'tight',dpi=600)
+
+
+def save_violin_data(metric_list, filename, columns):
+    df = pd.DataFrame(metric_list).T
+    df.columns = columns
+    df.to_csv(filename, index=False)
 
 
 kX_index = '20kX'
@@ -370,42 +353,33 @@ from copy import deepcopy
 
 
 def node_dimension(G, weight=True, fdigi=2):
-    node_dimension = {}
+    node_dimensions = {}
     G = nx.convert_node_labels_to_integers(G)
     if weight:
         for u, v, d in G.edges(data=True):
-            if d['weight'] != 0:
+            if d.get('weight', 0) != 0:
                 d['weight'] = 1.0 / d['weight']
-    if weight == None:
-        G_nk = nk.nxadapter.nx2nk(G)
-    else:
-        G_nk = nk.nxadapter.nx2nk(G, weightAttr='weight')
+    G_nk = nk.nxadapter.nx2nk(G, weightAttr='weight') if weight else nk.nxadapter.nx2nk(G)
 
     for node in G.nodes():
-        grow = []
-        r_g = []
-        num_g = []
+        distances = nk.distance.Dijkstra(G_nk, node, storePaths=False).run().getDistances()
+        distances.sort()
+        if weight:
+            distances = [round(d, fdigi) for d in distances if round(d, fdigi) != 0]
+        count = Counter(distances)
         num_nodes = 0
-        grow = nk.distance.Dijkstra(G_nk, int(node), storePaths=False).run().getDistances()
-        grow.sort()
-        if weight == True:
-            grow = [round(d, fdigi) for d in grow if round(d, fdigi) != 0]
-        num = Counter(grow)
-        for i, j in num.items():
-            num_nodes += j
-            if i > 0:
-                r_g.append(i)
+        r_g, num_g = [], []
+        for dist, cnt in count.items():
+            num_nodes += cnt
+            if dist > 0:
+                r_g.append(dist)
                 num_g.append(num_nodes)
-
-        x = np.log(r_g)
-        y = np.log(num_g)
-
         if len(r_g) > 2:
-            slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
-            node_dimension[node] = slope
+            slope, _, _, _, _ = stats.linregress(np.log(r_g), np.log(num_g))
+            node_dimensions[node] = slope
         else:
-            node_dimension[node] = 0
-    return node_dimension
+            node_dimensions[node] = 0
+    return node_dimensions
 
 
 nfd_centrality_list = []
