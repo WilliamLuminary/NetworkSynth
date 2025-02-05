@@ -50,6 +50,8 @@ data/output/*
 !data/output/
 !data/input/.keep
 !data/output/.keep
+!data/input/sample_input/
+!data/input/sample_input/**
 
 archieved/*
 !archieved/
