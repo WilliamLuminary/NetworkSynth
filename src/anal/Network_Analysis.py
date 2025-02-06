@@ -9,12 +9,54 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
+import networkx as nx
+from GraphRicciCurvature.OllivierRicci import OllivierRicci
 
 from tqdm import tqdm
 
 # noinspection PyUnresolvedReferences
 import main  ## Very important
 
+
+# =============================================================================
+# Global Configuration
+# =============================================================================
+
+def configure_plot_settings():
+    plt.rcParams.update({
+        'font.size': 20,
+        'font.family': 'sans-serif',
+        'font.sans-serif': ['Arial'],
+        'font.weight': 'bold',
+        'axes.labelweight': 'bold',
+        'axes.linewidth': 2,
+        'axes.labelpad': 10.0,
+        'axes.xmargin': 0,
+        'axes.ymargin': 0,
+        'xtick.major.size': 7,
+        'xtick.minor.size': 3.5,
+        'xtick.major.width': 1.1,
+        'xtick.minor.width': 1.1,
+        'ytick.major.size': 7,
+        'ytick.minor.size': 3.5,
+        'ytick.major.width': 1.1,
+        'ytick.minor.width': 1.1,
+        'lines.markersize': 10,
+        'lines.markeredgewidth': 0.8,
+        'figure.figsize': (9, 7),
+        'figure.subplot.left': 0.15,
+        'figure.subplot.right': 0.95,
+        'figure.subplot.bottom': 0.13,
+        'figure.subplot.top': 0.95
+    })
+
+
+configure_plot_settings()
+
+
+# =============================================================================
+# Data Loading and Setup
+# =============================================================================
 
 def load_pkl_files(base_dir):
     data_ = {}
@@ -93,46 +135,54 @@ def wnfd_network(graph, Q, weight=True, draw=False, f_digi=0):
     return tau_list
 
 
-def n_spectrum(tau_list, q_list, idx, color):
+def compute_wndf(G_list, weight_flag):
+    Q = [q / 100 for q in range(-2000, 2001, 10)]
+    wei_ntauls_list = []
+    for G in G_list:
+        if weight_flag == 'True':
+            ntau = wnfd_network(G, Q, weight=True, draw=False, f_digi=1)  # Peiyu: weight=None
+        else:
+            ntau = wnfd_network(G, Q, weight=False, draw=False)
+        wei_ntauls_list.append(ntau)
+    return Q, wei_ntauls_list
+
+
+def n_spectrum(tau_list, q_list, label: str, color):
     al_list = [(tau_list[i] - tau_list[i - 1]) / (q_list[i] - q_list[i - 1])
                for i in range(1, len(q_list))]
     fal_list = [q_list[i] * al_list[i] - tau_list[i] for i in range(len(al_list))]
 
-    plt.plot(al_list, fal_list, label=name[idx], linewidth=3, color=color)
+    plt.plot(al_list, fal_list, label=label, linewidth=3, color=color)
     plt.xlabel('Lipschitz-Hölder exponent, 'r'$\alpha$')
     plt.ylabel('Multi-fractal spectrum, 'r'$f(\alpha)$')
     # plt.legend()
     # plt.savefig('/Users/xiongyex/Downloads'+'/Spec_{}.png'.format(k),bbox_inches = 'tight',dpi=600)
     alpha_0 = al_list[np.argmax(fal_list)]
     width = np.max(al_list) - np.min(al_list)
+    max_al_val = np.max(al_list)
+    min_al_val = np.min(al_list)
     print('Holder Exponent:', alpha_0)
     print('width:', width)
-
-    metrics['holder_exp'].append(alpha_0)
-    metrics['widths'].append(width)
-    metrics['max_al'].append(np.max(al_list))
-    metrics['min_al'].append(np.min(al_list))
-    return alpha_0, width
+    return alpha_0, width, max_al_val, min_al_val
 
 
-def n_dimension(tau_list, q_list, idx, color):
+def n_dimension(tau_list, q_list, label, color):
     valid_pairs = [(q, tau) for q, tau in zip(q_list, tau_list) if q != 0]
     valid_q, valid_tau = zip(*valid_pairs)
     dim_list = [tau / q for q, tau in zip(valid_q, valid_tau)]
 
-    plt.plot(valid_q, dim_list, label=name[idx], linewidth=3, color=color)
+    plt.plot(valid_q, dim_list, label=label, linewidth=3, color=color)
     plt.xlabel('Distorting exponent, 'r'$q$')
     plt.ylabel('Generalized fractal dimension, 'r'$D(q)$')
     # plt.legend()
-    print('Dim_max:', np.max(dim_list))
-    print('Dim_min:', np.min(dim_list))
-    diff = np.max(dim_list) - np.min(dim_list)
-    print('Dim_max - Dim_min:', diff)
-    metrics['max_dim'].append(np.max(dim_list))
-    metrics['min_dim'].append(np.min(dim_list))
-    metrics['dimension'].append(diff)
-    return dim_list
     # plt.savefig('/Users/xiongyex/Downloads'+'/Spec_{}.png'.format(k),bbox_inches = 'tight',dpi=600)
+    dim_max = np.max(dim_list)
+    dim_min = np.min(dim_list)
+    diff = dim_max - dim_min
+    print('Dim_max:', dim_max)
+    print('Dim_min:', dim_min)
+    print('Dim_max - Dim_min:', diff)
+    return dim_list, dim_max, dim_min, diff
 
 
 def save_violin_data(metric_list, filename, columns):
@@ -171,208 +221,32 @@ def node_dimension(graph, weight=True, fdigi=2):
     return node_dimensions
 
 
-script_dir = get_script_dir()
-result_name = 'results_full_can_use'
-base_directory = os.path.abspath(os.path.join(script_dir, '..', '..', 'data', 'output', result_name))
-pkl_data = load_pkl_files(base_directory)
+def load_data():
+    script_dir = get_script_dir()
+    result_name = 'results_full_can_use'
+    base_directory = os.path.abspath(os.path.join(script_dir, '..', '..', 'data', 'output', result_name))
+    pkl_data = load_pkl_files(base_directory)
 
-sorted_keys = sorted(pkl_data.keys(), key=lambda x: int(x))
-G_list, name = [], []
-for set_name in sorted_keys:
-    sublist = pkl_data[set_name]
-    if len(sublist) < 100:
-        raise Exception(f"Set {set_name} has only {len(sublist)} items instead of 100.")
-    sublist = sublist[:100]
-    G_list.extend(sublist)
-    name.extend([set_name] * 100)
+    sorted_keys = sorted(pkl_data.keys(), key=lambda x: int(x))
+    G_list, name = [], []
+    for set_name in sorted_keys:
+        sublist = pkl_data[set_name]
+        if len(sublist) < 100:
+            raise Exception(f"Set {set_name} has only {len(sublist)} items instead of 100.")
+        sublist = sublist[:100]
+        G_list.extend(sublist)
+        name.extend([set_name] * 100)
 
-metrics = {
-    'max_dim': [],
-    'min_dim': [],
-    'dimension': [],
-    'holder_exp': [],
-    'widths': [],
-    'max_al': [],
-    'min_al': []
-}
-
-max_dim = []
-min_dim = []
-dimension = []
-holder_exp = []
-widths = []
-avg_frac = []
-avg_closeness = []
-avg_degree = []
-avg_clustering = []
-max_al = []
-min_al = []
-avg_eig = []
-
-kX_index = '20kX'
-root = os.path.join(script_dir, "anal")
-
-##################################################### Calculate Holder Exponent and Width #####################################################
-weight_flag = 'False'
-holder_exp = []
-widths = []
-Q = [q / 100 for q in range(-2000, 2001, 10)]
-wei_ntauls_list = []
-for i in range(len(G_list)):
-    if weight_flag == 'True':
-        ntau = wnfd_network(G_list[i], Q, weight=True, draw=False, f_digi=1)  # Peiyu: weight=None
-    else:
-        ntau = wnfd_network(G_list[i], Q, weight=False, draw=False)
-    wei_ntauls_list.append(ntau)
-np.save(root + f'/div_ntauls_{kX_index}_{weight_flag}.npy', wei_ntauls_list)
-
-plt.rcParams.update({'font.size': 30})
-plt.figure(figsize=(10, 10))
-
-from matplotlib import rcParams, colormaps
-from matplotlib.ticker import AutoMinorLocator
-
-rcParams['font.family'] = 'sans-serif'
-rcParams['font.sans-serif'] = ['Arial']
-plt.rcParams["font.weight"] = "bold"
-plt.rcParams["axes.labelweight"] = "bold"
-rcParams['font.size'] = 20
-rcParams['axes.linewidth'] = 2
-rcParams['axes.labelpad'] = 10.0
-# rcParams['axes.prop_cycle'] = plot_color_cycle
-rcParams['axes.xmargin'] = 0
-rcParams['axes.ymargin'] = 0
-rcParams.update({"figure.figsize": (6.4, 4.8),
-                 "figure.subplot.left": 0.177, "figure.subplot.right": 0.946,
-                 "figure.subplot.bottom": 0.156, "figure.subplot.top": 0.965,
-                 "axes.autolimit_mode": "round_numbers",
-                 "xtick.major.size": 7,
-                 "xtick.minor.size": 3.5,
-                 "xtick.major.width": 1.1,
-                 "xtick.minor.width": 1.1,
-                 "xtick.major.pad": 5,
-                 "xtick.minor.visible": True,
-                 "ytick.major.size": 7,
-                 "ytick.minor.size": 3.5,
-                 "ytick.major.width": 1.1,
-                 "ytick.minor.width": 1.1,
-                 "ytick.major.pad": 5,
-                 "ytick.minor.visible": True,
-                 "lines.markersize": 10,
-                 "lines.markerfacecolor": "none",
-                 "lines.markeredgewidth": 0.8})
-
-fig, ax = plt.subplots(figsize=(9, 7))
-ax.spines['right'].set_visible(False)
-ax.spines['top'].set_visible(False)
-for spine in ax.spines.values():
-    spine.set_edgecolor('black')
-
-num_colors = len(wei_ntauls_list)
-cmap = plt.get_cmap('RdBu')
-colors = [cmap(i / (num_colors - 1)) for i in range(num_colors)]
-
-for i in range(len(wei_ntauls_list)):
-    # nspectrum(wei_ntauls_list[i],Q,i,color=colors[i])
-    arg1 = wei_ntauls_list[i][:80]
-    arg2 = Q[:80]
-    n_spectrum(arg1, arg2, i, color=colors[i])
-print(holder_exp)
-print(widths)
-
-y_min, y_max = ax.get_ylim()
-ax.set_ylim(y_min, y_max + 0.1)
-ax = plt.gca()
-plt.gca().xaxis.set_minor_locator(AutoMinorLocator(n=2))
-plt.gca().yaxis.set_minor_locator(AutoMinorLocator(n=2))
-ax.legend(loc='upper right')
-plt.grid(False)
-# plt.legend(fontsize=25,loc='best')
-# # plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-# plt.legend(frameon=False, prop={'size': 15}, loc='best')
-# plt.grid(False)
-# ax = plt.gca()
-# ax.spines['right'].set_visible(False)
-# ax.spines['top'].set_visible(False)
-# for spine in ax.spines.values():
-#     spine.set_linewidth(2)
-#     spine.set_color('black')
-
-plt.savefig(root + 'weighted_{}_nspectrum.svg'.format(kX_index), bbox_inches='tight', dpi=600)
-plt.close()
-
-##################################################### Calculate Dimension #####################################################
-max_dim = []
-min_dim = []
-dimension = []
-plt.rcParams.update({'font.size': 30})
-plt.figure(figsize=(10, 10))
-from matplotlib.ticker import AutoMinorLocator
-from matplotlib import rcParams
-
-rcParams['font.family'] = 'sans-serif'
-rcParams['font.sans-serif'] = ['Arial']
-plt.rcParams["font.weight"] = "bold"
-plt.rcParams["axes.labelweight"] = "bold"
-rcParams['font.size'] = 20
-rcParams['axes.linewidth'] = 2
-rcParams['axes.labelpad'] = 10.0
-# rcParams['axes.prop_cycle'] = plot_color_cycle
-rcParams['axes.xmargin'] = 0
-rcParams['axes.ymargin'] = 0
-rcParams.update({"figure.figsize": (6.4, 4.8),
-                 "figure.subplot.left": 0.177, "figure.subplot.right": 0.946,
-                 "figure.subplot.bottom": 0.156, "figure.subplot.top": 0.965,
-                 "axes.autolimit_mode": "round_numbers",
-                 "xtick.major.size": 7,
-                 "xtick.minor.size": 3.5,
-                 "xtick.major.width": 1.1,
-                 "xtick.minor.width": 1.1,
-                 "xtick.major.pad": 5,
-                 "xtick.minor.visible": True,
-                 "ytick.major.size": 7,
-                 "ytick.minor.size": 3.5,
-                 "ytick.major.width": 1.1,
-                 "ytick.minor.width": 1.1,
-                 "ytick.major.pad": 5,
-                 "ytick.minor.visible": True,
-                 "lines.markersize": 10,
-                 "lines.markerfacecolor": "none",
-                 "lines.markeredgewidth": 0.8})
-
-fig, ax = plt.subplots(figsize=(9, 7))
-ax.spines['right'].set_visible(False)
-ax.spines['top'].set_visible(False)
-for spine in ax.spines.values():
-    spine.set_edgecolor('black')
-
-Q = [q / 100 for q in range(-2000, 2001, 10)]
-wei_ntauls_list = np.load(root + '/div_ntauls_{}_{}.npy'.format(kX_index, weight_flag), allow_pickle=True)
-for i in range(len(wei_ntauls_list)):
-    print(name[i])
-    n_dimension(wei_ntauls_list[i], Q, i, color=colors[i])
-print(dimension)
-
-ax = plt.gca()
-plt.gca().xaxis.set_minor_locator(AutoMinorLocator(n=2))
-plt.gca().yaxis.set_minor_locator(AutoMinorLocator(n=2))
-ax.legend(loc='upper right')
-plt.grid(False)
-
-# plt.legend(fontsize=25,loc='best')
-# # plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-# plt.legend(frameon=False, prop={'size': 15}, loc='best')
-# # plt.legend(ncol=10,frameon=False,prop={'size': 15}, loc='lower center', bbox_to_anchor=(0.5, -0.3))
-# plt.grid(False)
-# ax = plt.gca()
-# ax.spines['right'].set_visible(False)
-# ax.spines['top'].set_visible(False)
-# for spine in ax.spines.values():
-#     spine.set_linewidth(2)
-#     spine.set_color('black')
-plt.savefig(root + 'weighted_{}_ndimension.svg'.format(kX_index), bbox_inches='tight', dpi=600)
-
-from copy import deepcopy
+    metrics = {
+        'max_dim': [],
+        'min_dim': [],
+        'dimension': [],
+        'holder_exp': [],
+        'widths': [],
+        'max_al': [],
+        'min_al': []
+    }
+    return script_dir, G_list, name, metrics
 
 
 def compute_centralities(G_list, weight_flag):
@@ -388,174 +262,253 @@ def compute_centralities(G_list, weight_flag):
     for G in G_list:
         if weight_flag == 'True':
             nfd_centrality = node_dimension(G, weight=True).values()
+            closeness_centrality = nx.closeness_centrality(G, distance=lambda u, v, d: 1 / d['weight']).values()
+            degree_centrality = dict(G.degree(weight='weight')).values()
+            cluster_coef = nx.clustering(G, weight='weight').values()
+
         else:
             nfd_centrality = node_dimension(G, weight=None).values()  # Peiyu: weight=None
+            closeness_centrality = nx.closeness_centrality(G, distance=None).values()
+            degree_centrality = dict(G.degree(weight=None)).values()
+            cluster_coef = nx.clustering(G, weight=None).values()
+
         nfd_centrality_list.append(list(nfd_centrality))
         avg_frac.append(np.mean(np.array(nfd_centrality_list[-1])))
-
-    for G in tqdm(G_list):
-        if weight_flag == 'True':
-            closeness_centrality = nx.closeness_centrality(G, distance=lambda u, v, d: 1 / d['weight']).values()
-        else:
-            closeness_centrality = nx.closeness_centrality(G, distance=None).values()
         closeness_centrality_list.append(list(closeness_centrality))
         avg_closeness.append(np.mean(np.array(closeness_centrality_list[-1])))
-
-    for G in tqdm(G_list):
-        if weight_flag == 'True':
-            degree_centrality = dict(G.degree(weight='weight')).values()
-        else:
-            degree_centrality = dict(G.degree(weight=None)).values()
         degree_centrality_list.append(list(degree_centrality))
         avg_degree.append(np.mean(np.array(degree_centrality_list[-1])))
-
-    for G in tqdm(G_list):
-        if weight_flag == 'True':
-            cluster_coef = nx.clustering(G, weight='weight').values()
-        else:
-            cluster_coef = nx.clustering(G, weight=None).values()
         cluster_coef_list.append(list(cluster_coef))
         avg_clustering.append(np.mean(np.array(cluster_coef_list[-1])))
 
-    # 将 nfd_centrality_list 转换为 DataFrame, violinplot 数据
-    df = pd.DataFrame(nfd_centrality_list).T
-    df.columns = name
-    df.to_csv(root + '/{}_nfd_violin.csv'.format(kX_index), index=False)
-
-    df = pd.DataFrame(closeness_centrality_list).T
-    df.columns = name
-    df.to_csv(root + '/{}_closeness_violin.csv'.format(kX_index), index=False)
-
-    df = pd.DataFrame(degree_centrality_list).T
-    df.columns = name
-    df.to_csv(root + '/{}_degree_violin.csv'.format(kX_index), index=False)
-
-    df = pd.DataFrame(cluster_coef_list).T
-    df.columns = name
-    df.to_csv(root + '/{}_clustering_violin.csv'.format(kX_index), index=False)
+        return (nfd_centrality_list, avg_frac,
+                closeness_centrality_list, avg_closeness,
+                degree_centrality_list, avg_degree,
+                cluster_coef_list, avg_clustering)
 
 
-##################################################### Calculate betweenness centrality #####################################################
-betweenness_list = []
-avg_betweenness_list = []
-for G_nx in tqdm(G_list):
-    if weight_flag == 'True':
-        G_nx = deepcopy(G_nx)
-        for u, v, d in G_nx.edges(data=True):
-            if d['weight'] != 0:  # 确保权重不为 0
-                d['weight'] = 1.0 / d['weight']
-            else:
-                d['weight'] = float('inf')  # 如果权重为 0，设置为无穷大
-        G = nk.nxadapter.nx2nk(G_nx, weightAttr='weight')
-    else:
-        G = nk.nxadapter.nx2nk(G_nx, weightAttr=None)
-    betweenness = nk.centrality.Betweenness(G, normalized=True).run()
-    betweenness_list.append(betweenness.scores())
-    avg_betweenness = sum(betweenness.scores()) / G.numberOfNodes()
-    avg_betweenness_list.append(avg_betweenness)
-
-##################################################### Calculate ORC #####################################################
-import networkx as nx
-from GraphRicciCurvature.OllivierRicci import OllivierRicci
-
-avg_orcs = []
-orc_list = []
-for G in tqdm(G_list):
-    G = deepcopy(G)
-    avg_orc = []
-    if weight_flag == 'True':
-        for u, v, d in G.edges(data=True):
-            d['weight'] = 1.0 / d['weight']
-        orc = OllivierRicci(nx.convert_node_labels_to_integers(G), alpha=0.5, verbose="ERROR", weight='weight')
-    else:
-        orc = OllivierRicci(nx.convert_node_labels_to_integers(G), alpha=0.5, verbose="ERROR", weight=None)
-    # 计算Ollivier-Ricci曲率
-    orc.compute_ricci_curvature()
-    G_orc = orc.G.copy()
-    # 输出每条边的Ollivier-Ricci曲率
-    for (u, v, d) in G_orc.edges(data=True):
-        avg_orc.append(d['ricciCurvature'])
-    orc_list.append(avg_orc)
-    avg_orcs.append(np.mean(np.array(avg_orc)))
-df = pd.DataFrame(orc_list).T
-df.columns = name
-df.to_csv(root + '/{}_orc_violin.csv'.format(kX_index), index=False)
-
-##################################################### Calculate assortativity coefficient #####################################################
-assortativity_coef_list = []
-avg_assortativity = []
-for G in tqdm(G_list):
-    if weight_flag == 'True':
-        assortativity_coef = nx.degree_pearson_correlation_coefficient(G, weight='weight')
-    else:
-        assortativity_coef = nx.degree_pearson_correlation_coefficient(G, weight=None)
-    avg_assortativity.append(np.mean(np.array(assortativity_coef)))
-print("Degree Assortativity Coefficient:", avg_assortativity)
-
-##################################################### Calculate eigen_centrality #####################################################
-eigen_centrality_list = []
-avg_eigen_centrality = []
-for G in tqdm(G_list):
-    if not nx.is_connected(G):
-        raise ValueError(
-            "Graph must contain only the largest connected component before computing eigenvector centrality."
-        )
-
-    try:
+def compute_betweenness(G_list, weight_flag):
+    betweenness_list, avg_betweenness_list = [], []
+    for G in G_list:
         if weight_flag == 'True':
-            eigen_centrality = nx.eigenvector_centrality(G, max_iter=1000, weight='weight')
+            G_tmp = G.copy()
+            for u, v, d in G_tmp.edges(data=True):
+                d['weight'] = 1.0 / d['weight'] if d.get('weight', 0) != 0 else float('inf')  # 确保权重不为0, 若为 0，则设为无穷大
+            G_nk = nk.nxadapter.nx2nk(G, weightAttr='weight')
         else:
-            eigen_centrality = nx.eigenvector_centrality(G, max_iter=1000, weight=None)
+            G_nk = nk.nxadapter.nx2nk(G, weightAttr=None)
+        bt = nk.centrality.Betweenness(G_nk, normalized=True).run().scores()
+        betweenness_list.append(bt)
+        avg_betweenness_list.append(sum(bt) / G.number_of_nodes())
+    return betweenness_list, avg_betweenness_list
 
-        eigen_centrality_dict = dict(eigen_centrality)
-        nx.set_node_attributes(G, eigen_centrality_dict, 'eigen_centrality')
-        eigen_centrality_list.append(list(eigen_centrality.values()))
-        avg_eigen_centrality.append(np.mean(np.array(eigen_centrality_list[-1])))
 
-    except nx.PowerIterationFailedConvergence:
-        print("Skipping a graph due to eigenvector centrality convergence failure.")
-        eigen_centrality_list.append([np.nan] * len(G.nodes))  # Maintain alignment
-        avg_eigen_centrality.append(np.nan)  # Keep lists aligned
-
-print("Average Eigenvector Centrality:", avg_eigen_centrality)
-
-##################################################### Calculate diameter #####################################################
-if weight_flag == 'True':
-    diameter_list = []
-    for G in tqdm(G_list):
-        if nx.is_connected(G):
-            diameter = nx.diameter(G)
+def compute_orc(G_list, weight_flag):
+    orc_list, avg_orcs = [], []
+    for G in G_list:
+        G = G.copy()
+        if weight_flag == 'True':
+            for u, v, d in G.edges(data=True):
+                d['weight'] = 1.0 / d['weight']
+            orc = OllivierRicci(nx.convert_node_labels_to_integers(G), alpha=0.5, verbose="ERROR", weight='weight')
         else:
-            # 对于不连通的图，计算每个连通分量的直径，并取最大值
-            diameter = max(nx.diameter(G.subgraph(c).copy()) for c in nx.connected_components(G))
-        diameter_list.append(diameter)
-    print("Network Diameters:", diameter_list)
+            orc = OllivierRicci(nx.convert_node_labels_to_integers(G), alpha=0.5, verbose="ERROR", weight=None)
+        orc.compute_ricci_curvature()
+        curvatures = [d['ricciCurvature'] for u, v, d in orc.G.edges(data=True)]
+        orc_list.append(curvatures)
+        avg_orcs.append(np.mean(curvatures))
+    return orc_list, avg_orcs
+
+
+def compute_assortativity(G_list, weight_flag):
+    assortativity_coef_list, avg_assortativity = [], []
+    weight_ = 'weight' if weight_flag == 'True' else None
+    for G in G_list:
+        assortativity_coef = nx.degree_pearson_correlation_coefficient(G, weight=weight_)
+        avg_assortativity.append(np.mean(np.array(assortativity_coef)))
+
+    return assortativity_coef_list, avg_assortativity
+
+
+def compute_eigenvector(G_list, weight_flag):
+    eigen_centrality_list, avg_eigen_centrality = [], []
+    for G in G_list:
+        if not nx.is_connected(G):
+            raise ValueError("Graph must contain only the largest connected component.")
+        try:
+            weight_ = 'weight' if weight_flag == 'True' else None
+            eigen_centrality = nx.eigenvector_centrality(G, max_iter=1000, weight=weight_)
+            eigen_values = list(eigen_centrality.values())
+            eigen_centrality_list.append(eigen_values)
+            avg_eigen_centrality.append(np.mean(eigen_values))
+        except nx.PowerIterationFailedConvergence:
+            print("Skipping a graph due to eigenvector centrality convergence failure.")
+            eigen_centrality_list.append([np.nan] * G.number_of_nodes())  # Maintain alignment
+            avg_eigen_centrality.append(np.nan)  # Keep lists aligned
+    return eigen_centrality_list, avg_eigen_centrality
+
 
 ##################################################### save data #####################################################
-import pandas as pd
 
-data = {
-    'holder_exp': holder_exp,
-    'widths': widths,
-    'dimension': dimension,
-    'avg_frac': avg_frac,
-    'avg_closeness': avg_closeness,
-    'avg_degree': avg_degree,
-    'avg_clustering': avg_clustering,
-    'avg_betweenness_list': avg_betweenness_list,
-    'avg_orcs': avg_orcs,
-    'avg_assortativity': avg_assortativity,
-    'avg_eigen_centrality': avg_eigen_centrality,
-    'max_al': max_al,
-    'min_al': min_al,
-}
+def compute_diameter(G_list, weight_flag):
+    if weight_flag != 'True':
+        return None
+    diameter_list = []
+    for G in G_list:
+        if nx.is_connected(G):
+            diameter_list.append(nx.diameter(G))
+        else:
+            diameter_list.append(max(nx.diameter(G.subgraph(c).copy()) for c in nx.connected_components(G)))
+            # 对于不连通的图，计算每个连通分量的直径，并取最大值
+    return diameter_list
 
-if weight_flag == 'True':
-    data['diameter'] = diameter_list
 
-df = pd.DataFrame(data, index=[n for n in name])
-df = df.transpose()
-if weight_flag == 'True':
-    df.to_csv(root + '/{}_output.csv'.format(kX_index))
-else:
-    df.to_csv(root + '/{}_uw_output.csv'.format(kX_index))
+def main():
+    script_dir, G_list, names, metrics = load_data()
+    output_root = os.path.join(script_dir, "anal")
+
+    kX_index = '20kX'
+    weight_flag = 'False'
+
+    Q, wei_ntauls_list = compute_wndf(G_list, weight_flag)
+    np.save(os.path.join(output_root, f'div_ntauls_{kX_index}_{weight_flag}.npy'),
+            wei_ntauls_list)
+
+    # -------------------------------
+    # Plot multifractal spectrum
+    # -------------------------------
+    plt.rcParams.update({'font.size': 30})
+    fig, ax = plt.subplots(figsize=(9, 7))
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    for spine in ax.spines.values():
+        spine.set_edgecolor('black')
+
+    num_colors = len(wei_ntauls_list)
+    cmap = plt.get_cmap('RdBu')
+    colors = [cmap(i / (num_colors - 1)) for i in range(num_colors)]
+    for i, ntau in enumerate(wei_ntauls_list):
+        arg1 = ntau[:80]  # use first 80 elements for plotting
+        arg2 = Q[:80]
+        alpha, width, max_al_val, min_al_val = n_spectrum(arg1, arg2, label=names[i], color=colors[i])
+        metrics['holder_exp'].append(alpha)
+        metrics['widths'].append(width)
+        metrics['max_al'].append(max_al_val)
+        metrics['min_al'].append(min_al_val)
+
+    ax.legend(loc='upper right')
+    from matplotlib.ticker import AutoMinorLocator
+    plt.gca().xaxis.set_minor_locator(AutoMinorLocator(n=2))
+    plt.gca().yaxis.set_minor_locator(AutoMinorLocator(n=2))
+    plt.grid(False)
+    plt.savefig(os.path.join(output_root, f'weighted_{kX_index}_nspectrum.svg'), bbox_inches='tight', dpi=600)
+    plt.close()
+
+    # y_min, y_max = ax.get_ylim()
+    # ax.set_ylim(y_min, y_max + 0.1)
+
+    # -------------------------------
+    # Plot generalized fractal dimension
+    # -------------------------------
+    plt.rcParams.update({'font.size': 30})
+    fig, ax = plt.subplots(figsize=(9, 7))
+    for spine in ax.spines.values():
+        spine.set_edgecolor('black')
+
+    # Reload previously saved wnfd data
+    wei_ntauls_list = np.load(os.path.join(output_root, f'div_ntauls_{kX_index}_{weight_flag}.npy'),
+                              allow_pickle=True)
+    for i, ntau in enumerate(wei_ntauls_list):
+        _, dim_max, dim_min, diff = n_dimension(ntau, Q, label=names[i], color=colors[i])
+        metrics['max_dim'].append(dim_max)
+        metrics['min_dim'].append(dim_min)
+        metrics['dimension'].append(diff)
+
+    ax.legend(loc='upper right')
+    ax.xaxis.set_minor_locator(plt.matplotlib.ticker.AutoMinorLocator(2))
+    ax.yaxis.set_minor_locator(plt.matplotlib.ticker.AutoMinorLocator(2))
+    plt.grid(False)
+    plt.savefig(os.path.join(output_root, f'weighted_{kX_index}_ndimension.svg'),
+                bbox_inches='tight', dpi=600)
+    plt.close()
+
+    # -------------------------------
+    # Plot generalized fractal dimension
+    # -------------------------------
+    plt.rcParams.update({'font.size': 30})
+    fig, ax = plt.subplots(figsize=(9, 7))
+    for spine in ax.spines.values():
+        spine.set_edgecolor('black')
+
+    # Reload previously saved wnfd data
+    wei_ntauls_list = np.load(os.path.join(output_root, f'div_ntauls_{kX_index}_{weight_flag}.npy'),
+                              allow_pickle=True)
+    for i, ntau in enumerate(wei_ntauls_list):
+        _, dim_max, dim_min, diff = n_dimension(ntau, Q, label=names[i], color=colors[i])
+        metrics['max_dim'].append(dim_max)
+        metrics['min_dim'].append(dim_min)
+        metrics['dimension'].append(diff)
+
+    ax.legend(loc='upper right')
+    ax.xaxis.set_minor_locator(plt.matplotlib.ticker.AutoMinorLocator(2))
+    ax.yaxis.set_minor_locator(plt.matplotlib.ticker.AutoMinorLocator(2))
+    plt.grid(False)
+    plt.savefig(os.path.join(output_root, f'weighted_{kX_index}_ndimension.svg'),
+                bbox_inches='tight', dpi=600)
+    plt.close()
+
+    # -------------------------------
+    # Compute centrality measures and save CSV files
+    # -------------------------------
+    (nfd_list, avg_frac,
+     closeness_list, avg_closeness,
+     degree_list, avg_degree,
+     clustering_list, avg_clustering) = compute_centralities(G_list, weight_flag)
+
+    save_violin_data(nfd_list, os.path.join(output_root, f'{kX_index}_nfd_violin.csv'), names)
+    save_violin_data(closeness_list, os.path.join(output_root, f'{kX_index}_closeness_violin.csv'), names)
+    save_violin_data(degree_list, os.path.join(output_root, f'{kX_index}_degree_violin.csv'), names)
+    save_violin_data(clustering_list, os.path.join(output_root, f'{kX_index}_clustering_violin.csv'), names)
+
+    betweenness_list, avg_betweenness_list = compute_betweenness(G_list, weight_flag)
+
+    orc_list, avg_orcs = compute_orc(G_list, weight_flag)
+    save_violin_data(orc_list, os.path.join(output_root, f'{kX_index}_orc_violin.csv'), names)
+
+    assortativity_coef_list, avg_assortativity = compute_assortativity(G_list, weight_flag)
+
+    diameter_list, avg_diameter = compute_diameter(G_list, weight_flag)
+
+    eigen_list, avg_eigen = compute_eigenvector(G_list, weight_flag)
+    print("Average Eigenvector Centrality:", avg_eigen)
+
+    # -------------------------------
+    # Save summary data to CSV
+    # -------------------------------
+    summary_data = {
+        'holder_exp': metrics['holder_exp'],
+        'widths': metrics['widths'],
+        'dimension': metrics['dimension'],
+        'avg_frac': avg_frac,
+        'avg_closeness': avg_closeness,
+        'avg_degree': avg_degree,
+        'avg_clustering': avg_clustering,
+        'avg_betweenness_list': avg_betweenness_list,
+        'avg_orcs': avg_orcs,
+        'avg_assortativity': avg_assortativity,
+        'avg_eigen_centrality': avg_eigen,
+        'max_al': metrics['max_al'],
+        'min_al': metrics['min_al'],
+    }
+    if weight_flag == 'True' and diameter_list is not None:
+        summary_data['diameter'] = diameter_list
+    df_summary = pd.DataFrame(summary_data, index=names).transpose()
+    output_csv = os.path.join(output_root,
+                              f'{kX_index}_output.csv' if weight_flag == 'True'
+                              else f'{kX_index}_uw_output.csv')
+    df_summary.to_csv(output_csv)
+    print("Summary data saved to", output_csv)
+
+
+if __name__ == '__main__':
+    main()
