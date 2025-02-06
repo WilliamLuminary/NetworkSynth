@@ -9,13 +9,12 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
-import networkx as nx
 from GraphRicciCurvature.OllivierRicci import OllivierRicci
-
-from tqdm import tqdm
 
 # noinspection PyUnresolvedReferences
 import main  ## Very important
+
+Q = [q / 100 for q in range(-2000, 2001, 10)]
 
 
 # =============================================================================
@@ -85,8 +84,7 @@ def get_script_dir():
         return os.getcwd()
 
 
-def wnfd_network(graph, Q, weight=True, draw=False, f_digi=0):
-    ## Find radius
+def wnfd_network(graph, weight=True, draw=False, f_digi=0):
     N_list = []
     r_g_all_set = set()
     graph = nx.convert_node_labels_to_integers(graph)
@@ -111,8 +109,6 @@ def wnfd_network(graph, Q, weight=True, draw=False, f_digi=0):
     for i, num in enumerate(N_list):
         for j, r in enumerate(r_g_all):
             Nw_mat[i, j] += sum(count for radius, count in num.items() if radius <= r)
-    # for i, j in product(range(len(N_list)), range(len(r_g_all))):
-    #     Nw_mat[i, j] += sum(count for radius, count in N_list[i].items() if radius <= r_g_all[j])
 
     ## Distortion factor q: get Zq_mat
     diameter = r_g_all[-1]
@@ -135,16 +131,15 @@ def wnfd_network(graph, Q, weight=True, draw=False, f_digi=0):
     return tau_list
 
 
-def compute_wndf(G_list, weight_flag):
-    Q = [q / 100 for q in range(-2000, 2001, 10)]
-    wei_ntauls_list = []
-    for G in G_list:
+def compute_wndf(graphs, weight_flag):
+    wei_n_tauls_list = []
+    for graph in graphs:
         if weight_flag == 'True':
-            ntau = wnfd_network(G, Q, weight=True, draw=False, f_digi=1)  # Peiyu: weight=None
+            n_tau = wnfd_network(graph, weight=True, draw=False, f_digi=1)  # Peiyu: weight=None
         else:
-            ntau = wnfd_network(G, Q, weight=False, draw=False)
-        wei_ntauls_list.append(ntau)
-    return Q, wei_ntauls_list
+            n_tau = wnfd_network(graph, weight=False, draw=False)
+        wei_n_tauls_list.append(n_tau)
+    return wei_n_tauls_list
 
 
 def n_spectrum(tau_list, q_list, label: str, color):
@@ -179,9 +174,6 @@ def n_dimension(tau_list, q_list, label, color):
     dim_max = np.max(dim_list)
     dim_min = np.min(dim_list)
     diff = dim_max - dim_min
-    print('Dim_max:', dim_max)
-    print('Dim_min:', dim_min)
-    print('Dim_max - Dim_min:', diff)
     return dim_list, dim_max, dim_min, diff
 
 
@@ -191,7 +183,7 @@ def save_violin_data(metric_list, filename, columns):
     df_.to_csv(filename, index=False)
 
 
-def node_dimension(graph, weight=True, fdigi=2):
+def node_dimension(graph, weight=True, f_digi=2):
     node_dimensions = {}
     graph = nx.convert_node_labels_to_integers(graph)
     if weight:
@@ -204,7 +196,7 @@ def node_dimension(graph, weight=True, fdigi=2):
         distances = nk.distance.Dijkstra(G_nk, node, storePaths=False).run().getDistances()
         distances.sort()
         if weight:
-            distances = [round(d, fdigi) for d in distances if round(d, fdigi) != 0]
+            distances = [round(d, f_digi) for d in distances if round(d, f_digi) != 0]
         count = Counter(distances)
         num_nodes = 0
         r_g, num_g = [], []
@@ -228,14 +220,14 @@ def load_data():
     pkl_data = load_pkl_files(base_directory)
 
     sorted_keys = sorted(pkl_data.keys(), key=lambda x: int(x))
-    G_list, name = [], []
+    G_list, names = [], []
     for set_name in sorted_keys:
         sublist = pkl_data[set_name]
         if len(sublist) < 100:
             raise Exception(f"Set {set_name} has only {len(sublist)} items instead of 100.")
         sublist = sublist[:100]
         G_list.extend(sublist)
-        name.extend([set_name] * 100)
+        names.extend([set_name] * 100)
 
     metrics = {
         'max_dim': [],
@@ -246,10 +238,10 @@ def load_data():
         'max_al': [],
         'min_al': []
     }
-    return script_dir, G_list, name, metrics
+    return script_dir, G_list, names, metrics
 
 
-def compute_centralities(G_list, weight_flag):
+def compute_centrality(graphs, weight_flag):
     nfd_centrality_list = []
     avg_frac = []
     closeness_centrality_list = []
@@ -259,7 +251,7 @@ def compute_centralities(G_list, weight_flag):
     cluster_coef_list = []
     avg_clustering = []
 
-    for G in G_list:
+    for G in graphs:
         if weight_flag == 'True':
             nfd_centrality = node_dimension(G, weight=True).values()
             closeness_centrality = nx.closeness_centrality(G, distance=lambda u, v, d: 1 / d['weight']).values()
@@ -267,7 +259,7 @@ def compute_centralities(G_list, weight_flag):
             cluster_coef = nx.clustering(G, weight='weight').values()
 
         else:
-            nfd_centrality = node_dimension(G, weight=None).values()  # Peiyu: weight=None
+            nfd_centrality = node_dimension(G, weight=False).values()
             closeness_centrality = nx.closeness_centrality(G, distance=None).values()
             degree_centrality = dict(G.degree(weight=None)).values()
             cluster_coef = nx.clustering(G, weight=None).values()
@@ -281,10 +273,10 @@ def compute_centralities(G_list, weight_flag):
         cluster_coef_list.append(list(cluster_coef))
         avg_clustering.append(np.mean(np.array(cluster_coef_list[-1])))
 
-        return (nfd_centrality_list, avg_frac,
-                closeness_centrality_list, avg_closeness,
-                degree_centrality_list, avg_degree,
-                cluster_coef_list, avg_clustering)
+    return (nfd_centrality_list, avg_frac,
+            closeness_centrality_list, avg_closeness,
+            degree_centrality_list, avg_degree,
+            cluster_coef_list, avg_clustering)
 
 
 def compute_betweenness(G_list, weight_flag):
@@ -363,16 +355,16 @@ def compute_diameter(G_list, weight_flag):
     return diameter_list
 
 
-def main():
+def run():
     script_dir, G_list, names, metrics = load_data()
-    output_root = os.path.join(script_dir, "anal")
+    output_root = os.path.join(script_dir, "result")
 
     kX_index = '20kX'
     weight_flag = 'False'
 
-    Q, wei_ntauls_list = compute_wndf(G_list, weight_flag)
-    np.save(os.path.join(output_root, f'div_ntauls_{kX_index}_{weight_flag}.npy'),
-            wei_ntauls_list)
+    wei_ntauls_list = compute_wndf(G_list, weight_flag)
+    # noinspection PyTypeChecker
+    np.save(os.path.join(output_root, f'div_ntauls_{kX_index}_{weight_flag}.npy'), wei_ntauls_list)
 
     # -------------------------------
     # Plot multifractal spectrum
@@ -388,15 +380,13 @@ def main():
     cmap = plt.get_cmap('RdBu')
     colors = [cmap(i / (num_colors - 1)) for i in range(num_colors)]
     for i, ntau in enumerate(wei_ntauls_list):
-        arg1 = ntau[:80]  # use first 80 elements for plotting
-        arg2 = Q[:80]
-        alpha, width, max_al_val, min_al_val = n_spectrum(arg1, arg2, label=names[i], color=colors[i])
+        alpha, width, max_al_val, min_al_val = n_spectrum(ntau[:80], Q[:80], label=names[i], color=colors[i])
         metrics['holder_exp'].append(alpha)
         metrics['widths'].append(width)
         metrics['max_al'].append(max_al_val)
         metrics['min_al'].append(min_al_val)
 
-    ax.legend(loc='upper right')
+    # ax.legend(loc='upper right')
     from matplotlib.ticker import AutoMinorLocator
     plt.gca().xaxis.set_minor_locator(AutoMinorLocator(n=2))
     plt.gca().yaxis.set_minor_locator(AutoMinorLocator(n=2))
@@ -424,32 +414,7 @@ def main():
         metrics['min_dim'].append(dim_min)
         metrics['dimension'].append(diff)
 
-    ax.legend(loc='upper right')
-    ax.xaxis.set_minor_locator(plt.matplotlib.ticker.AutoMinorLocator(2))
-    ax.yaxis.set_minor_locator(plt.matplotlib.ticker.AutoMinorLocator(2))
-    plt.grid(False)
-    plt.savefig(os.path.join(output_root, f'weighted_{kX_index}_ndimension.svg'),
-                bbox_inches='tight', dpi=600)
-    plt.close()
-
-    # -------------------------------
-    # Plot generalized fractal dimension
-    # -------------------------------
-    plt.rcParams.update({'font.size': 30})
-    fig, ax = plt.subplots(figsize=(9, 7))
-    for spine in ax.spines.values():
-        spine.set_edgecolor('black')
-
-    # Reload previously saved wnfd data
-    wei_ntauls_list = np.load(os.path.join(output_root, f'div_ntauls_{kX_index}_{weight_flag}.npy'),
-                              allow_pickle=True)
-    for i, ntau in enumerate(wei_ntauls_list):
-        _, dim_max, dim_min, diff = n_dimension(ntau, Q, label=names[i], color=colors[i])
-        metrics['max_dim'].append(dim_max)
-        metrics['min_dim'].append(dim_min)
-        metrics['dimension'].append(diff)
-
-    ax.legend(loc='upper right')
+    # ax.legend(loc='upper right')
     ax.xaxis.set_minor_locator(plt.matplotlib.ticker.AutoMinorLocator(2))
     ax.yaxis.set_minor_locator(plt.matplotlib.ticker.AutoMinorLocator(2))
     plt.grid(False)
@@ -463,7 +428,7 @@ def main():
     (nfd_list, avg_frac,
      closeness_list, avg_closeness,
      degree_list, avg_degree,
-     clustering_list, avg_clustering) = compute_centralities(G_list, weight_flag)
+     clustering_list, avg_clustering) = compute_centrality(G_list, weight_flag)
 
     save_violin_data(nfd_list, os.path.join(output_root, f'{kX_index}_nfd_violin.csv'), names)
     save_violin_data(closeness_list, os.path.join(output_root, f'{kX_index}_closeness_violin.csv'), names)
@@ -477,7 +442,7 @@ def main():
 
     assortativity_coef_list, avg_assortativity = compute_assortativity(G_list, weight_flag)
 
-    diameter_list, avg_diameter = compute_diameter(G_list, weight_flag)
+    diameter_list = compute_diameter(G_list, weight_flag)
 
     eigen_list, avg_eigen = compute_eigenvector(G_list, weight_flag)
     print("Average Eigenvector Centrality:", avg_eigen)
@@ -511,4 +476,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    run()
