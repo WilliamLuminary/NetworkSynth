@@ -310,7 +310,7 @@ def compute_orc(graphs, weight_flag):
         else:
             orc = OllivierRicci(nx.convert_node_labels_to_integers(G), alpha=0.5, verbose="ERROR", weight=None)
         orc.compute_ricci_curvature()
-        curvatures = [d['Ollivier_Ricci_Curvature'] for u, v, d in orc.G.edges(data=True)]
+        curvatures = [d['ricciCurvature'] for u, v, d in orc.G.edges(data=True)]
         orc_list.append(curvatures)
         avg_orcs.append(np.mean(curvatures))
     return orc_list, avg_orcs
