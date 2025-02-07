@@ -118,6 +118,7 @@ def load_data():
     }
     return script_dir, synthetic_graphs, synthetic_names, original_graphs, original_names, metrics
 
+
 # noinspection SpellCheckingInspection
 def wnfd_network(graph, weight=True, draw=False, f_digi=0):
     N_list = []
@@ -159,6 +160,7 @@ def wnfd_network(graph, weight=True, draw=False, f_digi=0):
             plt.xlabel('ln(r/d)')
             plt.ylabel('ln(sum function)')
     return tau_list
+
 
 # noinspection SpellCheckingInspection
 def compute_wndf(graphs, weight_flag):
@@ -382,8 +384,8 @@ def run():
     for spine in ax.spines.values():
         spine.set_edgecolor('black')
 
-    synthetic_colors = plt.get_cmap('RdBu')(np.linspace(0, 1, len(synthetic_n_taus)))
-    original_color = 'black'
+    synthetic_colors = plt.get_cmap('BuRd')(np.linspace(.1, .5, len(synthetic_n_taus)))
+    original_color = 'red'
     for i, n_tau in enumerate(synthetic_n_taus):
         alpha, width, max_al_val, min_al_val = n_spectrum(n_tau[:80], Q[:80],
                                                           label=synthetic_names[i],
@@ -438,24 +440,18 @@ def run():
      closeness_list, avg_closeness,
      degree_list, avg_degree,
      clustering_list, avg_clustering) = compute_centrality(synthetic_graphs, weight_flag)
+    betweenness_list, avg_betweenness_list = compute_betweenness(synthetic_graphs, weight_flag)
+    orc_list, avg_orcs = compute_orc(synthetic_graphs, weight_flag)
+    assortativity_coef_list, avg_assortativity = compute_assortativity(synthetic_graphs, weight_flag)
+    diameter_list = compute_diameter(synthetic_graphs, weight_flag)
+    eigen_list, avg_eigen = compute_eigenvector(synthetic_graphs, weight_flag)
+    print("Average Eigenvector Centrality:", avg_eigen)
 
     save_violin_data(nfd_list, os.path.join(output_root, f'{kX_index}_nfd_violin.csv'), synthetic_names)
     save_violin_data(closeness_list, os.path.join(output_root, f'{kX_index}_closeness_violin.csv'), synthetic_names)
     save_violin_data(degree_list, os.path.join(output_root, f'{kX_index}_degree_violin.csv'), synthetic_names)
     save_violin_data(clustering_list, os.path.join(output_root, f'{kX_index}_clustering_violin.csv'), synthetic_names)
-
-    betweenness_list, avg_betweenness_list = compute_betweenness(synthetic_graphs, weight_flag)
-
-    orc_list, avg_orcs = compute_orc(synthetic_graphs, weight_flag)
     save_violin_data(orc_list, os.path.join(output_root, f'{kX_index}_orc_violin.csv'), synthetic_names)
-
-    assortativity_coef_list, avg_assortativity = compute_assortativity(synthetic_graphs, weight_flag)
-
-    diameter_list = compute_diameter(synthetic_graphs, weight_flag)
-
-    eigen_list, avg_eigen = compute_eigenvector(synthetic_graphs, weight_flag)
-    print("Average Eigenvector Centrality:", avg_eigen)
-
     # -------------------------------
     # Save summary data to CSV
     # -------------------------------
