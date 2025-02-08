@@ -10,5 +10,6 @@ if sudo apt update && sudo apt install -y emacs; then
   echo -e "${BLUE}Installation complete!${RESET}"
 else
   echo -e "${RED}Failed to update package list or install Emacs. Please check your system setup and try again.${RESET}"
-  exit 1
+  return 1
 fi
+return 0

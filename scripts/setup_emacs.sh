@@ -17,20 +17,21 @@ CLONE_DIR="/content/emacs-config"
 echo -e "${BLUE}Cloning Emacs configuration repository...${RESET}"
 git clone "$EMACS_REPO_URL" $CLONE_DIR || {
   echo -e "${RED}Failed to clone Emacs configuration repository.${RESET}"
-  exit 1
+  return 1
 }
 
 echo -e "${BLUE}Setting up Emacs configuration...${RESET}"
 mkdir -p ~/.emacs.d
 cp -r $CLONE_DIR/* ~/.emacs.d/ || {
   echo -e "${RED}Failed to copy configuration files.${RESET}"
-  exit 1
+  return 1
 }
 
 echo -e "${BLUE}Running Emacs setup to install packages...${RESET}"
 bash "$SCRIPT_DIR/setup_run_emacs.sh" || {
   echo -e "${RED}Emacs package installation failed.${RESET}"
-  exit 1
+  return 1
 }
 
 echo -e "${BLUE}Emacs setup complete!${RESET}"
+return 0
