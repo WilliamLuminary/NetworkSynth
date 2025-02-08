@@ -14,7 +14,7 @@ from config import Config1, Config2, ConfigSample
 from graph import GraphAttrAgent, GraphGenerator, GraphPostProcessor
 from handlers import DataAgent, MultifractalAnalyzer, Plotter, Saver, Summary
 
-ConfigSample.initialize()
+Config2.initialize()
 # Config2.initialize()
 preview = False
 exp = False  # Set to True to run the hyperparameter tuning experiment

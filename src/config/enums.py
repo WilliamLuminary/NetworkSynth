@@ -9,8 +9,8 @@ class SetName(Enum):
     C = "C"
     D = "D"
 
-    S4  = "004"
-    S8  = "008"
+    S4 = "004"
+    S8 = "008"
     S11 = "011"
     S14 = "014"
     S17 = "017"
@@ -29,6 +29,21 @@ class SetName(Enum):
     def __str__(self):
         return self.value
 
+    def __lt__(self, other):
+        if not isinstance(other, SetName):
+            return NotImplemented
+        return self._sort_key() < other._sort_key()
+
+    def _sort_key(self):
+        if self is SetName.NA:
+            return 2, 0
+        value = self.value
+        if value in {'A', 'B', 'C', 'D'}:
+            order = {'A': 0, 'B': 1, 'C': 2, 'D': 3}[value]
+            return 0, order
+        else:
+            return 1, int(value)
+
 
 class Resolution(Enum):
     X10K = "10kX"
@@ -44,6 +59,17 @@ class Resolution(Enum):
 
     def __str__(self):
         return self.value
+
+    def __lt__(self, other):
+        if not isinstance(other, Resolution):
+            return NotImplemented
+        return self._sort_key() < other._sort_key()
+
+    def _sort_key(self):
+        if self is Resolution.NA:
+            return 0
+        digits = ''.join(filter(str.isdigit, self.value))
+        return int(digits) if digits else 0
 
 
 class FileExtension(Enum):
