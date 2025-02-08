@@ -384,7 +384,7 @@ def run():
     for spine in ax.spines.values():
         spine.set_edgecolor('black')
 
-    synthetic_colors = plt.get_cmap('BuRd')(np.linspace(.1, .5, len(synthetic_n_taus)))
+    synthetic_colors = plt.get_cmap('RdBu_r')(np.linspace(.1, .5, len(synthetic_n_taus)))
     original_color = 'red'
     for i, n_tau in enumerate(synthetic_n_taus):
         alpha, width, max_al_val, min_al_val = n_spectrum(n_tau[:80], Q[:80],
@@ -452,6 +452,7 @@ def run():
     save_violin_data(degree_list, os.path.join(output_root, f'{kX_index}_degree_violin.csv'), synthetic_names)
     save_violin_data(clustering_list, os.path.join(output_root, f'{kX_index}_clustering_violin.csv'), synthetic_names)
     save_violin_data(orc_list, os.path.join(output_root, f'{kX_index}_orc_violin.csv'), synthetic_names)
+
     # -------------------------------
     # Save summary data to CSV
     # -------------------------------
