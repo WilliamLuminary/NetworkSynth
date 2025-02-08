@@ -6,6 +6,8 @@ from typing import Tuple, Union
 
 import networkx as nx
 import numpy as np
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from matplotlib.figure import Figure
 from numpy import ndarray
 
 from config import Config
@@ -74,3 +76,11 @@ def timer(func):
         return result
 
     return wrapper
+
+
+def figure_to_ndarray(fig: Figure) -> ndarray:
+    canvas = FigureCanvas(fig)
+    canvas.draw()
+    buf = canvas.buffer_rgba()
+    image_array = np.asarray(buf)
+    return image_array

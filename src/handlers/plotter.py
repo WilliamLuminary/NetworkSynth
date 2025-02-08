@@ -5,12 +5,11 @@ from typing import Union
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-from matplotlib.figure import Figure
 from numpy import ndarray
 
 from config import Config, DataType, FILE_CONFIGURATIONS, FileTag
 from utils import build_graph_pos_and_adj_mat, calculate_frame
+from utils.utils import figure_to_ndarray
 
 logger = logging.getLogger(__name__)
 
@@ -42,54 +41,55 @@ class Plotter:
             else:
                 graph = build_graph_pos_and_adj_mat(pos_and_adj_mat)
 
-        _file_config = FILE_CONFIGURATIONS.get(data_type)
-        _fig, _ax = plt.subplots(figsize=(10, 10), dpi=260)
+        file_config = FILE_CONFIGURATIONS.get(data_type)
+        fig, ax = plt.subplots(figsize=(10, 10), dpi=300)
 
-        _position_dict = nx.get_node_attributes(graph, 'pos')
-        if adjust_axis and _position_dict is not None:
-            __positions_array = np.array([_position_dict[node] for node in graph.nodes()])
-            __positions_array[:, [1, 0]] = __positions_array[:, [0, 1]]
-            __positions_array[:, 1] = Config.DEFAULT_FRAME_SIZE - __positions_array[:, 1]
-            _position_dict = {node: pos for node, pos in zip(graph.nodes(), __positions_array)}
+        position_dict = nx.get_node_attributes(graph, 'pos')
+        if adjust_axis and position_dict is not None:
+            positions_array = np.array([position_dict[node] for node in graph.nodes()])
+            positions_array[:, [1, 0]] = positions_array[:, [0, 1]]
+            positions_array[:, 1] = Config.DEFAULT_FRAME_SIZE - positions_array[:, 1]
+            position_dict = {node: pos for node, pos in zip(graph.nodes(), positions_array)}
 
-        _line_width = _file_config.line_width
+        line_width = file_config.line_width
         for u, v in graph.edges():
-            pos_u = _position_dict.get(u)
-            pos_v = _position_dict.get(v)
+            pos_u = position_dict.get(u)
+            pos_v = position_dict.get(v)
             if pos_u is not None and pos_v is not None:
-                __x_values = [pos_u[0], pos_v[0]]
-                __y_values = [pos_u[1], pos_v[1]]
-                _ax.plot(__x_values, __y_values, 'r-', linewidth=_line_width, zorder=2)
+                x_values = [pos_u[0], pos_v[0]]
+                y_values = [pos_u[1], pos_v[1]]
+                ax.plot(x_values, y_values, 'r-', linewidth=line_width, zorder=2)
 
-        _node_size = _file_config.node_size
+        node_size = file_config.node_size
         for node in graph.nodes():
-            pos = _position_dict.get(node)
+            pos = position_dict.get(node)
             if pos is not None:
-                _ax.plot(pos[0], pos[1], 'bo', markersize=_node_size, zorder=2)
+                ax.plot(pos[0], pos[1], 'bo', markersize=node_size, zorder=2)
 
         # _frame = calculate_frame(graph)
         if data_type is DataType.ORIGINAL_GRAPH:
-            _frame = getattr(_file_config, 'frame', ((0, Config.DEFAULT_FRAME_SIZE[0]), (0, Config.DEFAULT_FRAME_SIZE[1])))
+            frame = getattr(file_config, 'frame',
+                             ((0, Config.DEFAULT_FRAME_SIZE[0]), (0, Config.DEFAULT_FRAME_SIZE[1])))
         else:
-            _frame = calculate_frame(graph)
+            frame = calculate_frame(graph)
 
-        _ax.set_xlim(_frame[0])
-        _ax.set_ylim(_frame[1])
+        ax.set_xlim(frame[0])
+        ax.set_ylim(frame[1])
 
         if data_type is DataType.ORIGINAL_GRAPH:
             if self.original_image is None:
                 logger.info("No background has been provided.")
             else:
-                _image = self.original_image
-                _image_extent = (0, _image.shape[1], 0, _image.shape[0])
-                _alpha = getattr(_file_config, 'alpha', 1.0)
-                _ax.imshow(_image, cmap='gray', extent=_image_extent, alpha=_alpha)
+                image = self.original_image
+                image_extent = (0, image.shape[1], 0, image.shape[0])
+                alpha = getattr(file_config, 'alpha', 1.0)
+                ax.imshow(image, cmap='gray', extent=image_extent, alpha=alpha)
         else:
-            _ax.add_patch(
+            ax.add_patch(
                 plt.Rectangle(
-                    (_frame[0][0], _frame[1][0]),
-                    _frame[0][1] - _frame[0][0],
-                    _frame[1][1] - _frame[1][0],
+                    (frame[0][0], frame[1][0]),
+                    frame[0][1] - frame[0][0],
+                    frame[1][1] - frame[1][0],
                     facecolor='none',
                     edgecolor=(0, 0, 0, 0.8),
                     linewidth=2,
@@ -99,22 +99,14 @@ class Plotter:
         if 'title' in kwargs:
             plt.title(kwargs['title'])
 
-        _ax.set_xticks([])
-        _ax.set_yticks([])
-        _ax.axis('off')
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.axis('off')
 
         plt.tight_layout(pad=0)
 
-        if getattr(_file_config, 'show_on_the_fly', False):
+        if getattr(file_config, 'show_on_the_fly', False):
             plt.show()
-        _graph = self._figure_to_ndarray_direct(_fig)
+        graph = figure_to_ndarray(fig)
         plt.close()
-        return _graph
-
-    @staticmethod
-    def _figure_to_ndarray_direct(fig: Figure) -> ndarray:
-        canvas = FigureCanvas(fig)
-        canvas.draw()
-        buf = canvas.buffer_rgba()
-        image_array = np.asarray(buf)
-        return image_array
+        return graph
