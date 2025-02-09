@@ -140,7 +140,7 @@ class SingleGraphMultifractalAnalyzer:
         for node in graph.nodes():
             # noinspection PyUnresolvedReferences
             distances = nk.distance.Dijkstra(G_nk, int(node), storePaths=False).run().getDistances()
-            # distances.sort()
+            distances.sort()
             if self.weighted:
                 distances = [round(d, self.f_digit) for d in distances if round(d, self.f_digit) != 0]
 
