@@ -1,5 +1,5 @@
 # src/handlers/single_graph_multifractal_analyzer.py
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
 import math
 import numpy as np
@@ -7,6 +7,7 @@ import networkx as nx
 import networkit as nk
 from collections import Counter
 
+from GraphRicciCurvature.OllivierRicci import OllivierRicci
 from matplotlib import pyplot as plt
 from scipy.stats import linregress
 
@@ -106,6 +107,16 @@ class SingleGraphMultifractalAnalyzer:
         width = np.max(al_list) - np.min(al_list)
         return alpha_0, width, al_list, fal_list
 
+    @staticmethod
+    def plot_n_spectrum(al_list, fal_list):
+        fig, ax = plt.figure(figsize=(8, 8), dpi=300)
+        plt.xlabel('Lipschitz-Hölder exponent, 'r'$\alpha$')
+        plt.ylabel('Multi-fractal spectrum, 'r'$f(\alpha)$')
+        plt.legend()
+        fig = figure_to_ndarray(fig)
+        plt.close()
+        return fig
+
     def compute_n_dimension(self, tau_list, label, color):
         q_list = self.Q
         valid_pairs = [(q, tau) for q, tau in zip(q_list, tau_list) if q != 0]
@@ -117,7 +128,8 @@ class SingleGraphMultifractalAnalyzer:
         diff = dim_max - dim_min
         return dim_list, dim_max, dim_min, diff, valid_q
 
-    def plot_n_dimension(self, dim_list, valid_q, label, color):
+    @staticmethod
+    def plot_n_dimension(dim_list, valid_q, label, color) -> np.ndarray:
         fig, ax = plt.figure(figsize=(8, 8), dpi=300)
         plt.plot(valid_q, dim_list, label=label, linewidth=3, color=color)
         plt.xlabel('Distorting exponent, 'r'$q$')
@@ -161,3 +173,83 @@ class SingleGraphMultifractalAnalyzer:
             else:
                 node_dimensions[node] = 0
         return node_dimensions
+
+    def compute_centralities(self) -> Dict[str, List[float]]:
+        if self.weighted:
+            closeness_distance = lambda u, v, d: 1 / d['weight']
+            degree_attr = 'weight'
+            clustering_attr = 'weight'
+        else:
+            closeness_distance = None
+            degree_attr = None
+            clustering_attr = None
+
+        nfd_centrality = self.compute_node_dimension()
+        closeness_centrality = nx.closeness_centrality(self.graph, distance=closeness_distance)
+        degree_centrality = dict(self.graph.degree(weight=degree_attr))
+        cluster_coef = nx.clustering(self.graph, weight=clustering_attr)
+
+        return {
+            'nfd': list(nfd_centrality.values()),
+            'closeness': list(closeness_centrality.values()),
+            'degree': list(degree_centrality.values()),
+            'clustering': list(cluster_coef.values())
+        }
+
+    def compute_betweenness(self) -> List[float]:
+        graph_copy = self.graph.copy()
+        if self.weighted:
+            for u, v, d in graph_copy.edges(data=True):
+                # invert
+                if d.get('weight', 0) != 0:
+                    d['weight'] = 1.0 / d['weight']
+            G_nk = nk.nxadapter.nx2nk(graph_copy, weightAttr='weight')
+        else:
+            G_nk = nk.nxadapter.nx2nk(graph_copy)
+
+        bt = nk.centrality.Betweenness(G_nk, normalized=True).run().scores()
+        return bt  # TODO: Accuracy problem of the betweenness function
+
+    def compute_ollivier_ricci_curvature(self, alpha=0.5) -> List[float]:
+        graph_copy = self.graph.copy()
+        if self.weighted:
+            for u, v, d in graph_copy.edges(data=True):
+                if d.get('weight', 0) != 0:
+                    d['weight'] = 1.0 / d['weight']
+            orc = OllivierRicci(nx.convert_node_labels_to_integers(graph_copy),
+                                alpha=alpha, verbose="ERROR", weight='weight')
+        else:
+            orc = OllivierRicci(nx.convert_node_labels_to_integers(graph_copy),
+                                alpha=alpha, verbose="ERROR", weight=None)
+        orc.compute_ricci_curvature()
+        return [d['ricciCurvature'] for _, _, d in orc.G.edges(data=True)]
+
+    def compute_assortativity(self) -> float:
+        if self.weighted:
+            return nx.degree_pearson_correlation_coefficient(self.graph, weight='weight')
+        else:
+            return nx.degree_pearson_correlation_coefficient(self.graph)
+
+    def compute_eigenvector_centrality(self) -> List[float]:
+        if not nx.is_connected(self.graph):
+            nodes_lcc = max(nx.connected_components(self.graph), key=len)
+            G_lcc = self.graph.subgraph(nodes_lcc)
+        else:
+            G_lcc = self.graph
+
+        try:
+            if self.weighted:
+                ec_dict = nx.eigenvector_centrality(G_lcc, max_iter=1000, weight='weight')
+            else:
+                ec_dict = nx.eigenvector_centrality(G_lcc, max_iter=1000)
+            return list(ec_dict.values())
+        except nx.PowerIterationFailedConvergence:
+            return [float('nan')] * G_lcc.number_of_nodes()
+
+    def compute_diameter(self) -> float:
+        if nx.is_connected(self.graph):
+            return nx.diameter(self.graph)
+        else:
+            largest_cc = max(nx.connected_components(self.graph), key=len)
+            subg = self.graph.subgraph(largest_cc)
+            return nx.diameter(subg)
