@@ -1,5 +1,5 @@
 # src/handlers/single_graph_multifractal_analyzer.py
-from typing import Tuple
+from typing import Dict, Tuple
 
 import math
 import numpy as np
@@ -25,11 +25,11 @@ class SingleGraphMultifractalAnalyzer:
         self.f_digit = 0
 
     def multifractal_analysis(self) -> Tuple[float, float]:
-        tau_list, r_g_all, diameter, zq_list = self.calculate_multifractal_taus()
-        alpha_0, width, al_list, fal_list = self.n_spectrum(tau_list)
+        tau_list, r_g_all, diameter, zq_list = self.compute_multifractal_taus()
+        alpha_0, width, al_list, fal_list = self.compute_n_spectrum(tau_list)
         return alpha_0, width
 
-    def calculate_multifractal_taus(self):
+    def compute_multifractal_taus(self):
         graph = nx.convert_node_labels_to_integers(self.graph)
         if self.weighted:
             G_nk = nk.nxadapter.nx2nk(graph, weightAttr='weight')
@@ -80,7 +80,7 @@ class SingleGraphMultifractalAnalyzer:
             tau_list.append(slope)
         return tau_list, r_g_all, diameter, zq_list
 
-    def plot_multifractal_spectrum(self, r_g_all, diameter, zq_list):
+    def plot_multifractal_taus(self, r_g_all, diameter, zq_list):
         fig, ax = plt.figure(figsize=(8, 8), dpi=300)
         for idx, q in enumerate(self.Q):
             x = np.log(r_g_all / diameter)
@@ -93,16 +93,71 @@ class SingleGraphMultifractalAnalyzer:
         plt.close()
         return fig
 
-    @staticmethod
-    def n_spectrum(tau_list):
+    def compute_n_spectrum(self, tau_list):
         al_list = []
         fal_list = []
-        for i in range(1, len(SingleGraphMultifractalAnalyzer.Q)):
-            al = (tau_list[i] - tau_list[i - 1]) / (SingleGraphMultifractalAnalyzer.Q[i] - SingleGraphMultifractalAnalyzer.Q[i - 1])
+        for i in range(1, len(self.Q)):
+            al = (tau_list[i] - tau_list[i - 1]) / (self.Q[i] - self.Q[i - 1])
             al_list.append(al)
-        for j in range(len(SingleGraphMultifractalAnalyzer.Q) - 1):
-            fal = SingleGraphMultifractalAnalyzer.Q[j] * al_list[j] - tau_list[j]
+        for j in range(len(self.Q) - 1):
+            fal = self.Q[j] * al_list[j] - tau_list[j]
             fal_list.append(fal)
         alpha_0 = al_list[np.argmax(fal_list)]
         width = np.max(al_list) - np.min(al_list)
         return alpha_0, width, al_list, fal_list
+
+    def compute_n_dimension(self, tau_list, label, color):
+        q_list = self.Q
+        valid_pairs = [(q, tau) for q, tau in zip(q_list, tau_list) if q != 0]
+        valid_q, valid_tau = zip(*valid_pairs)
+        dim_list = [tau / q for q, tau in zip(valid_q, valid_tau)]
+
+        dim_max = np.max(dim_list)
+        dim_min = np.min(dim_list)
+        diff = dim_max - dim_min
+        return dim_list, dim_max, dim_min, diff, valid_q
+
+    def plot_n_dimension(self, dim_list, valid_q, label, color):
+        fig, ax = plt.figure(figsize=(8, 8), dpi=300)
+        plt.plot(valid_q, dim_list, label=label, linewidth=3, color=color)
+        plt.xlabel('Distorting exponent, 'r'$q$')
+        plt.ylabel('Generalized fractal dimension, 'r'$D(q)$')
+        fig = figure_to_ndarray(fig)
+        plt.close()
+        return fig
+
+    def compute_node_dimension(self) -> Dict[int, float]:
+        graph = nx.convert_node_labels_to_integers(self.graph)
+        if self.weighted:
+            for _, _, d in graph.edges(data=True):
+                if d.get('weight', 0) != 0:
+                    d['weight'] = 1.0 / d['weight']
+            G_nk = nk.nxadapter.nx2nk(graph, weightAttr='weight')
+        else:
+            G_nk = nk.nxadapter.nx2nk(graph)
+
+        node_dimensions = {}
+        for node in graph.nodes():
+            # noinspection PyUnresolvedReferences
+            distances = nk.distance.Dijkstra(G_nk, int(node), storePaths=False).run().getDistances()
+            # distances.sort()
+            if self.weighted:
+                distances = [round(d, self.f_digit) for d in distances if round(d, self.f_digit) != 0]
+
+            dist_count = Counter(distances)
+            unique_dist, cum_count = [], []
+            s = 0
+            for dist_val, count in dist_count.items():
+                s += count
+                if dist_val > 0:
+                    unique_dist.append(dist_val)
+                    cum_count.append(s)
+
+            if len(unique_dist) > 2:
+                x = np.log(unique_dist)
+                y = np.log(cum_count)
+                slope, _, _, _, _ = linregress(x, y)
+                node_dimensions[node] = slope
+            else:
+                node_dimensions[node] = 0
+        return node_dimensions
