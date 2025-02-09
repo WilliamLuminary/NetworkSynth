@@ -1,4 +1,4 @@
-# src/handlers/single_graph_multifractal_analyzer.py
+# src/handlers/multifractal_analyzer.py
 from collections import Counter
 from typing import Dict, List
 
@@ -17,13 +17,13 @@ from utils.utils import keep_largest_connected_component
 PLOT_MULTIFRACTAL_SPECTRUM = True
 
 
-class SingleGraphMultifractalAnalyzer:
+class MultifractalAnalyzer:
     Q = [q / 100 for q in range(-300, 301, 10)]
 
-    def __init__(self, graph: nx.Graph):
+    def __init__(self, graph: nx.Graph, digit_round: int = 0):
         self.graph = graph
         self.weighted = Config.MEASURE_WEIGHTED
-        self.f_digit = 0
+        self.f_digit = digit_round
 
     def multifractal_analysis(self):
         tau_list, r_g_all, diameter, zq_list = self.compute_multifractal_taus()
