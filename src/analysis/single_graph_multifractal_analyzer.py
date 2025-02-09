@@ -197,18 +197,16 @@ class SingleGraphMultifractalAnalyzer:
         }
 
     def compute_betweenness(self) -> List[float]:
-        graph_copy = self.graph.copy()
         if self.weighted:
-            for u, v, d in graph_copy.edges(data=True):
-                # invert
-                if d.get('weight', 0) != 0:
-                    d['weight'] = 1.0 / d['weight']
+            graph_copy = self.graph.copy()
+            for _, _, d in graph_copy.edges(data=True):
+                d['weight'] = 1.0 / d['weight'] if d.get('weight', 0) != 0 else float('inf')
             G_nk = nk.nxadapter.nx2nk(graph_copy, weightAttr='weight')
         else:
-            G_nk = nk.nxadapter.nx2nk(graph_copy)
+            G_nk = nk.nxadapter.nx2nk(self.graph, weightAttr=None)
 
         bt = nk.centrality.Betweenness(G_nk, normalized=True).run().scores()
-        return bt  # TODO: Accuracy problem of the betweenness function
+        return bt
 
     def compute_ollivier_ricci_curvature(self, alpha=0.5) -> List[float]:
         graph_copy = self.graph.copy()

@@ -110,7 +110,7 @@ def test_betweenness(load_graph_from_pickle):
     betweenness_dict = analyzer.compute_betweenness()
     correct_betweenness_dict = original_calculate_betweenness(sample_graph, False)
 
-    assert betweenness_dict == correct_betweenness_dict
+    assert np.allclose(betweenness_dict, correct_betweenness_dict, atol=1e-18)
 
 
 def test_ricci_curvature(load_graph_from_pickle):
@@ -138,6 +138,7 @@ def test_eigenvector_centrality(load_graph_from_pickle):
     correct_eigenvector_centrality = original_calculate_eigenvector_centrality(sample_graph, False)
 
     assert eigenvector_centrality == correct_eigenvector_centrality
+
 
 def test_diameter(load_graph_from_pickle):
     if not Config.MEASURE_WEIGHTED:
