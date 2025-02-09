@@ -212,7 +212,6 @@ def save_violin_data(metric_list, filename, columns):
 
 
 def node_dimension(graph, weight=True, f_digi=2) -> dict:
-    node_dimensions = {}
     graph = nx.convert_node_labels_to_integers(graph)
     if weight:
         for u, v, d in graph.edges(data=True):
@@ -220,19 +219,21 @@ def node_dimension(graph, weight=True, f_digi=2) -> dict:
                 d['weight'] = 1.0 / d['weight']
     G_nk = nk.nxadapter.nx2nk(graph, weightAttr='weight') if weight else nk.nxadapter.nx2nk(graph)
 
+    node_dimensions = {}
     for node in graph.nodes():
         distances = nk.distance.Dijkstra(G_nk, node, storePaths=False).run().getDistances()
         distances.sort()
         if weight:
             distances = [round(d, f_digi) for d in distances if round(d, f_digi) != 0]
-        count = Counter(distances)
+
         num_nodes = 0
         r_g, num_g = [], []
-        for dist, cnt in count.items():
+        for dist, cnt in Counter(distances).items():
             num_nodes += cnt
             if dist > 0:
                 r_g.append(dist)
                 num_g.append(num_nodes)
+
         if len(r_g) > 2:
             slope, _, _, _, _ = stats.linregress(np.log(r_g), np.log(num_g))
             node_dimensions[node] = slope
