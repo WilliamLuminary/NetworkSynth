@@ -1,18 +1,18 @@
 # src/handlers/single_graph_multifractal_analyzer.py
-from typing import Dict, List, Tuple
+from collections import Counter
+from typing import Dict, List
 
 import math
-import numpy as np
-import networkx as nx
 import networkit as nk
-from collections import Counter
-
+import networkx as nx
+import numpy as np
 from GraphRicciCurvature.OllivierRicci import OllivierRicci
 from matplotlib import pyplot as plt
 from scipy.stats import linregress
 
 from config import Config
 from utils import figure_to_ndarray
+from utils.utils import keep_largest_connected_component
 
 PLOT_MULTIFRACTAL_SPECTRUM = True
 
@@ -25,7 +25,7 @@ class SingleGraphMultifractalAnalyzer:
         self.weighted = Config.MEASURE_WEIGHTED
         self.f_digit = 0
 
-    def multifractal_analysis(self) -> Tuple[float, float]:
+    def multifractal_analysis(self):
         tau_list, r_g_all, diameter, zq_list = self.compute_multifractal_taus()
         alpha_0, width, al_list, fal_list = self.compute_n_spectrum(tau_list)
         return alpha_0, width
@@ -81,7 +81,7 @@ class SingleGraphMultifractalAnalyzer:
             tau_list.append(slope)
         return tau_list, r_g_all, diameter, zq_list
 
-    def plot_multifractal_taus(self, r_g_all, diameter, zq_list):
+    def plot_multifractal_taus(self, r_g_all, diameter, zq_list) -> np.ndarray:
         fig, ax = plt.figure(figsize=(8, 8), dpi=300)
         for idx, q in enumerate(self.Q):
             x = np.log(r_g_all / diameter)
@@ -108,8 +108,9 @@ class SingleGraphMultifractalAnalyzer:
         return alpha_0, width, al_list, fal_list
 
     @staticmethod
-    def plot_n_spectrum(al_list, fal_list):
+    def plot_n_spectrum(al_list, fal_list, label, color) -> np.ndarray:
         fig, ax = plt.figure(figsize=(8, 8), dpi=300)
+        plt.plot(al_list, fal_list, label=label, linewidth=3, color=color)
         plt.xlabel('Lipschitz-Hölder exponent, 'r'$\alpha$')
         plt.ylabel('Multi-fractal spectrum, 'r'$f(\alpha)$')
         plt.legend()
@@ -117,7 +118,7 @@ class SingleGraphMultifractalAnalyzer:
         plt.close()
         return fig
 
-    def compute_n_dimension(self, tau_list, label, color):
+    def compute_n_dimension(self, tau_list):
         q_list = self.Q
         valid_pairs = [(q, tau) for q, tau in zip(q_list, tau_list) if q != 0]
         valid_q, valid_tau = zip(*valid_pairs)
@@ -138,7 +139,7 @@ class SingleGraphMultifractalAnalyzer:
         plt.close()
         return fig
 
-    def compute_node_dimension(self) -> Dict[int, float]:
+    def _compute_node_dimension(self) -> Dict[int, float]:
         graph = nx.convert_node_labels_to_integers(self.graph)
         if self.weighted:
             for _, _, d in graph.edges(data=True):
@@ -184,7 +185,7 @@ class SingleGraphMultifractalAnalyzer:
             degree_attr = None
             clustering_attr = None
 
-        nfd_centrality = self.compute_node_dimension()
+        nfd_centrality = self._compute_node_dimension()
         closeness_centrality = nx.closeness_centrality(self.graph, distance=closeness_distance)
         degree_centrality = dict(self.graph.degree(weight=degree_attr))
         cluster_coef = nx.clustering(self.graph, weight=clustering_attr)
@@ -204,7 +205,7 @@ class SingleGraphMultifractalAnalyzer:
             G_nk = nk.nxadapter.nx2nk(graph_copy, weightAttr='weight')
         else:
             G_nk = nk.nxadapter.nx2nk(self.graph, weightAttr=None)
-
+        # noinspection PyUnresolvedReferences
         bt = nk.centrality.Betweenness(G_nk, normalized=True).run().scores()
         return bt
 
@@ -229,11 +230,10 @@ class SingleGraphMultifractalAnalyzer:
             return nx.degree_pearson_correlation_coefficient(self.graph)
 
     def compute_eigenvector_centrality(self) -> List[float]:
-        if not nx.is_connected(self.graph):
-            nodes_lcc = max(nx.connected_components(self.graph), key=len)
-            G_lcc = self.graph.subgraph(nodes_lcc)
-        else:
+        if nx.is_connected(self.graph):
             G_lcc = self.graph
+        else:
+            G_lcc = keep_largest_connected_component(self.graph)
 
         try:
             if self.weighted:
@@ -248,6 +248,4 @@ class SingleGraphMultifractalAnalyzer:
         if nx.is_connected(self.graph):
             return nx.diameter(self.graph)
         else:
-            largest_cc = max(nx.connected_components(self.graph), key=len)
-            subg = self.graph.subgraph(largest_cc)
-            return nx.diameter(subg)
+            return nx.diameter(keep_largest_connected_component(self.graph))
