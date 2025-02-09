@@ -3,6 +3,7 @@
 import networkx as nx
 
 from handlers import Mapper
+from utils.utils import keep_largest_connected_component
 
 
 class GraphPostProcessor:
@@ -22,16 +23,9 @@ class GraphPostProcessor:
             neighbors = list(_graph.neighbors(highest_degree_node))
             if neighbors:
                 _graph.remove_edge(highest_degree_node, neighbors[0])
-            _graph = self._keep_largest_connected_component(_graph)
+            _graph = keep_largest_connected_component(_graph)
 
         self.synthetic_graph = _graph
 
     def assign_weights(self):
         self.map_handler.assign_weights(self.synthetic_graph)
-
-    @staticmethod
-    def _keep_largest_connected_component(graph):
-        if graph.number_of_nodes() == 0:
-            return graph
-        largest_cc = max(nx.connected_components(graph), key=len)
-        return graph.subgraph(largest_cc).copy()

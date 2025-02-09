@@ -84,3 +84,20 @@ def figure_to_ndarray(fig: Figure) -> ndarray:
     buf = canvas.buffer_rgba()
     image_array = np.asarray(buf)
     return image_array
+
+
+def keep_largest_connected_component(graph: nx.Graph) -> nx.Graph:
+    """
+    Keep only the largest connected component of the graph.
+    :param graph: A networkx graph, possibly with multiple connected components.
+    :return: A networkx graph with only the largest connected component.
+
+    Post condition:
+        - The original graph remains unchanged.
+        - The returned graph is nx.graph copy of the largest connected component.
+    """
+    if graph.number_of_nodes() == 0:
+        return graph
+    largest_cc = max(nx.connected_components(graph), key=len)
+    # noinspection PyTypeChecker
+    return graph.subgraph(largest_cc).copy()
