@@ -1,12 +1,11 @@
 import os
 import pickle
-from copy import deepcopy
 
 import networkx as nx
 import numpy as np
 import pytest
 
-from anal.Original_Network_Analysis import (
+from tests.analysis.original_network_analysis_code import (
     nspectrum as original_n_spectrum,
     wnfd_nk as original_calculate_multifractal_taus,
     ndimension as original_n_dimension,
@@ -16,7 +15,6 @@ from anal.Original_Network_Analysis import (
     calculate_orc as original_calculate_ollivier_ricci_curvature,
     calculate_assortativity as original_calculate_assortativity,
     calculate_eigenvector_centrality as original_calculate_eigenvector_centrality,
-    calculate_diameter as original_calculate_diameter,
 )
 from analysis.single_graph_multifractal_analyzer import SingleGraphMultifractalAnalyzer
 from config import Config, ConfigSample
@@ -77,7 +75,7 @@ def test_n_dimension(load_graph_from_pickle):
     Q = SingleGraphMultifractalAnalyzer.Q
     ntau, _, _, _ = original_calculate_multifractal_taus(sample_graph, Q, weight=False)
     analyzer = SingleGraphMultifractalAnalyzer(sample_graph)
-    dim_list, dim_max, dim_min, diff, valid_q = analyzer.compute_n_dimension(ntau, label=0, color="red")
+    dim_list, dim_max, dim_min, diff, valid_q = analyzer.compute_n_dimension(ntau)
 
     correct_dim_list, correct_valid_q = original_n_dimension(ntau, Q, k=0, color="red")
 
@@ -89,7 +87,7 @@ def test_node_dimension(load_graph_from_pickle):
     sample_graph = load_graph_from_pickle
     analyzer = SingleGraphMultifractalAnalyzer(sample_graph)
     analyzer.f_digit = 2
-    node_dimension = analyzer.compute_node_dimension()
+    node_dimension = analyzer._compute_node_dimension()
     correct_node_dimension = original_node_dimension(sample_graph, weight=None)
 
     assert node_dimension == correct_node_dimension
