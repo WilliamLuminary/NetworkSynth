@@ -299,7 +299,7 @@ def compute_betweenness(graphs, weight_flag):
         avg_betweenness_list.append(sum(bt) / G.number_of_nodes())
         if len(bt) != G.number_of_nodes():
             print("Not Equal")
-    return betweenness_list, avg_betweenness_list
+    return betweenness_list, avg_betweenness_list  # TODO: Accuracy problem of the betweenness function
 
 
 def compute_orc(graphs, weight_flag):
