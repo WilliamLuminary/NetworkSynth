@@ -254,7 +254,7 @@ class MultifractalAnalyzer:
         tau_list, r_g_all, diameter, zq_list = self.compute_multifractal_taus()
         self.f_digit = 0
 
-        # 2. Compute holder exponent & width from n-spectrum
+        # 2. Compute holder exponent and width from n-spectrum
         alpha_0, width, al_list, fal_list = self.compute_n_spectrum(tau_list)
 
         # 3. Compute dimension stats

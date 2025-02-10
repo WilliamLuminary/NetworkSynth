@@ -14,7 +14,6 @@ class MultifractalAnalysisProcessor:
     def __init__(self,
                  graphs: Union[List[nx.Graph], Dict[str, nx.Graph]],
                  name: Optional[str] = None):
-
         if isinstance(graphs, dict):
             self.data_dict = graphs
         else:
@@ -58,7 +57,6 @@ class MultifractalAnalysisProcessor:
 
     @staticmethod
     def load_graphs_from_dir(base_dir: str) -> Tuple[List[nx.Graph], List[str]]:
-
         graphs = []
         names = []
         for root, dirs, files in os.walk(base_dir):
