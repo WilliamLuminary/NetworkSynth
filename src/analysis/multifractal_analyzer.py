@@ -14,8 +14,6 @@ from config import Config
 from utils import figure_to_ndarray
 from utils.utils import keep_largest_connected_component
 
-PLOT_MULTIFRACTAL_SPECTRUM = True
-
 
 class MultifractalAnalyzer:
     Q = [q / 100 for q in range(-300, 301, 10)]
