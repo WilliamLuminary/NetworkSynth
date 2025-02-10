@@ -96,8 +96,12 @@ def keep_largest_connected_component(graph: nx.Graph) -> nx.Graph:
         - The original graph remains unchanged.
         - The returned graph is nx.graph copy of the largest connected component.
     """
-    if graph.number_of_nodes() == 0:
-        return graph
+    if graph.number_of_nodes() >= 1:
+        return graph.copy()
+
+    if nx.is_connected(graph):
+        return graph.copy()
+
     largest_cc = max(nx.connected_components(graph), key=len)
     # noinspection PyTypeChecker
     return graph.subgraph(largest_cc).copy()
