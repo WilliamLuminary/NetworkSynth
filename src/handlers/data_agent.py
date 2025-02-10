@@ -6,9 +6,11 @@ import cv2
 import networkx as nx
 import numpy as np
 
-from config import Config
+from config import Config, DataType
 from graph import GraphAttrAgent
+from handlers import Saver
 from handlers.mapper import Mapper
+from utils.utils import plot_graph
 from utils import build_graph_pos_and_adj_mat
 
 logger = logging.getLogger(__name__)
@@ -22,17 +24,25 @@ class DataAgent:
         self.adjacency_matrix = None
         self.original_image = None
         self.original_network = None
+        self.original_graph = None
 
         self.attributes: Optional[GraphAttrAgent] = None
         self.mapper: Optional[Mapper] = None
+        self.saver: Optional[Saver] = self._create_saver()
 
         self.synthetic_networks = []
+
+    def _create_saver(self) -> Optional[Saver]:
+        if Config.DISABLE_SAVING:
+            return None
+        return Saver(self.set_name, self.resolution)
 
     def load_data(self):
         logger.info(f"Loading data for {self.set_name}, {self.resolution}...")
         self.positions_of_nodes = self._load_positions()
         self.adjacency_matrix = self._load_sparse_matrix()
         self.original_image = self._load_image()
+
         if not hasattr(Config, 'DEFAULT_FRAME_SIZE'):
             Config.update_frame_size((self.original_image.shape[1], self.original_image.shape[0]))
         self._resize_image()
@@ -41,6 +51,7 @@ class DataAgent:
         self.original_network = build_graph_pos_and_adj_mat((self.positions_of_nodes,
                                                              self.adjacency_matrix))
         self._transform_original_positions(rotation_deg=270)
+
         self.mapper = Mapper(self.original_network)
 
     def _load_positions(self) -> Union[np.ndarray, list]:
@@ -57,10 +68,6 @@ class DataAgent:
         Add a synthetic graph to the list of synthetic graphs.
         NOT THREAD-SAFE.
         """
-        # warn_mesg = 'Adding synthetic graphs is not thread-safe.
-        # Use with caution.'
-        # warnings.warn(warn_mesg)
-        # logger.warning(warn_mesg)
         self.synthetic_networks.append(graph)
 
     # def get_synthetic_graph(self):
@@ -73,6 +80,7 @@ class DataAgent:
         frame_range = frame_range or Config.DEFAULT_FRAME_SIZE
         if self.original_image is None:
             return
+
         target_size = min(frame_range)
         height, width = self.original_image.shape[:2]
         scaling_factor = target_size / min(height, width)
@@ -84,6 +92,7 @@ class DataAgent:
         frame_range = frame_range or Config.DEFAULT_FRAME_SIZE
         if self.original_image is None:
             return
+
         target_size = min(frame_range)
         height, width = self.original_image.shape[:2]
 
@@ -94,12 +103,14 @@ class DataAgent:
     def _transform_original_positions(self, flip_x=False, flip_y=False, rotation_deg=0):
         if self.original_image is None:
             return
+
         graph = self.original_network
         size = self.original_image.shape
         c = (size[0] / 2, size[1] / 2)
 
         if not flip_x and not flip_y and rotation_deg == 0:
             return
+
         for node, d in graph.nodes(data=True):
             p = np.array(d.get('pos', [0, 0]), dtype=np.float64)
 
@@ -123,3 +134,37 @@ class DataAgent:
             p[0] += c[0]
             p[1] += c[1]
             d['pos'] = p
+
+    def save(self, data_type: DataType, file_name_prefix: str = None, arg=None):
+        if not self.saver and data_type != DataType.SYNTHETIC_GRAPH:
+            return
+
+        show_figure_if_not_saving: bool = not self.saver and arg
+
+        file_name_prefix = f"{file_name_prefix}_" or file_name_prefix
+        if data_type == DataType.ORIGINAL_IMAGE:
+            self.saver.save_file(self.original_image, data_type, file_name_prefix)
+        elif data_type == DataType.ORIGINAL_NETWORK:
+            self.saver.save_file(self.original_network, data_type, file_name_prefix)
+        elif data_type == DataType.ORIGINAL_PROPERTY:
+            self.saver.save_file(self.attributes, data_type, file_name_prefix)
+        elif data_type == DataType.ORIGINAL_GRAPH:
+            original_figure = plot_graph(
+                data_type=DataType.ORIGINAL_GRAPH,
+                graph=self.original_network,
+                background=self.original_image,
+                show=True
+            )
+            self.saver.save_file(original_figure, data_type, file_name_prefix)
+        elif data_type == DataType.SYNTHETIC_GRAPH:
+            assert isinstance(arg, nx.Graph), \
+                "Content must be a networkx.Graph object and should be a synthetic network."
+            synthetic_figure = plot_graph(
+                data_type=DataType.SYNTHETIC_GRAPH,
+                graph=arg,
+                show=show_figure_if_not_saving
+            )
+            self.saver.save_file(synthetic_figure, DataType.SYNTHETIC_GRAPH, file_name_prefix)
+            self.add_synthetic_graph(arg)
+        elif data_type == DataType.SYNTHETIC_NETWORK:
+            self.saver.save_file(self.synthetic_networks, data_type, file_name_prefix)

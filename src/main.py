@@ -8,11 +8,12 @@ import numpy as np
 from scipy.spatial.distance import euclidean
 
 import wandb
+from analysis import MultifractalAnalyzer
 from config import Config, DataType, Resolution, SetName
 # noinspection PyUnresolvedReferences
 from config import Config1, Config2, ConfigSample
 from graph import GraphAttrAgent, GraphGenerator, GraphPostProcessor
-from handlers import DataAgent, MultifractalAnalyzer, Plotter, Saver, Summary
+from handlers import DataAgent, Saver, Summary
 
 Config2.initialize()
 # Config2.initialize()
@@ -65,7 +66,7 @@ def generate_synthetic_network(exit_event, org_alpha_0_and_width: tuple[float, f
     return _synthetic_graph, _error
 
 
-def generate_with_multiprocessing(data_agent: DataAgent, plotter: Plotter, saver, org_alpha_0_width: Tuple[float, float]) -> \
+def generate_with_multiprocessing(data_agent: DataAgent, org_alpha_0_width: Tuple[float, float]) -> \
         Optional[float]:
     num_syn_nw = Config.SYNTHETIC_NETWORK_NUMBER
     num_syn_graph = Config.SYNTHETIC_GRAPH_NUMBER
@@ -101,13 +102,12 @@ def generate_with_multiprocessing(data_agent: DataAgent, plotter: Plotter, saver
 
                 # Note: we do the plotting in the main process to avoid potential issues with MPL in child processes.
                 if num_syn_graph > 0:
-                    graph = plotter.plot_graph(
-                        data_type=DataType.SYNTHETIC_GRAPH,
-                        graph=synthetic_graph
-                    )
-                    if saver:
-                        saver.save_file(graph, DataType.SYNTHETIC_GRAPH)
+                    data_agent.save(data_type=DataType.SYNTHETIC_GRAPH, arg=synthetic_graph)
                     num_syn_graph -= 1
+                else:
+                    data_agent.add_synthetic_graph(synthetic_graph)
+
+                _errors.append(_error)
 
                 if preview:
                     print(
@@ -116,9 +116,6 @@ def generate_with_multiprocessing(data_agent: DataAgent, plotter: Plotter, saver
                         f'Error: {_error:.4f}')
                     return None
 
-                _errors.append(_error)
-                data_agent.add_synthetic_graph(synthetic_graph)
-
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt received. Terminating processes...")
         exit_event.set()
@@ -126,6 +123,7 @@ def generate_with_multiprocessing(data_agent: DataAgent, plotter: Plotter, saver
             future.cancel()
         executor.shutdown(wait=False)
         raise
+
     except Exception:
         exit_event.set()
         executor.shutdown(wait=False)
@@ -147,12 +145,8 @@ def generate_with_multiprocessing(data_agent: DataAgent, plotter: Plotter, saver
 
     _avg_err = round(np.mean(_non_outlier_errors), 3)
 
-    if saver:
-        saver.save_file(
-            data_agent.synthetic_networks,
-            DataType.SYNTHETIC_NETWORK,
-            file_name_prefix=f'nw_no_{num_syn_nw}_err_{_avg_err:.3f}'
-        )
+    data_agent.save(data_type=DataType.SYNTHETIC_NETWORK, file_name_prefix=f'nw_no_{num_syn_nw}_err_{_avg_err:.3f}')
+
     return _avg_err
 
 
@@ -163,18 +157,9 @@ def run(set_name: SetName, resolution: Resolution) -> Optional[float]:
     attr = GraphAttrAgent()
     attr.analyze(data_agent.original_network)
     data_agent.set_attributes(attr)
-    saver = None
-    if not preview:
-        saver = Saver(data_agent.set_name, data_agent.resolution)
-        saver.save_file(data_agent.original_image, DataType.ORIGINAL_IMAGE)
-        saver.save_file(data_agent.original_network, DataType.ORIGINAL_NETWORK)
-        saver.save_file(data_agent.attributes, DataType.ORIGINAL_PROPERTY)
-
-    plotter = Plotter(data_agent.original_image, data_agent.original_network)
-    graph = plotter.plot_graph(
-        data_type=DataType.ORIGINAL_GRAPH,
-        show=True,
-    )
+    data_agent.save(DataType.ORIGINAL_IMAGE)
+    data_agent.save(DataType.ORIGINAL_NETWORK)
+    data_agent.save(DataType.ORIGINAL_PROPERTY)
 
     if Config.SYNTHETIC_NETWORK_NUMBER != 0:
         org_analyzer = MultifractalAnalyzer(data_agent.original_network)
@@ -182,18 +167,17 @@ def run(set_name: SetName, resolution: Resolution) -> Optional[float]:
     else:
         mult_ans_res = [0, 0]
 
-    if not preview:
-        saver.save_file(graph, DataType.ORIGINAL_GRAPH)
+    data_agent.save(DataType.ORIGINAL_GRAPH)
 
     if exp:
-        exp_hyper_tuning(data_agent, plotter, saver, mult_ans_res)
+        exp_hyper_tuning(data_agent, mult_ans_res)
         return None
     else:
-        _error = generate_with_multiprocessing(data_agent, plotter, saver, mult_ans_res)
+        _error = generate_with_multiprocessing(data_agent, mult_ans_res)
         return _error
 
 
-def exp_hyper_tuning(data_agent, plotter, saver, mult_ans_res):
+def exp_hyper_tuning(data_agent, mult_ans_res):
     logger.info("[EXP] This is an experiment")
     closed_nodes_factors = [round(0.1 + 0.1 * i, 1) for i in range(20)]
     closed_edges_factors = [round(0.1 + 0.1 * i, 1) for i in range(20)]
@@ -204,7 +188,7 @@ def exp_hyper_tuning(data_agent, plotter, saver, mult_ans_res):
         Config.set_edge_factor(__ef)
         logger.info(Config())
 
-        _error = generate_with_multiprocessing(data_agent, plotter, saver, mult_ans_res)
+        _error = generate_with_multiprocessing(data_agent, mult_ans_res)
         if preview:
             logger.info("Preview mode enabled, skipping further iterations.")
             return

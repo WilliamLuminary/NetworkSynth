@@ -1,6 +1,5 @@
 # src/utils/saver.py
 
-import datetime
 import logging
 import os
 import pickle
@@ -16,16 +15,37 @@ logger = logging.getLogger(__name__)
 
 
 class Saver:
+    base_output_dir = None
+    latest_link_path = None
+
     def __init__(self, set_name: SetName, resolution: Resolution):
+        """
+        Initialize the Saver object.
+        The directory for each set and resolution is created.
+        :param set_name: A type from SetName.
+                         If NA, then skip this level of directory
+        :param resolution: A type from Resolution.
+                           If NA, then skip this level of directory
+        Preconditions:
+            - Saving must be enabled (Config.DISABLE_SAVING must be False)
+            - Saver.initialize() must be called before creating an instance
+        """
+        assert not Config.DISABLE_SAVING, "Saving is disabled."
+        assert self.base_output_dir and self.latest_link_path, \
+            "Base output directory is not initialized.\nCall Saver.initialize() first."
 
         self.name_res_output_dir = os.path.join(self.base_output_dir, str(set_name), str(resolution))
         self.ensure_directory(self.name_res_output_dir, exist_ok=True)
 
     @classmethod
-    def initialize(cls):
+    def initialize(cls) -> None:
+        """
+        Create only one base output directory for all the results.
+        :return: None
+        """
         cls.base_output_dir = os.path.join(Config.BASE_OUTPUT_PATH, f'results_{Saver._time_id()}')
         cls.ensure_directory(cls.base_output_dir)
-        logger.info(f"Created new directory: {cls.base_output_dir}")
+        logger.info(f"Created Base Output directory: {cls.base_output_dir}")
 
         cls.latest_link_path = os.path.join(Config.BASE_OUTPUT_PATH, 'latest_result')
         Saver._update_soft_link(cls.latest_link_path, cls.base_output_dir)
@@ -35,32 +55,14 @@ class Saver:
         if os.path.exists(link_path) or os.path.islink(link_path):
             try:
                 os.unlink(link_path)
-                logger.info(f"Removed existing soft link: {link_path}")
             except OSError as e:
                 logger.error(f"Failed to remove existing soft link: {link_path}. Error: {e}")
                 raise
         try:
             os.symlink(target_path, link_path)
-            logger.info(f"Created new soft link: {link_path} -> {target_path}")
         except OSError as e:
             logger.error(f"Failed to create soft link: {link_path}. Error: {e}")
             raise
-
-    @staticmethod
-    def archive_if_exists(path: str) -> None:
-        if os.path.exists(path):
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            if os.path.isfile(path):
-                base, ext = os.path.splitext(path)
-                archived_path = f"{base}_archived_{timestamp}{ext}"
-                os.rename(path, archived_path)
-                logger.info(f"Archived existing file: {archived_path}")
-            elif os.path.isdir(path):
-                archived_path = f"{path}_archived_{timestamp}"
-                os.rename(path, archived_path)
-                logger.info(f"Archived existing directory: {archived_path}")
-        else:
-            logger.warning(f"Path does not exist, nothing to archive: {path}")
 
     @staticmethod
     def ensure_directory(path: str, exist_ok=False) -> None:
@@ -70,16 +72,6 @@ class Saver:
         os.makedirs(path, exist_ok=exist_ok)
         if flag:
             logger.info(f"Created new directory: {path}")
-
-    @staticmethod
-    def delete_file(filepath: str) -> None:
-        if os.path.exists(filepath) and os.path.isfile(filepath):
-            os.remove(filepath)
-            logger.info(f"Deleted existing file: {filepath}")
-        elif os.path.isdir(filepath):
-            logger.warning(f"Expected a file but found a directory at: {filepath}")
-        else:
-            logger.debug(f"No existing file to delete at: {filepath}")
 
     def save_file(self, content: Any, data_type: DataType, file_name_prefix: Optional[str] = None) -> None:
         """
