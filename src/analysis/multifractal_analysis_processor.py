@@ -4,6 +4,7 @@ import pickle
 from typing import Dict, List, Optional, Tuple, Union
 
 import networkx as nx
+import numpy as np
 
 from analysis.multifractal_analyzer import MultifractalAnalyzer
 
@@ -32,28 +33,39 @@ class MultifractalAnalysisProcessor:
                 analyzer = MultifractalAnalyzer(G)
                 result_dict = analyzer.analyze_graph()
 
+                nfd_vals = result_dict["nfd_dist"]  # list of floats, one per node
+                closeness_vals = result_dict["closeness_dist"]
+                degree_vals = result_dict["degree_dist"]
+                cluster_vals = result_dict["clustering_dist"]
+                betweenness_vals = result_dict["betweenness_dist"]
+                ricci_vals = result_dict["ricci_dist"]
+                eigen_vals = result_dict["eigen_dist"]
+
+                avg_nfd = float(np.mean(nfd_vals)) if len(nfd_vals) > 0 else float('nan')
+                avg_closeness = float(np.mean(closeness_vals)) if len(closeness_vals) > 0 else float('nan')
+                avg_degree = float(np.mean(degree_vals)) if len(degree_vals) > 0 else float('nan')
+                avg_clustering = float(np.mean(cluster_vals)) if len(cluster_vals) > 0 else float('nan')
+                avg_betweenness = float(np.mean(betweenness_vals)) if len(betweenness_vals) > 0 else float('nan')
+                avg_ricci = float(np.mean(ricci_vals)) if len(ricci_vals) > 0 else float('nan')
+                avg_eigen = float(np.mean(eigen_vals)) if len(eigen_vals) > 0 else float('nan')
+
                 self.summary_data[dataset_name].append({
+                    "Dataset": dataset_name,
                     "GraphIndex": i,
-                    "HolderExp": result_dict["holder_exp"],
+                    "HolderExp": result_dict["alpha_0"],
                     "Width": result_dict["width"],
                     "DimDiff": result_dict["dim_diff"],
-                    "AvgNFD": result_dict["avg_nfd"],
-                    "AvgCloseness": result_dict["avg_closeness"],
-                    "AvgDegree": result_dict["avg_degree"],
-                    "AvgClustering": result_dict["avg_clustering"],
-                    "AvgBetweenness": result_dict["avg_betweenness"],
-                    "AvgRicci": result_dict["avg_ricci"],
-                    "Assortativity": result_dict["assortativity"],
-                    "AvgEigen": result_dict["avg_eigen"],
                     "Diameter": result_dict["diameter"],
-                    "TauList": result_dict["tau_list"]
-                })
+                    "Assortativity": result_dict["assortativity"],
 
-                logger.info(
-                    f"Processed dataset={dataset_name}, graph={i}, "
-                    f"holder_exp={self.summary_data[dataset_name][-1]['HolderExp']:.4f}, "
-                    f"width={self.summary_data[dataset_name][-1]['Width']:.4f}"
-                )
+                    "AvgNFD": avg_nfd,
+                    "AvgCloseness": avg_closeness,
+                    "AvgDegree": avg_degree,
+                    "AvgClustering": avg_clustering,
+                    "AvgBetweenness": avg_betweenness,
+                    "AvgRicci": avg_ricci,
+                    "AvgEigen": avg_eigen
+                })
 
     @staticmethod
     def load_graphs_from_dir(base_dir: str) -> Tuple[List[nx.Graph], List[str]]:

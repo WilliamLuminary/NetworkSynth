@@ -2,10 +2,9 @@
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from itertools import product
-from typing import Optional, Tuple
+from typing import Optional
 
 import numpy as np
-from scipy.spatial.distance import euclidean
 
 import wandb
 from analysis import MultifractalAnalyzer
@@ -24,53 +23,53 @@ exp = False  # Set to True to run the hyperparameter tuning experiment
 logger = logging.getLogger(__name__)
 
 
-def generate_synthetic_network(exit_event, org_alpha_0_and_width: tuple[float, float], attributes, map_handler,
+def generate_synthetic_network(exit_event, std_err_fea, attributes, map_handler,
                                avg_degree: float):
     generator = GraphGenerator(attributes)
 
-    _error = float('inf')
-    _attempt = 0
-    _synthetic_graph = None
-    _error_threshold = Config.ERROR_TOLERANCE
-    _max_attempts = Config.MAX_ATTEMPTS
-    while (_error > _error_threshold
-           and _attempt < _max_attempts
+    error_ = float('inf')
+    attempt = 0
+    synthetic_graph = None
+    error_threshold = Config.ERROR_TOLERANCE
+    max_attempts = Config.MAX_ATTEMPTS
+    while (error_ > error_threshold
+           and attempt < max_attempts
            and not exit_event.is_set()):
-        _attempt += 1
+        attempt += 1
 
         try:
-            _synthetic_graph = generator.generate_network()
+            synthetic_graph = generator.generate_network()
 
-            _postprocessor = GraphPostProcessor(_synthetic_graph, map_handler, avg_degree)
-            _postprocessor.trim_graph()
-            _postprocessor.assign_weights()
-            _synthetic_graph = _postprocessor.synthetic_graph
+            postprocessor = GraphPostProcessor(synthetic_graph, map_handler, avg_degree)
+            postprocessor.trim_graph()
+            postprocessor.assign_weights()
+            synthetic_graph = postprocessor.synthetic_graph
 
-            _analyzer = MultifractalAnalyzer(_synthetic_graph)
-            alpha_0_and_width = _analyzer.analyze_error()
+            analyzer = MultifractalAnalyzer(synthetic_graph)
+            err_fea = analyzer.analyze_error_values()
 
-            _error = euclidean(org_alpha_0_and_width, alpha_0_and_width)
+            error_ = analyzer.analyze_error(err_fea, std_err_fea)
 
         except Exception as exc:
-            logger.error(f"Exception occurred during graph generation: {exc}. Skipping attempt {_attempt}.")
+            logger.error(f"Exception occurred during graph generation: {exc}. Skipping attempt {attempt}.")
             continue
 
     if exit_event.is_set():
         logger.debug("Child process exiting due to exit signal.")
         return None, float('inf')
 
-    if _error > _error_threshold:
-        logger.warning(f"Failed after {_max_attempts} attempts (error={_error:.4f}).")
+    if error_ > error_threshold:
+        logger.warning(f"Failed after {max_attempts} attempts (error={error_:.4f}).")
         return None, float('inf')
 
-    return _synthetic_graph, _error
+    return synthetic_graph, error_
 
 
-def generate_with_multiprocessing(data_agent: DataAgent, org_alpha_0_width: Tuple[float, float]) -> \
+def generate_with_multiprocessing(data_agent: DataAgent, std_err_fea) -> \
         Optional[float]:
     num_syn_nw = Config.SYNTHETIC_NETWORK_NUMBER
     num_syn_graph = Config.SYNTHETIC_GRAPH_NUMBER
-    _errors = []
+    errors = []
     futures = []
     attributes = data_agent.attributes
     map_handler = data_agent.mapper
@@ -86,7 +85,7 @@ def generate_with_multiprocessing(data_agent: DataAgent, org_alpha_0_width: Tupl
                 future = executor.submit(
                     generate_synthetic_network,
                     exit_event,
-                    org_alpha_0_width,
+                    std_err_fea,
                     attributes,
                     map_handler,
                     avg_degree
@@ -94,7 +93,7 @@ def generate_with_multiprocessing(data_agent: DataAgent, org_alpha_0_width: Tupl
                 futures.append(future)
 
             for idx, future in enumerate(as_completed(futures), start=1):
-                synthetic_graph, _error = future.result()
+                synthetic_graph, error_ = future.result()
                 logger.info(f"[{idx}/{num_syn_nw}] Synthetic graph generation completed.")
 
                 if synthetic_graph is None:
@@ -107,13 +106,13 @@ def generate_with_multiprocessing(data_agent: DataAgent, org_alpha_0_width: Tupl
                 else:
                     data_agent.add_synthetic_graph(synthetic_graph)
 
-                _errors.append(_error)
+                errors.append(error_)
 
                 if preview:
                     print(
                         f'Node Factor {Config.CLOSED_NODES_FACTOR}. '
                         f'Edge Factor {Config.CLOSED_EDGES_FACTOR}. '
-                        f'Error: {_error:.4f}')
+                        f'Error: {error_:.4f}')
                     return None
 
     except KeyboardInterrupt:
@@ -129,10 +128,10 @@ def generate_with_multiprocessing(data_agent: DataAgent, org_alpha_0_width: Tupl
         executor.shutdown(wait=False)
         raise
 
-    if not _errors:
+    if not errors:
         return float('inf')
 
-    _non_inf_errors = [__e for __e in _errors if not np.isinf(__e)]
+    _non_inf_errors = [__e for __e in errors if not np.isinf(__e)]
     if not _non_inf_errors:
         return float('inf')
 
@@ -163,21 +162,21 @@ def run(set_name: SetName, resolution: Resolution) -> Optional[float]:
 
     if Config.SYNTHETIC_NETWORK_NUMBER != 0:
         org_analyzer = MultifractalAnalyzer(data_agent.original_network)
-        mult_ans_res = org_analyzer.analyze_error()
+        std_err_fea = org_analyzer.analyze_error_values()
     else:
-        mult_ans_res = [0, 0]
+        std_err_fea = [0, 0]
 
     data_agent.save(DataType.ORIGINAL_GRAPH)
 
     if exp:
-        exp_hyper_tuning(data_agent, mult_ans_res)
+        exp_hyper_tuning(data_agent, std_err_fea)
         return None
     else:
-        _error = generate_with_multiprocessing(data_agent, mult_ans_res)
+        _error = generate_with_multiprocessing(data_agent, std_err_fea)
         return _error
 
 
-def exp_hyper_tuning(data_agent, mult_ans_res):
+def exp_hyper_tuning(data_agent, std_err_fea):
     logger.info("[EXP] This is an experiment")
     closed_nodes_factors = [round(0.1 + 0.1 * i, 1) for i in range(20)]
     closed_edges_factors = [round(0.1 + 0.1 * i, 1) for i in range(20)]
@@ -188,7 +187,7 @@ def exp_hyper_tuning(data_agent, mult_ans_res):
         Config.set_edge_factor(__ef)
         logger.info(Config())
 
-        _error = generate_with_multiprocessing(data_agent, mult_ans_res)
+        _error = generate_with_multiprocessing(data_agent, std_err_fea)
         if preview:
             logger.info("Preview mode enabled, skipping further iterations.")
             return

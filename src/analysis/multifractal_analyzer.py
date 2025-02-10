@@ -1,5 +1,6 @@
 # src/handlers/multifractal_analyzer.py
 from collections import Counter
+from dataclasses import dataclass
 from typing import Dict, List
 
 import math
@@ -8,11 +9,18 @@ import networkx as nx
 import numpy as np
 from GraphRicciCurvature.OllivierRicci import OllivierRicci
 from matplotlib import pyplot as plt
+from scipy.spatial.distance import euclidean
 from scipy.stats import linregress
 
 from config import Config
 from utils import figure_to_ndarray
 from utils.utils import keep_largest_connected_component
+
+
+@dataclass
+class MultifractalErrorFeatures:
+    holder_exponent: float
+    spectrum_width: float
 
 
 class MultifractalAnalyzer:
@@ -23,10 +31,15 @@ class MultifractalAnalyzer:
         self.weighted = Config.MEASURE_WEIGHTED
         self.f_digit = 0
 
-    def analyze_error(self):
+    def analyze_error_values(self) -> MultifractalErrorFeatures:
         tau_list, _, _, _ = self.compute_multifractal_taus()
         alpha_0, width, _, _ = self.compute_n_spectrum(tau_list)
-        return alpha_0, width
+        error_features = MultifractalErrorFeatures(alpha_0, width)
+        return error_features
+
+    @staticmethod
+    def analyze_error(this: MultifractalErrorFeatures, other: MultifractalErrorFeatures) -> float:
+        return euclidean([this.holder_exponent, this.spectrum_width], [other.holder_exponent, other.spectrum_width])
 
     def compute_multifractal_taus(self):
         graph = nx.convert_node_labels_to_integers(self.graph)
@@ -248,64 +261,39 @@ class MultifractalAnalyzer:
         else:
             return nx.diameter(keep_largest_connected_component(self.graph))
 
-    def analyze_graph(self) -> Dict[str, object]:
-        # 1. Compute multi-fractal tau list
+    def analyze_graph(self) -> Dict[str, List]:
         self.f_digit = 1
         tau_list, r_g_all, diameter, zq_list = self.compute_multifractal_taus()
         self.f_digit = 0
 
-        # 2. Compute holder exponent and width from n-spectrum
         alpha_0, width, al_list, fal_list = self.compute_n_spectrum(tau_list)
 
-        # 3. Compute dimension stats
         self.f_digit = 2
         dim_list, dim_max, dim_min, dim_diff, valid_q = self.compute_n_dimension(tau_list)
         self.f_digit = 0
 
-        # 4. Compute centralities
-        cent = self.compute_centralities()
-        avg_nfd = float(np.mean(cent['nfd'])) if cent['nfd'] else float('nan')
-        avg_closeness = float(np.mean(cent['closeness'])) if cent['closeness'] else float('nan')
-        avg_degree = float(np.mean(cent['degree'])) if cent['degree'] else float('nan')
-        avg_clustering = float(np.mean(cent['clustering'])) if cent['clustering'] else float('nan')
-
-        # 5. Betweenness
-        bt = self.compute_betweenness()
-        avg_betweenness = float(np.mean(bt)) if bt else float('nan')
-
-        # 6. Ollivier-Ricci curvature
-        orc = self.compute_ollivier_ricci_curvature()
-        avg_ricci = float(np.mean(orc)) if orc else float('nan')
-
-        # 7. Assortativity
-        assortativity = self.compute_assortativity()
-
-        # 8. Eigenvector centrality
-        eigen_vecs = self.compute_eigenvector_centrality()
-        avg_eigen = float(np.mean(eigen_vecs)) if eigen_vecs else float('nan')
-
-        # 9. Diameter
+        centralities = self.compute_centralities()
+        betweenness = self.compute_betweenness()
+        ricci_list = self.compute_ollivier_ricci_curvature()
+        assort = self.compute_assortativity()
+        eigen_list = self.compute_eigenvector_centrality()
         diam = self.compute_diameter()
 
         return {
+            # Graph-level multifractal
             "tau_list": tau_list,
-            "holder_exp": alpha_0,
+            "alpha_0": alpha_0,
             "width": width,
             "dim_diff": dim_diff,
-            "avg_nfd": avg_nfd,
-            "avg_closeness": avg_closeness,
-            "avg_degree": avg_degree,
-            "avg_clustering": avg_clustering,
-            "avg_betweenness": avg_betweenness,
-            "avg_ricci": avg_ricci,
-            "assortativity": assortativity,
-            "avg_eigen": avg_eigen,
             "diameter": diam,
-            # Include optional arrays if you wish
-            "r_g_all": r_g_all,
-            "zq_list": zq_list,
-            "al_list": al_list,
-            "fal_list": fal_list,
-            "dim_list": dim_list,
-            "valid_q": valid_q
+            "assortativity": assort,
+
+            # Node-level distributions
+            "nfd_dist": centralities["nfd"],
+            "closeness_dist": centralities["closeness"],
+            "degree_dist": centralities["degree"],
+            "clustering_dist": centralities["clustering"],
+            "betweenness_dist": betweenness,
+            "ricci_dist": ricci_list,
+            "eigen_dist": eigen_list
         }
