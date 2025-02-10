@@ -12,7 +12,7 @@ from config import Config, DataType, Resolution, SetName
 # noinspection PyUnresolvedReferences
 from config import Config1, Config2, ConfigSample
 from graph import GraphAttrAgent, GraphGenerator, GraphPostProcessor
-from handlers import DataAgent, Saver, Summary
+from handlers import DataAgent, Saver, Summarizer
 
 Config2.initialize()
 # Config2.initialize()
@@ -220,7 +220,7 @@ if __name__ == '__main__':
         else:
             Saver.initialize()
 
-        summary = Summary()
+        summary = Summarizer()
 
         for __set_name, __resolution in product(set_names, resolutions):
             error = run(__set_name, __resolution)

@@ -8,10 +8,9 @@ import numpy as np
 
 from config import Config, DataType
 from graph import GraphAttrAgent
-from handlers import Saver
-from handlers.mapper import Mapper
-from utils.utils import plot_graph
-from utils import build_graph_pos_and_adj_mat
+from utils import build_graph_pos_and_adj_mat, plot_graph
+from .mapper import Mapper
+from .saver import Saver
 
 logger = logging.getLogger(__name__)
 

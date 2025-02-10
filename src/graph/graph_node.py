@@ -8,7 +8,7 @@ import numpy as np
 from scipy.spatial.distance import euclidean
 
 from config import Config
-from graph import GraphAttrAgent
+from .graph_attr_agent import GraphAttrAgent
 
 
 class GraphNode:

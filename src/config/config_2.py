@@ -17,13 +17,13 @@ class Config2(Config):
             SetName.S29, SetName.S32]
     RESOLUTIONS = [Resolution.NA]
 
-    DEFAULT_FRAME_SIZE = (470, 470)
+    DEFAULT_FRAME_SIZE = (1887 // 4, 2048 // 4)
     CLOSED_NODES_FACTOR = 1.2
     CLOSED_EDGES_FACTOR = 0.8
     # For 10_kx image, node fac should be 1.5, and edge fac should be 1
 
-    SYNTHETIC_GRAPH_NUMBER = 10
-    SYNTHETIC_NETWORK_NUMBER = 300
+    SYNTHETIC_GRAPH_NUMBER = 1
+    SYNTHETIC_NETWORK_NUMBER = 1
 
     MEASURE_WEIGHTED = False
     ERROR_TOLERANCE = .3

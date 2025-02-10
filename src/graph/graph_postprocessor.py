@@ -3,7 +3,7 @@
 import networkx as nx
 
 from handlers import Mapper
-from utils.utils import keep_largest_connected_component
+from utils import keep_largest_connected_component
 
 
 class GraphPostProcessor:

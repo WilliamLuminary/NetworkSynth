@@ -478,7 +478,7 @@ def run():
     output_csv = os.path.join(output_root,
                               f'{kX_index}_output.csv' if weight_flag == 'True' else f'{kX_index}_uw_output.csv')
     df_summary.to_csv(output_csv)
-    print("Summary data saved to", output_csv)
+    print("Summarizer data saved to", output_csv)
 
 
 if __name__ == '__main__':

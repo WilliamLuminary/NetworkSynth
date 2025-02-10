@@ -1,11 +1,11 @@
-# summary.py
+# summarizer.py
 
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-class Summary:
+class Summarizer:
     def __init__(self):
         self.results = []
 
@@ -21,11 +21,11 @@ class Summary:
             logger.info("No results to summarize.")
             return
 
-        logger.info("==== Experiment Summary ====")
+        logger.info("==== Experiment Summarizer ====")
         for r in self.results:
             logger.info(
                 f"Set: {r['set_name']} | "
                 f"Resolution: {r['resolution']} | "
                 f"Error: {r['error']:.4f}"
             )
-        logger.info("==== End of Summary ====")
+        logger.info("==== End of Summarizer ====")
