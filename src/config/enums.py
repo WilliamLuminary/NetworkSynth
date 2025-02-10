@@ -68,6 +68,7 @@ class Resolution(Enum):
     def _sort_key(self):
         if self is Resolution.NA:
             return 0
+        # noinspection PyTypeChecker
         digits = ''.join(filter(str.isdigit, self.value))
         return int(digits) if digits else 0
 
