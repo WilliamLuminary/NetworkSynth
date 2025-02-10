@@ -46,7 +46,7 @@ def generate_synthetic_network(exit_event, org_alpha_0_and_width: tuple[float, f
             _synthetic_graph = _postprocessor.synthetic_graph
 
             _analyzer = MultifractalAnalyzer(_synthetic_graph)
-            alpha_0_and_width = _analyzer.multifractal_analysis()
+            alpha_0_and_width = _analyzer.analyze_error()
 
             _error = euclidean(org_alpha_0_and_width, alpha_0_and_width)
 
@@ -178,7 +178,7 @@ def run(set_name: SetName, resolution: Resolution) -> Optional[float]:
 
     if Config.SYNTHETIC_NETWORK_NUMBER != 0:
         org_analyzer = MultifractalAnalyzer(data_agent.original_network)
-        mult_ans_res = org_analyzer.multifractal_analysis()
+        mult_ans_res = org_analyzer.analyze_error()
     else:
         mult_ans_res = [0, 0]
 

@@ -18,14 +18,14 @@ from utils.utils import keep_largest_connected_component
 class MultifractalAnalyzer:
     Q = [q / 100 for q in range(-300, 301, 10)]
 
-    def __init__(self, graph: nx.Graph, digit_round: int = 0):
+    def __init__(self, graph: nx.Graph):
         self.graph = graph
         self.weighted = Config.MEASURE_WEIGHTED
-        self.f_digit = digit_round
+        self.f_digit = 0
 
-    def multifractal_analysis(self):
-        tau_list, r_g_all, diameter, zq_list = self.compute_multifractal_taus()
-        alpha_0, width, al_list, fal_list = self.compute_n_spectrum(tau_list)
+    def analyze_error(self):
+        tau_list, _, _, _ = self.compute_multifractal_taus()
+        alpha_0, width, _, _ = self.compute_n_spectrum(tau_list)
         return alpha_0, width
 
     def compute_multifractal_taus(self):
@@ -125,7 +125,7 @@ class MultifractalAnalyzer:
         dim_max = np.max(dim_list)
         dim_min = np.min(dim_list)
         diff = dim_max - dim_min
-        return dim_list, dim_max, dim_min, diff, valid_q
+        return dim_list, dim_max, dim_min, diff, list(valid_q)
 
     @staticmethod
     def plot_n_dimension(dim_list, valid_q, label, color) -> np.ndarray:
@@ -207,17 +207,17 @@ class MultifractalAnalyzer:
         bt = nk.centrality.Betweenness(G_nk, normalized=True).run().scores()
         return bt
 
-    def compute_ollivier_ricci_curvature(self, alpha=0.5) -> List[float]:
+    def compute_ollivier_ricci_curvature(self) -> List[float]:
         graph_copy = self.graph.copy()
         if self.weighted:
             for u, v, d in graph_copy.edges(data=True):
                 if d.get('weight', 0) != 0:
                     d['weight'] = 1.0 / d['weight']
             orc = OllivierRicci(nx.convert_node_labels_to_integers(graph_copy),
-                                alpha=alpha, verbose="ERROR", weight='weight')
+                                alpha=.5, verbose="ERROR", weight='weight')
         else:
             orc = OllivierRicci(nx.convert_node_labels_to_integers(graph_copy),
-                                alpha=alpha, verbose="ERROR", weight=None)
+                                alpha=.5, verbose="ERROR", weight=None)
         orc.compute_ricci_curvature()
         return [d['ricciCurvature'] for _, _, d in orc.G.edges(data=True)]
 
@@ -247,3 +247,65 @@ class MultifractalAnalyzer:
             return nx.diameter(self.graph)
         else:
             return nx.diameter(keep_largest_connected_component(self.graph))
+
+    def analyze_graph(self) -> Dict[str, object]:
+        # 1. Compute multi-fractal tau list
+        self.f_digit = 1
+        tau_list, r_g_all, diameter, zq_list = self.compute_multifractal_taus()
+        self.f_digit = 0
+
+        # 2. Compute holder exponent & width from n-spectrum
+        alpha_0, width, al_list, fal_list = self.compute_n_spectrum(tau_list)
+
+        # 3. Compute dimension stats
+        self.f_digit = 2
+        dim_list, dim_max, dim_min, dim_diff, valid_q = self.compute_n_dimension(tau_list)
+        self.f_digit = 0
+
+        # 4. Compute centralities
+        cent = self.compute_centralities()
+        avg_nfd = float(np.mean(cent['nfd'])) if cent['nfd'] else float('nan')
+        avg_closeness = float(np.mean(cent['closeness'])) if cent['closeness'] else float('nan')
+        avg_degree = float(np.mean(cent['degree'])) if cent['degree'] else float('nan')
+        avg_clustering = float(np.mean(cent['clustering'])) if cent['clustering'] else float('nan')
+
+        # 5. Betweenness
+        bt = self.compute_betweenness()
+        avg_betweenness = float(np.mean(bt)) if bt else float('nan')
+
+        # 6. Ollivier-Ricci curvature
+        orc = self.compute_ollivier_ricci_curvature()
+        avg_ricci = float(np.mean(orc)) if orc else float('nan')
+
+        # 7. Assortativity
+        assortativity = self.compute_assortativity()
+
+        # 8. Eigenvector centrality
+        eigen_vecs = self.compute_eigenvector_centrality()
+        avg_eigen = float(np.mean(eigen_vecs)) if eigen_vecs else float('nan')
+
+        # 9. Diameter
+        diam = self.compute_diameter()
+
+        return {
+            "tau_list": tau_list,
+            "holder_exp": alpha_0,
+            "width": width,
+            "dim_diff": dim_diff,
+            "avg_nfd": avg_nfd,
+            "avg_closeness": avg_closeness,
+            "avg_degree": avg_degree,
+            "avg_clustering": avg_clustering,
+            "avg_betweenness": avg_betweenness,
+            "avg_ricci": avg_ricci,
+            "assortativity": assortativity,
+            "avg_eigen": avg_eigen,
+            "diameter": diam,
+            # Include optional arrays if you wish
+            "r_g_all": r_g_all,
+            "zq_list": zq_list,
+            "al_list": al_list,
+            "fal_list": fal_list,
+            "dim_list": dim_list,
+            "valid_q": valid_q
+        }
