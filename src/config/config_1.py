@@ -21,8 +21,8 @@ class Config1(Config):
     CLOSED_EDGES_FACTOR = 1
     # For 10_kx image, node fac should be 1.5, and edge fac should be 1
 
-    SYNTHETIC_GRAPH_NUMBER = 0
-    SYNTHETIC_NETWORK_NUMBER = 0
+    SYNTHETIC_GRAPH_NUMBER = 1
+    SYNTHETIC_NETWORK_NUMBER = 1
 
     MEASURE_WEIGHTED = True
 
@@ -41,7 +41,7 @@ class Config1(Config):
 
     @staticmethod
     def _load_positions(set_name, resolution):
-        directory_path = os.path.join(Config1.POSITION_DATA_DIR, resolution)
+        directory_path = Config1.POSITION_DATA_DIR
         pattern = re.compile(
             rf"{re.escape(set_name)}_{re.escape(resolution)}.*\.npy",
             re.IGNORECASE
@@ -55,7 +55,7 @@ class Config1(Config):
 
     @staticmethod
     def _load_sparse_matrix(set_name, resolution):
-        directory_path = os.path.join(Config1.ADJ_MATRIX_DATA_DIR, resolution)
+        directory_path = Config1.ADJ_MATRIX_DATA_DIR
         pattern = re.compile(
             rf"sparse_matrices_{re.escape(resolution)}.*\.npz",
             re.IGNORECASE
@@ -87,10 +87,14 @@ class Config1(Config):
 
     @staticmethod
     def _load_image(set_name, resolution):
-        directory_path = os.path.join(Config1.IMAGES_DIR, resolution)
+        directory_path = os.path.join(Config1.IMAGES_DIR, set_name)
+
+        if set_name == 'B':
+            directory_path = os.path.join(directory_path, '1811')
+            logger.warning("For set B, using the 1811 subdirectory for images.")
 
         pattern = re.compile(
-            rf"W-\d+-\d+-\d+_{re.escape(str(set_name))}_.*\.(tif|png|jpg)",
+            rf"\b{re.escape(resolution)}\b.*\.(tif|png|jpg)",
             re.IGNORECASE
         )
 

@@ -43,6 +43,8 @@ class Saver:
         Create only one base output directory for all the results.
         :return: None
         """
+        assert not Config.DISABLE_SAVING, "Saving is disabled."
+
         cls.base_output_dir = os.path.join(Config.BASE_OUTPUT_PATH, f'results_{Saver._time_id()}')
         cls.ensure_directory(cls.base_output_dir)
         logger.info(f"Created Base Output directory: {cls.base_output_dir}")
