@@ -81,11 +81,12 @@ def timer(func):
     return wrapper
 
 
-def figure_to_ndarray(fig: Figure) -> ndarray:
+def figure_to_ndarray(fig: Figure, swap: False) -> ndarray:
     canvas = FigureCanvas(fig)
     canvas.draw()
     buf = canvas.buffer_rgba()
     image_array = np.asarray(buf)
+    image_array = image_array[..., [2, 1, 0, 3]] if swap else image_array
     return image_array
 
 
@@ -195,6 +196,6 @@ def plot_graph(data_type: DataType, graph: nx.Graph = None,
 
     if getattr(file_config, 'show_on_the_fly', False):
         plt.show()
-    graph = figure_to_ndarray(fig)
+    fig = figure_to_ndarray(fig)
     plt.close()
-    return graph
+    return fig
