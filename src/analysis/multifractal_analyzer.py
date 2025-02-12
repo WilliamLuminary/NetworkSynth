@@ -136,7 +136,7 @@ class MultifractalAnalyzer:
         dim_max = np.max(dim_list)
         dim_min = np.min(dim_list)
         diff = dim_max - dim_min
-        return dim_list, dim_max, dim_min, diff
+        return dim_list, dim_max, dim_min, diff, valid_q
 
     @staticmethod
     def plot_n_dimension(dim_list, valid_q, label, color) -> np.ndarray:
@@ -267,7 +267,7 @@ class MultifractalAnalyzer:
         alpha_0, width, al_list, fal_list = self.compute_n_spectrum(tau_list)
 
         self.f_digit = 2
-        dim_list, dim_max, dim_min, dim_diff = self.compute_n_dimension(tau_list)
+        dim_list, dim_max, dim_min, dim_diff, valid_q = self.compute_n_dimension(tau_list)
         self.f_digit = 0
 
         centralities = self.compute_centralities()
@@ -285,7 +285,9 @@ class MultifractalAnalyzer:
             "al_list": al_list,
             "fal_list": fal_list,
 
+            "dim_list": dim_list,
             "dim_diff": dim_diff,
+            "valid_q": valid_q,
             "diameter": diam,
             "assortativity": assort,
 
