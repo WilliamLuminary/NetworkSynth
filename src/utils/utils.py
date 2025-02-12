@@ -81,7 +81,7 @@ def timer(func):
     return wrapper
 
 
-def figure_to_ndarray(fig: Figure, swap: False) -> ndarray:
+def figure_to_ndarray(fig: Figure, swap: bool = False) -> ndarray:
     canvas = FigureCanvas(fig)
     canvas.draw()
     buf = canvas.buffer_rgba()
