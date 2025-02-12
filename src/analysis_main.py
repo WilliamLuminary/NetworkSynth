@@ -29,7 +29,7 @@ DATA_STYLE = {
         'cmap': 'Blues',
         'alpha': 0.3,
         'lw': 1.5,
-        'zorder': 1
+        'z_order': 1
     },
     'original': {
         'cmap': 'Reds',
@@ -38,13 +38,6 @@ DATA_STYLE = {
         'z_order': 2
     }
 }
-
-
-def get_script_dir():
-    try:
-        return os.path.dirname(os.path.realpath(__file__))
-    except NameError:
-        return os.getcwd()
 
 
 def load_pkl_files(base_dir, sub_folders) -> Dict[str, Dict[str, List[nx.Graph]]]:
@@ -79,10 +72,9 @@ def load_pkl_files(base_dir, sub_folders) -> Dict[str, Dict[str, List[nx.Graph]]
     return data_
 
 
-def load_data() -> Dict[str, Dict[str, List[nx.Graph]]]:
-    script_dir = get_script_dir()
-    result_dir_name = 'results_20250202_013241'
-    base_directory = os.path.abspath(os.path.join(script_dir, '..', '..', 'data', 'output', result_dir_name))
+def load_data(result_dir) -> Dict[str, Dict[str, List[nx.Graph]]]:
+    base_output_dir = Config.BASE_OUTPUT_PATH
+    base_directory = os.path.abspath(os.path.join(base_output_dir, result_dir))
     return load_pkl_files(base_directory, sub_folders=('synthetic', 'origin', 'original'))
 
 
@@ -94,24 +86,26 @@ def setup_plot(fig_size=(10, 8), dpi=150):
 
 def plot_spectra_from_summary(summary_data: Dict[str, List[Dict]]) -> np.ndarray:
     fig, ax = setup_plot()
-
     legend_handles = []
 
     for data_type in summary_data:
         style = DATA_STYLE[data_type]
+        entries = summary_data[data_type]
         cmap = plt.get_cmap(style['cmap'])
-        base_color = cmap(0.6)
 
-        for entry in summary_data[data_type]:
+        color_vals = np.linspace(0.2, 0.8, len(entries))
+
+        for idx, entry in enumerate(entries):
+            color = cmap(color_vals[idx])
             ax.plot(entry["al_list"], entry["fal_list"],
-                    color=base_color,
+                    color=color,
                     alpha=style['alpha'],
                     lw=style['lw'],
                     zorder=style['z_order'])
 
         legend_handles.append(
-            plt.Line2D([0], [0], color=base_color,
-                       lw=3, label=data_type.capitalize())
+            plt.Line2D([0], [0], color=cmap(0.5),
+                       lw=3, label=f"{data_type.capitalize()} (n={len(entries)})")
         )
 
     ax.set_xlabel(r'$\alpha$ (Hölder Exponent)', fontweight='bold')
@@ -119,30 +113,31 @@ def plot_spectra_from_summary(summary_data: Dict[str, List[Dict]]) -> np.ndarray
     ax.legend(handles=legend_handles, loc='upper right',
               frameon=False, fontsize=18)
 
-    return finalize_plot(fig, ax)
+    return finalize_plot(fig)
 
 
 def plot_n_dimensions(summary_data: Dict[str, List[Dict]]) -> np.ndarray:
-    """Plot generalized fractal dimensions with proper style handling"""
     fig, ax = setup_plot()
-
     legend_handles = []
 
     for data_type in summary_data:
         style = DATA_STYLE[data_type]
+        entries = summary_data[data_type]
         cmap = plt.get_cmap(style['cmap'])
-        base_color = cmap(0.6)  # Midpoint color
 
-        for entry in summary_data[data_type]:
+        color_vals = np.linspace(0.2, 0.8, len(entries))
+
+        for idx, entry in enumerate(entries):
+            color = cmap(color_vals[idx])
             ax.plot(entry["valid_q"], entry["dim_list"],
-                    color=base_color,
+                    color=color,
                     alpha=style['alpha'],
                     lw=style['lw'],
                     zorder=style['z_order'])
 
         legend_handles.append(
-            plt.Line2D([0], [0], color=base_color,
-                       lw=3, label=data_type.capitalize())
+            plt.Line2D([0], [0], color=cmap(0.5),
+                       lw=3, label=f"{data_type.capitalize()} (n={len(entries)})")
         )
 
     ax.set_xlabel(r'Distorting Exponent $q$', fontweight='bold')
@@ -150,10 +145,10 @@ def plot_n_dimensions(summary_data: Dict[str, List[Dict]]) -> np.ndarray:
     ax.legend(handles=legend_handles, loc='upper right',
               frameon=False, fontsize=18)
 
-    return finalize_plot(fig, ax)
+    return finalize_plot(fig)
 
 
-def finalize_plot(fig, _):
+def finalize_plot(fig):
     plt.tight_layout()
     plt.show()
     fig = figure_to_ndarray(fig)
@@ -163,7 +158,7 @@ def finalize_plot(fig, _):
 
 Config.MEASURE_WEIGHTED = False
 if __name__ == '__main__':
-    data = load_data()
+    data = load_data('results_20250202_013241')
 
     summary = {}
     for name_, data in data.items():
@@ -179,4 +174,5 @@ if __name__ == '__main__':
         summary[name_] = current_summary
 
     for ds_name, data_dict in summary.items():
-        image = plot_spectra_from_summary(data_dict)
+        image1 = plot_spectra_from_summary(data_dict)
+        image2 = plot_n_dimensions(data_dict)
