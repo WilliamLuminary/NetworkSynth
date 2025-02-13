@@ -27,8 +27,8 @@ if preview:
 logger = logging.getLogger(__name__)
 
 
-def generate_synthetic_network(exit_event, std_err_fea, attributes, map_handler,
-                               avg_degree: float):
+
+def generate_synthetic_network(exit_event, std_err_fea, attributes, mapper):
     generator = GraphGenerator(attributes)
 
     error_ = float('inf')
@@ -44,9 +44,16 @@ def generate_synthetic_network(exit_event, std_err_fea, attributes, map_handler,
         try:
             synthetic_graph = generator.generate_network()
 
+            if exit_event.is_set():
+                logger.info(SIGINT_INFO)
+                return None, float('inf')
 
             synthetic_graph = trim_graph(synthetic_graph, attributes.average_degree)
             mapper.assign_weights(synthetic_graph)
+
+            if exit_event.is_set():
+                logger.info(SIGINT_INFO)
+                return None, float('inf')
 
             analyzer = MultifractalAnalyzer(synthetic_graph)
             err_fea = analyzer.analyze_error_values()
@@ -74,9 +81,6 @@ def generate_with_multiprocessing(data_agent: DataAgent, std_err_fea) -> \
     num_syn_graph = Config.SYNTHETIC_GRAPH_NUMBER
     errors = []
     futures = []
-    attributes = data_agent.attributes
-    map_handler = data_agent.mapper
-    avg_degree = attributes.average_degree
 
     from multiprocessing import Manager
     manager = Manager()
@@ -89,9 +93,8 @@ def generate_with_multiprocessing(data_agent: DataAgent, std_err_fea) -> \
                     generate_synthetic_network,
                     exit_event,
                     std_err_fea,
-                    attributes,
-                    map_handler,
-                    avg_degree
+                    data_agent.attributes,
+                    data_agent.mapper
                 )
                 futures.append(future)
 
