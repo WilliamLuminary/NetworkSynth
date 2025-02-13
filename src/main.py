@@ -34,13 +34,7 @@ def generate_synthetic_network(exit_event, std_err_fea, attributes, mapper):
 
     error_ = float('inf')
     synthetic_graph = None
-    error_threshold = Config.ERROR_TOLERANCE
-    max_attempts = Config.MAX_ATTEMPTS
-    while (error_ > error_threshold
-           and attempt < max_attempts
-           and not exit_event.is_set()):
-        attempt += 1
-
+    for attempt in range(Config.MAX_ATTEMPTS):
         try:
             if exit_event.is_set():
                 logger.info(SIGINT_INFO)
@@ -61,8 +55,9 @@ def generate_synthetic_network(exit_event, std_err_fea, attributes, mapper):
 
             analyzer = MultifractalAnalyzer(synthetic_graph)
             err_fea = analyzer.analyze_error_values()
-
             error_ = analyzer.analyze_error(err_fea, std_err_fea)
+            if error_ < Config.ERROR_TOLERANCE:
+                break  # Exit the loop if the error is within the tolerance
 
             if exit_event.is_set():
                 logger.info(SIGINT_INFO)
@@ -75,12 +70,8 @@ def generate_synthetic_network(exit_event, std_err_fea, attributes, mapper):
             logger.error(f"Exception occurred during graph generation: {exc}. Skipping attempt {attempt}.")
             continue
 
-    if exit_event.is_set():
-        logger.debug("Child process exiting due to exit signal.")
-        return None, float('inf')
-
-    if error_ > error_threshold:
-        logger.warning(f"Failed after {max_attempts} attempts (error={error_:.4f}).")
+    if error_ > Config.ERROR_TOLERANCE:
+        logger.warning(f"Max attempts reached. Abort!")
         return None, float('inf')
 
     return synthetic_graph, error_
@@ -139,7 +130,6 @@ def generate_with_multiprocessing(data_agent: DataAgent, std_err_fea) -> \
             future.cancel()
         executor.shutdown(wait=True, cancel_futures=True)
         raise
-
     except Exception:
         exit_event.set()
         executor.shutdown(wait=False)
