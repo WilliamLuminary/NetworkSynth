@@ -13,11 +13,13 @@ NUM_BINS: Final[int] = 100
 
 
 class Mapper:
-
     def __init__(self, graph: nx.Graph):
         lengths, weights = self._compute_edge_metrics(graph)
         self.avg_weights: Final = np.mean(weights)
         self.length_bins, self.weight_distributions = self._create_mapping_metrics(lengths, weights)
+        bins, dist = self._create_mapping_metrics(lengths, weights)
+        self.length_bins: Final = bins
+        self.weight_distributions: Final = dist
 
     @staticmethod
     def _compute_edge_metrics(graph: nx.Graph):
@@ -41,11 +43,14 @@ class Mapper:
             if len(sorted_lengths) > 100 \
             else Mapper._create_linear_bins(sorted_lengths)
 
+        return Mapper._build_weight_distributions(length_bins, lengths, weights)
+
+    @staticmethod
+    def _build_weight_distributions(length_bins, lengths, weights):
         weight_distributions = defaultdict(list)
-        for length, weight in zip(lengths, weights):
-            bin_idx = np.digitize(length, length_bins) - 1
-            bin_idx = np.clip(bin_idx, 0, len(length_bins) - 2)
-            weight_distributions[bin_idx].append(weight)
+        bin_indices = np.clip(np.digitize(lengths, length_bins) - 1, 0, len(length_bins) - 2)
+        for idx, weight in zip(bin_indices, weights):
+            weight_distributions[idx].append(weight)
         return length_bins, weight_distributions
 
     @staticmethod
@@ -64,6 +69,13 @@ class Mapper:
         return length_bins
 
     def assign_weights(self, graph) -> None:
+        """
+        Assigns edge weights to the graph based on the length of the edges.
+        :param graph: A networkx graph.
+        :return: None.
+        # Postcondition:
+        The graph is modified in place.
+        """
         if nx.get_edge_attributes(graph, 'weight'):
             raise ValueError('Graph already has edge weights assigned')
 
@@ -74,7 +86,7 @@ class Mapper:
         nx.set_edge_attributes(graph, weights, 'weight')
 
     def _length_to_weight(self, length: float) -> float:
-        bin_idx = np.digitize(length, self.length_bins) - 1
-        bin_idx = np.clip(bin_idx, 0, len(self.length_bins) - 2)
-        distribution = self.weight_distributions.get(bin_idx, None)
+        bin_idx = np.clip(np.digitize(length, self.length_bins) - 1,
+                          0, len(self.length_bins) - 2)
+        distribution = self.weight_distributions.get(bin_idx)
         return random.choice(distribution) if distribution else self.avg_weights
