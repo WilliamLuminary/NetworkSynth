@@ -1,7 +1,7 @@
 # src/original_network/graph_attr_agent.py
 
 from collections import Counter, defaultdict
-from typing import Dict, List, Tuple
+from typing import Dict, Final, List, Tuple
 
 import networkx as nx
 import numpy as np
@@ -9,7 +9,8 @@ from scipy.spatial.distance import euclidean
 
 
 class GraphAttrAgent:
-    def __init__(self):
+    def __init__(self, graph: nx.Graph):
+        self.graph: Final[nx.Graph] = graph
         self.node_positions: Dict[int, Tuple[float, float]] = {}
         self.degree_distribution: Dict[int, float] = {}
         self.degree_transition_probs: Dict[int, Dict[int, float]] = {}
@@ -18,14 +19,16 @@ class GraphAttrAgent:
         self.average_edge_length: float = 0.0
         self.average_degree: float = 0.0
 
-    def analyze(self, graph: nx.Graph):
-        self.node_positions = nx.get_node_attributes(graph, 'pos')
-        self.degree_distribution = self._compute_degree_distribution(graph)
-        self.degree_transition_probs = self._compute_degree_transition_probs(graph)
+    def analyze(self):
+        self.node_positions = nx.get_node_attributes(self.graph, 'pos')
+        self.degree_distribution = self._compute_degree_distribution(self.graph)
+        self.degree_transition_probs = self._compute_degree_transition_probs(self.graph)
         (self.degree_edge_lengths,
          self.degree_angle_diffs,
-         self.average_edge_length) = self._compute_edge_lengths_and_angle_diffs(graph)
-        self.average_degree = self._compute_average_degree(graph)
+         self.average_edge_length) = self._compute_edge_lengths_and_angle_diffs(self.graph)
+        self.average_degree = self._compute_average_degree(self.graph)
+        del self.graph
+        return self
 
     def _to_dict(self) -> dict:
         return {
