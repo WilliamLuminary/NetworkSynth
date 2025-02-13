@@ -11,7 +11,8 @@ from analysis import MultifractalAnalyzer
 from config import Config, DataType, Resolution, SetName
 # noinspection PyUnresolvedReferences
 from config import Config1, Config2, ConfigSample
-from graph import GraphAttrAgent, GraphGenerator, GraphPostProcessor
+from graph import GraphGenerator
+from utils.utils import trim_graph
 from handlers import DataAgent, Saver, Summarizer
 
 Config2.initialize()
@@ -43,10 +44,9 @@ def generate_synthetic_network(exit_event, std_err_fea, attributes, map_handler,
         try:
             synthetic_graph = generator.generate_network()
 
-            postprocessor = GraphPostProcessor(synthetic_graph, map_handler, avg_degree)
-            postprocessor.trim_graph()
-            postprocessor.assign_weights()
-            synthetic_graph = postprocessor.synthetic_graph
+
+            synthetic_graph = trim_graph(synthetic_graph, attributes.average_degree)
+            mapper.assign_weights(synthetic_graph)
 
             analyzer = MultifractalAnalyzer(synthetic_graph)
             err_fea = analyzer.analyze_error_values()
