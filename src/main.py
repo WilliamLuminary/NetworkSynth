@@ -159,10 +159,7 @@ def generate_with_multiprocessing(data_agent: DataAgent, std_err_fea) -> \
 def run(set_name: SetName, resolution: Resolution) -> Optional[float]:
     logger.info(Config())
     data_agent = DataAgent(set_name, resolution)
-    data_agent.load_data()
-    attr = GraphAttrAgent()
-    attr.analyze(data_agent.original_network)
-    data_agent.set_attributes(attr)
+    data_agent.prepare_data()
     data_agent.save(DataType.ORIGINAL_IMAGE)
     data_agent.save(DataType.ORIGINAL_NETWORK)
     data_agent.save(DataType.ORIGINAL_PROPERTY)
