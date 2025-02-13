@@ -26,13 +26,13 @@ if preview:
 
 logger = logging.getLogger(__name__)
 
+SIGINT_INFO = "SIGINT received. Terminating child process..."
 
 
 def generate_synthetic_network(exit_event, std_err_fea, attributes, mapper):
     generator = GraphGenerator(attributes)
 
     error_ = float('inf')
-    attempt = 0
     synthetic_graph = None
     error_threshold = Config.ERROR_TOLERANCE
     max_attempts = Config.MAX_ATTEMPTS
@@ -42,6 +42,10 @@ def generate_synthetic_network(exit_event, std_err_fea, attributes, mapper):
         attempt += 1
 
         try:
+            if exit_event.is_set():
+                logger.info(SIGINT_INFO)
+                return None, float('inf')
+
             synthetic_graph = generator.generate_network()
 
             if exit_event.is_set():
@@ -60,6 +64,13 @@ def generate_synthetic_network(exit_event, std_err_fea, attributes, mapper):
 
             error_ = analyzer.analyze_error(err_fea, std_err_fea)
 
+            if exit_event.is_set():
+                logger.info(SIGINT_INFO)
+                return None, float('inf')
+
+        except KeyboardInterrupt:
+            logger.info(SIGINT_INFO)
+            raise
         except Exception as exc:
             logger.error(f"Exception occurred during graph generation: {exc}. Skipping attempt {attempt}.")
             continue
@@ -122,11 +133,11 @@ def generate_with_multiprocessing(data_agent: DataAgent, std_err_fea) -> \
                     return None
 
     except KeyboardInterrupt:
-        logger.info("KeyboardInterrupt received. Terminating processes...")
+        logger.info(SIGINT_INFO)
         exit_event.set()
         for future in futures:
             future.cancel()
-        executor.shutdown(wait=False)
+        executor.shutdown(wait=True, cancel_futures=True)
         raise
 
     except Exception:
@@ -235,8 +246,5 @@ if __name__ == '__main__':
 
         summary.summarize()
 
-    except Exception as e:
-        logger.exception(e)
-        raise
-
-## Node before 1.0, edge before 1.o
+    except KeyboardInterrupt:
+        logger.critical("MAIN PROCESS: Forcing immediate shutdown!")
