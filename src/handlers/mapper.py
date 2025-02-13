@@ -6,6 +6,8 @@ from typing import DefaultDict, Final, Generator, Tuple
 import networkx as nx
 import numpy as np
 from scipy.spatial.distance import euclidean
+from scipy.stats import gaussian_kde
+from sklearn.neighbors import NearestNeighbors
 
 logger = logging.getLogger(__name__)
 
@@ -16,10 +18,11 @@ class Mapper:
     def __init__(self, graph: nx.Graph):
         lengths, weights = self._compute_edge_metrics(graph)
         self.avg_weights: Final = np.mean(weights)
-        self.length_bins, self.weight_distributions = self._create_mapping_metrics(lengths, weights)
         bins, dist = self._create_mapping_metrics(lengths, weights)
         self.length_bins: Final = bins
         self.weight_distributions: Final = dist
+        self.original_lengths = np.array(lengths)
+        self.original_weights = np.array(weights)
 
     @staticmethod
     def _compute_edge_metrics(graph: nx.Graph):
@@ -90,3 +93,48 @@ class Mapper:
                           0, len(self.length_bins) - 2)
         distribution = self.weight_distributions.get(bin_idx)
         return random.choice(distribution) if distribution else self.avg_weights
+
+
+class EnhancedMapper(Mapper):
+    def __init__(self, graph: nx.Graph, *, mix_intensity: float = 0.3):
+        """
+        :param mix_intensity: 0.0 (original) to 1.0 (full mixing)
+        """
+        super().__init__(graph)
+        self.mix_intensity = np.clip(mix_intensity, 0, 1)
+        self._prepare_mixing_model()
+
+    def _prepare_mixing_model(self):
+        lengths = np.array(self.original_lengths)
+        weights = np.array(self.original_weights)
+
+        self.kde = gaussian_kde(np.vstack([lengths, weights]))
+        self.nn_model = NearestNeighbors(n_neighbors=50).fit(np.vstack([lengths, weights]).T)
+
+        self.bandwidth = self.mix_intensity * np.std(lengths) * 2
+
+    def _get_mixed_weight(self, length: float) -> float:
+        distances, indices = self.nn_model.kneighbors([[length, 0]], return_distance=True)
+
+        raw_weights = 1 / (distances.squeeze() + 1e-8)
+        mixing_probs = raw_weights / raw_weights.sum()
+
+        return np.random.choice(self.original_weights[indices.squeeze()], p=mixing_probs)
+
+    def assign_weights(self, graph: nx.Graph) -> None:
+        if nx.get_edge_attributes(graph, 'weight'):
+            raise ValueError('Graph already has edge weights assigned')
+
+        weights = {}
+        for u, v, data in self._length_generator(graph):
+            length = data['length']
+
+            if np.random.random() < self.mix_intensity:
+                weight = self._get_mixed_weight(length)
+            else:
+                weight = self._length_to_weight(length)
+
+            weights[(u, v)] = weight
+
+        nx.set_edge_attributes(graph, weights, 'weight')
+
