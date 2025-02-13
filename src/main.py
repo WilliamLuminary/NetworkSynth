@@ -138,22 +138,22 @@ def generate_with_multiprocessing(data_agent: DataAgent, std_err_fea) -> \
     if not errors:
         return float('inf')
 
-    _non_inf_errors = [__e for __e in errors if not np.isinf(__e)]
-    if not _non_inf_errors:
+    non_inf_errors = [e for e in errors if not np.isinf(e)]
+    if not non_inf_errors:
         return float('inf')
 
-    _mean_e = np.mean(_non_inf_errors)
-    _std_e = np.std(_non_inf_errors)
-    _threshold = 2.0
-    _non_outlier_errors = [__e for __e in _non_inf_errors if abs(__e - _mean_e) <= _threshold * _std_e]
-    if not _non_outlier_errors:
+    mean_e = np.mean(non_inf_errors)
+    std_e = np.std(non_inf_errors)
+    threshold = 2.0
+    non_outlier_errors = [__e for __e in non_inf_errors if abs(__e - mean_e) <= threshold * std_e]
+    if not non_outlier_errors:
         return float('inf')
 
-    _avg_err = round(np.mean(_non_outlier_errors), 3)
+    avg_err = round(np.mean(non_outlier_errors), 3)
 
-    data_agent.save(data_type=DataType.SYNTHETIC_NETWORK, file_name_prefix=f'nw_no_{num_syn_nw}_err_{_avg_err:.3f}')
+    data_agent.save(data_type=DataType.SYNTHETIC_NETWORK, file_name_prefix=f'nw_no_{num_syn_nw}_err_{avg_err:.3f}')
 
-    return _avg_err
+    return avg_err
 
 
 def run(set_name: SetName, resolution: Resolution) -> Optional[float]:
@@ -229,10 +229,10 @@ if __name__ == '__main__':
 
         summary = Summarizer()
 
-        for __set_name, __resolution in product(set_names, resolutions):
-            error = run(__set_name, __resolution)
+        for set_name, resolution in product(set_names, resolutions):
+            error = run(set_name, resolution)
             if error is not None:
-                summary.add_result(__set_name.value, __resolution.value, error)
+                summary.add_result(set_name.value, resolution.value, error)
 
         summary.summarize()
 
