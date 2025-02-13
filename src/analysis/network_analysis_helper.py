@@ -107,16 +107,7 @@ def load_data():
         original_graphs.extend(graphs[:1])
         original_names.extend([set_name])
 
-    metrics = {
-        'max_dim': [],
-        'min_dim': [],
-        'dimension': [],
-        'holder_exp': [],
-        'widths': [],
-        'max_al': [],
-        'min_al': []
-    }
-    return script_dir, synthetic_graphs, synthetic_names, original_graphs, original_names, metrics
+    return script_dir, synthetic_graphs, synthetic_names, original_graphs, original_names
 
 
 # noinspection SpellCheckingInspection
@@ -363,7 +354,16 @@ def compute_diameter(graphs, weight_flag):
 
 
 def run():
-    script_dir, synthetic_graphs, synthetic_names, original_graphs, original_names, metrics = load_data()
+    script_dir, synthetic_graphs, synthetic_names, original_graphs, original_names = load_data()
+    metrics = {
+        'max_dim': [],
+        'min_dim': [],
+        'dimension': [],
+        'holder_exp': [],
+        'widths': [],
+        'max_al': [],
+        'min_al': []
+    }
     output_root = os.path.join(script_dir, "result")
     kX_index = '20kX'
     weight_flag = 'False'

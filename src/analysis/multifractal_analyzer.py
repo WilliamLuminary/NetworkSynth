@@ -1,6 +1,6 @@
 # src/handlers/multifractal_analyzer.py
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import astuple, dataclass
 from typing import Dict, List
 
 import math
@@ -23,25 +23,33 @@ class MultifractalErrorFeatures:
     spectrum_width: float
 
 
+def _generate_range(scale):
+    return [q / 100 for q in range(-scale, scale + 1, 10)]
+
+
 class MultifractalAnalyzer:
-    Q = [q / 100 for q in range(-300, 301, 10)]
+    error_analysis_range_Q = _generate_range(300)
+    full_analysis_range_Q = _generate_range(2000)
 
     def __init__(self, graph: nx.Graph):
         self.graph = graph
         self.weighted = Config.MEASURE_WEIGHTED
         self.f_digit = 0
+        self.Q = self.full_analysis_range_Q
 
     def analyze_error_values(self) -> MultifractalErrorFeatures:
-        tau_list, _, _, _ = self.compute_multifractal_taus()
+        self.Q = self.error_analysis_range_Q
+        tau_list, _, _, _ = self._compute_multifractal_taus()
         alpha_0, width, _, _ = self.compute_n_spectrum(tau_list)
         error_features = MultifractalErrorFeatures(alpha_0, width)
+        self.Q = self.error_analysis_range_Q
         return error_features
 
     @staticmethod
-    def analyze_error(this: MultifractalErrorFeatures, other: MultifractalErrorFeatures) -> float:
-        return euclidean([this.holder_exponent, this.spectrum_width], [other.holder_exponent, other.spectrum_width])
+    def analyze_error(this, other) -> float:
+        return euclidean(astuple(this), astuple(other))
 
-    def compute_multifractal_taus(self):
+    def _compute_multifractal_taus(self):
         graph = nx.convert_node_labels_to_integers(self.graph)
         if self.weighted:
             G_nk = nk.nxadapter.nx2nk(graph, weightAttr='weight')
@@ -106,28 +114,18 @@ class MultifractalAnalyzer:
         return fig
 
     def compute_n_spectrum(self, tau_list):
+        Q_ = self.Q
         al_list = []
         fal_list = []
-        for i in range(1, len(self.Q)):
-            al = (tau_list[i] - tau_list[i - 1]) / (self.Q[i] - self.Q[i - 1])
+        for i in range(1, len(Q_)):
+            al = (tau_list[i] - tau_list[i - 1]) / (Q_[i] - Q_[i - 1])
             al_list.append(al)
-        for j in range(len(self.Q) - 1):
-            fal = self.Q[j] * al_list[j] - tau_list[j]
+        for j in range(len(Q_) - 1):
+            fal = Q_[j] * al_list[j] - tau_list[j]
             fal_list.append(fal)
         alpha_0 = al_list[np.argmax(fal_list)]
         width = np.max(al_list) - np.min(al_list)
         return alpha_0, width, al_list, fal_list
-
-    @staticmethod
-    def plot_n_spectrum(al_list, fal_list, label, color) -> np.ndarray:
-        fig, ax = plt.figure(figsize=(8, 8), dpi=300)
-        plt.plot(al_list, fal_list, label=label, linewidth=3, color=color)
-        plt.xlabel('Lipschitz-Hölder exponent, 'r'$\alpha$')
-        plt.ylabel('Multi-fractal spectrum, 'r'$f(\alpha)$')
-        plt.legend()
-        fig = figure_to_ndarray(fig)
-        plt.close()
-        return fig
 
     def compute_n_dimension(self, tau_list):
         q_list = self.Q
@@ -138,7 +136,7 @@ class MultifractalAnalyzer:
         dim_max = np.max(dim_list)
         dim_min = np.min(dim_list)
         diff = dim_max - dim_min
-        return dim_list, dim_max, dim_min, diff, list(valid_q)
+        return dim_list, dim_max, dim_min, diff, valid_q
 
     @staticmethod
     def plot_n_dimension(dim_list, valid_q, label, color) -> np.ndarray:
@@ -263,7 +261,7 @@ class MultifractalAnalyzer:
 
     def analyze_graph(self) -> Dict[str, List]:
         self.f_digit = 1
-        tau_list, r_g_all, diameter, zq_list = self.compute_multifractal_taus()
+        tau_list, r_g_all, diameter, zq_list = self._compute_multifractal_taus()
         self.f_digit = 0
 
         alpha_0, width, al_list, fal_list = self.compute_n_spectrum(tau_list)
@@ -284,7 +282,12 @@ class MultifractalAnalyzer:
             "tau_list": tau_list,
             "alpha_0": alpha_0,
             "width": width,
+            "al_list": al_list,
+            "fal_list": fal_list,
+
+            "dim_list": dim_list,
             "dim_diff": dim_diff,
+            "valid_q": valid_q,
             "diameter": diam,
             "assortativity": assort,
 

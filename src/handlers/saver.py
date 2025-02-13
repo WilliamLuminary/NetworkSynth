@@ -18,14 +18,18 @@ class Saver:
     base_output_dir = None
     latest_link_path = None
 
-    def __init__(self, set_name: SetName, resolution: Resolution):
+    def __new__(cls, *args, **kwargs):
+        if Config.DISABLE_SAVING:
+            logger.info(f"Saving is disabled. No Saver will be instantiated. {Config.DISABLE_SAVING_NOTE}")
+            return None
+        return super().__new__(cls)
+
+    def __init__(self, set_name, resolution):
         """
         Initialize the Saver object.
         The directory for each set and resolution is created.
-        :param set_name: A type from SetName.
-                         If NA, then skip this level of directory
-        :param resolution: A type from Resolution.
-                           If NA, then skip this level of directory
+        :param set_name: If empty, then skip this level of directory
+        :param resolution: If NA, then skip this level of directory
         Preconditions:
             - Saving must be enabled (Config.DISABLE_SAVING must be False)
             - Saver.initialize() must be called before creating an instance
@@ -43,9 +47,12 @@ class Saver:
         Create only one base output directory for all the results.
         :return: None
         """
-        assert not Config.DISABLE_SAVING, "Saving is disabled."
+        if Config.DISABLE_SAVING:
+            logger.info(
+                f"Saving is disabled. {Config.DISABLE_SAVING_NOTE}. The base output directory will not be created.")
+            return
 
-        cls.base_output_dir = os.path.join(Config.BASE_OUTPUT_PATH, f'results_{Saver._time_id()}')
+        cls.base_output_dir = os.path.join(Config.BASE_OUTPUT_PATH, f'{Config.OUTPUT_DENOTE}_results_{Saver._time_id()}')
         cls.ensure_directory(cls.base_output_dir)
         logger.info(f"Created Base Output directory: {cls.base_output_dir}")
 
@@ -94,9 +101,6 @@ class Saver:
 
         file_config = FILE_CONFIGURATIONS[data_type]
         rel_path = file_config.relative_dir
-
-        file_name_prefix = (file_name_prefix + '_') if file_name_prefix and file_name_prefix[-1] != '_' else (
-                file_name_prefix or '')
         file_detail = (file_config.detail + '_') if file_config.detail and file_config.detail[-1] != '_' else (
                 file_config.detail or '')
         file_name = f"{file_name_prefix}{file_detail}{self._time_id()}.{file_config.file_extension}"

@@ -28,32 +28,34 @@ class PlotConfig(FileConfig):
     show_on_the_fly: bool = True
 
 
+ORIGINAL_DIR = "original"
+SYNTHETIC_DIR = "synthetic"
 FILE_CONFIGURATIONS = {
     DataType.ORIGINAL_IMAGE: ImageConfig(
-        relative_dir="origin",
+        relative_dir=ORIGINAL_DIR,
         data_type=DataType.ORIGINAL_IMAGE,
         alpha=0.6,
         detail="original_image"
     ),
     DataType.ORIGINAL_GRAPH: PlotConfig(
-        relative_dir="origin",
+        relative_dir=ORIGINAL_DIR,
         node_size=6.0,
         line_width=3.0,
         data_type=DataType.ORIGINAL_GRAPH,
         detail="original_graph"
     ),
     DataType.ORIGINAL_NETWORK: FileConfig(
-        relative_dir="origin",
+        relative_dir=ORIGINAL_DIR,
         data_type=DataType.ORIGINAL_NETWORK,
         detail="original_network"
     ),
     DataType.ORIGINAL_PROPERTY: FileConfig(
-        relative_dir="origin",
+        relative_dir=ORIGINAL_DIR,
         data_type=DataType.ORIGINAL_PROPERTY,
         detail="original_property"
     ),
     DataType.SYNTHETIC_GRAPH: PlotConfig(
-        relative_dir="synthetic",
+        relative_dir=SYNTHETIC_DIR,
         node_size=6.0,
         line_width=3.0,
         data_type=DataType.SYNTHETIC_GRAPH,
@@ -61,7 +63,7 @@ FILE_CONFIGURATIONS = {
         detail="synthetic_graph",
     ),
     DataType.SYNTHETIC_NETWORK: FileConfig(
-        relative_dir="synthetic",
+        relative_dir=SYNTHETIC_DIR,
         data_type=DataType.SYNTHETIC_NETWORK,
         detail="synthetic_network",
     ),

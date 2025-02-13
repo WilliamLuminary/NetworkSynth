@@ -69,26 +69,6 @@ def build_graph_nodes_and_edges(nodes: Union[list, set], edges: Union[list, set]
     return graph
 
 
-def timer(func):
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        start = time.time()
-        result = func(*args, **kwargs)
-        end = time.time()
-        logging.info(f"Time taken by func \"{func.__name__}\" : {round(end - start, 2)} seconds")
-        return result
-
-    return wrapper
-
-
-def figure_to_ndarray(fig: Figure) -> ndarray:
-    canvas = FigureCanvas(fig)
-    canvas.draw()
-    buf = canvas.buffer_rgba()
-    image_array = np.asarray(buf)
-    return image_array
-
-
 def keep_largest_connected_component(graph: nx.Graph) -> nx.Graph:
     """
     Keep only the largest connected component of the graph.
@@ -108,6 +88,18 @@ def keep_largest_connected_component(graph: nx.Graph) -> nx.Graph:
     largest_cc = max(nx.connected_components(graph), key=len)
     # noinspection PyTypeChecker
     return graph.subgraph(largest_cc).copy()
+
+
+def timer(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        end = time.time()
+        logging.info(f"Time taken by func \"{func.__name__}\" : {round(end - start, 2)} seconds")
+        return result
+
+    return wrapper
 
 
 def plot_graph(data_type: DataType, graph: nx.Graph = None,
@@ -195,6 +187,31 @@ def plot_graph(data_type: DataType, graph: nx.Graph = None,
 
     if getattr(file_config, 'show_on_the_fly', False):
         plt.show()
-    graph = figure_to_ndarray(fig)
+    fig = figure_to_ndarray(fig)
     plt.close()
+    return fig
+
+
+def figure_to_ndarray(fig: Figure, swap: bool = False) -> ndarray:
+    canvas = FigureCanvas(fig)
+    canvas.draw()
+    buf = canvas.buffer_rgba()
+    image_array = np.asarray(buf)
+    image_array = image_array[..., [2, 1, 0, 3]] if swap else image_array
+    return image_array
+
+
+def trim_graph(graph: nx.Graph, tar_avg_deg: float) -> nx.Graph:
+    """
+    Trim the synthetic graph to have an average degree close to the original graph.
+    :param graph: A synthetic graph.
+    :param tar_avg_deg: The target average degree.
+    :return: A copy of the trimmed synthetic graph.
+    """
+    while 2 * graph.number_of_edges() / graph.number_of_nodes() > 1.1 * tar_avg_deg:
+        highest_degree_node = max(graph.degree, key=lambda x: x[1])[0]
+        neighbors = list(graph.neighbors(highest_degree_node))
+        if neighbors:
+            graph.remove_edge(highest_degree_node, neighbors[0])
+        graph = keep_largest_connected_component(graph)
     return graph

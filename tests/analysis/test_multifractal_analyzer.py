@@ -1,3 +1,4 @@
+# tests/analysis/test_multifractal_analyzer.py
 import os
 import pickle
 
@@ -24,7 +25,7 @@ ConfigSample.initialize()
 
 @pytest.fixture
 def load_graph_from_pickle():
-    file_path = os.path.realpath(os.path.join("..", "data", "input_network.pkl"))
+    file_path = os.path.realpath(os.path.join("..", "data", "sample1_unweighted_network.pkl"))
     with open(file_path, "rb") as f:
         G = pickle.load(f)
     assert isinstance(G, nx.Graph)
@@ -34,7 +35,7 @@ def load_graph_from_pickle():
 def test_calculate_multifractal_taus(load_graph_from_pickle):
     sample_graph = load_graph_from_pickle
     analyzer = MultifractalAnalyzer(sample_graph)
-    tau_list, r_g_all, diameter, zq_list = analyzer.compute_multifractal_taus()
+    tau_list, r_g_all, diameter, zq_list = analyzer._compute_multifractal_taus()
 
     assert isinstance(tau_list, (np.ndarray, list))
     assert isinstance(r_g_all, (np.ndarray, list))

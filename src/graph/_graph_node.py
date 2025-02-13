@@ -1,4 +1,4 @@
-# src/graph/graph_node.py
+# src/graph/_graph_node.py
 
 import random
 from collections import defaultdict

@@ -1,5 +1,5 @@
 # src/config/enums.py
-from enum import Enum
+from enum import Enum, auto
 from typing import Set, Union
 
 
@@ -97,7 +97,7 @@ class DataType(Enum):
     DEFAULT_DATA = ("Default Data", {FileTag.DATA}, FileExtension.PKL)
     ORIGINAL_IMAGE = ("Original Image", {FileTag.FIG, FileTag.ORI}, FileExtension.PNG)
     ORIGINAL_GRAPH = ("Original Graph", {FileTag.FIG, FileTag.PLOT, FileTag.ORI}, FileExtension.PNG)
-    ORIGINAL_PROPERTY = ("Original Property", { FileTag.ORI, FileTag.DATA}, FileExtension.PKL)
+    ORIGINAL_PROPERTY = ("Original Property", {FileTag.ORI, FileTag.DATA}, FileExtension.PKL)
     ORIGINAL_NETWORK = ("Original Network", {FileTag.DATA, FileTag.ORI}, FileExtension.PKL)
     SYNTHETIC_GRAPH = ("Synthetic Graph", {FileTag.FIG, FileTag.PLOT, FileTag.SYN}, FileExtension.PNG)
     SYNTHETIC_NETWORK = ("Synthetic Network", {FileTag.DATA, FileTag.SYN}, FileExtension.PKL)
@@ -114,3 +114,9 @@ class DataType(Enum):
         if isinstance(tags, FileTag):
             return tags in self.tags
         return set(tags).issubset(self.tags)
+
+
+class AnalysisMode(Enum):
+    BASIC = auto()
+    FULL = auto()
+    RETROACTIVE = auto()

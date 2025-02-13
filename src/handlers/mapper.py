@@ -1,107 +1,140 @@
 import logging
 import random
-import warnings
 from collections import defaultdict
+from typing import DefaultDict, Final, Generator, Tuple
 
 import networkx as nx
 import numpy as np
-from matplotlib import pyplot as plt
 from scipy.spatial.distance import euclidean
+from scipy.stats import gaussian_kde
+from sklearn.neighbors import NearestNeighbors
 
 logger = logging.getLogger(__name__)
+
+NUM_BINS: Final[int] = 100
 
 
 class Mapper:
     def __init__(self, graph: nx.Graph):
-        self.length_bins = None
-        self.weight_baskets = None
-        self.edge_weights = None
-        self._initialize_mapper(graph)
-        self.assign_weights(graph)
-
-    def _map_weight_by_length(self, length):
-        bin_idx = np.digitize(length, self.length_bins) - 1
-        bin_idx = np.clip(bin_idx, 0, len(self.length_bins) - 2)
-        return random.choice(self.weight_baskets[bin_idx]) if self.weight_baskets[bin_idx] else np.mean(
-            self.edge_weights)
-
-    def _initialize_mapper(self, graph: nx.Graph, plot: bool = False):
-        edge_lengths, self.edge_weights = self._edge_lengths_and_weights(graph)
-
-        num_bins = 100
-        self.length_bins, self.weight_baskets = self._bins_and_baskets(edge_lengths, self.edge_weights, num_bins)
-
-        if plot:
-            warn_mesg = 'Plotting is not thread-safe. Use with caution.'
-            warnings.warn(warn_mesg)
-            logger.warning(warn_mesg)
-            mapped_weights = [self._map_weight_by_length(length)
-                              for length in edge_lengths]
-            plt.figure(figsize=(8, 6))
-            plt.scatter(edge_lengths, self.edge_weights, c='blue', alpha=0.3, label='Original Data')
-            plt.scatter(edge_lengths, mapped_weights, c='orange', alpha=0.3, label='Mapped Weights')
-            plt.title('Edge Length vs Weight with Basket-Based Mapping')
-            plt.xlabel('Length')
-            plt.ylabel('Weight')
-            plt.legend()
-            plt.grid(False)
-            plt.show()
-
-    def assign_weights(self, graph: nx.Graph):
-        edge_lengths = [euclidean(graph.nodes[u]['pos'], graph.nodes[v]['pos'])
-                        for u, v in graph.edges()]
-        weights = [self._map_weight_by_length(length) for length in edge_lengths]
-        for (u, v), weight in zip(graph.edges(), weights):
-            graph[u][v]['weight'] = weight
+        lengths, weights = self._compute_edge_metrics(graph)
+        self.avg_weights: Final = np.mean(weights)
+        bins, dist = self._create_mapping_metrics(lengths, weights)
+        self.length_bins: Final = bins
+        self.weight_distributions: Final = dist
+        self.original_lengths = np.array(lengths)
+        self.original_weights = np.array(weights)
 
     @staticmethod
-    def _edge_lengths_and_weights(graph: nx.Graph) -> tuple:
-        edge_lengths = []
-        edge_weights = []
+    def _compute_edge_metrics(graph: nx.Graph):
+        lengths, weights = [], []
+        for _, _, data in Mapper._length_generator(graph):
+            lengths.append(data['length'])
+            weights.append(data.get('weight', 1.0))
+        return lengths, weights
 
+    @staticmethod
+    def _length_generator(graph) -> Generator[tuple, None, None]:
         for u, v, data in graph.edges(data=True):
             if 'length' not in data:
-                pos_u = np.array(graph.nodes[u]['pos'], dtype=np.float64)
-                pos_v = np.array(graph.nodes[v]['pos'], dtype=np.float64)
-                length = np.linalg.norm(pos_u - pos_v)
-                graph.edges[u, v]['length'] = length
-            else:
-                length = data['length']
-
-            weight = data.get('weight', 1)
-
-            edge_lengths.append(length)
-            edge_weights.append(weight)
-
-        return np.array(edge_lengths), np.array(edge_weights)
+                data['length'] = euclidean(graph.nodes[u]['pos'], graph.nodes[v]['pos'])
+            yield u, v, data
 
     @staticmethod
-    def _bins_and_baskets(edge_lengths, edge_weights, num_bins=100, method: str = None):
-        method = method or 'thirds'
-        sorted_lengths = np.sort(edge_lengths)
-        num_edges = len(sorted_lengths)
+    def _create_mapping_metrics(lengths, weights) -> Tuple[np.ndarray, DefaultDict[int, list]]:
+        sorted_lengths = np.sort(lengths)
+        length_bins = Mapper._create_thirds_bins(sorted_lengths) \
+            if len(sorted_lengths) > 100 \
+            else Mapper._create_linear_bins(sorted_lengths)
 
-        if method == 'thirds':
-            one_third = num_edges // 3
-            two_thirds = 2 * num_edges // 3
+        return Mapper._build_weight_distributions(length_bins, lengths, weights)
 
-            min_third_value = sorted_lengths[one_third]
-            max_third_value = sorted_lengths[two_thirds]
+    @staticmethod
+    def _build_weight_distributions(length_bins, lengths, weights):
+        weight_distributions = defaultdict(list)
+        bin_indices = np.clip(np.digitize(lengths, length_bins) - 1, 0, len(length_bins) - 2)
+        for idx, weight in zip(bin_indices, weights):
+            weight_distributions[idx].append(weight)
+        return length_bins, weight_distributions
 
-            small_third_bins = np.linspace(sorted_lengths.min(), min_third_value, 50 + 1)
-            middle_third_bins = np.linspace(min_third_value, max_third_value, 30 + 1)
-            large_third_bins = np.linspace(max_third_value, sorted_lengths.max(), 20 + 1)
+    @staticmethod
+    def _create_linear_bins(sorted_lengths):
+        return np.linspace(sorted_lengths[0], sorted_lengths[-1], NUM_BINS + 1)
 
-            length_bins = np.concatenate([small_third_bins, middle_third_bins[1:], large_third_bins[1:]])
+    @staticmethod
+    def _create_thirds_bins(sorted_lengths):
+        n = len(sorted_lengths)
+        lower, upper = sorted_lengths[n // 3], sorted_lengths[2 * n // 3]
+        length_bins = np.concatenate([
+            np.linspace(sorted_lengths[0], lower, 51),
+            np.linspace(lower, upper, 31)[1:],
+            np.linspace(upper, sorted_lengths[-1], 21)[1:]
+        ])
+        return length_bins
 
-        else:  # Default to 'linear' binning
-            length_bins = np.linspace(edge_lengths.min(), edge_lengths.max(), num_bins + 1)
+    def assign_weights(self, graph) -> None:
+        """
+        Assigns edge weights to the graph based on the length of the edges.
+        :param graph: A networkx graph.
+        :return: None.
+        # Postcondition:
+        The graph is modified in place.
+        """
+        if nx.get_edge_attributes(graph, 'weight'):
+            raise ValueError('Graph already has edge weights assigned')
 
-        weight_baskets = defaultdict(list)
+        weights = {
+            (u, v): self._length_to_weight(data['length'])
+            for u, v, data in self._length_generator(graph)
+        }
+        nx.set_edge_attributes(graph, weights, 'weight')
 
-        for length, weight in zip(edge_lengths, edge_weights):
-            bin_idx = np.digitize(length, length_bins) - 1
-            bin_idx = np.clip(bin_idx, 0, len(length_bins) - 2)
-            weight_baskets[bin_idx].append(weight)
+    def _length_to_weight(self, length: float) -> float:
+        bin_idx = np.clip(np.digitize(length, self.length_bins) - 1,
+                          0, len(self.length_bins) - 2)
+        distribution = self.weight_distributions.get(bin_idx)
+        return random.choice(distribution) if distribution else self.avg_weights
 
-        return length_bins, weight_baskets
+
+class EnhancedMapper(Mapper):
+    def __init__(self, graph: nx.Graph, *, mix_intensity: float = 0.3):
+        """
+        :param mix_intensity: 0.0 (original) to 1.0 (full mixing)
+        """
+        super().__init__(graph)
+        self.mix_intensity = np.clip(mix_intensity, 0, 1)
+        self._prepare_mixing_model()
+
+    def _prepare_mixing_model(self):
+        lengths = np.array(self.original_lengths)
+        weights = np.array(self.original_weights)
+
+        self.kde = gaussian_kde(np.vstack([lengths, weights]))
+        self.nn_model = NearestNeighbors(n_neighbors=50).fit(np.vstack([lengths, weights]).T)
+
+        self.bandwidth = self.mix_intensity * np.std(lengths) * 2
+
+    def _get_mixed_weight(self, length: float) -> float:
+        distances, indices = self.nn_model.kneighbors([[length, 0]], return_distance=True)
+
+        raw_weights = 1 / (distances.squeeze() + 1e-8)
+        mixing_probs = raw_weights / raw_weights.sum()
+
+        return np.random.choice(self.original_weights[indices.squeeze()], p=mixing_probs)
+
+    def assign_weights(self, graph: nx.Graph) -> None:
+        if nx.get_edge_attributes(graph, 'weight'):
+            raise ValueError('Graph already has edge weights assigned')
+
+        weights = {}
+        for u, v, data in self._length_generator(graph):
+            length = data['length']
+
+            if np.random.random() < self.mix_intensity:
+                weight = self._get_mixed_weight(length)
+            else:
+                weight = self._length_to_weight(length)
+
+            weights[(u, v)] = weight
+
+        nx.set_edge_attributes(graph, weights, 'weight')
+

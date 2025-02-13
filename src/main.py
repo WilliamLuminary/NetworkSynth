@@ -11,11 +11,11 @@ from analysis import MultifractalAnalyzer
 from config import Config, DataType, Resolution, SetName
 # noinspection PyUnresolvedReferences
 from config import Config1, Config2, ConfigSample
-from graph import GraphAttrAgent, GraphGenerator, GraphPostProcessor
+from graph import GraphGenerator
+from utils.utils import trim_graph
 from handlers import DataAgent, Saver, Summarizer
 
-Config1.initialize()
-# Config2.initialize()
+Config2.initialize()
 
 preview = False
 exp = False  # Set to True to run the hyperparameter tuning experiment
@@ -26,44 +26,52 @@ if preview:
 
 logger = logging.getLogger(__name__)
 
+SIGINT_INFO = "SIGINT received. Terminating child process..."
 
-def generate_synthetic_network(exit_event, std_err_fea, attributes, map_handler,
-                               avg_degree: float):
+
+def generate_synthetic_network(exit_event, std_err_fea, attributes, mapper):
     generator = GraphGenerator(attributes)
 
     error_ = float('inf')
-    attempt = 0
     synthetic_graph = None
-    error_threshold = Config.ERROR_TOLERANCE
-    max_attempts = Config.MAX_ATTEMPTS
-    while (error_ > error_threshold
-           and attempt < max_attempts
-           and not exit_event.is_set()):
-        attempt += 1
-
+    for attempt in range(Config.MAX_ATTEMPTS):
         try:
+            if exit_event.is_set():
+                logger.info(SIGINT_INFO)
+                return None, float('inf')
+
             synthetic_graph = generator.generate_network()
 
-            postprocessor = GraphPostProcessor(synthetic_graph, map_handler, avg_degree)
-            postprocessor.trim_graph()
-            postprocessor.assign_weights()
-            synthetic_graph = postprocessor.synthetic_graph
+            if exit_event.is_set():
+                logger.info(SIGINT_INFO)
+                return None, float('inf')
+
+            synthetic_graph = trim_graph(synthetic_graph, attributes.average_degree)
+            mapper.assign_weights(synthetic_graph)
+
+            if exit_event.is_set():
+                logger.info(SIGINT_INFO)
+                return None, float('inf')
 
             analyzer = MultifractalAnalyzer(synthetic_graph)
             err_fea = analyzer.analyze_error_values()
-
             error_ = analyzer.analyze_error(err_fea, std_err_fea)
+            if error_ < Config.ERROR_TOLERANCE:
+                break  # Exit the loop if the error is within the tolerance
 
+            if exit_event.is_set():
+                logger.info(SIGINT_INFO)
+                return None, float('inf')
+
+        except KeyboardInterrupt:
+            logger.info(SIGINT_INFO)
+            raise
         except Exception as exc:
             logger.error(f"Exception occurred during graph generation: {exc}. Skipping attempt {attempt}.")
             continue
 
-    if exit_event.is_set():
-        logger.debug("Child process exiting due to exit signal.")
-        return None, float('inf')
-
-    if error_ > error_threshold:
-        logger.warning(f"Failed after {max_attempts} attempts (error={error_:.4f}).")
+    if error_ > Config.ERROR_TOLERANCE:
+        logger.warning(f"Max attempts reached. Abort!")
         return None, float('inf')
 
     return synthetic_graph, error_
@@ -75,9 +83,6 @@ def generate_with_multiprocessing(data_agent: DataAgent, std_err_fea) -> \
     num_syn_graph = Config.SYNTHETIC_GRAPH_NUMBER
     errors = []
     futures = []
-    attributes = data_agent.attributes
-    map_handler = data_agent.mapper
-    avg_degree = attributes.average_degree
 
     from multiprocessing import Manager
     manager = Manager()
@@ -90,9 +95,8 @@ def generate_with_multiprocessing(data_agent: DataAgent, std_err_fea) -> \
                     generate_synthetic_network,
                     exit_event,
                     std_err_fea,
-                    attributes,
-                    map_handler,
-                    avg_degree
+                    data_agent.attributes,
+                    data_agent.mapper
                 )
                 futures.append(future)
 
@@ -120,13 +124,12 @@ def generate_with_multiprocessing(data_agent: DataAgent, std_err_fea) -> \
                     return None
 
     except KeyboardInterrupt:
-        logger.info("KeyboardInterrupt received. Terminating processes...")
+        logger.info(SIGINT_INFO)
         exit_event.set()
         for future in futures:
             future.cancel()
-        executor.shutdown(wait=False)
+        executor.shutdown(wait=True, cancel_futures=True)
         raise
-
     except Exception:
         exit_event.set()
         executor.shutdown(wait=False)
@@ -135,31 +138,28 @@ def generate_with_multiprocessing(data_agent: DataAgent, std_err_fea) -> \
     if not errors:
         return float('inf')
 
-    _non_inf_errors = [__e for __e in errors if not np.isinf(__e)]
-    if not _non_inf_errors:
+    non_inf_errors = [e for e in errors if not np.isinf(e)]
+    if not non_inf_errors:
         return float('inf')
 
-    _mean_e = np.mean(_non_inf_errors)
-    _std_e = np.std(_non_inf_errors)
-    _threshold = 2.0
-    _non_outlier_errors = [__e for __e in _non_inf_errors if abs(__e - _mean_e) <= _threshold * _std_e]
-    if not _non_outlier_errors:
+    mean_e = np.mean(non_inf_errors)
+    std_e = np.std(non_inf_errors)
+    threshold = 2.0
+    non_outlier_errors = [__e for __e in non_inf_errors if abs(__e - mean_e) <= threshold * std_e]
+    if not non_outlier_errors:
         return float('inf')
 
-    _avg_err = round(np.mean(_non_outlier_errors), 3)
+    avg_err = round(np.mean(non_outlier_errors), 3)
 
-    data_agent.save(data_type=DataType.SYNTHETIC_NETWORK, file_name_prefix=f'nw_no_{num_syn_nw}_err_{_avg_err:.3f}')
+    data_agent.save(data_type=DataType.SYNTHETIC_NETWORK, file_name_prefix=f'nw_no_{num_syn_nw}_err_{avg_err:.3f}')
 
-    return _avg_err
+    return avg_err
 
 
 def run(set_name: SetName, resolution: Resolution) -> Optional[float]:
     logger.info(Config())
     data_agent = DataAgent(set_name, resolution)
-    data_agent.load_data()
-    attr = GraphAttrAgent()
-    attr.analyze(data_agent.original_network)
-    data_agent.set_attributes(attr)
+    data_agent.prepare_data()
     data_agent.save(DataType.ORIGINAL_IMAGE)
     data_agent.save(DataType.ORIGINAL_NETWORK)
     data_agent.save(DataType.ORIGINAL_PROPERTY)
@@ -226,15 +226,12 @@ if __name__ == '__main__':
 
         summary = Summarizer()
 
-        for __set_name, __resolution in product(set_names, resolutions):
-            error = run(__set_name, __resolution)
+        for set_name, resolution in product(set_names, resolutions):
+            error = run(set_name, resolution)
             if error is not None:
-                summary.add_result(__set_name.value, __resolution.value, error)
+                summary.add_result(set_name.value, resolution.value, error)
 
         summary.summarize()
 
-    except Exception as e:
-        logger.exception(e)
-        raise
-
-## Node before 1.0, edge before 1.o
+    except KeyboardInterrupt:
+        logger.critical("MAIN PROCESS: Forcing immediate shutdown!")

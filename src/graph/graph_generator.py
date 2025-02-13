@@ -9,7 +9,7 @@ from numpy import ndarray
 from config import Config
 from utils import build_graph_nodes_and_edges, calculate_frame
 from . import GraphAttrAgent
-from .graph_node import GraphNode
+from ._graph_node import GraphNode
 
 
 class GraphGenerator:
