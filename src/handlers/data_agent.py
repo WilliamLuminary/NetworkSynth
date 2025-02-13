@@ -1,12 +1,12 @@
 # src/data/data_agent.py
 import logging
-from typing import Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import cv2
 import networkx as nx
 import numpy as np
 
-from config import Config, DataType
+from config import Config, DataType, Resolution, SetName
 from graph import GraphAttrAgent
 from utils import build_graph_pos_and_adj_mat, plot_graph
 from .mapper import Mapper
@@ -70,6 +70,34 @@ def _transform_coordinates_by_image(network: nx.Graph, image: np.ndarray, flip_x
         d['pos'] = p
 
     def save(self, data_type: DataType, file_name_prefix: str = None, arg=None):
+
+class DataLoader:
+    def __init__(self, **kwargs):
+        if 'set_name' in kwargs and 'resolution' in kwargs:
+            self.set_name = kwargs['set_name']
+            self.resolution = kwargs['resolution']
+
+            self.original_network = build_graph_pos_and_adj_mat((self._load_positions(), self._load_sparse_matrix()))
+            self.original_image = self._load_image()
+
+    def load(self):
+        if not Config.DEFAULT_FRAME_SIZE:
+            Config.update_frame_size((self.original_image.shape[1], self.original_image.shape[0]))
+
+        image = _resize_cv2_image(self.original_image)
+        image = _trim_cv2_image(image)
+        _transform_coordinates_by_image(self.original_network, image)
+        return self.original_image, self.original_network
+
+    def _load_positions(self) -> Union[np.ndarray, List]:
+        return Config.POSITION_DATA_FUNC(str(self.set_name), str(self.resolution))
+
+    def _load_sparse_matrix(self) -> Union[np.ndarray, List]:
+        return Config.ADJ_MATRIX_DATA_FUNC(str(self.set_name), str(self.resolution))
+
+    def _load_image(self) -> Union[np.ndarray, List]:
+        return Config.IMAGES_FUNC(str(self.set_name), str(self.resolution))
+            if isinstance(args[0], SetName) and isinstance(args[1], Resolution):
         if not self.saver and data_type != DataType.SYNTHETIC_GRAPH:
             return
 
