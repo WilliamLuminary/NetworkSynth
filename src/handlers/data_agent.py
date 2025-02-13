@@ -153,7 +153,8 @@ class DataAgent:
 
         show_figure_if_not_saving: bool = not self.saver and arg
 
-        file_name_prefix = f"{file_name_prefix}_" or file_name_prefix
+        file_name_prefix = f"{file_name_prefix}" if file_name_prefix and file_name_prefix[-1] != '_' else (
+                file_name_prefix or '')
         if data_type == DataType.ORIGINAL_IMAGE:
             self.saver.save_file(self.original_image, data_type, file_name_prefix)
         elif data_type == DataType.ORIGINAL_NETWORK:

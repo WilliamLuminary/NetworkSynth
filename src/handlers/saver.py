@@ -101,8 +101,6 @@ class Saver:
 
         file_config = FILE_CONFIGURATIONS[data_type]
         rel_path = file_config.relative_dir
-
-
         file_detail = (file_config.detail + '_') if file_config.detail and file_config.detail[-1] != '_' else (
                 file_config.detail or '')
         file_name = f"{file_name_prefix}{file_detail}{self._time_id()}.{file_config.file_extension}"
