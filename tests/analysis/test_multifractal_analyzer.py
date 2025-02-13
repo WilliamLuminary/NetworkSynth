@@ -1,3 +1,4 @@
+# tests/analysis/test_multifractal_analyzer.py
 import os
 import pickle
 
@@ -24,7 +25,7 @@ ConfigSample.initialize()
 
 @pytest.fixture
 def load_graph_from_pickle():
-    file_path = os.path.realpath(os.path.join("..", "data", "input_network.pkl"))
+    file_path = os.path.realpath(os.path.join("..", "data", "sample1_unweighted_network.pkl"))
     with open(file_path, "rb") as f:
         G = pickle.load(f)
     assert isinstance(G, nx.Graph)
