@@ -1,107 +1,77 @@
 import logging
 import random
-import warnings
 from collections import defaultdict
+from typing import DefaultDict, Final, Tuple
 
 import networkx as nx
 import numpy as np
-from matplotlib import pyplot as plt
 from scipy.spatial.distance import euclidean
 
 logger = logging.getLogger(__name__)
 
+NUM_BINS: Final[int] = 100
+
 
 class Mapper:
     def __init__(self, graph: nx.Graph):
-        self.length_bins = None
-        self.weight_baskets = None
-        self.edge_weights = None
-        self._initialize_mapper(graph)
-        self.assign_weights(graph)
+        lengths, weights = self._compute_edge_metrics(graph)
+        self.avg_weights: Final[float] = np.mean(weights)
+        self.length_bins, self.weight_distributions = self._create_map_metrics(lengths, weights)
 
-    def _map_weight_by_length(self, length):
+    def _length_to_weight(self, length: float) -> float:
         bin_idx = np.digitize(length, self.length_bins) - 1
         bin_idx = np.clip(bin_idx, 0, len(self.length_bins) - 2)
-        return random.choice(self.weight_baskets[bin_idx]) if self.weight_baskets[bin_idx] else np.mean(
-            self.edge_weights)
-
-    def _initialize_mapper(self, graph: nx.Graph, plot: bool = False):
-        edge_lengths, self.edge_weights = self._edge_lengths_and_weights(graph)
-
-        num_bins = 100
-        self.length_bins, self.weight_baskets = self._bins_and_baskets(edge_lengths, self.edge_weights, num_bins)
-
-        if plot:
-            warn_mesg = 'Plotting is not thread-safe. Use with caution.'
-            warnings.warn(warn_mesg)
-            logger.warning(warn_mesg)
-            mapped_weights = [self._map_weight_by_length(length)
-                              for length in edge_lengths]
-            plt.figure(figsize=(8, 6))
-            plt.scatter(edge_lengths, self.edge_weights, c='blue', alpha=0.3, label='Original Data')
-            plt.scatter(edge_lengths, mapped_weights, c='orange', alpha=0.3, label='Mapped Weights')
-            plt.title('Edge Length vs Weight with Basket-Based Mapping')
-            plt.xlabel('Length')
-            plt.ylabel('Weight')
-            plt.legend()
-            plt.grid(False)
-            plt.show()
-
-    def assign_weights(self, graph: nx.Graph):
-        edge_lengths = [euclidean(graph.nodes[u]['pos'], graph.nodes[v]['pos'])
-                        for u, v in graph.edges()]
-        weights = [self._map_weight_by_length(length) for length in edge_lengths]
-        for (u, v), weight in zip(graph.edges(), weights):
-            graph[u][v]['weight'] = weight
+        distribution = self.weight_distributions.get(bin_idx, None)
+        return random.choice(distribution) if distribution else self.avg_weights
 
     @staticmethod
-    def _edge_lengths_and_weights(graph: nx.Graph) -> tuple:
-        edge_lengths = []
-        edge_weights = []
-
+    def _compute_edge_metrics(graph: nx.Graph) -> tuple:
+        lengths, weights = [], []
         for u, v, data in graph.edges(data=True):
             if 'length' not in data:
-                pos_u = np.array(graph.nodes[u]['pos'], dtype=np.float64)
-                pos_v = np.array(graph.nodes[v]['pos'], dtype=np.float64)
-                length = np.linalg.norm(pos_u - pos_v)
-                graph.edges[u, v]['length'] = length
-            else:
-                length = data['length']
-
-            weight = data.get('weight', 1)
-
-            edge_lengths.append(length)
-            edge_weights.append(weight)
-
-        return np.array(edge_lengths), np.array(edge_weights)
+                length = euclidean(graph.nodes[u]['pos'], graph.nodes[v]['pos'])
+                data['length'] = length
+            np.append(lengths, data['length'])
+            np.append(weights, data.get('weight', 1.0))
+        return lengths, weights
 
     @staticmethod
-    def _bins_and_baskets(edge_lengths, edge_weights, num_bins=100, method: str = None):
-        method = method or 'thirds'
-        sorted_lengths = np.sort(edge_lengths)
-        num_edges = len(sorted_lengths)
+    def _create_map_metrics(lengths: np.ndarray,
+                            weights: np.ndarray
+                            ) -> Tuple[np.ndarray, DefaultDict[int, list]]:
 
-        if method == 'thirds':
-            one_third = num_edges // 3
-            two_thirds = 2 * num_edges // 3
+        sorted_lengths = np.sort(lengths)
+        length_bins = Mapper._create_thirds_bins(sorted_lengths) \
+            if len(sorted_lengths) > 100 \
+            else np.linspace(sorted_lengths[0], sorted_lengths[1], NUM_BINS + 1)
 
-            min_third_value = sorted_lengths[one_third]
-            max_third_value = sorted_lengths[two_thirds]
-
-            small_third_bins = np.linspace(sorted_lengths.min(), min_third_value, 50 + 1)
-            middle_third_bins = np.linspace(min_third_value, max_third_value, 30 + 1)
-            large_third_bins = np.linspace(max_third_value, sorted_lengths.max(), 20 + 1)
-
-            length_bins = np.concatenate([small_third_bins, middle_third_bins[1:], large_third_bins[1:]])
-
-        else:  # Default to 'linear' binning
-            length_bins = np.linspace(edge_lengths.min(), edge_lengths.max(), num_bins + 1)
-
-        weight_baskets = defaultdict(list)
-
-        for length, weight in zip(edge_lengths, edge_weights):
+        weight_distributions = defaultdict(list)
+        for length, weight in zip(lengths, weights):
             bin_idx = np.digitize(length, length_bins) - 1
             bin_idx = np.clip(bin_idx, 0, len(length_bins) - 2)
-            weight_baskets[bin_idx].append(weight)
+            weight_distributions[bin_idx].append(weight)
+        return length_bins, weight_distributions
 
-        return length_bins, weight_baskets
+    @staticmethod
+    def _create_thirds_bins(sorted_lengths):
+        n = len(sorted_lengths)
+        lower, upper = sorted_lengths[n // 3], sorted_lengths[2 * n // 3]
+        length_bins = np.concatenate([
+            np.linspace(sorted_lengths[0], lower, 51),
+            np.linspace(lower, upper, 31)[1:],
+            np.linspace(upper, sorted_lengths[-1], 21)[1:]
+        ])
+        return length_bins
+
+    def assign_weights(self, graph: nx.Graph):
+        if nx.get_edge_attributes(graph, 'weight'):
+            raise ValueError('Graph already has edge weights assigned')
+
+        lengths = []
+        for u, v, data in graph.edges(data=True):
+            if 'length' not in data:
+                length = euclidean(graph.nodes[u]['pos'], graph.nodes[v]['pos'])
+                data['length'] = length
+            lengths.append(data['length'])
+        weights = [self._length_to_weight(length) for length in lengths]
+        nx.set_edge_attributes(graph, dict(zip(graph.edges(), weights)), 'weight')
