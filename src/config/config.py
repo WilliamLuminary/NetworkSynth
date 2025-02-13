@@ -21,7 +21,7 @@ class Config:
     SETS: Union[list, np.ndarray]
     RESOLUTIONS = Union[list, np.ndarray]
 
-    DEFAULT_FRAME_SIZE: Tuple[int, int]  # General (510, 510) # (width, height)
+    DEFAULT_FRAME_SIZE: Tuple[int, int] = None
     CLOSED_NODES_FACTOR: float
     CLOSED_EDGES_FACTOR: float
 
@@ -46,9 +46,6 @@ class Config:
     DISABLE_SAVING_NOTE: str = ""
 
     BASE_OUTPUT_PATH = os.path.join(BASE_DATA_PATH, 'output')
-    SYNTHETIC_GRAPH_DIRECTORY_NAME = 'synthetic_networks'
-    ORIGINAL_GRAPH_DIRECTORY_NAME = 'original_graphs'
-
     POSITION_DATA_FUNC = ADJ_MATRIX_DATA_FUNC = IMAGES_FUNC = load_idle
 
     @classmethod
@@ -77,6 +74,7 @@ class Config:
     @classmethod
     def initialize(cls):
         cls._setup_logger(details=cls.__name__)
+        cls.OUTPUT_DENOTE = cls.__name__
 
     @classmethod
     def _update_attrs_in_base_config(cls):
