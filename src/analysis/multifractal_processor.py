@@ -11,26 +11,29 @@ logger = logging.getLogger(__name__)
 
 class MultifractalProcessor:
     def __init__(self, arg: Union[Dict, nx.Graph, List[Dict], List[nx.Graph]]):
-        self.graphs: Optional[List[nx.Graph]] = None
-        self.summary_data: Optional[List[Dict]] = None
-        if isinstance(arg[0], nx.Graph):
-            self.graphs = arg
-        elif isinstance(arg[0], Dict):
-            self.summary_data: List[Dict] = []
-        elif isinstance(arg, nx.Graph):
-            self.graphs = [arg]
+        self._graphs: Optional[List[nx.Graph]] = None
+        self._analysis_results: Optional[List[Dict]] = None
+        if isinstance(arg, nx.Graph):
+            self._graphs = [arg]
         elif isinstance(arg, Dict):
-            self.summary_data: List[Dict] = []
+            self._analysis_results: List[Dict] = [arg]
+        elif isinstance(arg[0], nx.Graph):
+            self._graphs = arg
+        elif isinstance(arg[0], Dict):
+            self._analysis_results: List[Dict] = arg
+
+    def get_summary_data(self) -> List[Dict]:
+        return self._analysis_results
 
     def analyze(self) -> None:
-        if self.graphs:
-            self.summary_data = self._perform_full_analysis()
-        elif self.summary_data:
+        if self._graphs:
+            self._analysis_results = self._perform_full_analysis()
+        elif self._analysis_results:
             self._augment_with_averages()
 
     def _perform_full_analysis(self) -> List[Dict]:
         return [self._analyze_single_graph(i, G)
-                for i, G in enumerate(self.graphs)]
+                for i, G in enumerate(self._graphs)]
 
     def _analyze_single_graph(self, idx: int, graph: nx.Graph) -> Dict:
         analyzer = MultifractalAnalyzer(graph)
@@ -52,9 +55,9 @@ class MultifractalProcessor:
         }
 
     def _augment_with_averages(self) -> None:
-        if self._has_averages(self.summary_data[0]):
+        if self._has_averages(self._analysis_results[0]):
             return
-        for entry in self.summary_data:
+        for entry in self._analysis_results:
             entry.update(self._calculate_averages(entry))
 
     @staticmethod
@@ -78,8 +81,3 @@ class MultifractalProcessor:
             "avg_ricci": safe_mean(data_.get("ricci_dist")),
             "avg_eigen": safe_mean(data_.get("eigen_dist")),
         }
-
-
-
-
-
