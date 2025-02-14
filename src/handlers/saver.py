@@ -15,7 +15,7 @@ from config import Config, DataType, FILE_CONFIGURATIONS, FileTag, Resolution, S
 logger = logging.getLogger(__name__)
 
 
-class SaverMode(Enum):
+class Mode(Enum):
     Generate = auto()
     Analyze = auto()
 
@@ -42,7 +42,7 @@ def _ensure_directory(path: str, exist_ok=False) -> None:
 
 class Saver:
     base_output_dir = None
-    mode = SaverMode.Generate
+    mode = None
 
     def __new__(cls, *args, **kwargs):
         if Config.DISABLE_SAVING:
@@ -67,12 +67,14 @@ class Saver:
             - The directory for each set and resolution is created.
         """
         assert not Config.DISABLE_SAVING, "Saving is disabled."
-        assert self.base_output_dir, "Base output directory is not initialized.\nCall Saver.initialize() first."
         if output_dir:
             self.output_dir = output_dir
+            self.mode = Mode.Analyze
         else:
+            assert self.base_output_dir, "Base output directory is not initialized.\nCall Saver.initialize() first."
             # Each output_dir is for each original network
             self.output_dir = os.path.join(self.base_output_dir, str(set_name), str(resolution))
+            self.mode = Mode.Generate
 
         _ensure_directory(self.output_dir, exist_ok=True)
 
@@ -88,10 +90,10 @@ class Saver:
             return
 
         if result_dir:
-            cls.mode = SaverMode.Analyze
+            cls.mode = Mode.Analyze
             cls.base_output_dir = os.path.join(Config.BASE_OUTPUT_PATH, result_dir)
         else:
-            cls.mode = SaverMode.Generate
+            cls.mode = Mode.Generate
             cls.base_output_dir = os.path.join(Config.BASE_OUTPUT_PATH,
                                                f'{Config.OUTPUT_DENOTE}_results_{Saver._time_id()}')
             _ensure_directory(cls.base_output_dir)
@@ -116,13 +118,14 @@ class Saver:
             logger.warning(f"{Config.DISABLE_SAVING_NOTE} Saving is disabled. ")
             return
 
-        file_config = FILE_CONFIGURATIONS[data_type]
-        file_detail = (file_config.detail + '_') if file_config.detail and file_config.detail[-1] != '_' else (
-                file_config.detail or '')
+        file_config = FILE_CONFIGURATIONS.get(data_type, FILE_CONFIGURATIONS[DataType.DEFAULT_DATA])
+        file_detail = file_config.detail
 
-        if self.mode == SaverMode.Generate:
+        if self.mode == Mode.Generate:
             file_name_identifier = self._time_id()
             rel_path = file_config.relative_dir
+            file_detail = (file_detail + '_') if file_config.detail and file_config.detail[-1] != '_' else (
+                    file_config.detail or '')
         else:
             file_name_identifier = ''
             rel_path = ''
