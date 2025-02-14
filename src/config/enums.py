@@ -75,7 +75,6 @@ class Resolution(Enum):
 
 class FileExtension(Enum):
     PNG = "png"
-    JPG = "jpg"
     PKL = "pkl"
 
     def __str__(self):

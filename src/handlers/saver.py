@@ -10,7 +10,7 @@ import cv2
 from numpy import ndarray
 
 from config import Config, DataType, FILE_CONFIGURATIONS, FileTag, Resolution, SetName
-from config.enums import Mode
+from config.enums import FileExtension, Mode
 
 logger = logging.getLogger(__name__)
 
@@ -129,11 +129,9 @@ class Saver:
         abs_path = os.path.join(self.output_dir, rel_path, file_name)
         _ensure_directory(os.path.dirname(abs_path), exist_ok=True)
 
-        if FileTag.FIG in data_type.tags:
-            Saver._save_image(content, abs_path)
-        elif FileTag.DATA in data_type.tags:
-            if hasattr(content, 'as_savable') and callable(content.as_savable):
-                content = content.as_savable()
+        if FileExtension.PNG == data_type.file_extension:
+            Saver._save_png_image(content, abs_path)
+        elif FileExtension.PKL == data_type.file_extension:
             Saver._save_pickle(content, abs_path)
         else:
             raise ValueError(f"Unsupported DataType for saving: {data_type}")
@@ -147,10 +145,9 @@ class Saver:
             pickle.dump(obj, f)
 
     @staticmethod
-    def _save_image(image: Union[ndarray], filepath: str) -> None:
+    def _save_png_image(image: Union[ndarray], filepath: str) -> None:
         if not isinstance(image, ndarray):
             raise ValueError("Unsupported image format. Expected ndarray.")
-
         cv2.imwrite(filepath, image)
 
     @staticmethod

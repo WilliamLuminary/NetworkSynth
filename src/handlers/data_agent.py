@@ -181,12 +181,6 @@ class DataAgent:
         """
         self.synthetic_networks.append(graph)
 
-    # def get_synthetic_graph(self):
-    #     return self.synthetic_networks.get() if not self.synthetic_networks.empty() else None
-
-    def set_attributes(self, attributes: GraphAttrAgent):
-        self.attributes = attributes
-
     def save(self, data_type: DataType, file_name_prefix: Optional[str] = None, arg=None):
         if not self.saver and data_type != DataType.SYNTHETIC_GRAPH:
             return
@@ -200,7 +194,7 @@ class DataAgent:
         elif data_type == DataType.ORIGINAL_NETWORK:
             self.saver.save_file(self.original_network, data_type, file_name_prefix)
         elif data_type == DataType.ORIGINAL_PROPERTY:
-            self.saver.save_file(self.attributes, data_type, file_name_prefix)
+            self.saver.save_file(self.attributes.savable(), data_type, file_name_prefix)
         elif data_type == DataType.ORIGINAL_GRAPH:
             original_figure = plot_network(
                 data_type=DataType.ORIGINAL_GRAPH,
@@ -235,8 +229,6 @@ def plot_network(data_type: DataType,
     """
     :param data_type:
     :param graph: If provided, plot the graph directly.
-    :param pos_and_adj_mat: Only used if `graph` is not provided.
-    Tuple / List / Ndarray of positions and adjacency matrix.
     :param adjust_axis:
     :param kwargs: Title, frame, plot_in_frame, background, image, alpha, edge_width, node_size, output_path
     """
