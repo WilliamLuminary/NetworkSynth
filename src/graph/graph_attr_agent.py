@@ -41,7 +41,7 @@ class GraphAttrAgent:
             'average_degree': self.average_degree
         }
 
-    def as_savable(self):
+    def savable(self) -> dict:
         return self._to_dict()
 
     @staticmethod
