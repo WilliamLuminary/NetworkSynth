@@ -1,5 +1,6 @@
 import os
 import pickle
+from collections import deque
 from typing import Dict, List
 
 import networkx as nx
@@ -128,47 +129,53 @@ class MultifractalBatchProcessor:
         return img
 
 
-def load_pkl_files(base_dir, sub_folders) -> Dict[str, Dict[str, List[nx.Graph]]]:
-    data_ = {}
-    if not os.path.isdir(base_dir):
-        raise FileNotFoundError(f"Base directory not found: {base_dir}")
-
-    for set_name_dir in os.listdir(base_dir):
-        if set_name_dir.startswith('__') or set_name_dir.startswith('.'):
-            continue
-        set_name_path = os.path.join(base_dir, set_name_dir)
-        if not os.path.isdir(set_name_path):
-            continue
-
-        data_[set_name_dir] = {}
-        for sub in sub_folders:
-            sub_path = os.path.join(set_name_path, sub)
-            if os.path.isdir(sub_path):
-                graphs = _load_graphs(sub_path)
-                if sub == 'origin':
-                    sub = 'original'
-                data_[set_name_dir][sub] = graphs
-    return data_
-
-
-def _load_graphs(folder):
-    graphs = []
+def _load_graphs_pkl(folder: str) -> List[nx.Graph]:
     for file in os.listdir(folder):
         if file.endswith('.pkl') and 'network' in file:
             with open(os.path.join(folder, file), 'rb') as f:
                 content = pickle.load(f)
-                if isinstance(content, nx.Graph):
-                    graphs.append(content)
-                else:
-                    graphs.extend(content)
-                break  # Currently, only one network file per directory
-    return graphs
+                return [content] if isinstance(content, nx.Graph) else content
+    return []
 
 
-def load_data(result_dir: str) -> Dict[str, Dict[str, List[nx.Graph]]]:
+def find_directories(base_dir: str, sub_folders=('synthetic', 'origin', 'original'), max_depth: int = 3) -> Dict[
+    str, Dict]:
+    name_networks_dict = {}
+    queue = deque([(base_dir, 0, '')])  # (path, depth, rel_path)
+
+    while queue:
+        current_dir, depth, rel_path = queue.popleft()
+
+        if os.path.basename(current_dir).startswith(('.', '__')):
+            continue
+
+        found = []
+        tmp_dict = {}
+        for entry in os.listdir(current_dir):
+            if entry in sub_folders:
+                key = 'original' if entry == 'origin' else entry
+                full_path = os.path.join(current_dir, entry)
+                tmp_dict[key] = _load_graphs_pkl(full_path)
+                found.append(entry)
+        if tmp_dict:
+            name_networks_dict[rel_path] = tmp_dict
+
+        if not found and depth < max_depth:
+            for entry in os.listdir(current_dir):
+                entry_path = os.path.join(current_dir, entry)
+                if os.path.isdir(entry_path):
+                    new_rel = os.path.join(rel_path, entry) if rel_path else entry
+                    queue.append((entry_path, depth + 1, new_rel))
+        elif found:
+            name_networks_dict[rel_path]['path'] = current_dir
+
+    return name_networks_dict
+
+
+def load_data(result_dir: str) -> Dict[str, Dict]:
     base_output_dir = Config.BASE_OUTPUT_PATH
     base_directory = os.path.abspath(os.path.join(base_output_dir, result_dir))
-    return load_pkl_files(base_directory, sub_folders=('synthetic', 'origin', 'original'))
+    return find_directories(base_directory, ('synthetic', 'origin', 'original'))
 
 
 ConfigSample.initialize()
