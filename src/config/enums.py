@@ -96,7 +96,7 @@ class FileTag(Enum):
 
 
 class DataType(Enum):
-    DEFAULT_DATA = ("Default Data", {FileTag.DATA}, FileExtension.PKL)
+    DEFAULT_DATA = ("", {FileTag.DATA}, FileExtension.PKL)
     ORIGINAL_IMAGE = ("Original Image", {FileTag.FIG, FileTag.ORI}, FileExtension.PNG)
     ORIGINAL_GRAPH = ("Original Graph", {FileTag.FIG, FileTag.PLOT, FileTag.ORI}, FileExtension.PNG)
     ORIGINAL_PROPERTY = ("Original Property", {FileTag.ORI, FileTag.DATA}, FileExtension.PKL)

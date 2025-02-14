@@ -8,13 +8,13 @@ import cv2
 import networkx as nx
 import numpy as np
 
-from analysis import MultifractalAnalyzer
-from analysis_main import MultifractalBatchProcessor
+from analysis.multifractal_batch_processor import MultifractalBatchProcessor
 from config import Config, DataType, Resolution, SetName
 from graph import GraphAttrAgent
 from utils import build_graph_pos_and_adj_mat, plot_network
 from .mapper import Mapper
 from .saver import Saver
+from config.enums import Mode
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +136,7 @@ class DataAgent:
 
             self.saver = Saver(output_dir=analyze_source_path)
             self.batch_processor = MultifractalBatchProcessor(self.original_network, self.synthetic_networks)
-
+            self.mode = Mode.Analyze
         else:
             if not set_name or not resolution:
                 raise ValueError("Both set_name and resolution are required for traditional initialization")
@@ -148,19 +148,18 @@ class DataAgent:
 
             self.saver = Saver(set_name=set_name, resolution=resolution)
             self.batch_processor = None
+            self.mode = Mode.Generate
 
         self.original_image = None
 
         self.original_analysis = None
         self.synthetic_analysis = None
 
-        self.spectra_image = None
-        self.dimensions_image = None
-
         self.attributes: Optional[GraphAttrAgent] = None
         self.mapper: Optional[Mapper] = None
 
     def prepare_data(self):
+        assert self.mode == Mode.Generate, "This method is only for generating data."
         self.original_image, self.original_network = DataLoader(set_name=self.set_name,
                                                                 resolution=self.resolution).load()
         self.attributes = GraphAttrAgent(self.original_network).analyze()
@@ -168,7 +167,8 @@ class DataAgent:
 
     def multifractal_analysis(self):
         assert self.synthetic_networks, "Add synthetic networks at first."
-        self.batch_processor = MultifractalBatchProcessor([self.original_network], self.synthetic_networks)
+        network = self.original_network if isinstance(self.original_network, list) else [self.original_network]
+        self.batch_processor = MultifractalBatchProcessor(network, self.synthetic_networks)
         self.batch_processor.process().plot()
 
     def add_synthetic_graph(self, graph: nx.Graph):
