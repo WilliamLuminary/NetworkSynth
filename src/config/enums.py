@@ -84,10 +84,12 @@ class FileExtension(Enum):
 
 class FileTag(Enum):
     FIG = "figure"
-    DATA = "data"
     PLOT = "plot"
+    DATA = "data"
+
     ORI = "original"
     SYN = "synthetic"
+    ANA = "analysis"
 
     def __str__(self):
         return self.value
@@ -101,6 +103,8 @@ class DataType(Enum):
     ORIGINAL_NETWORK = ("Original Network", {FileTag.DATA, FileTag.ORI}, FileExtension.PKL)
     SYNTHETIC_GRAPH = ("Synthetic Graph", {FileTag.FIG, FileTag.PLOT, FileTag.SYN}, FileExtension.PNG)
     SYNTHETIC_NETWORK = ("Synthetic Network", {FileTag.DATA, FileTag.SYN}, FileExtension.PKL)
+    ANALYSIS_DATA = ("Analysis Data", {FileTag.DATA, FileTag.ANA}, FileExtension.PKL)
+    ANALYSIS_FIGURE = ("Analysis Figure", {FileTag.FIG, FileTag.PLOT, FileTag.ANA}, FileExtension.PNG)
 
     def __init__(self, description: str, tags: Set[FileTag], file_extension: FileExtension):
         self.description = description
