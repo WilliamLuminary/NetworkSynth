@@ -30,6 +30,7 @@ class PlotConfig(FileConfig):
 
 ORIGINAL_DIR = "original"
 SYNTHETIC_DIR = "synthetic"
+INPLACE_DIR = ""
 FILE_CONFIGURATIONS = {
     DataType.ORIGINAL_IMAGE: ImageConfig(
         relative_dir=ORIGINAL_DIR,
@@ -66,6 +67,16 @@ FILE_CONFIGURATIONS = {
         relative_dir=SYNTHETIC_DIR,
         data_type=DataType.SYNTHETIC_NETWORK,
         detail="synthetic_network",
+    ),
+    DataType.ANALYSIS_DATA: FileConfig(
+        relative_dir=INPLACE_DIR,
+        data_type=DataType.ANALYSIS_DATA,
+        detail="analysis_data",
+    ),
+    DataType.ANALYSIS_FIGURE: PlotConfig(
+        relative_dir=INPLACE_DIR,
+        data_type=DataType.ANALYSIS_FIGURE,
+        detail="analysis_figure",
     ),
     DataType.DEFAULT_DATA: FileConfig(
         relative_dir="",
