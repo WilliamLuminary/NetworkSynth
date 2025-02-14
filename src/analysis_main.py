@@ -34,23 +34,30 @@ class MultifractalBatchProcessor:
         'original': {'alpha': 1.0, 'lw': 3}
     }
 
-    def __init__(self, data_: Dict):
-        self.synthetic: List = data_['synthetic']
-        self.original: List = data_['original']
-        self._processed = False
+    def __init__(self, original: List = None, synthetic: List=None, processed: bool = False):
+        self.original = original
+        self.synthetic = synthetic
+        self._processed: bool = processed
+        self.images = {}
+
+    @classmethod
+    def from_dict(cls, data_: Dict):
+        return cls(
+            original=data_['original'],
+            synthetic=data_['synthetic']
+        )
 
     def process(self):
         if not self._processed:
-            synthetic_results = self._process_batch(self.synthetic)
-            assert len(synthetic_results) == len(self.synthetic)
-            self.synthetic = synthetic_results
-
-            original_results = self._process_batch(self.original)
-            assert len(original_results) == len(self.original)
-            self.original = original_results
-
+            if self.synthetic:
+                synthetic_results = self._process_batch(self.synthetic)
+                assert len(synthetic_results) == len(self.synthetic)
+                self.synthetic = synthetic_results
+            if self.original:
+                original_results = self._process_batch(self.original)
+                assert len(original_results) == len(self.original)
+                self.original = original_results
             self._processed = True
-
         return self
 
     @staticmethod
@@ -58,6 +65,12 @@ class MultifractalBatchProcessor:
         processor = MultifractalProcessor(graphs)
         processor.analyze()
         return processor.get_summary_data()
+
+    def plot(self):
+        self.images.update({
+            'spectra': self.plot_spectra(),
+            'dimensions': self.plot_dimensions(),
+        })
 
     def plot_spectra(self):
         return self._create_plot('al_list', 'fal_list',
@@ -77,7 +90,7 @@ class MultifractalBatchProcessor:
         for data_type in ['synthetic', 'original']:
             results = getattr(self, f'{data_type}_results', [])
             if not results:
-                continue
+                return None
 
             self._plot_dataset(
                 ax=ax,
