@@ -1,14 +1,21 @@
 # src/data/data_agent.py
 import logging
+import os
+import pickle
 from typing import List, Optional, Tuple, Union
 
 import cv2
 import networkx as nx
 import numpy as np
+from matplotlib import pyplot as plt
+from numpy import ndarray
 
-from config import Config, DataType, Resolution, SetName
+from analysis.multifractal_batch_processor import MultifractalBatchProcessor
+from config import Config, DataType, FILE_CONFIGURATIONS, FileTag, Resolution, SetName
+from config.enums import Mode
 from graph import GraphAttrAgent
-from utils import build_graph_pos_and_adj_mat, plot_graph
+from utils import build_graph_pos_and_adj_mat, calculate_frame
+from utils.utils import finalize_plot
 from .mapper import Mapper
 from .saver import Saver
 
@@ -98,41 +105,74 @@ class DataLoader:
         return Config.IMAGES_FUNC(str(self.set_name), str(self.resolution))
 
 
+def _load_network_pkl(folder: str) -> List[nx.Graph]:
+    for file in os.listdir(folder):
+        if file.endswith('.pkl') and 'network' in file:
+            with open(os.path.join(folder, file), 'rb') as f:
+                content = pickle.load(f)
+                return [content] if isinstance(content, nx.Graph) else content
+    return []
+
+
+def _load_networks(data_path: str):
+    original_network, synthetic_networks = None, None
+    for entry in os.listdir(data_path):
+        entry_path = os.path.join(data_path, entry)
+        if entry == 'synthetic':
+            synthetic_networks = _load_network_pkl(entry_path)
+        elif entry in ('origin', 'original'):
+            original_network = _load_network_pkl(entry_path)
+    return original_network, synthetic_networks
+
+
 class DataAgent:
-    def __init__(self, *args):
-        self.original_image = None
-        self.original_network: Optional[nx.Graph, List[nx.Graph]] = None
-        self.synthetic_networks: Optional[List[nx.Graph]] = []
+    def __init__(self,
+                 set_name: SetName = None,
+                 resolution: Resolution = None,
+                 *,
+                 analyze_source_path: Optional[str] = None):
+        if analyze_source_path:
+            self.set_name = None
+            self.resolution = None
 
-        self.saver: Optional[Saver] = None
+            self.original_network, self.synthetic_networks = _load_networks(analyze_source_path)
+
+            self.saver = Saver(output_dir=analyze_source_path)
+            self.batch_processor = MultifractalBatchProcessor(self.original_network, self.synthetic_networks)
+            self.mode = Mode.Analyze
+        else:
+            if not set_name or not resolution:
+                raise ValueError("Both set_name and resolution are required for traditional initialization")
+            self.set_name = set_name
+            self.resolution = resolution
+
+            self.original_network = None
+            self.synthetic_networks = []
+
+            self.saver = Saver(set_name=set_name, resolution=resolution)
+            self.batch_processor = None
+            self.mode = Mode.Generate
+
+        self.original_image = None
+
+        self.original_analysis = None
+        self.synthetic_analysis = None
+
         self.attributes: Optional[GraphAttrAgent] = None
         self.mapper: Optional[Mapper] = None
-
-        if len(args) == 2:
-            if isinstance(args[0], SetName) and isinstance(args[1], Resolution):
-                self.set_name, self.resolution = args
-                self._init_by_set_and_resolution()
-            elif isinstance(args[0], List) and isinstance(args[1], List):
-                self.original_network, self.synthetic_networks = args if len(args[0]) < len(args[1]) else args[::-1]
-                self._init_by_networks()
-
-    def _init_by_set_and_resolution(self):
-        self.original_image = None
-        self.original_network: Optional[nx.Graph, List[nx.Graph]] = None
-        self.synthetic_networks: Optional[List[nx.Graph]] = []
-
-        self.saver: Optional[Saver] = Saver(self.set_name, self.resolution)
-        self.attributes: Optional[GraphAttrAgent] = None
-        self.mapper: Optional[Mapper] = None
-
-    def _init_by_networks(self):
-        self.saver: Optional[Saver] = Saver(self.set_name, self.resolution)
 
     def prepare_data(self):
+        assert self.mode == Mode.Generate, "This method is only for generating data."
         self.original_image, self.original_network = DataLoader(set_name=self.set_name,
                                                                 resolution=self.resolution).load()
         self.attributes = GraphAttrAgent(self.original_network).analyze()
         self.mapper = Mapper(self.original_network)
+
+    def multifractal_analysis(self):
+        assert self.synthetic_networks, "Add synthetic networks at first."
+        network = self.original_network if isinstance(self.original_network, list) else [self.original_network]
+        self.batch_processor = MultifractalBatchProcessor(network, self.synthetic_networks)
+        self.batch_processor.process().plot()
 
     def add_synthetic_graph(self, graph: nx.Graph):
         """
@@ -140,12 +180,6 @@ class DataAgent:
         NOT THREAD-SAFE.
         """
         self.synthetic_networks.append(graph)
-
-    # def get_synthetic_graph(self):
-    #     return self.synthetic_networks.get() if not self.synthetic_networks.empty() else None
-
-    def set_attributes(self, attributes: GraphAttrAgent):
-        self.attributes = attributes
 
     def save(self, data_type: DataType, file_name_prefix: Optional[str] = None, arg=None):
         if not self.saver and data_type != DataType.SYNTHETIC_GRAPH:
@@ -160,9 +194,9 @@ class DataAgent:
         elif data_type == DataType.ORIGINAL_NETWORK:
             self.saver.save_file(self.original_network, data_type, file_name_prefix)
         elif data_type == DataType.ORIGINAL_PROPERTY:
-            self.saver.save_file(self.attributes, data_type, file_name_prefix)
+            self.saver.save_file(self.attributes.savable(), data_type, file_name_prefix)
         elif data_type == DataType.ORIGINAL_GRAPH:
-            original_figure = plot_graph(
+            original_figure = plot_network(
                 data_type=DataType.ORIGINAL_GRAPH,
                 graph=self.original_network,
                 background=self.original_image,
@@ -172,7 +206,7 @@ class DataAgent:
         elif data_type == DataType.SYNTHETIC_GRAPH:
             assert isinstance(arg, nx.Graph), \
                 "Content must be a networkx.Graph object and should be a synthetic network."
-            synthetic_figure = plot_graph(
+            synthetic_figure = plot_network(
                 data_type=DataType.SYNTHETIC_GRAPH,
                 graph=arg,
                 show=show_figure_if_not_saving
@@ -181,3 +215,79 @@ class DataAgent:
             self.add_synthetic_graph(arg)
         elif data_type == DataType.SYNTHETIC_NETWORK:
             self.saver.save_file(self.synthetic_networks, data_type, file_name_prefix)
+        elif data_type == DataType.ANALYSIS_DATA:
+            self.saver.save_file(self.batch_processor.original, data_type, file_name_prefix)
+            self.saver.save_file(self.batch_processor.synthetic, data_type, file_name_prefix)
+        elif data_type == DataType.ANALYSIS_FIGURE:
+            for image_name, image in self.batch_processor.images.items():
+                self.saver.save_file(image, data_type, f"{image_name}_")
+
+
+def plot_network(data_type: DataType,
+                 graph: nx.Graph,
+                 adjust_axis: bool = False, **kwargs) -> ndarray:
+    """
+    :param data_type:
+    :param graph: If provided, plot the graph directly.
+    :param adjust_axis:
+    :param kwargs: Title, frame, plot_in_frame, background, image, alpha, edge_width, node_size, output_path
+    """
+    if not data_type.has_tag(FileTag.PLOT):
+        raise ValueError(f"Invalid data type: {data_type}, only graphs can be passed to this method.")
+
+    file_config = FILE_CONFIGURATIONS.get(data_type)
+    fig, ax = plt.subplots(figsize=(10, 10), dpi=300)
+
+    position_dict = nx.get_node_attributes(graph, 'pos')
+    if adjust_axis and position_dict is not None:
+        positions_array = np.array([position_dict[node] for node in graph.nodes()])
+        positions_array[:, [1, 0]] = positions_array[:, [0, 1]]
+        positions_array[:, 1] = Config.DEFAULT_FRAME_SIZE - positions_array[:, 1]
+        position_dict = {node: pos for node, pos in zip(graph.nodes(), positions_array)}
+
+    edge_width = file_config.line_width
+    for u, v in graph.edges():
+        pos_u = position_dict.get(u)
+        pos_v = position_dict.get(v)
+        if pos_u is not None and pos_v is not None:
+            x_values = [pos_u[0], pos_v[0]]
+            y_values = [pos_u[1], pos_v[1]]
+            ax.plot(x_values, y_values, 'r-', linewidth=edge_width, zorder=2)
+
+    node_size = file_config.node_size
+    for node in graph.nodes():
+        pos = position_dict.get(node)
+        if pos is not None:
+            ax.plot(pos[0], pos[1], 'bo', markersize=node_size, zorder=2)
+
+    if data_type is DataType.ORIGINAL_GRAPH:
+        frame = (0, Config.DEFAULT_FRAME_SIZE[0]), (0, Config.DEFAULT_FRAME_SIZE[1])
+    else:
+        frame = calculate_frame(graph)
+
+    ax.set_xlim(frame[0])
+    ax.set_ylim(frame[1])
+
+    if data_type is DataType.ORIGINAL_GRAPH:
+        image = kwargs['background']
+        alpha = getattr(file_config, 'alpha', 1.0)
+        ax.imshow(image, cmap='gray', extent=(0, image.shape[0], 0, image.shape[1]), alpha=alpha)
+    else:
+        ax.add_patch(
+            plt.Rectangle(
+                (frame[0][0], frame[1][0]),
+                frame[0][1] - frame[0][0],
+                frame[1][1] - frame[1][0],
+                facecolor='none',
+                edgecolor=(0, 0, 0, 0.8),
+                linewidth=2,
+                zorder=1
+            ))
+
+    if 'title' in kwargs:
+        plt.title(kwargs['title'])
+
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.axis('off')
+    return finalize_plot(fig, getattr(file_config, 'show_on_the_fly', False))
