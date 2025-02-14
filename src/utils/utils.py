@@ -102,7 +102,6 @@ def timer(func):
 
 
 def finalize_plot(fig: plt.Figure, show: bool = False) -> np.ndarray:
-    plt.close()
     plt.tight_layout(pad=0)
     if show:
         plt.show()
