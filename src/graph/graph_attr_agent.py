@@ -41,8 +41,9 @@ class GraphAttrAgent:
             'average_degree': self.average_degree
         }
 
-    def as_savable(self):
-        return self._to_dict()
+    def __reduce__(self):
+        """Force pickle to treat this object as a dictionary"""
+        return dict, (self._to_dict(),)
 
     @staticmethod
     def _compute_degree_distribution(graph: nx.Graph) -> Dict[int, float]:
