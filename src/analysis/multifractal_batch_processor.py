@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
 
 from analysis import MultifractalProcessor
-from utils import figure_to_ndarray
+from utils.utils import finalize_plot
 
 
 class MultifractalBatchProcessor:
@@ -99,7 +99,7 @@ class MultifractalBatchProcessor:
         ax.set_ylabel(y_label, fontweight='bold')
         ax.legend(handles=legend, loc='upper right', frameon=False)
 
-        return self._finalize_plot(fig)
+        return finalize_plot(fig)
 
     def _plot_dataset(self, ax, entries, data_type, x_key, y_key, legend):
         cmap_config = self._CMAP_RANGES[data_type]
@@ -127,10 +127,3 @@ class MultifractalBatchProcessor:
             lw=4,
             label=f"{data_type.capitalize()} (n={len(entries)})"
         ))
-
-    @staticmethod
-    def _finalize_plot(fig: plt.Figure) -> np.ndarray:
-        plt.tight_layout()
-        img = figure_to_ndarray(fig)
-        plt.close()
-        return img
