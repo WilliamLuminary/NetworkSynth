@@ -14,9 +14,34 @@ from config import Config, DataType, FILE_CONFIGURATIONS, FileTag, Resolution, S
 logger = logging.getLogger(__name__)
 
 
+class SaverMode(Enum):
+    Generate = auto()
+    Analyze = auto()
+
+
+def _update_soft_link(link_path: str, target_path: str) -> None:
+    if os.path.exists(link_path) or os.path.islink(link_path):
+        try:
+            os.unlink(link_path)
+        except OSError as e:
+            logger.error(f"Failed to remove existing soft link: {link_path}. Error: {e}")
+            raise
+    try:
+        os.symlink(target_path, link_path)
+    except OSError as e:
+        logger.error(f"Failed to create soft link: {link_path}. Error: {e}")
+        raise
+
+
+def _ensure_directory(path: str, exist_ok=False) -> None:
+    if not exist_ok and not os.path.exists(path):
+        logger.info(f"Create new directory: {path}")
+    os.makedirs(path, exist_ok=exist_ok)
+
+
 class Saver:
     base_output_dir = None
-    latest_link_path = None
+    mode = SaverMode.Generate
 
     def __new__(cls, *args, **kwargs):
         if Config.DISABLE_SAVING:
@@ -52,35 +77,17 @@ class Saver:
                 f"Saving is disabled. {Config.DISABLE_SAVING_NOTE}. The base output directory will not be created.")
             return
 
-        cls.base_output_dir = os.path.join(Config.BASE_OUTPUT_PATH, f'{Config.OUTPUT_DENOTE}_results_{Saver._time_id()}')
-        cls.ensure_directory(cls.base_output_dir)
-        logger.info(f"Created Base Output directory: {cls.base_output_dir}")
-
-        cls.latest_link_path = os.path.join(Config.BASE_OUTPUT_PATH, 'latest_result')
-        Saver._update_soft_link(cls.latest_link_path, cls.base_output_dir)
-
-    @staticmethod
-    def _update_soft_link(link_path: str, target_path: str) -> None:
-        if os.path.exists(link_path) or os.path.islink(link_path):
-            try:
-                os.unlink(link_path)
-            except OSError as e:
-                logger.error(f"Failed to remove existing soft link: {link_path}. Error: {e}")
-                raise
-        try:
-            os.symlink(target_path, link_path)
-        except OSError as e:
-            logger.error(f"Failed to create soft link: {link_path}. Error: {e}")
-            raise
-
-    @staticmethod
-    def ensure_directory(path: str, exist_ok=False) -> None:
-        flag = False
-        if not exist_ok and not os.path.exists(path):
-            flag = True
-        os.makedirs(path, exist_ok=exist_ok)
-        if flag:
-            logger.info(f"Created new directory: {path}")
+        if result_dir:
+            cls.mode = SaverMode.Analyze
+            cls.base_output_dir = os.path.join(Config.BASE_OUTPUT_PATH, result_dir)
+        else:
+            cls.mode = SaverMode.Generate
+            cls.base_output_dir = os.path.join(Config.BASE_OUTPUT_PATH,
+                                               f'{Config.OUTPUT_DENOTE}_results_{Saver._time_id()}')
+            _ensure_directory(cls.base_output_dir)
+            logger.info(f"Base Output directory: {cls.base_output_dir}")
+            latest_link_path = os.path.join(Config.BASE_OUTPUT_PATH, 'latest_result')
+            _update_soft_link(latest_link_path, cls.base_output_dir)
 
     def save_file(self, content: Any, data_type: DataType, file_name_prefix: Optional[str] = None) -> None:
         """
