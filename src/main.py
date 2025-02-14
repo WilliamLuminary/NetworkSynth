@@ -15,7 +15,7 @@ from graph import GraphGenerator
 from utils.utils import trim_graph
 from handlers import DataAgent, Saver, Summarizer
 
-Config2.initialize()
+ConfigSample.initialize()
 
 preview = False
 exp = False  # Set to True to run the hyperparameter tuning experiment
