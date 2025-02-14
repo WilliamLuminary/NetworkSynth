@@ -12,7 +12,7 @@ from analysis import MultifractalAnalyzer
 from analysis_main import MultifractalBatchProcessor
 from config import Config, DataType, Resolution, SetName
 from graph import GraphAttrAgent
-from utils import build_graph_pos_and_adj_mat, plot_graph
+from utils import build_graph_pos_and_adj_mat, plot_network
 from .mapper import Mapper
 from .saver import Saver
 
@@ -199,7 +199,7 @@ class DataAgent:
         elif data_type == DataType.ORIGINAL_PROPERTY:
             self.saver.save_file(self.attributes, data_type, file_name_prefix)
         elif data_type == DataType.ORIGINAL_GRAPH:
-            original_figure = plot_graph(
+            original_figure = plot_network(
                 data_type=DataType.ORIGINAL_GRAPH,
                 graph=self.original_network,
                 background=self.original_image,
@@ -209,7 +209,7 @@ class DataAgent:
         elif data_type == DataType.SYNTHETIC_GRAPH:
             assert isinstance(arg, nx.Graph), \
                 "Content must be a networkx.Graph object and should be a synthetic network."
-            synthetic_figure = plot_graph(
+            synthetic_figure = plot_network(
                 data_type=DataType.SYNTHETIC_GRAPH,
                 graph=arg,
                 show=show_figure_if_not_saving
