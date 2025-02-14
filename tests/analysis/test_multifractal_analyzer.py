@@ -61,7 +61,7 @@ def test_n_spectrum(load_graph_from_pickle):
     sample_graph = load_graph_from_pickle
     ntau, _, _, _ = original_calculate_multifractal_taus(sample_graph, MultifractalAnalyzer.Q, weight=False)
     analyzer = MultifractalAnalyzer(sample_graph)
-    alpha_0, width, al_list, fal_list = analyzer.compute_n_spectrum(ntau)
+    alpha_0, width, al_list, fal_list = analyzer._compute_n_spectrum(ntau)
 
     correct_alpha_0, correct_width = original_n_spectrum(ntau, MultifractalAnalyzer.Q, 0, 'b')
 
@@ -76,7 +76,7 @@ def test_n_dimension(load_graph_from_pickle):
     Q = MultifractalAnalyzer.Q
     ntau, _, _, _ = original_calculate_multifractal_taus(sample_graph, Q, weight=False)
     analyzer = MultifractalAnalyzer(sample_graph)
-    dim_list, dim_max, dim_min, diff, valid_q = analyzer.compute_n_dimension(ntau)
+    dim_list, dim_max, dim_min, diff, valid_q = analyzer._compute_n_dimension(ntau)
 
     correct_dim_list, correct_valid_q = original_n_dimension(ntau, Q, k=0, color="red")
 
@@ -97,7 +97,7 @@ def test_node_dimension(load_graph_from_pickle):
 def test_centralities(load_graph_from_pickle):
     sample_graph = load_graph_from_pickle
     analyzer = MultifractalAnalyzer(sample_graph)
-    centralities_dict = analyzer.compute_centralities()
+    centralities_dict = analyzer._compute_centralities()
     correct_centralities_dict = original_calculate_centralities(sample_graph, False)
 
     assert centralities_dict == correct_centralities_dict
@@ -106,7 +106,7 @@ def test_centralities(load_graph_from_pickle):
 def test_betweenness(load_graph_from_pickle):
     sample_graph = load_graph_from_pickle
     analyzer = MultifractalAnalyzer(sample_graph)
-    betweenness_dict = analyzer.compute_betweenness()
+    betweenness_dict = analyzer._compute_betweenness()
     correct_betweenness_dict = original_calculate_betweenness(sample_graph, False)
 
     assert np.allclose(betweenness_dict, correct_betweenness_dict, atol=1e-18)
@@ -115,7 +115,7 @@ def test_betweenness(load_graph_from_pickle):
 def test_ricci_curvature(load_graph_from_pickle):
     sample_graph = load_graph_from_pickle
     analyzer = MultifractalAnalyzer(sample_graph)
-    ricci_curvature = analyzer.compute_ollivier_ricci_curvature()
+    ricci_curvature = analyzer._compute_ollivier_ricci_curvature()
     correct_ricci_curvature = original_calculate_ollivier_ricci_curvature(sample_graph, False)
 
     assert ricci_curvature == correct_ricci_curvature
@@ -124,7 +124,7 @@ def test_ricci_curvature(load_graph_from_pickle):
 def test_assortativity(load_graph_from_pickle):
     sample_graph = load_graph_from_pickle
     analyzer = MultifractalAnalyzer(sample_graph)
-    assortativity = analyzer.compute_assortativity()
+    assortativity = analyzer._compute_assortativity()
     correct_assortativity = original_calculate_assortativity(sample_graph, False)
 
     assert assortativity == correct_assortativity
@@ -133,7 +133,7 @@ def test_assortativity(load_graph_from_pickle):
 def test_eigenvector_centrality(load_graph_from_pickle):
     sample_graph = load_graph_from_pickle
     analyzer = MultifractalAnalyzer(sample_graph)
-    eigenvector_centrality = analyzer.compute_eigenvector_centrality()
+    eigenvector_centrality = analyzer._compute_eigenvector_centrality()
     correct_eigenvector_centrality = original_calculate_eigenvector_centrality(sample_graph, False)
 
     assert eigenvector_centrality == correct_eigenvector_centrality
@@ -145,7 +145,7 @@ def test_diameter(load_graph_from_pickle):
 
     sample_graph = load_graph_from_pickle
     analyzer = MultifractalAnalyzer(sample_graph)
-    diameter = analyzer.compute_diameter()
+    diameter = analyzer._compute_diameter()
     correct_diameter = nx.diameter(sample_graph, True)
 
     assert diameter == correct_diameter
