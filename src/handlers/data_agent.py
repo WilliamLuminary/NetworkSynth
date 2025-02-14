@@ -1,11 +1,15 @@
 # src/data/data_agent.py
 import logging
+import os
+import pickle
 from typing import List, Optional, Tuple, Union
 
 import cv2
 import networkx as nx
 import numpy as np
 
+from analysis import MultifractalAnalyzer
+from analysis_main import MultifractalBatchProcessor
 from config import Config, DataType, Resolution, SetName
 from graph import GraphAttrAgent
 from utils import build_graph_pos_and_adj_mat, plot_graph
@@ -98,41 +102,74 @@ class DataLoader:
         return Config.IMAGES_FUNC(str(self.set_name), str(self.resolution))
 
 
+def _load_network_pkl(folder: str) -> List[nx.Graph]:
+    for file in os.listdir(folder):
+        if file.endswith('.pkl') and 'network' in file:
+            with open(os.path.join(folder, file), 'rb') as f:
+                content = pickle.load(f)
+                return [content] if isinstance(content, nx.Graph) else content
+    return []
+
+
+def _load_networks(data_path: str):
+    original_network, synthetic_networks = None, None
+    for entry in os.listdir(data_path):
+        entry_path = os.path.join(data_path, entry)
+        if entry == 'synthetic':
+            synthetic_networks = _load_network_pkl(entry_path)
+        elif entry in ('origin', 'original'):
+            original_network = _load_network_pkl(entry_path)
+    return original_network, synthetic_networks
+
+
 class DataAgent:
-    def __init__(self, *args):
-        self.original_image = None
-        self.original_network: Optional[nx.Graph, List[nx.Graph]] = None
-        self.synthetic_networks: Optional[List[nx.Graph]] = []
+    def __init__(self,
+                 set_name: SetName = None,
+                 resolution: Resolution = None,
+                 *,
+                 analyze_source_path: Optional[str] = None):
+        if analyze_source_path:
+            self.set_name = None
+            self.resolution = None
 
-        self.saver: Optional[Saver] = None
+            self.original_network, self.synthetic_networks = _load_networks(analyze_source_path)
+
+            self.saver = Saver(output_dir=analyze_source_path)
+            self.batch_processor = MultifractalBatchProcessor(self.original_network, self.synthetic_networks)
+
+        else:
+            if not set_name or not resolution:
+                raise ValueError("Both set_name and resolution are required for traditional initialization")
+            self.set_name = set_name
+            self.resolution = resolution
+
+            self.original_network = None
+            self.synthetic_networks = []
+
+            self.saver = Saver(set_name=set_name, resolution=resolution)
+            self.batch_processor = None
+
+        self.original_image = None
+
+        self.original_analysis = None
+        self.synthetic_analysis = None
+
+        self.spectra_image = None
+        self.dimensions_image = None
+
         self.attributes: Optional[GraphAttrAgent] = None
         self.mapper: Optional[Mapper] = None
-
-        if len(args) == 2:
-            if isinstance(args[0], SetName) and isinstance(args[1], Resolution):
-                self.set_name, self.resolution = args
-                self._init_by_set_and_resolution()
-            elif isinstance(args[0], List) and isinstance(args[1], List):
-                self.original_network, self.synthetic_networks = args if len(args[0]) < len(args[1]) else args[::-1]
-                self._init_by_networks()
-
-    def _init_by_set_and_resolution(self):
-        self.original_image = None
-        self.original_network: Optional[nx.Graph, List[nx.Graph]] = None
-        self.synthetic_networks: Optional[List[nx.Graph]] = []
-
-        self.saver: Optional[Saver] = Saver(self.set_name, self.resolution)
-        self.attributes: Optional[GraphAttrAgent] = None
-        self.mapper: Optional[Mapper] = None
-
-    def _init_by_networks(self):
-        self.saver: Optional[Saver] = Saver(self.set_name, self.resolution)
 
     def prepare_data(self):
         self.original_image, self.original_network = DataLoader(set_name=self.set_name,
                                                                 resolution=self.resolution).load()
         self.attributes = GraphAttrAgent(self.original_network).analyze()
         self.mapper = Mapper(self.original_network)
+
+    def multifractal_analysis(self):
+        assert self.synthetic_networks, "Add synthetic networks at first."
+        self.batch_processor = MultifractalBatchProcessor([self.original_network], self.synthetic_networks)
+        self.batch_processor.process().plot()
 
     def add_synthetic_graph(self, graph: nx.Graph):
         """
@@ -181,3 +218,9 @@ class DataAgent:
             self.add_synthetic_graph(arg)
         elif data_type == DataType.SYNTHETIC_NETWORK:
             self.saver.save_file(self.synthetic_networks, data_type, file_name_prefix)
+        elif data_type == DataType.ANALYSIS_DATA:
+            self.saver.save_file(self.batch_processor.original, data_type, file_name_prefix)
+            self.saver.save_file(self.batch_processor.synthetic, data_type, file_name_prefix)
+        elif data_type == DataType.ANALYSIS_FIGURE:
+            for (image_name, image) in self.batch_processor.images:
+                self.saver.save_file(image, data_type, image_name)
