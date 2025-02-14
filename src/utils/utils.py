@@ -12,8 +12,6 @@ from numpy import ndarray
 
 from config import Config
 
-logger = logging.getLogger(__name__)
-
 
 def calculate_frame(graph: nx.Graph = None,
                     center_position: Union[tuple, list, ndarray] = None,
