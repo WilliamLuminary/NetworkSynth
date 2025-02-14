@@ -1,4 +1,5 @@
 # src/handlers/multifractal_analyzer.py
+import logging
 from collections import Counter
 from dataclasses import astuple, dataclass
 from typing import Dict, List
@@ -13,6 +14,8 @@ from scipy.stats import linregress
 
 from config import Config
 from utils.utils import keep_largest_connected_component
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -36,6 +39,7 @@ class MultifractalAnalyzer:
         self.Q = None
 
     def analyze_error_features(self) -> MultifractalErrorFeatures:
+        logger.info("Analyzing error features with small Q.")
         self.Q = self.error_analysis_range_Q
         tau_list, _, _, _ = self._compute_multifractal_taus()
         alpha_0, width, _, _ = self._compute_n_spectrum(tau_list)
@@ -234,6 +238,7 @@ class MultifractalAnalyzer:
             return nx.diameter(keep_largest_connected_component(self.graph))
 
     def analyze_graph(self) -> Dict[str, List]:
+        logger.info("Analyzing multifractal properties with full Q range.")
         self.Q = self.full_analysis_range_Q
         self.f_digit = 1
         tau_list, r_g_all, diameter, zq_list = self._compute_multifractal_taus()
@@ -251,7 +256,7 @@ class MultifractalAnalyzer:
         assort = self._compute_assortativity()
         eigen_list = self._compute_eigenvector_centrality()
         diam = self._compute_diameter()
-
+        self.Q = None
         return {
             # Graph-level multifractal
             "tau_list": tau_list,

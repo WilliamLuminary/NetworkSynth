@@ -27,8 +27,10 @@ class MultifractalProcessor:
 
     def analyze(self) -> None:
         if self._analysis_results:
+            logger.info("Augmenting with averages.")
             self._augment_with_averages()
         elif self._graphs:
+            logger.info("Performing full analysis.")
             self._analysis_results = self._perform_full_analysis()
 
     def _perform_full_analysis(self) -> List[Dict]:

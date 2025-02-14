@@ -1,3 +1,4 @@
+import logging
 from typing import Dict, List
 
 import numpy as np
@@ -7,6 +8,7 @@ from matplotlib.lines import Line2D
 from analysis import MultifractalProcessor
 from utils.utils import finalize_plot
 
+logger = logging.getLogger(__name__)
 
 class MultifractalBatchProcessor:
     # noinspection SpellCheckingInspection
@@ -44,6 +46,7 @@ class MultifractalBatchProcessor:
 
     def process(self):
         if not self._processed:
+            logger.info("Processing Multifractal Data.")
             if self.synthetic:
                 synthetic_results = self._process_batch(self.synthetic)
                 assert len(synthetic_results) == len(self.synthetic)
@@ -63,16 +66,16 @@ class MultifractalBatchProcessor:
 
     def plot(self):
         self.images.update({
-            'spectra': self.plot_spectra(),
-            'dimensions': self.plot_dimensions(),
+            'spectra': self._plot_spectra(),
+            'dimensions': self._plot_dimensions(),
         })
 
-    def plot_spectra(self):
+    def _plot_spectra(self):
         return self._create_plot('al_list', 'fal_list',
                                  r'$\alpha$ (Hölder Exponent)',
                                  r'$f(\alpha)$ (Multifractal Spectrum)')
 
-    def plot_dimensions(self):
+    def _plot_dimensions(self):
         return self._create_plot('valid_q', 'dim_list',
                                  r'Distorting Exponent $q$',
                                  r'Generalized Fractal Dimension $D(q)$')

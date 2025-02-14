@@ -1,3 +1,4 @@
+import logging
 import os
 from collections import deque
 from typing import Dict
@@ -7,9 +8,11 @@ from handlers import DataAgent
 
 Config2.initialize()
 
+logger = logging.getLogger(__name__)
 
 
 def find_pkl_containers(base_dir: str, max_depth: int = 3) -> Dict[str, str]:
+    logger.info(f"Searching for container directories in {base_dir} up to depth {max_depth}.")
     containers = {}
     queue = deque([(base_dir, 0, '')])  # (path, depth, rel_path)
 
@@ -35,6 +38,7 @@ def find_pkl_containers(base_dir: str, max_depth: int = 3) -> Dict[str, str]:
                     new_rel = os.path.join(rel_path, entry) if rel_path else entry
                     queue.append((entry_path, depth + 1, new_rel))
 
+    logger.info(f"Found {len(containers)} container directories.")
     return containers
 
 
