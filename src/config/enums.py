@@ -124,3 +124,8 @@ class AnalysisMode(Enum):
     BASIC = auto()
     FULL = auto()
     RETROACTIVE = auto()
+
+
+class Mode(Enum):
+    Generate = auto()
+    Analyze = auto()
