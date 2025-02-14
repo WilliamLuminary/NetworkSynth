@@ -4,6 +4,7 @@ import logging
 import os
 import pickle
 import time
+from enum import Enum, auto
 from typing import Any, Optional, Union
 
 import cv2
@@ -49,32 +50,41 @@ class Saver:
             return None
         return super().__new__(cls)
 
-    def __init__(self, set_name, resolution):
+    def __init__(self,
+                 set_name: Optional[SetName] = None,
+                 resolution: Optional[Resolution] = None,
+                 *,
+                 output_dir: str = None):
         """
         Initialize the Saver object.
-        The directory for each set and resolution is created.
+        :param output_dir:
         :param set_name: If empty, then skip this level of directory
         :param resolution: If NA, then skip this level of directory
         Preconditions:
             - Saving must be enabled (Config.DISABLE_SAVING must be False)
             - Saver.initialize() must be called before creating an instance
+        Postconditions:
+            - The directory for each set and resolution is created.
         """
         assert not Config.DISABLE_SAVING, "Saving is disabled."
-        assert self.base_output_dir and self.latest_link_path, \
-            "Base output directory is not initialized.\nCall Saver.initialize() first."
+        assert self.base_output_dir, "Base output directory is not initialized.\nCall Saver.initialize() first."
+        if output_dir:
+            self.output_dir = output_dir
+        else:
+            # Each output_dir is for each original network
+            self.output_dir = os.path.join(self.base_output_dir, str(set_name), str(resolution))
 
-        self.name_res_output_dir = os.path.join(self.base_output_dir, str(set_name), str(resolution))
-        self.ensure_directory(self.name_res_output_dir, exist_ok=True)
+        _ensure_directory(self.output_dir, exist_ok=True)
 
     @classmethod
-    def initialize(cls) -> None:
+    def initialize(cls, result_dir: str = None) -> None:
         """
         Create only one base output directory for all the results.
         :return: None
         """
         if Config.DISABLE_SAVING:
             logger.info(
-                f"Saving is disabled. {Config.DISABLE_SAVING_NOTE}. The base output directory will not be created.")
+                f"Saving is disabled. {Config.DISABLE_SAVING_NOTE}.")
             return
 
         if result_dir:
@@ -107,13 +117,19 @@ class Saver:
             return
 
         file_config = FILE_CONFIGURATIONS[data_type]
-        rel_path = file_config.relative_dir
         file_detail = (file_config.detail + '_') if file_config.detail and file_config.detail[-1] != '_' else (
                 file_config.detail or '')
-        file_name = f"{file_name_prefix}{file_detail}{self._time_id()}.{file_config.file_extension}"
 
-        abs_path = os.path.join(self.name_res_output_dir, rel_path, file_name)
-        self.ensure_directory(os.path.dirname(abs_path), exist_ok=True)
+        if self.mode == SaverMode.Generate:
+            file_name_identifier = self._time_id()
+            rel_path = file_config.relative_dir
+        else:
+            file_name_identifier = ''
+            rel_path = ''
+
+        file_name = f"{file_name_prefix}{file_detail}{file_name_identifier}.{file_config.file_extension}"
+        abs_path = os.path.join(self.output_dir, rel_path, file_name)
+        _ensure_directory(os.path.dirname(abs_path), exist_ok=True)
 
         if FileTag.FIG in data_type.tags:
             Saver._save_image(content, abs_path)
