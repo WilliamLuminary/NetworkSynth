@@ -54,7 +54,7 @@ def generate_synthetic_network(exit_event, std_err_fea, attributes, mapper):
                 return None, float('inf')
 
             analyzer = MultifractalAnalyzer(synthetic_graph)
-            err_fea = analyzer.analyze_error_values()
+            err_fea = analyzer.analyze_error_features()
             error_ = analyzer.analyze_error(err_fea, std_err_fea)
             if error_ < Config.ERROR_TOLERANCE:
                 break  # Exit the loop if the error is within the tolerance
@@ -166,7 +166,7 @@ def run(set_name: SetName, resolution: Resolution) -> Optional[float]:
 
     if Config.SYNTHETIC_NETWORK_NUMBER != 0:
         org_analyzer = MultifractalAnalyzer(data_agent.original_network)
-        std_err_fea = org_analyzer.analyze_error_values()
+        std_err_fea = org_analyzer.analyze_error_features()
     else:
         std_err_fea = [0, 0]
 
