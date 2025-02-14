@@ -259,6 +259,7 @@ class MultifractalAnalyzer:
             return nx.diameter(keep_largest_connected_component(self.graph))
 
     def analyze_graph(self) -> Dict[str, List]:
+        self.Q = self.full_analysis_range_Q
         self.f_digit = 1
         tau_list, r_g_all, diameter, zq_list = self._compute_multifractal_taus()
         self.f_digit = 0
