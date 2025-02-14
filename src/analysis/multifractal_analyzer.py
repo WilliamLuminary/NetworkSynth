@@ -35,14 +35,14 @@ class MultifractalAnalyzer:
         self.graph = graph
         self.weighted = Config.MEASURE_WEIGHTED
         self.f_digit = 0
-        self.Q = self.full_analysis_range_Q
+        self.Q = None
 
     def analyze_error_values(self) -> MultifractalErrorFeatures:
         self.Q = self.error_analysis_range_Q
         tau_list, _, _, _ = self._compute_multifractal_taus()
-        alpha_0, width, _, _ = self.compute_n_spectrum(tau_list)
+        alpha_0, width, _, _ = self._compute_n_spectrum(tau_list)
         error_features = MultifractalErrorFeatures(alpha_0, width)
-        self.Q = self.error_analysis_range_Q
+        self.Q = None
         return error_features
 
     @staticmethod
@@ -113,7 +113,7 @@ class MultifractalAnalyzer:
         plt.close()
         return fig
 
-    def compute_n_spectrum(self, tau_list):
+    def _compute_n_spectrum(self, tau_list):
         Q_ = self.Q
         al_list = []
         fal_list = []
@@ -127,7 +127,7 @@ class MultifractalAnalyzer:
         width = np.max(al_list) - np.min(al_list)
         return alpha_0, width, al_list, fal_list
 
-    def compute_n_dimension(self, tau_list):
+    def _compute_n_dimension(self, tau_list):
         q_list = self.Q
         valid_pairs = [(q, tau) for q, tau in zip(q_list, tau_list) if q != 0]
         valid_q, valid_tau = zip(*valid_pairs)
@@ -184,7 +184,7 @@ class MultifractalAnalyzer:
                 node_dimensions[node] = 0
         return node_dimensions
 
-    def compute_centralities(self) -> Dict[str, List[float]]:
+    def _compute_centralities(self) -> Dict[str, List[float]]:
         if self.weighted:
             closeness_distance = lambda u, v, d: 1 / d['weight']
             degree_attr = 'weight'
@@ -206,7 +206,7 @@ class MultifractalAnalyzer:
             'clustering': list(cluster_coef.values())
         }
 
-    def compute_betweenness(self) -> List[float]:
+    def _compute_betweenness(self) -> List[float]:
         if self.weighted:
             graph_copy = self.graph.copy()
             for _, _, d in graph_copy.edges(data=True):
@@ -218,7 +218,7 @@ class MultifractalAnalyzer:
         bt = nk.centrality.Betweenness(G_nk, normalized=True).run().scores()
         return bt
 
-    def compute_ollivier_ricci_curvature(self) -> List[float]:
+    def _compute_ollivier_ricci_curvature(self) -> List[float]:
         graph_copy = self.graph.copy()
         if self.weighted:
             for u, v, d in graph_copy.edges(data=True):
@@ -232,13 +232,13 @@ class MultifractalAnalyzer:
         orc.compute_ricci_curvature()
         return [d['ricciCurvature'] for _, _, d in orc.G.edges(data=True)]
 
-    def compute_assortativity(self) -> float:
+    def _compute_assortativity(self) -> float:
         if self.weighted:
             return nx.degree_pearson_correlation_coefficient(self.graph, weight='weight')
         else:
             return nx.degree_pearson_correlation_coefficient(self.graph)
 
-    def compute_eigenvector_centrality(self) -> List[float]:
+    def _compute_eigenvector_centrality(self) -> List[float]:
         if nx.is_connected(self.graph):
             G_lcc = self.graph
         else:
@@ -253,7 +253,7 @@ class MultifractalAnalyzer:
         except nx.PowerIterationFailedConvergence:
             return [float('nan')] * G_lcc.number_of_nodes()
 
-    def compute_diameter(self) -> float:
+    def _compute_diameter(self) -> float:
         if nx.is_connected(self.graph):
             return nx.diameter(self.graph)
         else:
@@ -264,18 +264,18 @@ class MultifractalAnalyzer:
         tau_list, r_g_all, diameter, zq_list = self._compute_multifractal_taus()
         self.f_digit = 0
 
-        alpha_0, width, al_list, fal_list = self.compute_n_spectrum(tau_list)
+        alpha_0, width, al_list, fal_list = self._compute_n_spectrum(tau_list)
 
         self.f_digit = 2
-        dim_list, dim_max, dim_min, dim_diff, valid_q = self.compute_n_dimension(tau_list)
+        dim_list, dim_max, dim_min, dim_diff, valid_q = self._compute_n_dimension(tau_list)
         self.f_digit = 0
 
-        centralities = self.compute_centralities()
-        betweenness = self.compute_betweenness()
-        ricci_list = self.compute_ollivier_ricci_curvature()
-        assort = self.compute_assortativity()
-        eigen_list = self.compute_eigenvector_centrality()
-        diam = self.compute_diameter()
+        centralities = self._compute_centralities()
+        betweenness = self._compute_betweenness()
+        ricci_list = self._compute_ollivier_ricci_curvature()
+        assort = self._compute_assortativity()
+        eigen_list = self._compute_eigenvector_centrality()
+        diam = self._compute_diameter()
 
         return {
             # Graph-level multifractal
