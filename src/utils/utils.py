@@ -8,7 +8,6 @@ import networkx as nx
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-from matplotlib.figure import Figure
 from numpy import ndarray
 
 from config import Config, DataType, FILE_CONFIGURATIONS, FileTag
@@ -193,7 +192,7 @@ def plot_network(data_type: DataType,
     return fig
 
 
-def figure_to_ndarray(fig: Figure, swap: bool = False) -> ndarray:
+def figure_to_ndarray(fig: plt.Figure, swap: bool = False) -> ndarray:
     canvas = FigureCanvas(fig)
     canvas.draw()
     buf = canvas.buffer_rgba()
