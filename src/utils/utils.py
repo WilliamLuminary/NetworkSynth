@@ -15,9 +15,9 @@ from config import Config
 logger = logging.getLogger(__name__)
 
 
-def calculate_frame(graph: nx.Graph = None, center_position: Union[tuple, list, ndarray] = None,
-                    frame_range: Tuple[int, int] = None) -> tuple[
-    tuple[float, float], tuple[float, float]]:
+def calculate_frame(graph: nx.Graph = None,
+                    center_position: Union[tuple, list, ndarray] = None,
+                    frame_range: Tuple[int, int] = None) -> tuple[tuple[float, float], tuple[float, float]]:
     frame_range = frame_range or Config.DEFAULT_FRAME_SIZE
     if graph is None:
         if not center_position:
@@ -101,21 +101,22 @@ def timer(func):
     return wrapper
 
 
+def finalize_plot(fig: plt.Figure, show: bool = False) -> np.ndarray:
+    plt.close()
     plt.tight_layout(pad=0)
-
-    if getattr(file_config, 'show_on_the_fly', False):
+    if show:
         plt.show()
     fig = figure_to_ndarray(fig)
     plt.close()
     return fig
 
 
-def figure_to_ndarray(fig: plt.Figure, swap: bool = False) -> ndarray:
+def figure_to_ndarray(fig: plt.Figure, swap_channels: bool = False) -> ndarray:
     canvas = FigureCanvas(fig)
     canvas.draw()
     buf = canvas.buffer_rgba()
     image_array = np.asarray(buf)
-    image_array = image_array[..., [2, 1, 0, 3]] if swap else image_array
+    image_array = image_array[..., [2, 1, 0, 3]] if swap_channels else image_array
     return image_array
 
 
