@@ -4,20 +4,15 @@ import logging
 import os
 import pickle
 import time
-from enum import Enum, auto
 from typing import Any, Optional, Union
 
 import cv2
 from numpy import ndarray
 
 from config import Config, DataType, FILE_CONFIGURATIONS, FileTag, Resolution, SetName
+from config.enums import Mode
 
 logger = logging.getLogger(__name__)
-
-
-class Mode(Enum):
-    Generate = auto()
-    Analyze = auto()
 
 
 def _update_soft_link(link_path: str, target_path: str) -> None:
