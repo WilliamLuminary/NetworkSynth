@@ -37,7 +37,7 @@ class MultifractalAnalyzer:
         self.f_digit = 0
         self.Q = None
 
-    def analyze_error_values(self) -> MultifractalErrorFeatures:
+    def analyze_error_features(self) -> MultifractalErrorFeatures:
         self.Q = self.error_analysis_range_Q
         tau_list, _, _, _ = self._compute_multifractal_taus()
         alpha_0, width, _, _ = self._compute_n_spectrum(tau_list)
@@ -115,8 +115,7 @@ class MultifractalAnalyzer:
 
     def _compute_n_spectrum(self, tau_list):
         Q_ = self.Q
-        al_list = []
-        fal_list = []
+        al_list, fal_list = [], []
         for i in range(1, len(Q_)):
             al = (tau_list[i] - tau_list[i - 1]) / (Q_[i] - Q_[i - 1])
             al_list.append(al)
