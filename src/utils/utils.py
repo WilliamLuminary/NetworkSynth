@@ -102,9 +102,10 @@ def timer(func):
     return wrapper
 
 
-def plot_graph(data_type: DataType, graph: nx.Graph = None,
-               pos_and_adj_mat: Union[tuple, list, ndarray] = None,
-               adjust_axis: bool = False, **kwargs) -> ndarray:
+def plot_network(data_type: DataType,
+                 graph: nx.Graph = None,
+                 pos_and_adj_mat: Union[tuple, list, ndarray] = None,
+                 adjust_axis: bool = False, **kwargs) -> ndarray:
     """
     :param data_type:
     :param graph: If provided, plot the graph directly.
