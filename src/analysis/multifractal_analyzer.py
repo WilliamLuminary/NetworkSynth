@@ -8,12 +8,10 @@ import networkit as nk
 import networkx as nx
 import numpy as np
 from GraphRicciCurvature.OllivierRicci import OllivierRicci
-from matplotlib import pyplot as plt
 from scipy.spatial.distance import euclidean
 from scipy.stats import linregress
 
 from config import Config
-from utils import figure_to_ndarray
 from utils.utils import keep_largest_connected_component
 
 
@@ -100,19 +98,6 @@ class MultifractalAnalyzer:
             tau_list.append(slope)
         return tau_list, r_g_all, diameter, zq_list
 
-    def plot_multifractal_taus(self, r_g_all, diameter, zq_list) -> np.ndarray:
-        fig, ax = plt.figure(figsize=(8, 8), dpi=300)
-        for idx, q in enumerate(self.Q):
-            x = np.log(r_g_all / diameter)
-            y = np.log(zq_list[idx])
-            plt.plot(x, y, '*', label=f'q={q:.0f}')
-            plt.xlabel('ln(r/d)')
-            plt.ylabel('ln(sum function)')
-        plt.legend()
-        fig = figure_to_ndarray(fig)
-        plt.close()
-        return fig
-
     def _compute_n_spectrum(self, tau_list):
         Q_ = self.Q
         al_list, fal_list = [], []
@@ -136,16 +121,6 @@ class MultifractalAnalyzer:
         dim_min = np.min(dim_list)
         diff = dim_max - dim_min
         return dim_list, dim_max, dim_min, diff, valid_q
-
-    @staticmethod
-    def plot_n_dimension(dim_list, valid_q, label, color) -> np.ndarray:
-        fig, ax = plt.figure(figsize=(8, 8), dpi=300)
-        plt.plot(valid_q, dim_list, label=label, linewidth=3, color=color)
-        plt.xlabel('Distorting exponent, 'r'$q$')
-        plt.ylabel('Generalized fractal dimension, 'r'$D(q)$')
-        fig = figure_to_ndarray(fig)
-        plt.close()
-        return fig
 
     def _compute_node_dimension(self) -> Dict[int, float]:
         graph = nx.convert_node_labels_to_integers(self.graph)
