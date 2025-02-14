@@ -14,8 +14,8 @@ from analysis.multifractal_batch_processor import MultifractalBatchProcessor
 from config import Config, DataType, FILE_CONFIGURATIONS, FileTag, Resolution, SetName
 from config.enums import Mode
 from graph import GraphAttrAgent
-from utils import build_graph_pos_and_adj_mat, plot_network
 from utils import build_graph_pos_and_adj_mat, calculate_frame
+from utils.utils import finalize_plot
 from .mapper import Mapper
 from .saver import Saver
 
