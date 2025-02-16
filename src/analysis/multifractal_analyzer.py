@@ -206,6 +206,7 @@ class MultifractalAnalyzer:
             orc = OllivierRicci(nx.convert_node_labels_to_integers(graph_copy),
                                 alpha=.5, verbose="ERROR", weight='weight')
         else:
+            # noinspection PyTypeChecker
             orc = OllivierRicci(nx.convert_node_labels_to_integers(graph_copy),
                                 alpha=.5, verbose="ERROR", weight=None)
         orc.compute_ricci_curvature()
