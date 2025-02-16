@@ -63,6 +63,7 @@ class DataAgent:
         self.multifractal_analysis()
 
     def multifractal_analysis(self):
+        assert self.mode == Mode.Analyze, "This method is only available in Analyze mode."
         assert self.batch_processor, "Batch processor is not initialized."
         self.batch_processor.process().plot()
 
@@ -81,18 +82,21 @@ class DataAgent:
             return
 
         show_figure_if_not_saving: bool = not self.saver and arg
-
         file_name_prefix = f"{file_name_prefix}" if file_name_prefix and file_name_prefix[-1] != '_' else (
                 file_name_prefix or '')
+
         if data_type == DataType.ORIGINAL_IMAGE:
+            assert self.mode == Mode.Generate, "This data type is only available in Generate mode."
             original_image = self.data_loader.get_original_image()
             self.saver.save_file(original_image, data_type, file_name_prefix)
 
         elif data_type == DataType.ORIGINAL_NETWORK:
+            assert self.mode == Mode.Generate, "This data type is only available in Generate mode."
             original_network = self.data_loader.get_original_network()
             self.saver.save_file(original_network, data_type, file_name_prefix)
 
         elif data_type == DataType.ORIGINAL_PROPERTY:
+            assert self.mode == Mode.Generate, "This data type is only available in Generate mode."
             self.saver.save_file(self.attributes.savable(), data_type, file_name_prefix)
 
         elif data_type == DataType.ORIGINAL_GRAPH:
@@ -116,17 +120,22 @@ class DataAgent:
             self.saver.save_file(synthetic_figure, DataType.SYNTHETIC_GRAPH, file_name_prefix)
 
         elif data_type == DataType.SYNTHETIC_NETWORK:
+            assert self.mode == Mode.Generate, "This data type is only available in Generate mode."
             synthetic_networks = self.data_loader.get_synthetic_networks()
             self.saver.save_file(synthetic_networks, data_type, file_name_prefix)
 
         elif data_type == DataType.ANALYSIS_DATA:
+            assert self.mode == Mode.Analyze, "This data type is only available in Analyze mode."
             self.saver.save_file({'original_multifractal_analysis_results': self.batch_processor.original,
                                   'synthetic_multifractal_analysis_results': self.batch_processor.synthetic}, data_type,
                                  file_name_prefix)
 
         elif data_type == DataType.ANALYSIS_FIGURE:
+            assert self.mode == Mode.Analyze, "This data type is only available in Analyze mode."
             for image_name, image in self.batch_processor.images.items():
                 self.saver.save_file(image, data_type, f"{image_name}_")
+
+        logger.error(f"Please configure save() for {data_type}.")
 
 
 def plot_network(data_type: DataType,
