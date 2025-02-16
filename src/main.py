@@ -96,7 +96,10 @@ def generate_with_multiprocessing(data_agent: DataAgent, std_err_fea):
 
     avg_err = _compute_average_error(errors)
     data_agent.save(data_type=DataType.SYNTHETIC_NETWORK, file_name_prefix=f'len_{len(errors)}_err_{avg_err:.3f}')
-
+    if Config.FULL_ANALYSIS:
+        data_agent.multifractal_analysis_in_generate_mode()
+        data_agent.save(data_type=DataType.ANALYSIS_DATA)
+        data_agent.save(data_type=DataType.ANALYSIS_FIGURE)
 
 def _compute_average_error(errors: List) -> float:
     valid_errors = [e for e in errors if not np.isinf(e)]
