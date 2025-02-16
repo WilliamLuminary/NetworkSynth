@@ -40,10 +40,12 @@ venv.bak/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 .idea/
 
+# Mac OS
 .DS_Store
 
 # Private files
-/credentials/
+credentials/*
+!credentials/.keep
 
 # Ignore everything in the data/input and data/output directories
 data/input/*
