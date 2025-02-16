@@ -49,6 +49,7 @@ class MultifractalAnalyzer:
 
     @staticmethod
     def analyze_error(this, other) -> float:
+        assert this and other, "Invalid input."
         return euclidean(astuple(this), astuple(other))
 
     def _compute_multifractal_taus(self):
