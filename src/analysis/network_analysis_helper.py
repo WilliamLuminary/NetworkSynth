@@ -118,6 +118,7 @@ def wnfd_network(graph, weight=True, draw=False, f_digi=0):
     G_nk = nk.nxadapter.nx2nk(graph, weightAttr='weight') if weight else nk.nxadapter.nx2nk(graph)
 
     for node in graph.nodes():
+        # noinspection PyUnresolvedReferences
         distances = nk.distance.Dijkstra(G_nk, node, storePaths=False).run().getDistances()
         grow = [d for d in distances if 0 < d < 99999]
         grow.sort()
@@ -212,6 +213,7 @@ def node_dimension(graph, weight=True, f_digi=2) -> dict:
 
     node_dimensions = {}
     for node in graph.nodes():
+        # noinspection PyUnresolvedReferences
         distances = nk.distance.Dijkstra(G_nk, node, storePaths=False).run().getDistances()
         distances.sort()
         if weight:
@@ -255,10 +257,10 @@ def compute_centrality(graphs, weight_flag):
     avg_clustering = []
 
     for G in graphs:
-        nfd_centrality = list(node_dimension(G, weight=weight_param).values())
-        closeness_centrality = list(nx.closeness_centrality(G, distance=closeness_distance).values())
-        degree_centrality = list(dict(G.degree(weight=degree_attr)).values())
-        cluster_coef = list(nx.clustering(G, weight=clustering_attr).values())
+        nfd_centrality = np.array(node_dimension(G, weight=weight_param).values())
+        closeness_centrality = np.array(nx.closeness_centrality(G, distance=closeness_distance).values())
+        degree_centrality = np.array(dict(G.degree(weight=degree_attr)).values())
+        cluster_coef = np.array(nx.clustering(G, weight=clustering_attr).values())
 
         nfd_centrality_list.append(nfd_centrality)
         avg_frac.append(np.mean(nfd_centrality))
@@ -285,6 +287,7 @@ def compute_betweenness(graphs, weight_flag):
             G_nk = nk.nxadapter.nx2nk(G, weightAttr='weight')
         else:
             G_nk = nk.nxadapter.nx2nk(G, weightAttr=None)
+        # noinspection PyUnresolvedReferences
         bt = nk.centrality.Betweenness(G_nk, normalized=True).run().scores()
         betweenness_list.append(bt)
         avg_betweenness_list.append(sum(bt) / G.number_of_nodes())
@@ -302,6 +305,7 @@ def compute_orc(graphs, weight_flag):
                 d['weight'] = 1.0 / d['weight']
             orc = OllivierRicci(nx.convert_node_labels_to_integers(G), alpha=0.5, verbose="ERROR", weight='weight')
         else:
+            # noinspection PyTypeChecker
             orc = OllivierRicci(nx.convert_node_labels_to_integers(G), alpha=0.5, verbose="ERROR", weight=None)
         orc.compute_ricci_curvature()
         curvatures = [d['ricciCurvature'] for u, v, d in orc.G.edges(data=True)]
