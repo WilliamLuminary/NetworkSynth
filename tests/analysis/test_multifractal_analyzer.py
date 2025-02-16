@@ -6,7 +6,7 @@ import networkx as nx
 import numpy as np
 import pytest
 
-from tests.analysis.original_network_analysis_code import (
+from tests.analysis.for_test_original_network_analysis import (
     nspectrum as original_n_spectrum,
     wnfd_nk as original_calculate_multifractal_taus,
     ndimension as original_n_dimension,
