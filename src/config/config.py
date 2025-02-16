@@ -26,6 +26,7 @@ class Config:
     CLOSED_EDGES_FACTOR: float
 
     MEASURE_WEIGHTED: bool
+    FULL_ANALYSIS: bool = False
 
     SYNTHETIC_GRAPH_NUMBER: int = 0
     SYNTHETIC_NETWORK_NUMBER: int = 0

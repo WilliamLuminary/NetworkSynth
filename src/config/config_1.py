@@ -25,6 +25,7 @@ class Config1(Config):
     SYNTHETIC_NETWORK_NUMBER = 1
 
     MEASURE_WEIGHTED = True
+    FULL_ANALYSIS = False
 
     BASE_INPUT_PATH = os.path.join(Config.BASE_INPUT_PATH, 'old_input')
     POSITION_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'position')
