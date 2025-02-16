@@ -9,33 +9,34 @@ from analysis import MultifractalProcessor
 from utils.utils import finalize_plot
 
 logger = logging.getLogger(__name__)
+# noinspection SpellCheckingInspection
+_PLOT_CONFIG = {
+    'font.size': 24,
+    'axes.linewidth': 2,
+    'axes.spines.right': False,
+    'axes.spines.top': False,
+    'xtick.minor.visible': True,
+    'ytick.minor.visible': True
+}
+
+_CMAP_RANGES = {
+    'synthetic': {'name': 'Blues', 'start': 0.4, 'end': 0.8},
+    'original': {'name': 'Reds', 'start': 0.8, 'end': 1}
+}
+
+_PLOT_STYLE = {
+    'synthetic': {'alpha': 0.6, 'lw': 3},
+    'original': {'alpha': 1.0, 'lw': 3}
+}
+
 
 class MultifractalBatchProcessor:
-    # noinspection SpellCheckingInspection
-    _PLOT_CONFIG = {
-        'font.size': 24,
-        'axes.linewidth': 2,
-        'axes.spines.right': False,
-        'axes.spines.top': False,
-        'xtick.minor.visible': True,
-        'ytick.minor.visible': True
-    }
-
-    _CMAP_RANGES = {
-        'synthetic': {'name': 'Blues', 'start': 0.4, 'end': 0.8},
-        'original': {'name': 'Reds', 'start': 0.8, 'end': 1}
-    }
-
-    _PLOT_STYLE = {
-        'synthetic': {'alpha': 0.6, 'lw': 3},
-        'original': {'alpha': 1.0, 'lw': 3}
-    }
 
     def __init__(self, original: List = None, synthetic: List = None, processed: bool = False):
-        self.original = original
-        self.synthetic = synthetic
+        self._original_data = original
+        self._synthetic_data = synthetic
         self._processed: bool = processed
-        self.images = {}
+        self._images = {}
 
     @classmethod
     def from_dict(cls, data_: Dict):
@@ -47,14 +48,14 @@ class MultifractalBatchProcessor:
     def process(self):
         if not self._processed:
             logger.info("Processing Multifractal Data.")
-            if self.synthetic:
-                synthetic_results = self._process_batch(self.synthetic)
-                assert len(synthetic_results) == len(self.synthetic)
-                self.synthetic = synthetic_results
-            if self.original:
-                original_results = self._process_batch(self.original)
-                assert len(original_results) == len(self.original)
-                self.original = original_results
+            if self._synthetic_data:
+                synthetic_results = self._process_batch(self._synthetic_data)
+                assert len(synthetic_results) == len(self._synthetic_data)
+                self._synthetic_data = synthetic_results
+            if self._original_data:
+                original_results = self._process_batch(self._original_data)
+                assert len(original_results) == len(self._original_data)
+                self._original_data = original_results
             self._processed = True
         return self
 
@@ -65,7 +66,7 @@ class MultifractalBatchProcessor:
         return processor.get_summary_data()
 
     def plot(self):
-        self.images.update({
+        self._images.update({
             'spectra': self._plot_spectra(),
             'dimensions': self._plot_dimensions(),
         })
@@ -81,7 +82,7 @@ class MultifractalBatchProcessor:
                                  r'Generalized Fractal Dimension $D(q)$')
 
     def _create_plot(self, x_key, y_key, x_label, y_label):
-        plt.rcParams.update(self._PLOT_CONFIG)
+        plt.rcParams.update(_PLOT_CONFIG)
         fig, ax = plt.subplots(figsize=(10, 8), dpi=150)
         legend = []
 
@@ -104,9 +105,10 @@ class MultifractalBatchProcessor:
 
         return finalize_plot(fig)
 
-    def _plot_dataset(self, ax, entries, data_type, x_key, y_key, legend):
-        cmap_config = self._CMAP_RANGES[data_type]
-        style = self._PLOT_STYLE[data_type]
+    @staticmethod
+    def _plot_dataset(ax, entries, data_type, x_key, y_key, legend):
+        cmap_config = _CMAP_RANGES[data_type]
+        style = _PLOT_STYLE[data_type]
         cmap = plt.get_cmap(cmap_config['name'])
 
         color_values = np.linspace(
