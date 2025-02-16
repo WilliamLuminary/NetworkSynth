@@ -13,8 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class Config2(Config):
-    SETS = [SetName.S4, SetName.S8, SetName.S11, SetName.S14, SetName.S17, SetName.S20, SetName.S23, SetName.S26,
-            SetName.S29, SetName.S32]
+    SETS = [SetName.S4, SetName.S8]
     RESOLUTIONS = [Resolution.NA]
 
     DEFAULT_FRAME_SIZE = (1887 // 4, 2048 // 4)
@@ -26,6 +25,7 @@ class Config2(Config):
     SYNTHETIC_NETWORK_NUMBER = 1
 
     MEASURE_WEIGHTED = False
+    FULL_ANALYSIS = False
     ERROR_TOLERANCE = .3
 
     BASE_INPUT_PATH = os.path.join(Config.BASE_INPUT_PATH, 'new_input')
