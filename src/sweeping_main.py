@@ -2,10 +2,9 @@
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from itertools import product
-from typing import List, Optional
+from typing import Optional
 
 import cv2
-import numpy as np
 
 import wandb
 from analysis import MultifractalAnalyzer
@@ -14,7 +13,7 @@ from config import Config, DataType, Resolution, SetName
 from config import Config1, Config2, ConfigSample
 from handlers import DataAgent
 from handlers.data_agent import plot_network
-from main import _compute_average_error, generate_synthetic_network
+from main import compute_average_error, generate_synthetic_network
 
 Config2.initialize()
 Config.disable_saving("Sweeping Experiment")
@@ -64,7 +63,7 @@ def generate_networks_multiprocess(data_agent: DataAgent, std_err_fea) -> Option
             future.cancel()
         executor.shutdown(wait=True, cancel_futures=True)
 
-    return _compute_average_error(errors)
+    return compute_average_error(errors)
 
 
 def run_with_params(data_agent, ef, nf, std_err_fea):
