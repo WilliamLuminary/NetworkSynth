@@ -12,10 +12,9 @@ from analysis import MultifractalAnalyzer
 from config import Config, DataType, Resolution, SetName
 # noinspection PyUnresolvedReferences
 from config import Config1, Config2, ConfigSample
-from graph import GraphAttrAgent, GraphGenerator
-from handlers import DataAgent, Mapper
+from handlers import DataAgent
 from handlers.data_agent import plot_network
-from utils.utils import trim_graph
+from main import _compute_average_error, generate_synthetic_network
 
 Config2.initialize()
 Config.disable_saving("Sweeping Experiment")
@@ -28,43 +27,7 @@ logger = logging.getLogger(__name__)
 SIGINT_INFO = "SIGINT received. Terminating child process..."
 
 
-def _should_exit(exit_event) -> bool:
-    if exit_event.is_set():
-        logger.info(SIGINT_INFO)
-        return True
-    return False
-
-
-def generate_synthetic_network(exit_event, std_err_fea, attributes: GraphAttrAgent, mapper: Mapper):
-    if _should_exit(exit_event):
-        return None, float('inf')
-
-    generator = GraphGenerator(attributes)
-    for attempt in range(Config.MAX_ATTEMPTS):
-        try:
-            synthetic_graph = generator.generate_network()
-            synthetic_graph = trim_graph(synthetic_graph, attributes.average_degree)
-            mapper.assign_weights(synthetic_graph)
-
-            if _should_exit(exit_event):
-                return None, float('inf')
-
-            err_fea = MultifractalAnalyzer(synthetic_graph).analyze_error_features()
-            error_ = MultifractalAnalyzer.analyze_error(err_fea, std_err_fea)
-            if error_ < Config.ERROR_TOLERANCE:
-                return synthetic_graph, error_
-
-        except KeyboardInterrupt:
-            logger.info(SIGINT_INFO)
-            raise
-        except Exception as exc:
-            logger.error(f"Exception occurred: {exc}. Retrying...")
-
-    logger.warning("Max attempts reached. Aborting!")
-    return None, float('inf')
-
-
-def generate_with_multiprocessing(data_agent: DataAgent, std_err_fea) -> Optional[float]:
+def generate_networks_multiprocess(data_agent: DataAgent, std_err_fea) -> Optional[float]:
     num_network, num_figures = Config.SYNTHETIC_NETWORK_NUMBER, Config.SYNTHETIC_GRAPH_NUMBER
     errors, futures = [], []
     from multiprocessing import Manager
@@ -104,21 +67,11 @@ def generate_with_multiprocessing(data_agent: DataAgent, std_err_fea) -> Optiona
     return _compute_average_error(errors)
 
 
-def _compute_average_error(errors: List) -> float:
-    valid_errors = [e for e in errors if not np.isinf(e)]
-    if not valid_errors:
-        return float('inf')
-
-    mean_e, std_e = np.mean(valid_errors), np.std(valid_errors)
-    non_outliers = [e for e in valid_errors if abs(e - mean_e) <= 2.0 * std_e]
-    return round(np.mean(non_outliers), 3) if non_outliers else float('inf')
-
-
 def run_with_params(data_agent, ef, nf, std_err_fea):
     Config.set_node_factor(nf)
     Config.set_edge_factor(ef)
     logger.info(Config())
-    error = generate_with_multiprocessing(data_agent, std_err_fea)
+    error = generate_networks_multiprocess(data_agent, std_err_fea)
     return error
 
 
