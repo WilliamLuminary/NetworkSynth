@@ -165,7 +165,7 @@ def run(set_name: SetName, resolution: Resolution) -> Optional[float]:
     data_agent.save(DataType.ORIGINAL_PROPERTY)
 
     if Config.SYNTHETIC_NETWORK_NUMBER != 0:
-        org_analyzer = MultifractalAnalyzer(data_agent.original_network)
+        org_analyzer = MultifractalAnalyzer(data_agent.get_original_network())
         std_err_fea = org_analyzer.analyze_error_features()
     else:
         std_err_fea = [0, 0]
@@ -226,10 +226,10 @@ if __name__ == '__main__':
 
         summary = Summarizer()
 
-        for set_name, resolution in product(set_names, resolutions):
-            error = run(set_name, resolution)
+        for set_name_, resolution_ in product(set_names, resolutions):
+            error = run(set_name_, resolution_)
             if error is not None:
-                summary.add_result(set_name.value, resolution.value, error)
+                summary.add_result(set_name_.value, resolution_.value, error)
 
         summary.summarize()
 
