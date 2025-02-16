@@ -92,6 +92,7 @@ class DataLoader:
         elif 'analyze_source_path' in kwargs and 'original_image' in kwargs:
             self._analysis_source_path = kwargs['analyze_source_path']
             self._mode = Mode.Analyze
+
     def get_original_image(self) -> np.ndarray:
         return self._original_image
 
