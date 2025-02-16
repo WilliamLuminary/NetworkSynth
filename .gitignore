@@ -57,10 +57,6 @@ data/output/*
 !data/input/sample_input/
 !data/input/sample_input/**
 
-archieved/*
-!archieved/
-!archieved/*.ipynb
-
 wandb/
 
 src/anal/*
