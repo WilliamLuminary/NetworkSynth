@@ -114,7 +114,6 @@ class DataAgent:
                 show=show_figure_if_not_saving
             )
             self.saver.save_file(synthetic_figure, DataType.SYNTHETIC_GRAPH, file_name_prefix)
-            self.add_synthetic_graph(arg)
 
         elif data_type == DataType.SYNTHETIC_NETWORK:
             synthetic_networks = self.data_loader.get_synthetic_networks()
