@@ -15,10 +15,7 @@ from handlers import DataAgent, Mapper, Saver
 from utils.utils import trim_graph
 
 Config2.initialize()
-
-preview = False
-if preview:
-    Config.disable_saving("Preview")
+# Config.disable_saving("Preview")
 
 logger = logging.getLogger(__name__)
 SIGINT_INFO = "SIGINT received. Terminating child process..."
@@ -94,11 +91,11 @@ def generate_with_multiprocessing(data_agent: DataAgent, std_err_fea):
             future.cancel()
         executor.shutdown(wait=True, cancel_futures=True)
 
-    avg_err = _compute_average_error(errors)
+    avg_err = compute_average_error(errors)
     data_agent.save(data_type=DataType.SYNTHETIC_NETWORK, file_name_prefix=f'len_{len(errors)}_err_{avg_err:.3f}')
 
 
-def _compute_average_error(errors: List) -> float:
+def compute_average_error(errors: List) -> float:
     valid_errors = [e for e in errors if not np.isinf(e)]
     if not valid_errors:
         return float('inf')
