@@ -3,4 +3,4 @@
 from .data_agent import DataAgent
 from .mapper import Mapper, EnhancedMapper
 from .saver import Saver
-from .summarizer import Summarizer
+from .attributes_calculator import AttributesCalculator
