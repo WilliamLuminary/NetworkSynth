@@ -8,9 +8,9 @@ from matplotlib import pyplot as plt
 from numpy import ndarray
 
 from analysis.multifractal_batch_processor import MultifractalBatchProcessor
-from config import Config, DataType, FILE_CONFIGURATIONS, FileTag, Resolution, SetName
+from config import BaseConfig, DataType, FILE_CONFIGURATIONS, FileTag, Resolution, SetName
 from config.enums import Mode
-from graph import GraphAttrAgent
+from .attributes_calculator import AttributesCalculator
 from utils import calculate_frame
 from utils.utils import finalize_plot
 from .data_loader import DataLoader
@@ -22,21 +22,28 @@ logger = logging.getLogger(__name__)
 
 class DataAgent:
     def __init__(self,
+                 *,
                  set_name: SetName = None,
                  resolution: Resolution = None,
-                 *,
-                 analyze_source_path: Optional[str] = None):
-        if analyze_source_path:
+                 networks_path: Optional[str] = None,
+                 attr_path: Optional[str] = None):
+        if networks_path:
             self.mode = Mode.Analyze
-            self.data_loader = DataLoader(analyze_source_path=analyze_source_path)
-            self.saver = Saver(output_dir=analyze_source_path)
+            self.data_loader = DataLoader(Mode.Analyze, path=networks_path)
+            self.saver = Saver(output_dir=networks_path)
             self.batch_processor = None
-
         elif set_name and resolution:
             self.mode = Mode.Generate
-            self.data_loader = DataLoader(set_name=set_name, resolution=resolution)
+            self.data_loader = DataLoader(Mode.Generate, set_name=set_name, resolution=resolution)
             self.saver = Saver(set_name=set_name, resolution=resolution)
-            self.attributes: Optional[GraphAttrAgent] = None
+            self.attributes: Optional[AttributesCalculator] = None
+            self.mapper: Optional[Mapper] = None
+            self.batch_processor = None
+        elif attr_path:
+            self.mode = Mode.ATTR_GENERATE
+            self.data_loader = DataLoader(Mode.ATTR_GENERATE, path=attr_path)
+            self.saver = Saver(output_dir=attr_path)
+            self.attributes: Optional[AttributesCalculator] = None
             self.mapper: Optional[Mapper] = None
             self.batch_processor = None
         else:
@@ -46,14 +53,18 @@ class DataAgent:
         if self.mode == Mode.Generate:
             self.data_loader.load()
             original_network = self.data_loader.get_original_network()
-            self.attributes = GraphAttrAgent(original_network).analyze()
+            self.attributes = AttributesCalculator(original_network).analyze()
             self.mapper = Mapper(original_network)
 
         elif self.mode == Mode.Analyze:
             self.data_loader.load()
-            original_networks = [self.data_loader.get_original_network()]
+            original_networks = self.data_loader.get_original_network()
             synthetic_networks = self.data_loader.get_synthetic_networks()
             self.batch_processor = MultifractalBatchProcessor(original_networks, synthetic_networks)
+
+        elif self.mode == Mode.ATTR_GENERATE:
+            self.data_loader.load()
+            self.attributes = AttributesCalculator.from_dict(self.data_loader.get_attr_dict())
 
     def multifractal_analysis_in_generate_mode(self):
         assert self.mode == Mode.Generate, "This method is only available in Generate mode."
@@ -126,16 +137,18 @@ class DataAgent:
 
         elif data_type == DataType.ANALYSIS_DATA:
             assert self.mode == Mode.Analyze, "This data type is only available in Analyze mode."
-            self.saver.save_file({'original_multifractal_analysis_results': self.batch_processor.original,
-                                  'synthetic_multifractal_analysis_results': self.batch_processor.synthetic}, data_type,
+            self.saver.save_file({'original_multifractal_analysis_results': self.batch_processor.get_original_data(),
+                                  'synthetic_multifractal_analysis_results': self.batch_processor.get_synthetic_data()},
+                                 data_type,
                                  file_name_prefix)
 
         elif data_type == DataType.ANALYSIS_FIGURE:
             assert self.mode == Mode.Analyze, "This data type is only available in Analyze mode."
-            for image_name, image in self.batch_processor.images.items():
+            for image_name, image in self.batch_processor.get_images().items():
                 self.saver.save_file(image, data_type, f"{image_name}_")
 
-        logger.error(f"Please configure save() for {data_type}.")
+        else:
+            logger.error(f"Please configure save() for {data_type}.")
 
 
 def plot_network(data_type: DataType,
@@ -157,7 +170,7 @@ def plot_network(data_type: DataType,
     if adjust_axis and position_dict is not None:
         positions_array = np.array([position_dict[node] for node in graph.nodes()])
         positions_array[:, [1, 0]] = positions_array[:, [0, 1]]
-        positions_array[:, 1] = Config.DEFAULT_FRAME_SIZE - positions_array[:, 1]
+        positions_array[:, 1] = BaseConfig.DEFAULT_FRAME_SIZE - positions_array[:, 1]
         position_dict = {node: pos for node, pos in zip(graph.nodes(), positions_array)}
 
     edge_width = file_config.line_width
@@ -176,7 +189,7 @@ def plot_network(data_type: DataType,
             ax.plot(pos[0], pos[1], 'bo', markersize=node_size, zorder=2)
 
     if data_type is DataType.ORIGINAL_GRAPH:
-        frame = (0, Config.DEFAULT_FRAME_SIZE[0]), (0, Config.DEFAULT_FRAME_SIZE[1])
+        frame = (0, BaseConfig.DEFAULT_FRAME_SIZE[0]), (0, BaseConfig.DEFAULT_FRAME_SIZE[1])
     else:
         frame = calculate_frame(graph)
 
