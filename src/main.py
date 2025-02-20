@@ -9,16 +9,13 @@ import numpy as np
 from analysis import MultifractalAnalyzer
 from config import BaseConfig, DataType, Resolution, SetName
 # noinspection PyUnresolvedReferences
-from config import Config1, Config2, BaseConfigSample
+from config import Config1, Config2, GenerateModeConfigSample
 from graph import GraphGenerator
 from handlers import AttributesCalculator, DataAgent, Mapper, Saver
 from utils.utils import trim_graph
 
-ConfigSample.initialize()
-
-preview = False
-if preview:
-    Config.disable_saving("Preview")
+GenerateModeConfigSample.initialize()
+# Config.disable_saving("Preview")
 
 logger = logging.getLogger(__name__)
 SIGINT_INFO = "SIGINT received. Terminating child process..."
@@ -94,14 +91,14 @@ def generate_with_multiprocessing(data_agent: DataAgent, std_err_fea):
             future.cancel()
         executor.shutdown(wait=True, cancel_futures=True)
 
-    avg_err = _compute_average_error(errors)
+    avg_err = compute_average_error(errors)
     data_agent.save(data_type=DataType.SYNTHETIC_NETWORK, file_name_prefix=f'len_{len(errors)}_err_{avg_err:.3f}')
     if BaseConfig.FULL_ANALYSIS:
         data_agent.multifractal_analysis_in_generate_mode()
         data_agent.save(data_type=DataType.ANALYSIS_DATA)
         data_agent.save(data_type=DataType.ANALYSIS_FIGURE)
 
-def _compute_average_error(errors: List) -> float:
+def compute_average_error(errors: List) -> float:
     valid_errors = [e for e in errors if not np.isinf(e)]
     if not valid_errors:
         return float('inf')

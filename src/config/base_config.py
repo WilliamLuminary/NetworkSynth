@@ -9,7 +9,7 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
-def load_idle(_):
+def load_idle(*_, **__):
     err_msg = "Logic of loading data is not implemented yet."
     logging.info(err_msg)
     raise NotImplementedError(err_msg)
