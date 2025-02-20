@@ -1,4 +1,4 @@
-# src/config/config_1.py
+# src/config/config/config_1.py
 import logging
 import os
 import re
@@ -6,13 +6,13 @@ import re
 import cv2
 import numpy as np
 
-from .config import Config
-from .enums import Resolution, SetName
+from config.base_config import BaseConfig
+from config.enums import Resolution, SetName
 
 logger = logging.getLogger(__name__)
 
 
-class Config1(Config):
+class Config1(BaseConfig):
     SETS = [SetName.A, SetName.B, SetName.C, SetName.D]
     RESOLUTIONS = [Resolution.X10K]
 
@@ -27,7 +27,7 @@ class Config1(Config):
     MEASURE_WEIGHTED = True
     FULL_ANALYSIS = False
 
-    BASE_INPUT_PATH = os.path.join(Config.BASE_INPUT_PATH, 'old_input')
+    BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, 'old_input')
     POSITION_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'position')
     ADJ_MATRIX_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'sparse_matrices')
     IMAGES_DIR = os.path.join(BASE_INPUT_PATH, 'Original Graphs')
@@ -47,7 +47,7 @@ class Config1(Config):
             rf"{re.escape(set_name)}_{re.escape(resolution)}.*\.npy",
             re.IGNORECASE
         )
-        file_path = Config._find_file_with_pattern(
+        file_path = BaseConfig._find_file_with_pattern(
             directory_path, pattern, f'positions_of_nodes for {set_name}'
         )
         logger.info(f"Positions file loaded: {file_path}")
@@ -61,7 +61,7 @@ class Config1(Config):
             rf"sparse_matrices_{re.escape(resolution)}.*\.npz",
             re.IGNORECASE
         )
-        file_path = Config._find_file_with_pattern(
+        file_path = BaseConfig._find_file_with_pattern(
             directory_path, pattern, 'sparse matrix'
         )
         matrix_data = np.load(file_path, allow_pickle=True)
@@ -99,7 +99,7 @@ class Config1(Config):
             re.IGNORECASE
         )
 
-        file_path = Config._find_file_with_pattern(
+        file_path = BaseConfig._find_file_with_pattern(
             directory_path, pattern, f'image for {set_name}'
         )
         if file_path is None:
