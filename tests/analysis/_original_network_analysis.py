@@ -255,3 +255,11 @@ def calculate_diameter(G, weight_flag):
     else:
         diameter = max(nx.diameter(G.subgraph(c).copy()) for c in nx.connected_components(G))
     return diameter
+
+
+def calculate_assortativity(G, weight_flag):
+    if weight_flag == 'True':
+        assortativity_coef = nx.degree_pearson_correlation_coefficient(G, weight='weight')
+    else:
+        assortativity_coef = nx.degree_pearson_correlation_coefficient(G, weight=None)
+    return assortativity_coef
