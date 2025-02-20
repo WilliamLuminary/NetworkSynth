@@ -2,14 +2,12 @@
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-from config import BaseConfig, DataType
-# noinspection PyUnresolvedReferences
-from config import BaseConfigSample, Config1, Config2
+from config import AttributesGenerateModeConfigSample, BaseConfig, DataType
 from graph import GraphGenerator
-from handlers import DataAgent, Saver, AttributesCalculator
+from handlers import AttributesCalculator, DataAgent
 from utils.utils import trim_graph
 
-Config2.initialize()
+AttributesGenerateModeConfigSample.initialize()
 # Config.disable_saving("Preview")
 
 logger = logging.getLogger(__name__)
@@ -31,10 +29,12 @@ def generate_synthetic_network(exit_event, attributes: AttributesCalculator):
     for attempt in range(BaseConfig.MAX_ATTEMPTS):
         try:
             synthetic_graph = generator.generate_network()
-            synthetic_graph = trim_graph(synthetic_graph, attributes.average_degree)
 
             if _should_exit(exit_event):
                 return None, float('inf')
+
+            synthetic_graph = trim_graph(synthetic_graph, attributes.average_degree)
+            return synthetic_graph
 
         except KeyboardInterrupt:
             logger.info(SIGINT_INFO)
@@ -83,9 +83,9 @@ def generate_with_multiprocessing(data_agent: DataAgent):
     data_agent.save(data_type=DataType.SYNTHETIC_NETWORK)
 
 
-def run(path):
+def run():
     logger.info(BaseConfig())
-    data_agent = DataAgent(attr_path=BaseConfig.ATTRIBUTES_DICT_PATH)
+    data_agent = DataAgent(attr_path=BaseConfig.ATTRIBUTES_DICT_DATA_PATH)
     data_agent.prepare_data()
 
     generate_with_multiprocessing(data_agent)
@@ -93,7 +93,6 @@ def run(path):
 
 def main():
     try:
-        Saver.initialize()
         run()
     except KeyboardInterrupt:
         logger.critical("MAIN PROCESS: Forcing immediate shutdown!")
