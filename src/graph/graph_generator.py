@@ -6,18 +6,18 @@ from typing import Optional, Tuple, Union
 import networkx as nx
 from numpy import ndarray
 
-from config import Config
+from config import BaseConfig
+from handlers import AttributesCalculator
 from utils import build_graph_nodes_and_edges, calculate_frame
-from . import GraphAttrAgent
 from ._graph_node import GraphNode
 
 
 class GraphGenerator:
-    def __init__(self, attributes: GraphAttrAgent):
+    def __init__(self, attributes: AttributesCalculator):
         GraphNode.initialize(attributes)
 
     def generate_network(self, frame_range: Optional[Tuple[int, int]] = None, regenerate_times: int = 100):
-        frame_range = frame_range or Config.DEFAULT_FRAME_SIZE
+        frame_range = frame_range or BaseConfig.DEFAULT_FRAME_SIZE
 
         for _ in range(regenerate_times):
             nodes, edges = self._generate_graph_by_nodes_and_edges(frame_range)
@@ -32,7 +32,7 @@ class GraphGenerator:
         return synthetic_network
 
     def _generate_graph_by_nodes_and_edges(self, frame_range: Optional[Tuple[int, int]] = None):
-        frame_range = frame_range or Config.DEFAULT_FRAME_SIZE
+        frame_range = frame_range or BaseConfig.DEFAULT_FRAME_SIZE
 
         GraphNode.reset()
         root_node = GraphNode((0, 0))
