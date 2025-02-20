@@ -35,11 +35,11 @@ class MultifractalBatchProcessor:
     def __init__(self, original: List = None,
                  synthetic: List = None,
                  original_processed: bool = False,
-                 synthetic_processd: bool = False):
+                 synthetic_processed: bool = False):
         self._original_data = original
         self._original_processed: bool = original_processed
         self._synthetic_data = synthetic
-        self._synthetic_processed: bool = synthetic_processd
+        self._synthetic_processed: bool = synthetic_processed
         self._images = {}
 
     @classmethod
