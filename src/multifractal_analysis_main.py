@@ -45,7 +45,7 @@ def find_pkl_containers(base_dir: str, max_depth: int = 3) -> Dict[str, str]:
 
 
 if __name__ == '__main__':
-    data_dict = find_pkl_containers(os.path.join(BaseConfig.BASE_OUTPUT_PATH, 'results_multi'))
+    data_dict = find_pkl_containers(BaseConfig.NETWORKS_DATA_PATH)
     for name, path in data_dict.items():
         data_agent = DataAgent(networks_path=path)
         data_agent.prepare_data()
