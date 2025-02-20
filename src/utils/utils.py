@@ -10,13 +10,13 @@ from matplotlib import pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from numpy import ndarray
 
-from config import Config
+from config import BaseConfig
 
 
 def calculate_frame(graph: nx.Graph = None,
                     center_position: Union[tuple, list, ndarray] = None,
                     frame_range: Tuple[int, int] = None) -> tuple[tuple[float, float], tuple[float, float]]:
-    frame_range = frame_range or Config.DEFAULT_FRAME_SIZE
+    frame_range = frame_range or BaseConfig.DEFAULT_FRAME_SIZE
     if graph is None:
         if not center_position:
             raise ValueError("Either synthetic_graph or center_position must be provided.")
