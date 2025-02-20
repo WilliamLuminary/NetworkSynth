@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import cv2
 import networkx as nx
@@ -91,7 +91,7 @@ class DataLoader:
     def get_original_image(self) -> np.ndarray:
         return self._original_image
 
-    def get_original_network(self) -> nx.Graph:
+    def get_original_network(self) -> Optional[nx.Graph, List[nx.Graph]]:
         return self._original_network
 
     def get_attr_dict(self) -> Dict:
