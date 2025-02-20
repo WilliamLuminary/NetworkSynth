@@ -122,6 +122,7 @@ class DataAgent:
             self.saver.save_file(original_figure, data_type, file_name_prefix)
 
         elif data_type == DataType.SYNTHETIC_GRAPH:
+
             assert isinstance(arg, nx.Graph), "Must be a networkx.Graph synthetic network."
             synthetic_figure = plot_network(
                 data_type=DataType.SYNTHETIC_GRAPH,
@@ -131,7 +132,6 @@ class DataAgent:
             self.saver.save_file(synthetic_figure, DataType.SYNTHETIC_GRAPH, file_name_prefix)
 
         elif data_type == DataType.SYNTHETIC_NETWORK:
-            assert self.mode == Mode.Generate, "This data type is only available in Generate mode."
             synthetic_networks = self.data_loader.get_synthetic_networks()
             self.saver.save_file(synthetic_networks, data_type, file_name_prefix)
 
