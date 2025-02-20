@@ -10,7 +10,7 @@ from scipy.spatial.distance import euclidean
 
 class AttributesCalculator:
     def __init__(self, graph: nx.Graph):
-        self.graph: Final[nx.Graph] = graph
+        self._graph: Final[nx.Graph] = graph
         self.node_positions: Dict[int, Tuple[float, float]] = {}
         self.degree_distribution: Dict[int, float] = {}
         self.degree_transition_probs: Dict[int, Dict[int, float]] = {}
@@ -20,14 +20,14 @@ class AttributesCalculator:
         self.average_degree: float = 0.0
 
     def analyze(self):
-        self.node_positions = nx.get_node_attributes(self.graph, 'pos')
-        self.degree_distribution = self._compute_degree_distribution(self.graph)
-        self.degree_transition_probs = self._compute_degree_transition_probs(self.graph)
+        self.node_positions = nx.get_node_attributes(self._graph, 'pos')
+        self.degree_distribution = self._compute_degree_distribution(self._graph)
+        self.degree_transition_probs = self._compute_degree_transition_probs(self._graph)
         (self.degree_edge_lengths,
          self.degree_angle_diffs,
-         self.average_edge_length) = self._compute_edge_lengths_and_angle_diffs(self.graph)
-        self.average_degree = self._compute_average_degree(self.graph)
-        del self.graph
+         self.average_edge_length) = self._compute_edge_lengths_and_angle_diffs(self._graph)
+        self.average_degree = self._compute_average_degree(self._graph)
+        del self._graph
         return self
 
     @classmethod
@@ -43,6 +43,7 @@ class AttributesCalculator:
         agent.average_edge_length = data['average_edge_length']
         agent.average_degree = data['average_degree']
 
+        del agent._graph
         return agent
 
     def _to_dict(self) -> dict:
