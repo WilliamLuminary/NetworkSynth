@@ -41,7 +41,7 @@ class BaseConfig:
     ADJ_MATRIX_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'sparse_matrices_data')
     IMAGES_DIR = os.path.join(BASE_INPUT_PATH, 'original_images_data')
     NETWORKS_DATA_PATH = None
-    ATTRIBUTES_DICT_PATH = None
+    ATTRIBUTES_DICT_DATA_PATH = None
 
     MAX_ATTEMPTS = 10
     ERROR_TOLERANCE = .15  # Generally should be 0.15
