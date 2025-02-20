@@ -12,7 +12,7 @@ from GraphRicciCurvature.OllivierRicci import OllivierRicci
 from scipy.spatial.distance import euclidean
 from scipy.stats import linregress
 
-from config import Config
+from config import BaseConfig
 from utils.utils import keep_largest_connected_component
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ class MultifractalAnalyzer:
 
     def __init__(self, graph: nx.Graph):
         self.graph = graph
-        self.weighted = Config.MEASURE_WEIGHTED
+        self.weighted = BaseConfig.MEASURE_WEIGHTED
         self.f_digit = 0
         self.Q = None
 
