@@ -6,7 +6,7 @@ import networkx as nx
 import numpy as np
 import pytest
 
-from tests.analysis.for_test_original_network_analysis import (
+from tests.analysis._original_network_analysis import (
     nspectrum as original_n_spectrum,
     wnfd_nk as original_calculate_multifractal_taus,
     ndimension as original_n_dimension,
@@ -18,9 +18,9 @@ from tests.analysis.for_test_original_network_analysis import (
     calculate_eigenvector_centrality as original_calculate_eigenvector_centrality,
 )
 from analysis.multifractal_analyzer import MultifractalAnalyzer
-from config import Config, ConfigSample
+from config import BaseConfig, GenerateModeConfigSample
 
-ConfigSample.initialize()
+S.initialize()
 
 
 @pytest.fixture
@@ -140,7 +140,7 @@ def test_eigenvector_centrality(load_graph_from_pickle):
 
 
 def test_diameter(load_graph_from_pickle):
-    if not Config.MEASURE_WEIGHTED:
+    if not BaseConfig.MEASURE_WEIGHTED:
         return pytest.skip("Test only for weighted graphs")
 
     sample_graph = load_graph_from_pickle
