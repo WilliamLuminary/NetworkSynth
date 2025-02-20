@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class MultifractalConfig(BaseConfig):
     MEASURE_WEIGHTED = False
-    ATTRIBUTES_DICT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, 'sample_input', 'property_generate_mode')
+    NETWORKS_DATA_PATH = os.path.join(BaseConfig.BASE_OUTPUT_PATH, 'results_multi')
 
     @classmethod
     def initialize(cls):
