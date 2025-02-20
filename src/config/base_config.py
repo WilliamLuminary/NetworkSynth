@@ -1,4 +1,4 @@
-# src/config/config.py
+# src/config/base_config.py
 import inspect
 import logging
 import os
@@ -9,13 +9,13 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
-def load_idle(*_args, **_kwargs):
+def load_idle(_):
     err_msg = "Logic of loading data is not implemented yet."
     logging.info(err_msg)
     raise NotImplementedError(err_msg)
 
 
-class Config:
+class BaseConfig:
     """ Define base paths, this config file must be in the subdirectory of the project root"""
 
     SETS: Union[list, np.ndarray]
@@ -36,9 +36,12 @@ class Config:
     BASE_DATA_PATH = os.path.join(PROJECT_ROOT, 'data')
 
     BASE_INPUT_PATH = os.path.join(BASE_DATA_PATH, 'input')
+
     POSITION_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'position_data')
     ADJ_MATRIX_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'sparse_matrices_data')
     IMAGES_DIR = os.path.join(BASE_INPUT_PATH, 'original_images_data')
+    NETWORKS_DATA_PATH = None
+    ATTRIBUTES_DICT_PATH = None
 
     MAX_ATTEMPTS = 10
     ERROR_TOLERANCE = .15  # Generally should be 0.15
@@ -48,6 +51,8 @@ class Config:
 
     BASE_OUTPUT_PATH = os.path.join(BASE_DATA_PATH, 'output')
     POSITION_DATA_FUNC = ADJ_MATRIX_DATA_FUNC = IMAGES_FUNC = load_idle
+    NETWORKS_FUNC = load_idle
+    ATTRIBUTES_DICT_FUNC = load_idle
 
     @classmethod
     def _setup_logger(cls, log_level=None, details=None):
@@ -60,7 +65,7 @@ class Config:
             console_handler = logging.StreamHandler()
             console_handler.setLevel(log_level)
 
-            logs_dir = os.path.join(Config.BASE_OUTPUT_PATH, 'logs')
+            logs_dir = os.path.join(BaseConfig.BASE_OUTPUT_PATH, 'logs')
             os.makedirs(logs_dir, exist_ok=True)
             file_handler = logging.FileHandler(os.path.join(logs_dir, f'project_{details}.log'))
             file_handler.setLevel(log_level)
@@ -82,7 +87,7 @@ class Config:
         for name in dir(cls):
             if name.isupper() and not name.startswith('__'):
                 value = getattr(cls, name)
-                setattr(Config, name, value)
+                setattr(BaseConfig, name, value)
 
     @classmethod
     def set_node_factor(cls, factor: float):
@@ -96,13 +101,13 @@ class Config:
 
     @classmethod
     def disable_saving(cls, reason: str = ""):
-        Config.DISABLE_SAVING = True
-        Config.DISABLE_SAVING_NOTE = reason
+        BaseConfig.DISABLE_SAVING = True
+        BaseConfig.DISABLE_SAVING_NOTE = reason
 
     @classmethod
     def enable_saving(cls, reason: str = ""):
-        Config.DISABLE_SAVING = False
-        Config.DISABLE_SAVING_NOTE = reason
+        BaseConfig.DISABLE_SAVING = False
+        BaseConfig.DISABLE_SAVING_NOTE = reason
 
     @classmethod
     def update_frame_size(cls, frame_size: Tuple[int, int]):
