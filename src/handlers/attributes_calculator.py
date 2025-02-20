@@ -1,4 +1,4 @@
-# src/original_network/graph_attr_agent.py
+# src/handlers/attributes_calculator.py
 
 from collections import Counter, defaultdict
 from typing import Dict, Final, List, Tuple
@@ -8,7 +8,7 @@ import numpy as np
 from scipy.spatial.distance import euclidean
 
 
-class GraphAttrAgent:
+class AttributesCalculator:
     def __init__(self, graph: nx.Graph):
         self.graph: Final[nx.Graph] = graph
         self.node_positions: Dict[int, Tuple[float, float]] = {}
@@ -29,6 +29,21 @@ class GraphAttrAgent:
         self.average_degree = self._compute_average_degree(self.graph)
         del self.graph
         return self
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "AttributesCalculator":
+        graph = nx.Graph()
+        agent = cls(graph)
+
+        agent.node_positions = data['node_positions']
+        agent.degree_distribution = data['degree_distribution']
+        agent.degree_transition_probs = data['degree_transition_probs']
+        agent.degree_edge_lengths = data['degree_edge_lengths']
+        agent.degree_angle_diffs = data['degree_angle_diffs']
+        agent.average_edge_length = data['average_edge_length']
+        agent.average_degree = data['average_degree']
+
+        return agent
 
     def _to_dict(self) -> dict:
         return {
