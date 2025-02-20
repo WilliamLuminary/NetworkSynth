@@ -91,7 +91,7 @@ class DataLoader:
     def get_original_image(self) -> np.ndarray:
         return self._original_image
 
-    def get_original_network(self) -> Optional[nx.Graph, List[nx.Graph]]:
+    def get_original_network(self) -> Union[nx.Graph, List[nx.Graph]]:
         return self._original_network
 
     def get_attr_dict(self) -> Dict:
