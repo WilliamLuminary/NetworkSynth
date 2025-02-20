@@ -128,3 +128,4 @@ class AnalysisMode(Enum):
 class Mode(Enum):
     Generate = auto()
     Analyze = auto()
+    ATTR_GENERATE = auto()
