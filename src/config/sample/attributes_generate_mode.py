@@ -9,6 +9,7 @@ from config.base_config import BaseConfig
 logger = logging.getLogger(__name__)
 
 
+# TODO: If generate networks from attributes/properties, modify based on this config.
 class AttributesGenerateModeConfigSample(BaseConfig):
     DEFAULT_FRAME_SIZE = (1887 // 4, 2048 // 4)
     CLOSED_NODES_FACTOR = 1.2
