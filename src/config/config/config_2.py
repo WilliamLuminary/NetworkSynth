@@ -1,4 +1,4 @@
-# src/config/config_2.py
+# src/config/config/config_2.py
 import logging
 import os
 import re
@@ -6,13 +6,13 @@ import re
 import cv2
 import numpy as np
 
-from .config import Config
-from .enums import Resolution, SetName
+from config.base_config import BaseConfig
+from config.enums import Resolution, SetName
 
 logger = logging.getLogger(__name__)
 
 
-class Config2(Config):
+class Config2(BaseConfig):
     SETS = [SetName.S4, SetName.S8]
     RESOLUTIONS = [Resolution.NA]
 
@@ -28,7 +28,7 @@ class Config2(Config):
     FULL_ANALYSIS = False
     ERROR_TOLERANCE = .3
 
-    BASE_INPUT_PATH = os.path.join(Config.BASE_INPUT_PATH, 'new_input')
+    BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, 'new_input')
     POSITION_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'position')
     ADJ_MATRIX_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'sparse_matrices')
     IMAGES_DIR = os.path.join(BASE_INPUT_PATH, 'Original Graphs')
@@ -48,7 +48,7 @@ class Config2(Config):
             rf"W-\d+-\d+-\d+_{re.escape(str(set_name))}_postion\.npy",
             re.IGNORECASE
         )  # Only difference
-        file_path = Config._find_file_with_pattern(
+        file_path = BaseConfig._find_file_with_pattern(
             directory_path, pattern, f'positions_of_nodes for {set_name}'
         )
         logger.info(f"Positions file loaded: {file_path}")
@@ -60,7 +60,7 @@ class Config2(Config):
         directory_path = os.path.join(Config2.ADJ_MATRIX_DATA_DIR, resolution)
         pattern = re.compile(r"sparse_matrices\.npz", re.IGNORECASE)
 
-        file_path = Config._find_file_with_pattern(
+        file_path = BaseConfig._find_file_with_pattern(
             directory_path, pattern, details="sparse matrix"
         )
         matrix_data = np.load(file_path, allow_pickle=True)
@@ -92,7 +92,7 @@ class Config2(Config):
             re.IGNORECASE
         )
 
-        file_path = Config._find_file_with_pattern(
+        file_path = BaseConfig._find_file_with_pattern(
             directory_path, pattern, f'image for {set_name}'
         )
         if file_path is None:

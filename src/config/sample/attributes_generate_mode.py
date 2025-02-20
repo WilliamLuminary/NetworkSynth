@@ -1,0 +1,38 @@
+# src/config/sample/generate_mode.py
+import logging
+import os
+import pickle
+from typing import Dict
+
+from config.base_config import BaseConfig
+
+logger = logging.getLogger(__name__)
+
+
+class AttributesGenerateModeConfigSample(BaseConfig):
+    DEFAULT_FRAME_SIZE = (1887 // 4, 2048 // 4)
+    CLOSED_NODES_FACTOR = 1.2
+    CLOSED_EDGES_FACTOR = .8
+    # For 10_kx image, node fac should be 1.5, and edge fac should be 1
+
+    SYNTHETIC_GRAPH_NUMBER = 0
+    SYNTHETIC_NETWORK_NUMBER = 0
+
+    MAX_ATTEMPTS = 10
+
+    BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, 'sample_input', 'generate_mode')
+
+    @classmethod
+    def initialize(cls):
+        super().initialize()
+        cls.ATTRIBUTES_DICT_FUNC = cls._load_attr_dict
+        cls._update_attrs_in_base_config()
+
+    @staticmethod
+    def _load_attr_dict(path) -> Dict:
+        for file in os.listdir(path):
+            if file.endswith('.pkl') and ('property' in file or 'attribute' in file):
+                with open(os.path.join(path, file), 'rb') as f:
+                    content = pickle.load(f)
+                    return content
+        return {}

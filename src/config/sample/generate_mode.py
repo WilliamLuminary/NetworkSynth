@@ -1,17 +1,17 @@
-# src/config/config_sample.py
+# src/config/sample/generate_mode.py
 import logging
 import os
 
 import cv2
 import numpy as np
 
-from .config import Config
-from .enums import Resolution, SetName
+from config.base_config import BaseConfig
+from config.enums import Resolution, SetName
 
 logger = logging.getLogger(__name__)
 
 
-class ConfigSample(Config):
+class GenerateModeConfigSample(BaseConfig):
     SETS = [SetName.Sample1, SetName.Sample2, SetName.Sample3]
     RESOLUTIONS = [Resolution.NA]
 
@@ -28,7 +28,7 @@ class ConfigSample(Config):
 
     MEASURE_WEIGHTED = False
 
-    BASE_INPUT_PATH = os.path.join(Config.BASE_INPUT_PATH, 'sample_input')
+    BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, 'sample_input', 'generate_mode')
     POSITION_DATA_DIR = os.path.join(BASE_INPUT_PATH, '')
     ADJ_MATRIX_DATA_DIR = os.path.join(BASE_INPUT_PATH, '')
     IMAGES_DIR = os.path.join(BASE_INPUT_PATH, '')
@@ -48,7 +48,7 @@ class ConfigSample(Config):
 
     @staticmethod
     def _load_positions(set_name, _):
-        directory_path = ConfigSample.POSITION_DATA_DIR
+        directory_path = GenerateModeConfigSample.POSITION_DATA_DIR
         file_name = f"{str(set_name)}_pos.npy"
         file_path = os.path.join(directory_path, file_name)
 
@@ -62,7 +62,7 @@ class ConfigSample(Config):
 
     @staticmethod
     def _load_sparse_matrix(set_name, _):
-        directory_path = ConfigSample.ADJ_MATRIX_DATA_DIR
+        directory_path = GenerateModeConfigSample.ADJ_MATRIX_DATA_DIR
         file_name = f"{str(set_name)}_mat.npy"
         file_path = os.path.join(directory_path, file_name)
 
@@ -76,7 +76,7 @@ class ConfigSample(Config):
 
     @staticmethod
     def _load_image(set_name, _):
-        directory_path = ConfigSample.IMAGES_DIR
+        directory_path = GenerateModeConfigSample.IMAGES_DIR
         file_name = f"{str(set_name)}_image.tif"
         file_path = os.path.join(directory_path, file_name)
 
