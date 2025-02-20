@@ -1,12 +1,13 @@
+# src/multifractal_analysis_main.py
 import logging
 import os
 from collections import deque
 from typing import Dict
 
-from config import Config, Config2, DataType
+from config import BaseConfig, DataType, MultifractalConfig
 from handlers import DataAgent
 
-Config2.initialize()
+MultifractalConfig.initialize()
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ def find_pkl_containers(base_dir: str, max_depth: int = 3) -> Dict[str, str]:
 
         if has_network_dirs:
             containers[rel_path] = current_dir
+            logger.info(f"Found container directory: {current_dir}")
             continue
 
         if depth < max_depth:
@@ -43,9 +45,10 @@ def find_pkl_containers(base_dir: str, max_depth: int = 3) -> Dict[str, str]:
 
 
 if __name__ == '__main__':
-    data_dict = find_pkl_containers(os.path.join(Config.BASE_OUTPUT_PATH, 'results_multi'))
+    data_dict = find_pkl_containers(os.path.join(BaseConfig.BASE_OUTPUT_PATH, 'results_multi'))
     for name, path in data_dict.items():
-        data_agent = DataAgent(analyze_source_path=path)
+        data_agent = DataAgent(networks_path=path)
+        data_agent.prepare_data()
         data_agent.multifractal_analysis()
         data_agent.save(DataType.ANALYSIS_DATA)
         data_agent.save(DataType.ANALYSIS_FIGURE)
