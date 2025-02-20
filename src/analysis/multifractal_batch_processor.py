@@ -32,10 +32,14 @@ _PLOT_STYLE = {
 
 class MultifractalBatchProcessor:
 
-    def __init__(self, original: List = None, synthetic: List = None, processed: bool = False):
+    def __init__(self, original: List = None,
+                 synthetic: List = None,
+                 original_processed: bool = False,
+                 synthetic_processd: bool = False):
         self._original_data = original
+        self._original_processed: bool = original_processed
         self._synthetic_data = synthetic
-        self._processed: bool = processed
+        self._synthetic_processed: bool = synthetic_processd
         self._images = {}
 
     @classmethod
@@ -46,18 +50,30 @@ class MultifractalBatchProcessor:
         )
 
     def process(self):
-        if not self._processed:
+        if not self._original_processed:
             logger.info("Processing Multifractal Data.")
-            if self._synthetic_data:
-                synthetic_results = self._process_batch(self._synthetic_data)
-                assert len(synthetic_results) == len(self._synthetic_data)
-                self._synthetic_data = synthetic_results
-            if self._original_data:
-                original_results = self._process_batch(self._original_data)
-                assert len(original_results) == len(self._original_data)
-                self._original_data = original_results
-            self._processed = True
+            assert self._synthetic_data, "No synthetic data available."
+            synthetic_results = self._process_batch(self._synthetic_data)
+            assert len(synthetic_results) == len(self._synthetic_data)
+            self._synthetic_data = synthetic_results
+            self._original_processed = True
+
+        if not self._synthetic_processed:
+            assert self._original_data, "No original data available."
+            original_results = self._process_batch(self._original_data)
+            assert len(original_results) == len(self._original_data)
+            self._original_data = original_results
+            self._synthetic_processed = True
+
         return self
+
+    def get_original_data(self):
+        assert self._original_processed, "Original data has not been processed."
+        return self._original_data
+
+    def get_synthetic_data(self):
+        assert self._synthetic_processed, "Synthetic data has not been processed."
+        return self._synthetic_data
 
     @staticmethod
     def _process_batch(graphs):
@@ -70,6 +86,9 @@ class MultifractalBatchProcessor:
             'spectra': self._plot_spectra(),
             'dimensions': self._plot_dimensions(),
         })
+
+    def get_images(self) -> Dict[str, np.ndarray]:
+        return self._images
 
     def _plot_spectra(self):
         return self._create_plot('al_list', 'fal_list',
@@ -87,7 +106,7 @@ class MultifractalBatchProcessor:
         legend = []
 
         for data_type in ['synthetic', 'original']:
-            results = getattr(self, f'{data_type}', [])
+            results = getattr(self, f'_{data_type}_data', [])
             assert results, f"No {data_type} data available."
 
             self._plot_dataset(
