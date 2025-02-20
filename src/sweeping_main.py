@@ -1,4 +1,4 @@
-# src/main.py
+# src/sweeping_main.py
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from itertools import product
@@ -8,15 +8,15 @@ import cv2
 
 import wandb
 from analysis import MultifractalAnalyzer
-from config import Config, DataType, Resolution, SetName
+from config import BaseConfig, DataType, Resolution, SetName
 # noinspection PyUnresolvedReferences
-from config import Config1, Config2, ConfigSample
+from config import Config1, Config2, BaseConfigSample
 from handlers import DataAgent
 from handlers.data_agent import plot_network
 from main import compute_average_error, generate_synthetic_network
 
 Config2.initialize()
-Config.disable_saving("Sweeping Experiment")
+BaseConfig.disable_saving("Sweeping Experiment")
 EXPERIMENT_PROJECT_NAME = "hyperparam-tuning"
 EXPERIMENT_NAME = "adjusting-node-and-edge-factors"
 NODE_FACTORS = [round(0.1 + 0.1 * i, 1) for i in range(20)]
@@ -27,7 +27,7 @@ SIGINT_INFO = "SIGINT received. Terminating child process..."
 
 
 def generate_networks_multiprocess(data_agent: DataAgent, std_err_fea) -> Optional[float]:
-    num_network, num_figures = Config.SYNTHETIC_NETWORK_NUMBER, Config.SYNTHETIC_GRAPH_NUMBER
+    num_network, num_figures = BaseConfig.SYNTHETIC_NETWORK_NUMBER, BaseConfig.SYNTHETIC_GRAPH_NUMBER
     errors, futures = [], []
     from multiprocessing import Manager
     exit_event = Manager().Event()
@@ -67,15 +67,15 @@ def generate_networks_multiprocess(data_agent: DataAgent, std_err_fea) -> Option
 
 
 def run_with_params(data_agent, ef, nf, std_err_fea):
-    Config.set_node_factor(nf)
-    Config.set_edge_factor(ef)
-    logger.info(Config())
+    BaseConfig.set_node_factor(nf)
+    BaseConfig.set_edge_factor(ef)
+    logger.info(BaseConfig())
     error = generate_networks_multiprocess(data_agent, std_err_fea)
     return error
 
 
 def run_for_each_set_resolution(set_name: SetName, resolution: Resolution) -> None:
-    data_agent = DataAgent(set_name, resolution)
+    data_agent = DataAgent(set_name=set_name, resolution=resolution)
     data_agent.prepare_data()
     std_err_fea = MultifractalAnalyzer(data_agent.get_original_network()).analyze_error_features()
 
@@ -93,12 +93,12 @@ def run_for_each_set_resolution(set_name: SetName, resolution: Resolution) -> No
 
 
 def main():
-    assert Config.SYNTHETIC_NETWORK_NUMBER != 0, "Sweeping experiments require synthetic networks."
+    assert BaseConfig.SYNTHETIC_NETWORK_NUMBER != 0, "Sweeping experiments require synthetic networks."
 
     wandb.login()
-    wandb.init(project=EXPERIMENT_PROJECT_NAME, name=EXPERIMENT_NAME)
+    wandb.init(project=EXPERIMENT_PROJECT_NAME, name=EXPERIMENT_NAME, dir=BaseConfig.PROJECT_ROOT)
     try:
-        for set_name_, resolution_ in product(Config.SETS, Config.RESOLUTIONS):
+        for set_name_, resolution_ in product(BaseConfig.SETS, BaseConfig.RESOLUTIONS):
             run_for_each_set_resolution(set_name_, resolution_)
     except KeyboardInterrupt:
         logger.critical("MAIN PROCESS: Forcing immediate shutdown!")
