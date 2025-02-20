@@ -11,6 +11,7 @@ from config.enums import Resolution, SetName
 logger = logging.getLogger(__name__)
 
 
+# TODO: If generate networks from the original network, modify based on this config.
 class GenerateModeConfigSample(BaseConfig):
     SETS = [SetName.Sample1, SetName.Sample2, SetName.Sample3]
     RESOLUTIONS = [Resolution.NA]
