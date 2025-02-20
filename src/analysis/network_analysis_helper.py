@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import networkit as nk
 import networkx as nx
 import numpy as np
+import pandas as pd
 import scipy.stats as stats
 from GraphRicciCurvature.OllivierRicci import OllivierRicci
 from matplotlib.ticker import AutoMinorLocator
@@ -196,10 +197,10 @@ def n_dimension(tau_list, q_list, label, color):
     return dim_list, dim_max, dim_min, diff
 
 
-# def save_violin_data(metric_list, filename, columns):
-#     df_ = pd.DataFrame(metric_list).T
-#     df_.columns = columns
-#     df_.to_csv(filename, index=False)
+def save_violin_data(metric_list, filename, columns):
+    df_ = pd.DataFrame(metric_list).T
+    df_.columns = columns
+    df_.to_csv(filename, index=False)
 
 
 def node_dimension(graph, weight=True, f_digi=2) -> dict:
@@ -451,11 +452,11 @@ def run():
     eigen_list, avg_eigen = compute_eigenvector(synthetic_graphs, weight_flag)
     print("Average Eigenvector Centrality:", avg_eigen)
 
-    # save_violin_data(nfd_list, os.path.join(output_root, f'{kX_index}_nfd_violin.csv'), synthetic_names)
-    # save_violin_data(closeness_list, os.path.join(output_root, f'{kX_index}_closeness_violin.csv'), synthetic_names)
-    # save_violin_data(degree_list, os.path.join(output_root, f'{kX_index}_degree_violin.csv'), synthetic_names)
-    # save_violin_data(clustering_list, os.path.join(output_root, f'{kX_index}_clustering_violin.csv'), synthetic_names)
-    # save_violin_data(orc_list, os.path.join(output_root, f'{kX_index}_orc_violin.csv'), synthetic_names)
+    save_violin_data(nfd_list, os.path.join(output_root, f'{kX_index}_nfd_violin.csv'), synthetic_names)
+    save_violin_data(closeness_list, os.path.join(output_root, f'{kX_index}_closeness_violin.csv'), synthetic_names)
+    save_violin_data(degree_list, os.path.join(output_root, f'{kX_index}_degree_violin.csv'), synthetic_names)
+    save_violin_data(clustering_list, os.path.join(output_root, f'{kX_index}_clustering_violin.csv'), synthetic_names)
+    save_violin_data(orc_list, os.path.join(output_root, f'{kX_index}_orc_violin.csv'), synthetic_names)
 
     # -------------------------------
     # Save summary data to CSV
@@ -477,11 +478,11 @@ def run():
     }
     if weight_flag == 'True' and diameter_list is not None:
         summary_data['diameter'] = diameter_list
-    # df_summary = pd.DataFrame(summary_data, index=synthetic_names).transpose()
-    # output_csv = os.path.join(output_root,
-    #                           f'{kX_index}_output.csv' if weight_flag == 'True' else f'{kX_index}_uw_output.csv')
-    # df_summary.to_csv(output_csv)
-    # print("Summarizer data saved to", output_csv)
+    df_summary = pd.DataFrame(summary_data, index=synthetic_names).transpose()
+    output_csv = os.path.join(output_root,
+                              f'{kX_index}_output.csv' if weight_flag == 'True' else f'{kX_index}_uw_output.csv')
+    df_summary.to_csv(output_csv)
+    print("Summarizer data saved to", output_csv)
 
 
 if __name__ == '__main__':
