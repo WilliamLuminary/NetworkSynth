@@ -9,7 +9,7 @@ from typing import Any, Optional, Union
 import cv2
 from numpy import ndarray
 
-from config import Config, DataType, FILE_CONFIGURATIONS, Resolution, SetName
+from config import BaseConfig, DataType, FILE_CONFIGURATIONS, Resolution, SetName
 from config.enums import FileExtension, Mode
 
 logger = logging.getLogger(__name__)
@@ -40,8 +40,8 @@ class Saver:
     mode = None
 
     def __new__(cls, *args, **kwargs):
-        if Config.DISABLE_SAVING:
-            logger.info(f"Saving is disabled. No Saver will be instantiated. {Config.DISABLE_SAVING_NOTE}")
+        if BaseConfig.DISABLE_SAVING:
+            logger.info(f"Saving is disabled. No Saver will be instantiated. {BaseConfig.DISABLE_SAVING_NOTE}")
             return None
         return super().__new__(cls)
 
@@ -61,7 +61,7 @@ class Saver:
         Postconditions:
             - The directory for each set and resolution is created.
         """
-        assert not Config.DISABLE_SAVING, "Saving is disabled."
+        assert not BaseConfig.DISABLE_SAVING, "Saving is disabled."
         if output_dir:
             self.output_dir = output_dir
             self.mode = Mode.Analyze
@@ -79,21 +79,21 @@ class Saver:
         Create only one base output directory for all the results.
         :return: None
         """
-        if Config.DISABLE_SAVING:
+        if BaseConfig.DISABLE_SAVING:
             logger.info(
-                f"Saving is disabled. {Config.DISABLE_SAVING_NOTE}.")
+                f"Saving is disabled. {BaseConfig.DISABLE_SAVING_NOTE}.")
             return
 
         if result_dir:
             cls.mode = Mode.Analyze
-            cls.base_output_dir = os.path.join(Config.BASE_OUTPUT_PATH, result_dir)
+            cls.base_output_dir = os.path.join(BaseConfig.BASE_OUTPUT_PATH, result_dir)
         else:
             cls.mode = Mode.Generate
-            cls.base_output_dir = os.path.join(Config.BASE_OUTPUT_PATH,
-                                               f'{Config.OUTPUT_DENOTE}_results_{Saver._time_id()}')
+            cls.base_output_dir = os.path.join(BaseConfig.BASE_OUTPUT_PATH,
+                                               f'{BaseConfig.OUTPUT_DENOTE}_results_{Saver._time_id()}')
             _ensure_directory(cls.base_output_dir)
             logger.info(f"Base Output directory: {cls.base_output_dir}")
-            latest_link_path = os.path.join(Config.BASE_OUTPUT_PATH, 'latest_result')
+            latest_link_path = os.path.join(BaseConfig.BASE_OUTPUT_PATH, 'latest_result')
             _update_soft_link(latest_link_path, cls.base_output_dir)
 
     def save_file(self, content: Any, data_type: DataType, file_name_prefix: Optional[str] = None) -> None:
@@ -109,8 +109,8 @@ class Saver:
             logger.warning("Content is None.")
             return
 
-        if Config.DISABLE_SAVING:
-            logger.warning(f"{Config.DISABLE_SAVING_NOTE} Saving is disabled. ")
+        if BaseConfig.DISABLE_SAVING:
+            logger.warning(f"{BaseConfig.DISABLE_SAVING_NOTE} Saving is disabled. ")
             return
 
         file_config = FILE_CONFIGURATIONS.get(data_type, FILE_CONFIGURATIONS[DataType.DEFAULT_DATA])
