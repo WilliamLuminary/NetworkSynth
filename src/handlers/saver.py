@@ -63,6 +63,7 @@ class Saver:
         """
         assert not BaseConfig.DISABLE_SAVING, "Saving is disabled."
         if output_dir:
+            assert not self.base_output_dir, "Output directory has been set. Don't call Saver.initialize()."
             self.output_dir = output_dir
             self.mode = Mode.Analyze
         else:
@@ -116,7 +117,7 @@ class Saver:
         file_config = FILE_CONFIGURATIONS.get(data_type, FILE_CONFIGURATIONS[DataType.DEFAULT_DATA])
         file_detail = file_config.detail
 
-        if self.mode == Mode.Generate:
+        if self.mode == Mode.Generate or data_type.file_extension == FileExtension.PNG:
             file_name_identifier = self._time_id()
             rel_path = file_config.relative_dir
             file_detail = (file_detail + '_') if file_config.detail and file_config.detail[-1] != '_' else (
