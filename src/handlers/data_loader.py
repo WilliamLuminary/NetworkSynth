@@ -1,18 +1,16 @@
-import os
-import pickle
-from typing import List, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import cv2
 import networkx as nx
 import numpy as np
 
-from config import Config
+from config import BaseConfig
 from config.enums import Mode
 from utils import build_graph_pos_and_adj_mat
 
 
 def _resize_cv2_image(image: np.ndarray, frame_range: Tuple[int, int] = None) -> np.ndarray:
-    frame_range = frame_range or Config.DEFAULT_FRAME_SIZE
+    frame_range = frame_range or BaseConfig.DEFAULT_FRAME_SIZE
     target_size = min(frame_range)
     height, width = image.shape[:2]
     scaling_factor = target_size / min(height, width)
@@ -23,7 +21,7 @@ def _resize_cv2_image(image: np.ndarray, frame_range: Tuple[int, int] = None) ->
 
 
 def _trim_cv2_image(image: np.ndarray, frame_range: Tuple[int, int] = None) -> np.ndarray:
-    frame_range = frame_range or Config.DEFAULT_FRAME_SIZE
+    frame_range = frame_range or BaseConfig.DEFAULT_FRAME_SIZE
     target_size = min(frame_range)
     height, width = image.shape[:2]
 
@@ -65,39 +63,39 @@ def _transform_graph_coordinates(network: nx.Graph, image_shape: Tuple, flip_x=F
         d['pos'] = p
 
 
-def _load_network_pkl(folder: str) -> List[nx.Graph]:
-    for file in os.listdir(folder):
-        if file.endswith('.pkl') and 'network' in file:
-            with open(os.path.join(folder, file), 'rb') as f:
-                content = pickle.load(f)
-                return [content] if isinstance(content, nx.Graph) else content
-    return []
-
-
 class DataLoader:
-    def __init__(self, **kwargs):
+    def __init__(self, mode, **kwargs):
         self._set_name = None
         self._resolution = None
-        self._analysis_source_path = None
+        self._both_networks_path = None
 
         self._original_image = None
 
         self._original_network = None
         self._synthetic_networks = []
 
-        if 'set_name' in kwargs and 'resolution' in kwargs:
+        if mode == Mode.Generate:
+            assert 'set_name' in kwargs and 'resolution' in kwargs, "set_name and resolution are required."
             self._set_name = kwargs['set_name']
             self._resolution = kwargs['resolution']
-            self._mode = Mode.Generate
-        elif 'analyze_source_path' in kwargs and 'original_image' in kwargs:
-            self._analysis_source_path = kwargs['analyze_source_path']
-            self._mode = Mode.Analyze
+        elif mode == Mode.Analyze:
+            assert 'path' in kwargs, "path is required."
+            self._both_networks_path = kwargs['path']
+        elif mode == Mode.ATTR_GENERATE:
+            assert 'path' in kwargs, "path is required."
+            self._attr_path = kwargs['path']
+            self._attr = None
+
+        self._mode = mode
 
     def get_original_image(self) -> np.ndarray:
         return self._original_image
 
     def get_original_network(self) -> nx.Graph:
         return self._original_network
+
+    def get_attr_dict(self) -> Dict:
+        return self._attr
 
     def get_synthetic_networks(self) -> List[nx.Graph]:
         return self._synthetic_networks
@@ -110,32 +108,32 @@ class DataLoader:
             self._original_network = build_graph_pos_and_adj_mat((self._load_positions(), self._load_sparse_matrix()))
             self._original_image = self._load_image()
 
-            if not Config.DEFAULT_FRAME_SIZE:
-                Config.update_frame_size((self._original_image.shape[1], self._original_image.shape[0]))
+            if not BaseConfig.DEFAULT_FRAME_SIZE:
+                BaseConfig.update_frame_size((self._original_image.shape[1], self._original_image.shape[0]))
 
             image = _resize_cv2_image(self._original_image)
             image = _trim_cv2_image(image)
             _transform_graph_coordinates(self._original_network, image.shape)
             return self._original_image, self._original_network
+
         elif self._mode == Mode.Analyze:
             self._original_network, self._synthetic_networks = self._load_networks()
             return self._original_network, self._synthetic_networks
 
+        elif self._mode == Mode.ATTR_GENERATE:
+            self._attr = self._load_attr()
+
     def _load_positions(self) -> Union[np.ndarray, List]:
-        return Config.POSITION_DATA_FUNC(str(self._set_name), str(self._resolution))
+        return BaseConfig.POSITION_DATA_FUNC(str(self._set_name), str(self._resolution))
 
     def _load_sparse_matrix(self) -> Union[np.ndarray, List]:
-        return Config.ADJ_MATRIX_DATA_FUNC(str(self._set_name), str(self._resolution))
+        return BaseConfig.ADJ_MATRIX_DATA_FUNC(str(self._set_name), str(self._resolution))
 
     def _load_image(self) -> Union[np.ndarray, List]:
-        return Config.IMAGES_FUNC(str(self._set_name), str(self._resolution))
+        return BaseConfig.IMAGES_FUNC(str(self._set_name), str(self._resolution))
 
-    def _load_networks(self):
-        original_network, synthetic_networks = None, None
-        for entry in os.listdir(self._analysis_source_path):
-            entry_path = os.path.join(self._analysis_source_path, entry)
-            if entry == 'synthetic':
-                synthetic_networks = _load_network_pkl(entry_path)
-            elif entry in ('origin', 'original'):
-                original_network = _load_network_pkl(entry_path)
-        return original_network, synthetic_networks
+    def _load_networks(self) -> Tuple[List[nx.Graph], List[nx.Graph]]:
+        return BaseConfig.NETWORKS_FUNC(self._both_networks_path)
+
+    def _load_attr(self) -> Dict:
+        return BaseConfig.ATTRIBUTES_DICT_FUNC(self._attr_path)
