@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import cv2
 import networkx as nx
@@ -11,17 +11,15 @@ from utils import build_graph
 
 def _resize_cv2_image(image: np.ndarray, frame_range: Tuple[int, int] = None) -> np.ndarray:
     frame_range = frame_range or BaseConfig.DEFAULT_FRAME_SIZE
-    target_size = min(frame_range)
     height, width = image.shape[:2]
-    scaling_factor = target_size / min(height, width)
-    new_width = int(width * scaling_factor)
-    new_height = int(height * scaling_factor)
+    scaling_factor = min(frame_range) / min(height, width)
+    new_height, new_width = int(height * scaling_factor), int(width * scaling_factor)
     image = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_LANCZOS4)
     return image
 
 
 def _trim_cv2_image(image: np.ndarray, frame_range: Tuple[int, int] = None) -> np.ndarray:
-    frame_range = frame_range or BaseConfig.DEFAULT_FRAME_SIZE
+    frame_range = frame_range or BaseConfig.IMAGE_SIZE
     target_size = min(frame_range)
     height, width = image.shape[:2]
 
@@ -100,19 +98,18 @@ class DataLoader:
     def get_synthetic_networks(self) -> List[nx.Graph]:
         return self._synthetic_networks
 
-    def add_synthetic_graph(self, graph: nx.Graph):
+    def add_synthetic_graph(self, graph: nx.Graph) -> None:
         self._synthetic_networks.append(graph)
 
-    def load(self):
+    def load(self) -> None:
         if self._mode == Mode.Generate:
             self._original_network = build_graph(self._load_positions(), self._load_sparse_matrix())
 
-            if not BaseConfig.DEFAULT_FRAME_SIZE:
-                BaseConfig.update_frame_size((self._original_image.shape[1], self._original_image.shape[0]))
-
-            image = _resize_cv2_image(self._original_image)
+            image = self._load_image()
             image = _trim_cv2_image(image)
+            image = _resize_cv2_image(image)
             self._original_image = image
+
             _transform_graph_coordinates(self._original_network, image.shape)
 
         elif self._mode == Mode.Analyze:
