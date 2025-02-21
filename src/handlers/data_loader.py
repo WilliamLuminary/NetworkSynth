@@ -112,12 +112,11 @@ class DataLoader:
 
             image = _resize_cv2_image(self._original_image)
             image = _trim_cv2_image(image)
+            self._original_image = image
             _transform_graph_coordinates(self._original_network, image.shape)
-            return self._original_image, self._original_network
 
         elif self._mode == Mode.Analyze:
             self._original_network, self._synthetic_networks = self._load_networks()
-            return self._original_network, self._synthetic_networks
 
         elif self._mode == Mode.ATTR_GENERATE:
             self._attr = self._load_attr()
