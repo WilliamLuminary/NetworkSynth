@@ -10,9 +10,9 @@ from numpy import ndarray
 from analysis.multifractal_batch_processor import MultifractalBatchProcessor
 from config import BaseConfig, DataType, FILE_CONFIGURATIONS, FileTag, Resolution, SetName
 from config.enums import Mode
-from .attributes_calculator import AttributesCalculator
 from utils import calculate_frame
 from utils.utils import finalize_plot
+from .attributes_calculator import AttributesCalculator
 from .data_loader import DataLoader
 from .mapper import Mapper
 from .saver import Saver
