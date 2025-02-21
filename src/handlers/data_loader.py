@@ -6,7 +6,7 @@ import numpy as np
 
 from config import BaseConfig
 from config.enums import Mode
-from utils import build_graph_pos_and_adj_mat
+from utils import build_graph
 
 
 def _resize_cv2_image(image: np.ndarray, frame_range: Tuple[int, int] = None) -> np.ndarray:
@@ -105,8 +105,7 @@ class DataLoader:
 
     def load(self):
         if self._mode == Mode.Generate:
-            self._original_network = build_graph_pos_and_adj_mat((self._load_positions(), self._load_sparse_matrix()))
-            self._original_image = self._load_image()
+            self._original_network = build_graph(self._load_positions(), self._load_sparse_matrix())
 
             if not BaseConfig.DEFAULT_FRAME_SIZE:
                 BaseConfig.update_frame_size((self._original_image.shape[1], self._original_image.shape[0]))
