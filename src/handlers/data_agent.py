@@ -1,4 +1,5 @@
 # src/data/data_agent.py
+import inspect
 import logging
 from typing import Optional
 
@@ -89,10 +90,9 @@ class DataAgent:
         return self.data_loader.get_original_network()
 
     def save(self, data_type: DataType, file_name_prefix: Optional[str] = None, arg=None):
-        if not self.saver and data_type != DataType.SYNTHETIC_GRAPH:
+        if not self.saver and not data_type.has_tag(FileTag.PLOT):
             return
 
-        show_figure_if_not_saving: bool = not self.saver and arg
         file_name_prefix = f"{file_name_prefix}" if file_name_prefix and file_name_prefix[-1] != '_' else (
                 file_name_prefix or '')
 
@@ -113,23 +113,26 @@ class DataAgent:
         elif data_type == DataType.ORIGINAL_GRAPH:
             original_network = self.data_loader.get_original_network()
             original_image = self.data_loader.get_original_image()
+
             original_figure = plot_network(
                 data_type=DataType.ORIGINAL_GRAPH,
                 graph=original_network,
                 background=original_image,
                 show=True
             )
-            self.saver.save_file(original_figure, data_type, file_name_prefix)
+            if self.saver:
+                self.saver.save_file(original_figure, data_type, file_name_prefix)
 
         elif data_type == DataType.SYNTHETIC_GRAPH:
-
             assert isinstance(arg, nx.Graph), "Must be a networkx.Graph synthetic network."
+            show_figure_if_not_saving: bool = not self.saver and arg
             synthetic_figure = plot_network(
                 data_type=DataType.SYNTHETIC_GRAPH,
                 graph=arg,
                 show=show_figure_if_not_saving
             )
-            self.saver.save_file(synthetic_figure, DataType.SYNTHETIC_GRAPH, file_name_prefix)
+            if not show_figure_if_not_saving:
+                self.saver.save_file(synthetic_figure, DataType.SYNTHETIC_GRAPH, file_name_prefix)
 
         elif data_type == DataType.SYNTHETIC_NETWORK:
             synthetic_networks = self.data_loader.get_synthetic_networks()
@@ -160,8 +163,7 @@ def plot_network(data_type: DataType,
     :param adjust_axis:
     :param kwargs: Title, frame, plot_in_frame, background, image, alpha, edge_width, node_size, output_path
     """
-    if not data_type.has_tag(FileTag.PLOT):
-        raise ValueError(f"Invalid data type: {data_type}, only graphs can be passed to this method.")
+    assert data_type.has_tag(FileTag.PLOT), f"{data_type} shouldn't call {inspect.currentframe().f_code.co_name}."
 
     file_config = FILE_CONFIGURATIONS.get(data_type)
     fig, ax = plt.subplots(figsize=(10, 10), dpi=300)
@@ -218,4 +220,5 @@ def plot_network(data_type: DataType,
     ax.set_xticks([])
     ax.set_yticks([])
     ax.axis('off')
-    return finalize_plot(fig, getattr(file_config, 'show_on_the_fly', False))
+    show_on_the_fly = kwargs.get('show', False) or getattr(file_config, 'show_on_the_fly', False)
+    return finalize_plot(fig, show_on_the_fly)
