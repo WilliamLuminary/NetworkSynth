@@ -1,6 +1,7 @@
 # src/handlers/multifractal_analyzer.py
 import logging
 from collections import Counter
+from contextlib import contextmanager
 from dataclasses import astuple, dataclass
 from typing import Dict, List
 
@@ -13,7 +14,7 @@ from scipy.spatial.distance import euclidean
 from scipy.stats import linregress
 
 from config import BaseConfig
-from utils.utils import keep_largest_connected_component
+from utils.utils import largest_connected_component
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +30,8 @@ def _generate_range(scale):
 
 
 class MultifractalAnalyzer:
-    error_analysis_range_Q = _generate_range(300)
-    full_analysis_range_Q = _generate_range(2000)
+    small_q = _generate_range(300)
+    full_q = _generate_range(2000)
 
     def __init__(self, graph: nx.Graph):
         self.graph = graph
@@ -39,13 +40,11 @@ class MultifractalAnalyzer:
         self.Q = None
 
     def analyze_error_features(self) -> MultifractalErrorFeatures:
-        logger.info("Analyzing error features with small Q.")
-        self.Q = self.error_analysis_range_Q
-        tau_list, _, _, _ = self._compute_multifractal_taus()
-        alpha_0, width, _, _ = self._compute_n_spectrum(tau_list)
-        error_features = MultifractalErrorFeatures(alpha_0, width)
-        self.Q = None
-        return error_features
+        # Use a small Q range for error analysis
+        with self.set_q(self.small_q):
+            tau_list, _ = self._compute_multifractal_taus()
+            alpha_0, width, _, _ = self._compute_n_spectrum(tau_list)
+        return MultifractalErrorFeatures(alpha_0, width)
 
     @staticmethod
     def analyze_error(this, other) -> float:
@@ -101,7 +100,7 @@ class MultifractalAnalyzer:
             y = np.log(zq_list[idx])
             slope, _, _, _, _ = linregress(x, y)
             tau_list.append(slope)
-        return tau_list, r_g_all, diameter, zq_list
+        return tau_list, zq_list
 
     def _compute_n_spectrum(self, tau_list):
         Q_ = self.Q
@@ -222,7 +221,7 @@ class MultifractalAnalyzer:
         if nx.is_connected(self.graph):
             G_lcc = self.graph
         else:
-            G_lcc = keep_largest_connected_component(self.graph)
+            G_lcc = largest_connected_component(self.graph)
 
         try:
             if self.weighted:
@@ -237,28 +236,26 @@ class MultifractalAnalyzer:
         if nx.is_connected(self.graph):
             return nx.diameter(self.graph)
         else:
-            return nx.diameter(keep_largest_connected_component(self.graph))
+            return nx.diameter(largest_connected_component(self.graph))
 
     def analyze_graph(self) -> Dict[str, List]:
-        logger.info("Analyzing multifractal properties with full Q range.")
-        self.Q = self.full_analysis_range_Q
-        self.f_digit = 1
-        tau_list, r_g_all, diameter, zq_list = self._compute_multifractal_taus()
-        self.f_digit = 0
+        # Use the full Q range for error analysis
+        with self.set_q(self.full_q):
+            with self.set_f_digit(1):
+                tau_list, zq_list = self._compute_multifractal_taus()
 
-        alpha_0, width, al_list, fal_list = self._compute_n_spectrum(tau_list)
+            alpha_0, width, al_list, fal_list = self._compute_n_spectrum(tau_list)
 
-        self.f_digit = 2
-        dim_list, dim_max, dim_min, dim_diff, valid_q = self._compute_n_dimension(tau_list)
-        self.f_digit = 0
+            with self.set_f_digit(2):
+                dim_list, dim_max, dim_min, dim_diff, valid_q = self._compute_n_dimension(tau_list)
 
-        centralities = self._compute_centralities()
-        betweenness = self._compute_betweenness()
-        ricci_list = self._compute_ollivier_ricci_curvature()
-        assort = self._compute_assortativity()
-        eigen_list = self._compute_eigenvector_centrality()
-        diam = self._compute_diameter()
-        self.Q = None
+            centralities = self._compute_centralities()
+            betweenness = self._compute_betweenness()
+            ricci_list = self._compute_ollivier_ricci_curvature()
+            assort = self._compute_assortativity()
+            eigen_list = self._compute_eigenvector_centrality()
+            diam = self._compute_diameter()
+
         return {
             # Graph-level multifractal
             "tau_list": tau_list,
@@ -282,3 +279,21 @@ class MultifractalAnalyzer:
             "ricci_dist": ricci_list,
             "eigen_dist": eigen_list
         }
+
+    @contextmanager
+    def set_q(self, q_list):
+        original_Q = self.Q
+        try:
+            self.Q = q_list
+            yield
+        finally:
+            self.Q = original_Q
+
+    @contextmanager
+    def set_f_digit(self, f_digit_value):
+        original_f_digit = self.f_digit
+        try:
+            self.f_digit = f_digit_value
+            yield
+        finally:
+            self.f_digit = original_f_digit

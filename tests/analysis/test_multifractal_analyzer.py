@@ -35,16 +35,12 @@ def load_graph_from_pickle():
 def test_calculate_multifractal_taus(load_graph_from_pickle):
     sample_graph = load_graph_from_pickle
     analyzer = MultifractalAnalyzer(sample_graph)
-    tau_list, r_g_all, diameter, zq_list = analyzer._compute_multifractal_taus()
+    tau_list, zq_list = analyzer._compute_multifractal_taus()
 
     assert isinstance(tau_list, (np.ndarray, list))
-    assert isinstance(r_g_all, (np.ndarray, list))
-    assert isinstance(diameter, (np.int64, np.int32, int, float))
     assert isinstance(zq_list, (np.ndarray, list))
 
     assert len(tau_list) == len(MultifractalAnalyzer.Q)
-    assert len(r_g_all) > 0
-    assert diameter > 0
 
     correct_tau_list, correct_r_g_all, correct_diameter, correct_zq_list = (
         original_calculate_multifractal_taus(sample_graph,
@@ -52,8 +48,6 @@ def test_calculate_multifractal_taus(load_graph_from_pickle):
                                              weight=False))
 
     assert np.array_equal(tau_list, correct_tau_list)
-    assert np.array_equal(r_g_all, correct_r_g_all)
-    assert np.array_equal(diameter, correct_diameter)
     assert np.array_equal(zq_list, correct_zq_list)
 
 

@@ -16,7 +16,8 @@ class Config2(BaseConfig):
     SETS = [SetName.S4, SetName.S8]
     RESOLUTIONS = [Resolution.NA]
 
-    DEFAULT_FRAME_SIZE = (1887 // 4, 2048 // 4)
+    IMAGE_SIZE = (1887 - 150, 2048)
+    DEFAULT_FRAME_SIZE = ((1887 - 150) // 4, 2048 // 4)
     CLOSED_NODES_FACTOR = 1.2
     CLOSED_EDGES_FACTOR = 0.8
     # For 10_kx image, node fac should be 1.5, and edge fac should be 1
