@@ -2,6 +2,7 @@
 import functools
 import logging
 import time
+from functools import singledispatch
 from typing import Tuple, Union
 
 import networkx as nx
@@ -9,6 +10,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from numpy import ndarray
+from scipy.sparse import spmatrix
 
 from config import BaseConfig
 
@@ -37,36 +39,39 @@ def calculate_frame(graph: nx.Graph = None,
     return frame
 
 
-def build_graph_pos_and_adj_mat(pos_and_adj_mat: tuple) -> nx.Graph:
-    """
-    :param pos_and_adj_mat: A tuple of positions and adjacency matrix.
-    :return:
-    """
-    positions_of_nodes, adjacency_matrix = pos_and_adj_mat
+@singledispatch
+def build_graph(*args):
+    raise TypeError(f"Unsupported input types: {tuple(type(arg) for arg in args)}")
+
+
+@build_graph.register
+def _(positions: np.ndarray, adjacency_matrix: spmatrix) -> nx.Graph:
     # noinspection PyUnresolvedReferences
     graph = nx.from_scipy_sparse_array(adjacency_matrix, edge_attribute='weight')
-    for i, pos in enumerate(positions_of_nodes):
-        graph.nodes[i]['pos'] = pos.astype(np.float64)
+    for i, pos in enumerate(positions):
+        graph.nodes[i]['pos'] = pos
 
-    largest_cc = max(nx.connected_components(graph), key=len)
-    graph = graph.subgraph(largest_cc).copy()
+    graph = largest_connected_component(graph)
     graph = nx.convert_node_labels_to_integers(graph, label_attribute='old_label')
     return graph
 
 
-def build_graph_nodes_and_edges(nodes: Union[list, set], edges: Union[list, set]) -> nx.Graph:
+@build_graph.register
+def _(nodes: set, edges: set) -> nx.Graph:
     graph = nx.Graph()
     position_map = {node.position: node for node in nodes}
+
     for node in nodes:
         graph.add_node(position_map[node.position].id, pos=node.position)
 
     for edge in edges:
         u, v = position_map[edge[0]].id, position_map[edge[1]].id
         graph.add_edge(u, v)
+
     return graph
 
 
-def keep_largest_connected_component(graph: nx.Graph) -> nx.Graph:
+def largest_connected_component(graph: nx.Graph) -> nx.Graph:
     """
     Keep only the largest connected component of the graph.
     :param graph: A networkx graph, possibly with multiple connected components.
@@ -129,5 +134,5 @@ def trim_graph(graph: nx.Graph, tar_avg_deg: float) -> nx.Graph:
         neighbors = list(graph.neighbors(highest_degree_node))
         if neighbors:
             graph.remove_edge(highest_degree_node, neighbors[0])
-        graph = keep_largest_connected_component(graph)
+        graph = largest_connected_component(graph)
     return graph
