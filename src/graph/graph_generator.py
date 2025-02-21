@@ -8,7 +8,7 @@ from numpy import ndarray
 
 from config import BaseConfig
 from handlers import AttributesCalculator
-from utils import build_graph_nodes_and_edges, calculate_frame
+from utils import build_graph, calculate_frame
 from ._graph_node import GraphNode
 
 
@@ -26,7 +26,7 @@ class GraphGenerator:
         else:
             raise Exception("Failed to generate a original_network within the specified attempts.")
 
-        _synthetic_network = build_graph_nodes_and_edges(nodes, edges)
+        _synthetic_network = build_graph(nodes, edges)
         frame = calculate_frame(graph=_synthetic_network, frame_range=frame_range)
         synthetic_network = self._filter_graph(_synthetic_network, frame)
         return synthetic_network
