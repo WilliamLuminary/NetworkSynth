@@ -57,7 +57,7 @@ def _(positions: np.ndarray, adjacency_matrix: spmatrix) -> nx.Graph:
 
 
 @build_graph.register
-def _(nodes: list, edges: list) -> nx.Graph:
+def _(nodes: set, edges: set) -> nx.Graph:
     graph = nx.Graph()
     position_map = {node.position: node for node in nodes}
 
