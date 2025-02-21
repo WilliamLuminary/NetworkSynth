@@ -71,7 +71,7 @@ def _(nodes: list, edges: list) -> nx.Graph:
     return graph
 
 
-def keep_largest_connected_component(graph: nx.Graph) -> nx.Graph:
+def largest_connected_component(graph: nx.Graph) -> nx.Graph:
     """
     Keep only the largest connected component of the graph.
     :param graph: A networkx graph, possibly with multiple connected components.
@@ -134,5 +134,5 @@ def trim_graph(graph: nx.Graph, tar_avg_deg: float) -> nx.Graph:
         neighbors = list(graph.neighbors(highest_degree_node))
         if neighbors:
             graph.remove_edge(highest_degree_node, neighbors[0])
-        graph = keep_largest_connected_component(graph)
+        graph = largest_connected_component(graph)
     return graph
