@@ -14,7 +14,7 @@ from scipy.spatial.distance import euclidean
 from scipy.stats import linregress
 
 from config import BaseConfig
-from utils.utils import keep_largest_connected_component
+from utils.utils import largest_connected_component
 
 logger = logging.getLogger(__name__)
 
@@ -221,7 +221,7 @@ class MultifractalAnalyzer:
         if nx.is_connected(self.graph):
             G_lcc = self.graph
         else:
-            G_lcc = keep_largest_connected_component(self.graph)
+            G_lcc = largest_connected_component(self.graph)
 
         try:
             if self.weighted:
@@ -236,7 +236,7 @@ class MultifractalAnalyzer:
         if nx.is_connected(self.graph):
             return nx.diameter(self.graph)
         else:
-            return nx.diameter(keep_largest_connected_component(self.graph))
+            return nx.diameter(largest_connected_component(self.graph))
 
     def analyze_graph(self) -> Dict[str, List]:
         # Use the full Q range for error analysis
