@@ -14,7 +14,7 @@ from scipy.spatial.distance import euclidean
 from scipy.stats import linregress
 
 from config import BaseConfig
-from utils.utils import largest_connected_component
+from utils import largest_connected_component
 
 logger = logging.getLogger(__name__)
 

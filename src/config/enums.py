@@ -126,6 +126,6 @@ class AnalysisMode(Enum):
 
 
 class Mode(Enum):
-    Generate = auto()
-    Analyze = auto()
-    ATTR_GENERATE = auto()
+    GEN = "generate_from_original_network"
+    ANA = "multifractal_analyze"
+    ATR = "generate_from_attributes"
