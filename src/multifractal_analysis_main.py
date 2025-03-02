@@ -4,10 +4,11 @@ import os
 from collections import deque
 from typing import Dict
 
-from config import BaseConfig, DataType, MultifractalConfig
-from handlers import DataAgent
+from config import AnaConfig
+from config import BaseConfig, DataType
+from handlers import RunAgent
 
-MultifractalConfig.initialize()
+AnaConfig.initialize()
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,7 @@ def find_pkl_containers(base_dir: str, max_depth: int = 3) -> Dict[str, str]:
 if __name__ == '__main__':
     data_dict = find_pkl_containers(BaseConfig.NETWORKS_DATA_PATH)
     for name, path in data_dict.items():
-        data_agent = DataAgent(networks_path=path)
+        data_agent = RunAgent(networks_path=path)
         data_agent.prepare_data()
         data_agent.multifractal_analysis()
         data_agent.save(DataType.ANALYSIS_DATA)

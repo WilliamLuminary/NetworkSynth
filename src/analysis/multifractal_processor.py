@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Union
 import networkx as nx
 import numpy as np
 
-from analysis.multifractal_analyzer import MultifractalAnalyzer
+from .multifractal_analyzer import MultifractalAnalyzer
 
 logger = logging.getLogger(__name__)
 
