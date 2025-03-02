@@ -2,12 +2,13 @@
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-from config import AttributesGenerateModeConfigSample, BaseConfig, DataType
+from config import BaseConfig, DataType
+from config import AttrConfig
 from graph import GraphGenerator
 from handlers import AttributesCalculator, DataAgent
 from utils.utils import trim_graph
 
-AttributesGenerateModeConfigSample.initialize()
+AttrConfig.initialize()
 # Config.disable_saving("Preview")
 
 logger = logging.getLogger(__name__)

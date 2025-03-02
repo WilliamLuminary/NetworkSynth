@@ -1,4 +1,4 @@
-# src/config/config/config_1.py
+# src/config/generate_mode/config_1.py
 import logging
 import os
 import re
@@ -8,10 +8,54 @@ import numpy as np
 
 from config.base_config import BaseConfig
 from config.enums import Resolution, SetName
-from config.utils import _find_file_with_pattern, _resize_cv2_image, _transpose_coordinates, _trim_cv2_image
 from utils import build_graph
+from .utils import _resize_cv2_image, _transpose_network_pos, _trim_cv2_image
+from ..utils import find_file_with_pattern
 
 logger = logging.getLogger(__name__)
+
+
+class Config1(BaseConfig):
+    SETS = [SetName.A]
+    RESOLUTIONS = [Resolution.X10K]
+
+    DEFAULT_FRAME_SIZE = (510, 510)
+    CLOSED_NODES_FACTOR = 1.5
+    CLOSED_EDGES_FACTOR = 1
+    # For 10_kx image, node fac should be 1.5, and edge fac should be 1
+
+    SYNTHETIC_GRAPH_NUMBER = 1
+    SYNTHETIC_NETWORK_NUMBER = 1
+
+    MEASURE_WEIGHTED = True
+    FULL_ANALYSIS = False
+
+    BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, 'old_input')
+    POSITION_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'position')
+    ADJ_MATRIX_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'sparse_matrices')
+    IMAGES_DIR = os.path.join(BASE_INPUT_PATH, 'Original Graphs')
+
+    @classmethod
+    def initialize(cls):
+        super().initialize()
+        cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
+        cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
+        cls._update_attrs_in_base_config()
+
+    @staticmethod
+    def load_original_network(set_name, resolution):
+        positions = _load_positions(set_name, resolution)
+        mat = _load_sparse_matrix(set_name, resolution)
+        original_network = build_graph(positions, mat)
+        _transpose_network_pos(original_network)
+        return original_network
+
+    @staticmethod
+    def load_original_image(set_name, resolution):
+        image = _load_raw_image(set_name, resolution)
+        image = _trim_cv2_image(image)
+        image = _resize_cv2_image(image)
+        return image
 
 
 def _load_positions(set_name, resolution):
@@ -20,10 +64,10 @@ def _load_positions(set_name, resolution):
         rf"{re.escape(set_name)}_{re.escape(resolution)}.*\.npy",
         re.IGNORECASE
     )
-    file_path = _find_file_with_pattern(directory_path,
-                                        pattern,
-                                        f'positions_of_nodes for {set_name}'
-                                        )
+    file_path = find_file_with_pattern(directory_path,
+                                       pattern,
+                                       f'positions_of_nodes for {set_name}'
+                                       )
     logger.info(f"Positions file loaded: {file_path}")
     positions = np.load(file_path, allow_pickle=True)
     return positions
@@ -35,10 +79,10 @@ def _load_sparse_matrix(set_name, resolution):
         rf"sparse_matrices_{re.escape(resolution)}.*\.npz",
         re.IGNORECASE
     )
-    file_path = _find_file_with_pattern(directory_path,
-                                        pattern,
-                                        'sparse matrix'
-                                        )
+    file_path = find_file_with_pattern(directory_path,
+                                       pattern,
+                                       'sparse matrix'
+                                       )
     matrix_data = np.load(file_path, allow_pickle=True)
 
     set_name = set_name
@@ -74,10 +118,10 @@ def _load_raw_image(set_name, resolution):
         re.IGNORECASE
     )
 
-    file_path = _find_file_with_pattern(directory_path,
-                                        pattern,
-                                        f'image for {set_name}'
-                                        )
+    file_path = find_file_with_pattern(directory_path,
+                                       pattern,
+                                       f'image for {set_name}'
+                                       )
     if file_path is None:
         logger.warning(f"Background image is None.")
         return None
@@ -90,46 +134,3 @@ def _load_raw_image(set_name, resolution):
         logger.warning(err_msg)
         return None
     return image
-
-
-class Config1(BaseConfig):
-    SETS = [SetName.A]
-    RESOLUTIONS = [Resolution.X10K]
-
-    DEFAULT_FRAME_SIZE = (510, 510)
-    CLOSED_NODES_FACTOR = 1.5
-    CLOSED_EDGES_FACTOR = 1
-    # For 10_kx image, node fac should be 1.5, and edge fac should be 1
-
-    SYNTHETIC_GRAPH_NUMBER = 1
-    SYNTHETIC_NETWORK_NUMBER = 1
-
-    MEASURE_WEIGHTED = True
-    FULL_ANALYSIS = False
-
-    BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, 'old_input')
-    POSITION_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'position')
-    ADJ_MATRIX_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'sparse_matrices')
-    IMAGES_DIR = os.path.join(BASE_INPUT_PATH, 'Original Graphs')
-
-    @classmethod
-    def initialize(cls):
-        super().initialize()
-        cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
-        cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
-        cls._update_attrs_in_base_config()
-
-    @staticmethod
-    def load_original_network(set_name, resolution):
-        positions = _load_positions(set_name, resolution)
-        mat = _load_sparse_matrix(set_name, resolution)
-        original_network = build_graph(positions, mat)
-        _transpose_coordinates(original_network)
-        return original_network
-
-    @staticmethod
-    def load_original_image(set_name, resolution):
-        image = _load_raw_image(set_name, resolution)
-        image = _trim_cv2_image(image)
-        image = _resize_cv2_image(image)
-        return image
