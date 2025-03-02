@@ -1,4 +1,4 @@
-# src/config/sample/generate_mode.py
+# src/config/attr_generate_mode/sample.py
 import logging
 import os
 import pickle
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 # TODO: If generate networks from attributes/properties, modify based on this config.
-class AttributesGenerateModeConfigSample(BaseConfig):
+class SampleConfig(BaseConfig):
     DEFAULT_FRAME_SIZE = (1887 // 4, 2048 // 4)
     CLOSED_NODES_FACTOR = 1.2
     CLOSED_EDGES_FACTOR = .8

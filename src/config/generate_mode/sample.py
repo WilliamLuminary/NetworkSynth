@@ -1,4 +1,4 @@
-# src/config/sample/generate_mode.py
+# src/config/generate_mode/sample.py
 import logging
 import os
 
@@ -7,52 +7,13 @@ import numpy as np
 
 from config.base_config import BaseConfig
 from config.enums import Resolution, SetName
-from config.utils import _resize_cv2_image, _transpose_coordinates, _trim_cv2_image
 from utils import build_graph
+from .utils import _resize_cv2_image, _transpose_network_pos, _trim_cv2_image
 
 logger = logging.getLogger(__name__)
 
 
-# TODO: If generate networks from the original network, modify based on this config.
-def _load_positions(set_name):
-    file_path = os.path.join(GenerateModeConfigSample.POSITION_DATA_DIR, f"{str(set_name)}_pos.npy")
-
-    if not os.path.exists(file_path):
-        msg = f"Positions file does not exist: {file_path}"
-        logger.error(msg)
-        raise FileNotFoundError(msg)
-
-    logger.info(f"Loading positions from {file_path}")
-    return np.load(file_path, allow_pickle=True)
-
-
-def _load_sparse_matrix(set_name):
-    file_path = os.path.join(GenerateModeConfigSample.ADJ_MATRIX_DATA_DIR, f"{str(set_name)}_mat.npy")
-
-    if not os.path.exists(file_path):
-        msg = f"Sparse matrix file does not exist: {file_path}"
-        logger.error(msg)
-        raise FileNotFoundError(msg)
-
-    logger.info(f"Loading adjacency matrix from {file_path}")
-    return np.load(file_path, allow_pickle=True).item()
-
-
-def _load_raw_image(set_name):
-    file_path = os.path.join(GenerateModeConfigSample.IMAGES_DIR, f"{str(set_name)}_image.tif")
-
-    if not os.path.exists(file_path):
-        logger.warning(f"No image found at {file_path}. Returning None.")
-        return None
-
-    logger.info(f"Loading image from {file_path}")
-    image = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
-    if image is None:
-        logger.warning(f"Failed to load image from {file_path}")
-    return image
-
-
-class GenerateModeConfigSample(BaseConfig):
+class SampleConfig(BaseConfig):
     SETS = [SetName.Sample1, SetName.Sample2, SetName.Sample3]
     RESOLUTIONS = [Resolution.NA]
 
@@ -91,7 +52,7 @@ class GenerateModeConfigSample(BaseConfig):
         positions = _load_positions(set_name)
         mat = _load_sparse_matrix(set_name)
         original_network = build_graph(positions, mat)
-        _transpose_coordinates(original_network)
+        _transpose_network_pos(original_network)
         return original_network
 
     @staticmethod
@@ -100,3 +61,44 @@ class GenerateModeConfigSample(BaseConfig):
         image = _trim_cv2_image(image)
         image = _resize_cv2_image(image)
         return image
+
+
+# TODO: If generate networks from the original network, modify based on this config.
+
+
+def _load_positions(set_name):
+    file_path = os.path.join(SampleConfig.POSITION_DATA_DIR, f"{str(set_name)}_pos.npy")
+
+    if not os.path.exists(file_path):
+        msg = f"Positions file does not exist: {file_path}"
+        logger.error(msg)
+        raise FileNotFoundError(msg)
+
+    logger.info(f"Loading positions from {file_path}")
+    return np.load(file_path, allow_pickle=True)
+
+
+def _load_sparse_matrix(set_name):
+    file_path = os.path.join(SampleConfig.ADJ_MATRIX_DATA_DIR, f"{str(set_name)}_mat.npy")
+
+    if not os.path.exists(file_path):
+        msg = f"Sparse matrix file does not exist: {file_path}"
+        logger.error(msg)
+        raise FileNotFoundError(msg)
+
+    logger.info(f"Loading adjacency matrix from {file_path}")
+    return np.load(file_path, allow_pickle=True).item()
+
+
+def _load_raw_image(set_name):
+    file_path = os.path.join(SampleConfig.IMAGES_DIR, f"{str(set_name)}_image.tif")
+
+    if not os.path.exists(file_path):
+        logger.warning(f"No image found at {file_path}. Returning None.")
+        return None
+
+    logger.info(f"Loading image from {file_path}")
+    image = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        logger.warning(f"Failed to load image from {file_path}")
+    return image
