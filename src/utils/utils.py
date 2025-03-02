@@ -68,6 +68,7 @@ def _(nodes: set, edges: set) -> nx.Graph:
         u, v = position_map[edge[0]].id, position_map[edge[1]].id
         graph.add_edge(u, v)
 
+    graph = largest_connected_component(graph)
     return graph
 
 

@@ -9,56 +9,26 @@ from config.enums import Mode
 from utils import build_graph
 
 
-def _resize_cv2_image(image: np.ndarray, frame_range: Tuple[int, int] = None) -> np.ndarray:
-    frame_range = frame_range or BaseConfig.DEFAULT_FRAME_SIZE
+def _resize_cv2_image(image: np.ndarray) -> np.ndarray:
+    frame_range = BaseConfig.DEFAULT_FRAME_SIZE
     height, width = image.shape[:2]
-    scaling_factor = min(frame_range) / min(height, width)
-    new_height, new_width = int(height * scaling_factor), int(width * scaling_factor)
+    scaling_factor = max(frame_range) / max(height, width)
+    new_height, new_width = round(height * scaling_factor), round(width * scaling_factor)
     image = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_LANCZOS4)
     return image
 
 
-def _trim_cv2_image(image: np.ndarray, frame_range: Tuple[int, int] = None) -> np.ndarray:
-    frame_range = frame_range or BaseConfig.IMAGE_SIZE
-    target_size = min(frame_range)
-    height, width = image.shape[:2]
-
-    bottom = min(height, target_size)
-    right = min(width, target_size)
-    image = image[:bottom, :right]
+def _trim_cv2_image(image: np.ndarray, trim: Tuple[int, int, int, int] = None) -> np.ndarray:
+    trim = trim or BaseConfig.TRIM_SIZE
+    top, bottom, left, right = trim
+    image = image[top:image.shape[0] - bottom, left:image.shape[1] - right]
     return image
 
 
-def _transform_graph_coordinates(network: nx.Graph, image_shape: Tuple, flip_x=False, flip_y=False,
-                                 rotation_deg=270):
-    c = (image_shape[0] / 2, image_shape[1] / 2)
-
-    if not flip_x and not flip_y and rotation_deg == 0:
-        return
-
+def _transpose_coordinates(network: nx.Graph) -> None:
     for node, d in network.nodes(data=True):
         p = np.array(d.get('pos', [0, 0]), dtype=np.float64)
-
-        p[0] -= c[0]
-        p[1] -= c[1]
-
-        if flip_x:
-            p[0] = -p[0]
-        if flip_y:
-            p[1] = -p[1]
-
-        if rotation_deg == 90:
-            px, py = -p[1], p[0]
-            p[0], p[1] = px, py
-        elif rotation_deg == 180:
-            p = -p
-        elif rotation_deg == 270:
-            px, py = p[1], -p[0]
-            p[0], p[1] = px, py
-
-        p[0] += c[0]
-        p[1] += c[1]
-        d['pos'] = p
+        d['pos'] = np.array([p[1], p[0]])
 
 
 class DataLoader:
@@ -104,13 +74,13 @@ class DataLoader:
     def load(self) -> None:
         if self._mode == Mode.Generate:
             self._original_network = build_graph(self._load_positions(), self._load_sparse_matrix())
+            _transpose_coordinates(self._original_network)
 
             image = self._load_image()
             image = _trim_cv2_image(image)
             image = _resize_cv2_image(image)
+            # _shift_network(self._original_network)
             self._original_image = image
-
-            _transform_graph_coordinates(self._original_network, image.shape)
 
         elif self._mode == Mode.Analyze:
             self._original_network, self._synthetic_networks = self._load_networks()
