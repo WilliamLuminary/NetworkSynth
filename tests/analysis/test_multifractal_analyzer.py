@@ -18,9 +18,9 @@ from tests.analysis._original_network_analysis import (
     calculate_eigenvector_centrality as original_calculate_eigenvector_centrality,
 )
 from analysis.multifractal_analyzer import MultifractalAnalyzer
-from config import BaseConfig, GenerateModeConfigSample
+from config import BaseConfig, AnaConfig
 
-S.initialize()
+AnaConfig.initialize()
 
 
 @pytest.fixture

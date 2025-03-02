@@ -11,7 +11,7 @@ from config import BaseConfig, DataType, Resolution, SetName
 # noinspection PyUnresolvedReferences
 from config import GenConfig, GenConfig1, GenConfig2
 from graph import GraphGenerator
-from handlers import AttributesCalculator, DataAgent, Mapper, Saver
+from handlers import AttributesCalculator, RunAgent, Mapper, Saver
 from utils.utils import trim_graph
 
 # Config.disable_saving("Preview")
@@ -57,7 +57,7 @@ def generate_synthetic_network(exit_event, std_err_fea, attributes: AttributesCa
     return None, float('inf')
 
 
-def generate_with_multiprocessing(data_agent: DataAgent, std_err_fea):
+def generate_with_multiprocessing(data_agent: RunAgent, std_err_fea):
     num_network, num_figures = BaseConfig.SYNTHETIC_NETWORK_NUMBER, BaseConfig.SYNTHETIC_GRAPH_NUMBER
     errors, futures = [], []
     from multiprocessing import Manager
@@ -110,7 +110,7 @@ def compute_average_error(errors: List) -> float:
 
 def run_for_each_set_resolution(set_name: SetName, resolution: Resolution):
     logger.info(BaseConfig())
-    data_agent = DataAgent(set_name=set_name, resolution=resolution)
+    data_agent = RunAgent(set_name=set_name, resolution=resolution)
     data_agent.prepare_data()
     data_agent.save(DataType.ORIGINAL_IMAGE)
     data_agent.save(DataType.ORIGINAL_NETWORK)
