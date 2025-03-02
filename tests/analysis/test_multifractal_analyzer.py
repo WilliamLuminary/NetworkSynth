@@ -40,11 +40,11 @@ def test_calculate_multifractal_taus(load_graph_from_pickle):
     assert isinstance(tau_list, (np.ndarray, list))
     assert isinstance(zq_list, (np.ndarray, list))
 
-    assert len(tau_list) == len(MultifractalAnalyzer.Q)
+    assert len(tau_list) == len(MultifractalAnalyzer.full_q)
 
     correct_tau_list, correct_r_g_all, correct_diameter, correct_zq_list = (
         original_calculate_multifractal_taus(sample_graph,
-                                             MultifractalAnalyzer.Q,
+                                             MultifractalAnalyzer.full_q,
                                              weight=False))
 
     assert np.array_equal(tau_list, correct_tau_list)
@@ -53,11 +53,11 @@ def test_calculate_multifractal_taus(load_graph_from_pickle):
 
 def test_n_spectrum(load_graph_from_pickle):
     sample_graph = load_graph_from_pickle
-    ntau, _, _, _ = original_calculate_multifractal_taus(sample_graph, MultifractalAnalyzer.Q, weight=False)
+    n_tau, _, _, _ = original_calculate_multifractal_taus(sample_graph, MultifractalAnalyzer.full_q, weight=False)
     analyzer = MultifractalAnalyzer(sample_graph)
-    alpha_0, width, al_list, fal_list = analyzer._compute_n_spectrum(ntau)
+    alpha_0, width, al_list, fal_list = analyzer._compute_n_spectrum(n_tau)
 
-    correct_alpha_0, correct_width = original_n_spectrum(ntau, MultifractalAnalyzer.Q, 0, 'b')
+    correct_alpha_0, correct_width = original_n_spectrum(n_tau, MultifractalAnalyzer.full_q, 0, 'b')
 
     assert np.array_equal(alpha_0, correct_alpha_0)
     assert np.array_equal(width, correct_width)
@@ -67,12 +67,12 @@ def test_n_spectrum(load_graph_from_pickle):
 
 def test_n_dimension(load_graph_from_pickle):
     sample_graph = load_graph_from_pickle
-    Q = MultifractalAnalyzer.Q
-    ntau, _, _, _ = original_calculate_multifractal_taus(sample_graph, Q, weight=False)
+    Q = MultifractalAnalyzer.full_q
+    n_tau, _, _, _ = original_calculate_multifractal_taus(sample_graph, Q, weight=False)
     analyzer = MultifractalAnalyzer(sample_graph)
-    dim_list, dim_max, dim_min, diff, valid_q = analyzer._compute_n_dimension(ntau)
+    dim_list, dim_max, dim_min, diff, valid_q = analyzer._compute_n_dimension(n_tau)
 
-    correct_dim_list, correct_valid_q = original_n_dimension(ntau, Q, k=0, color="red")
+    correct_dim_list, correct_valid_q = original_n_dimension(n_tau, Q, k=0, color="red")
 
     assert np.array_equal(dim_list, correct_dim_list)
     assert np.array_equal(valid_q, correct_valid_q)
