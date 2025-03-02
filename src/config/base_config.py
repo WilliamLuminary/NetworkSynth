@@ -21,7 +21,7 @@ class BaseConfig:
     SETS: Union[list, np.ndarray]
     RESOLUTIONS = Union[list, np.ndarray]
 
-    TRIM_SIZE: Tuple[int, int] = None
+    TRIM_SIZE: Tuple[int, int] = (0, 0, 0, 0)
     DEFAULT_FRAME_SIZE: Tuple[int, int] = None
 
     CLOSED_NODES_FACTOR: float
