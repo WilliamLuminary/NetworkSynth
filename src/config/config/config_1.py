@@ -8,8 +8,88 @@ import numpy as np
 
 from config.base_config import BaseConfig
 from config.enums import Resolution, SetName
+from config.utils import _find_file_with_pattern, _resize_cv2_image, _transpose_coordinates, _trim_cv2_image
+from utils import build_graph
 
 logger = logging.getLogger(__name__)
+
+
+def _load_positions(set_name, resolution):
+    directory_path = Config1.POSITION_DATA_DIR
+    pattern = re.compile(
+        rf"{re.escape(set_name)}_{re.escape(resolution)}.*\.npy",
+        re.IGNORECASE
+    )
+    file_path = _find_file_with_pattern(directory_path,
+                                        pattern,
+                                        f'positions_of_nodes for {set_name}'
+                                        )
+    logger.info(f"Positions file loaded: {file_path}")
+    positions = np.load(file_path, allow_pickle=True)
+    return positions
+
+
+def _load_sparse_matrix(set_name, resolution):
+    directory_path = Config1.ADJ_MATRIX_DATA_DIR
+    pattern = re.compile(
+        rf"sparse_matrices_{re.escape(resolution)}.*\.npz",
+        re.IGNORECASE
+    )
+    file_path = _find_file_with_pattern(directory_path,
+                                        pattern,
+                                        'sparse matrix'
+                                        )
+    matrix_data = np.load(file_path, allow_pickle=True)
+
+    set_name = set_name
+    if set_name == 'C':
+        if 'C1' in matrix_data:
+            set_name = 'C1'
+        elif 'C' in matrix_data:
+            set_name = 'C'
+        else:
+            available_keys = list(matrix_data.keys())
+            err_msg = f"Neither 'C' nor 'C1' is found in sparse matrix data. Available sets: {available_keys}"
+            logger.error(err_msg)
+            raise KeyError(err_msg)
+
+    if set_name not in matrix_data:
+        available_keys = list(matrix_data.keys())
+        err_msg = f"Set '{set_name}' not found in sparse matrix data. Available sets: {available_keys}"
+        logger.error(err_msg)
+        raise KeyError(err_msg)
+
+    return matrix_data[set_name].item()
+
+
+def _load_raw_image(set_name, resolution):
+    directory_path = os.path.join(Config1.IMAGES_DIR, set_name)
+
+    if set_name == 'B':
+        directory_path = os.path.join(directory_path, '1811')
+        logger.warning("For set B, using the 1811 subdirectory for images.")
+
+    pattern = re.compile(
+        rf"\b{re.escape(resolution)}\b.*\.(tif|png|jpg)",
+        re.IGNORECASE
+    )
+
+    file_path = _find_file_with_pattern(directory_path,
+                                        pattern,
+                                        f'image for {set_name}'
+                                        )
+    if file_path is None:
+        logger.warning(f"Background image is None.")
+        return None
+
+    logger.info(f"Image file loaded: {file_path}")
+
+    image = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        err_msg = f"Failed to load image from file: {file_path}"
+        logger.warning(err_msg)
+        return None
+    return image
 
 
 class Config1(BaseConfig):
@@ -35,82 +115,21 @@ class Config1(BaseConfig):
     @classmethod
     def initialize(cls):
         super().initialize()
-        cls.POSITION_DATA_FUNC = cls._load_positions
-        cls.ADJ_MATRIX_DATA_FUNC = cls._load_sparse_matrix
-        cls.IMAGES_FUNC = cls._load_image
+        cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
+        cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
         cls._update_attrs_in_base_config()
 
     @staticmethod
-    def _load_positions(set_name, resolution):
-        directory_path = Config1.POSITION_DATA_DIR
-        pattern = re.compile(
-            rf"{re.escape(set_name)}_{re.escape(resolution)}.*\.npy",
-            re.IGNORECASE
-        )
-        file_path = BaseConfig._find_file_with_pattern(
-            directory_path, pattern, f'positions_of_nodes for {set_name}'
-        )
-        logger.info(f"Positions file loaded: {file_path}")
-        positions = np.load(file_path, allow_pickle=True)
-        return positions
+    def load_original_network(set_name, resolution):
+        positions = _load_positions(set_name, resolution)
+        mat = _load_sparse_matrix(set_name, resolution)
+        original_network = build_graph(positions, mat)
+        _transpose_coordinates(original_network)
+        return original_network
 
     @staticmethod
-    def _load_sparse_matrix(set_name, resolution):
-        directory_path = Config1.ADJ_MATRIX_DATA_DIR
-        pattern = re.compile(
-            rf"sparse_matrices_{re.escape(resolution)}.*\.npz",
-            re.IGNORECASE
-        )
-        file_path = BaseConfig._find_file_with_pattern(
-            directory_path, pattern, 'sparse matrix'
-        )
-        matrix_data = np.load(file_path, allow_pickle=True)
-
-        set_name = set_name
-        if set_name == 'C':
-            if 'C1' in matrix_data:
-                set_name = 'C1'
-            elif 'C' in matrix_data:
-                set_name = 'C'
-            else:
-                available_keys = list(matrix_data.keys())
-                err_msg = f"Neither 'C' nor 'C1' is found in sparse matrix data. Available sets: {available_keys}"
-                logger.error(err_msg)
-                raise KeyError(err_msg)
-
-        if set_name not in matrix_data:
-            available_keys = list(matrix_data.keys())
-            err_msg = f"Set '{set_name}' not found in sparse matrix data. Available sets: {available_keys}"
-            logger.error(err_msg)
-            raise KeyError(err_msg)
-
-        return matrix_data[set_name].item()
-
-    @staticmethod
-    def _load_image(set_name, resolution):
-        directory_path = os.path.join(Config1.IMAGES_DIR, set_name)
-
-        if set_name == 'B':
-            directory_path = os.path.join(directory_path, '1811')
-            logger.warning("For set B, using the 1811 subdirectory for images.")
-
-        pattern = re.compile(
-            rf"\b{re.escape(resolution)}\b.*\.(tif|png|jpg)",
-            re.IGNORECASE
-        )
-
-        file_path = BaseConfig._find_file_with_pattern(
-            directory_path, pattern, f'image for {set_name}'
-        )
-        if file_path is None:
-            logger.warning(f"Background image is None.")
-            return None
-
-        logger.info(f"Image file loaded: {file_path}")
-
-        image = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
-        if image is None:
-            err_msg = f"Failed to load image from file: {file_path}"
-            logger.warning(err_msg)
-            return None
+    def load_original_image(set_name, resolution):
+        image = _load_raw_image(set_name, resolution)
+        image = _trim_cv2_image(image)
+        image = _resize_cv2_image(image)
         return image
