@@ -1,2 +1,3 @@
 from .multifractal_analyzer import MultifractalAnalyzer
 from .multifractal_processor import MultifractalProcessor
+from .multifractal_batch_processor import MultifractalBatchProcessor
