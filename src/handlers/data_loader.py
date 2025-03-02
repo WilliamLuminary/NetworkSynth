@@ -25,36 +25,10 @@ def _trim_cv2_image(image: np.ndarray, trim: Tuple[int, int, int, int] = None) -
     return image
 
 
-def _transform_graph_coordinates(network: nx.Graph, image_shape: Tuple, flip_x=False, flip_y=False,
-                                 rotation_deg=270):
-    c = (image_shape[0] / 2, image_shape[1] / 2)
-
-    if not flip_x and not flip_y and rotation_deg == 0:
-        return
-
+def _transpose_coordinates(network: nx.Graph) -> None:
     for node, d in network.nodes(data=True):
         p = np.array(d.get('pos', [0, 0]), dtype=np.float64)
-
-        p[0] -= c[0]
-        p[1] -= c[1]
-
-        if flip_x:
-            p[0] = -p[0]
-        if flip_y:
-            p[1] = -p[1]
-
-        if rotation_deg == 90:
-            px, py = -p[1], p[0]
-            p[0], p[1] = px, py
-        elif rotation_deg == 180:
-            p = -p
-        elif rotation_deg == 270:
-            px, py = p[1], -p[0]
-            p[0], p[1] = px, py
-
-        p[0] += c[0]
-        p[1] += c[1]
-        d['pos'] = p
+        d['pos'] = np.array([p[1], p[0]])
 
 
 class DataLoader:
@@ -100,6 +74,7 @@ class DataLoader:
     def load(self) -> None:
         if self._mode == Mode.Generate:
             self._original_network = build_graph(self._load_positions(), self._load_sparse_matrix())
+            _transpose_coordinates(self._original_network)
 
             image = self._load_image()
             image = _trim_cv2_image(image)
