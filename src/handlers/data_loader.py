@@ -31,6 +31,33 @@ def _transpose_coordinates(network: nx.Graph) -> None:
         d['pos'] = np.array([p[1], p[0]])
 
 
+def _load_positions(set_name, resolution) -> Union[np.ndarray, List]:
+    return BaseConfig.POSITION_DATA_FUNC(str(set_name), str(resolution))
+
+
+def _load_sparse_matrix(set_name, resolution) -> Union[np.ndarray, List]:
+    return BaseConfig.ADJ_MATRIX_DATA_FUNC(str(set_name), str(resolution))
+
+
+def _load_raw_image(set_name, resolution) -> Union[np.ndarray, List]:
+    return BaseConfig.IMAGES_FUNC(str(set_name), str(resolution))
+
+
+def load_original_network(resolution, set_name):
+    positions = _load_positions(set_name, resolution)
+    mat = _load_sparse_matrix(set_name, resolution)
+    original_network = build_graph(positions, mat)
+    _transpose_coordinates(original_network)
+    return original_network
+
+
+def load_original_image(resolution, set_name):
+    image = _load_raw_image(set_name, resolution)
+    image = _trim_cv2_image(image)
+    image = _resize_cv2_image(image)
+    return image
+
+
 class DataLoader:
     def __init__(self, mode, **kwargs):
         self._set_name = None
@@ -73,31 +100,24 @@ class DataLoader:
 
     def load(self) -> None:
         if self._mode == Mode.Generate:
-            self._original_network = build_graph(self._load_positions(), self._load_sparse_matrix())
-            _transpose_coordinates(self._original_network)
-
-            image = self._load_image()
-            image = _trim_cv2_image(image)
-            image = _resize_cv2_image(image)
-            # _shift_network(self._original_network)
-            self._original_image = image
+            self._original_network = self._load_original_network()
+            self._original_image = self._load_original_image()
 
         elif self._mode == Mode.Analyze:
-            self._original_network, self._synthetic_networks = self._load_networks()
+            self._original_network, self._synthetic_networks = self._load_both_networks()
 
         elif self._mode == Mode.ATTR_GENERATE:
             self._attr = self._load_attr()
 
-    def _load_positions(self) -> Union[np.ndarray, List]:
-        return BaseConfig.POSITION_DATA_FUNC(str(self._set_name), str(self._resolution))
+    def _load_original_image(self):
+        set_name, resolution = self._set_name, self._resolution
+        return load_original_image(resolution, set_name)
 
-    def _load_sparse_matrix(self) -> Union[np.ndarray, List]:
-        return BaseConfig.ADJ_MATRIX_DATA_FUNC(str(self._set_name), str(self._resolution))
+    def _load_original_network(self):
+        set_name, resolution = self._set_name, self._resolution
+        return load_original_network(resolution, set_name)
 
-    def _load_image(self) -> Union[np.ndarray, List]:
-        return BaseConfig.IMAGES_FUNC(str(self._set_name), str(self._resolution))
-
-    def _load_networks(self) -> Tuple[List[nx.Graph], List[nx.Graph]]:
+    def _load_both_networks(self) -> Tuple[List[nx.Graph], List[nx.Graph]]:
         return BaseConfig.NETWORKS_FUNC(self._both_networks_path)
 
     def _load_attr(self) -> Dict:
