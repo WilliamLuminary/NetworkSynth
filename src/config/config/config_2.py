@@ -16,7 +16,7 @@ class Config2(BaseConfig):
     SETS = [SetName.S4]
     RESOLUTIONS = [Resolution.NA]
 
-    TRIM_SIZE = (0, 29, 0, 0) # (Top, Bottom, Left, Right)
+    TRIM_SIZE = (0, 116, 0, 0) # (Top, Bottom, Left, Right)
     DEFAULT_FRAME_SIZE = (1887 // 4, 2048 // 4)
 
     CLOSED_NODES_FACTOR = 1.2

@@ -79,9 +79,8 @@ class DataLoader:
             image = self._load_image()
             image = _trim_cv2_image(image)
             image = _resize_cv2_image(image)
+            # _shift_network(self._original_network)
             self._original_image = image
-
-            _transform_graph_coordinates(self._original_network, image.shape)
 
         elif self._mode == Mode.Analyze:
             self._original_network, self._synthetic_networks = self._load_networks()
