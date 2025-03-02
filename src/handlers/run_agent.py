@@ -8,8 +8,7 @@ from matplotlib import pyplot as plt
 from numpy import ndarray
 
 from analysis.multifractal_batch_processor import MultifractalBatchProcessor
-from config import BaseConfig, DataType, FILE_CONFIGURATIONS, FileTag, Resolution, SetName
-from config.enums import Mode
+from config import BaseConfig, DataType, FILE_CONFIGURATIONS, FileTag, Mode, Resolution, SetName
 from utils import calculate_frame, finalize_plot
 from .attributes_calculator import AttributesCalculator
 from .data_loader import DataLoader

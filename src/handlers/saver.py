@@ -9,8 +9,7 @@ from typing import Any, Optional, Union
 import cv2
 from numpy import ndarray
 
-from config import BaseConfig, DataType, FILE_CONFIGURATIONS, Resolution, SetName
-from config.enums import FileExtension, Mode
+from config import BaseConfig, DataType, FILE_CONFIGURATIONS, FileExtension, Mode, Resolution, SetName
 
 logger = logging.getLogger(__name__)
 
