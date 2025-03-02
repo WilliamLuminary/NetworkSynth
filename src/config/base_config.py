@@ -61,7 +61,7 @@ class BaseConfig:
         cls.OUTPUT_DENOTE = cls.__name__
 
     @classmethod
-    def _update_attrs_in_base_config(cls):
+    def _inject_dependencies(cls):
         for name in dir(cls):
             if name.isupper() and not name.startswith('__'):
                 value = getattr(cls, name)
