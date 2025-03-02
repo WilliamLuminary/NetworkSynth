@@ -4,10 +4,11 @@ import os
 from collections import deque
 from typing import Dict
 
-from config import BaseConfig, DataType, MultifractalConfig
 from handlers import DataAgent
+from config import BaseConfig, DataType
+from config import AnaConfig
 
-MultifractalConfig.initialize()
+AnaConfig.initialize()
 
 logger = logging.getLogger(__name__)
 

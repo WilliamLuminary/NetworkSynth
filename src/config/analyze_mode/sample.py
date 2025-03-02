@@ -1,4 +1,4 @@
-# src/config/config/config_2.py
+# src/config/analyze_mode/sample.py
 import logging
 import os
 import pickle
@@ -11,7 +11,7 @@ from config.base_config import BaseConfig
 logger = logging.getLogger(__name__)
 
 
-class MultifractalConfig(BaseConfig):
+class SampleConfig(BaseConfig):
     MEASURE_WEIGHTED = False
     NETWORKS_DATA_PATH = os.path.join(BaseConfig.BASE_OUTPUT_PATH, 'results_multi')
 

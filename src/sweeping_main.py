@@ -10,12 +10,12 @@ import wandb
 from analysis import MultifractalAnalyzer
 from config import BaseConfig, DataType, Resolution, SetName
 # noinspection PyUnresolvedReferences
-from config import Config1, Config2, BaseConfigSample
 from handlers import DataAgent
 from handlers.data_agent import plot_network
+from config import GenConfig, GenConfig1, GenConfig2
 from main import compute_average_error, generate_synthetic_network
 
-Config2.initialize()
+GenConfig2.initialize()
 BaseConfig.disable_saving("Sweeping Experiment")
 EXPERIMENT_PROJECT_NAME = "hyperparam-tuning"
 EXPERIMENT_NAME = "adjusting-node-and-edge-factors"
