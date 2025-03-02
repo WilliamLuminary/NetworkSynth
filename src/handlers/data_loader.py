@@ -1,61 +1,10 @@
 from typing import Dict, List, Tuple, Union
 
-import cv2
 import networkx as nx
 import numpy as np
 
 from config import BaseConfig
 from config.enums import Mode
-from utils import build_graph
-
-
-def _resize_cv2_image(image: np.ndarray) -> np.ndarray:
-    frame_range = BaseConfig.DEFAULT_FRAME_SIZE
-    height, width = image.shape[:2]
-    scaling_factor = max(frame_range) / max(height, width)
-    new_height, new_width = round(height * scaling_factor), round(width * scaling_factor)
-    image = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_LANCZOS4)
-    return image
-
-
-def _trim_cv2_image(image: np.ndarray, trim: Tuple[int, int, int, int] = None) -> np.ndarray:
-    trim = trim or BaseConfig.TRIM_SIZE
-    top, bottom, left, right = trim
-    image = image[top:image.shape[0] - bottom, left:image.shape[1] - right]
-    return image
-
-
-def _transpose_coordinates(network: nx.Graph) -> None:
-    for node, d in network.nodes(data=True):
-        p = np.array(d.get('pos', [0, 0]), dtype=np.float64)
-        d['pos'] = np.array([p[1], p[0]])
-
-
-def _load_positions(set_name, resolution) -> Union[np.ndarray, List]:
-    return BaseConfig.POSITION_DATA_FUNC(str(set_name), str(resolution))
-
-
-def _load_sparse_matrix(set_name, resolution) -> Union[np.ndarray, List]:
-    return BaseConfig.ADJ_MATRIX_DATA_FUNC(str(set_name), str(resolution))
-
-
-def _load_raw_image(set_name, resolution) -> Union[np.ndarray, List]:
-    return BaseConfig.IMAGES_FUNC(str(set_name), str(resolution))
-
-
-def load_original_network(resolution, set_name):
-    positions = _load_positions(set_name, resolution)
-    mat = _load_sparse_matrix(set_name, resolution)
-    original_network = build_graph(positions, mat)
-    _transpose_coordinates(original_network)
-    return original_network
-
-
-def load_original_image(resolution, set_name):
-    image = _load_raw_image(set_name, resolution)
-    image = _trim_cv2_image(image)
-    image = _resize_cv2_image(image)
-    return image
 
 
 class DataLoader:
@@ -110,12 +59,10 @@ class DataLoader:
             self._attr = self._load_attr()
 
     def _load_original_image(self):
-        set_name, resolution = self._set_name, self._resolution
-        return load_original_image(resolution, set_name)
+        return BaseConfig.ORIGINAL_IMAGE_FUNC(str(self._set_name), str(self._resolution))
 
     def _load_original_network(self):
-        set_name, resolution = self._set_name, self._resolution
-        return load_original_network(resolution, set_name)
+        return BaseConfig.ORIGINAL_NETWORK_FUNC(str(self._set_name), str(self._resolution))
 
     def _load_both_networks(self) -> Tuple[List[nx.Graph], List[nx.Graph]]:
         return BaseConfig.NETWORKS_FUNC(self._both_networks_path)
