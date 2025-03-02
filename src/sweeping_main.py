@@ -5,17 +5,17 @@ from itertools import product
 from typing import Optional
 
 import cv2
-
 import wandb
+
 from analysis import MultifractalAnalyzer
 from config import BaseConfig, DataType, Resolution, SetName
 # noinspection PyUnresolvedReferences
-from config import Config1, Config2, BaseConfigSample
-from handlers import DataAgent
-from handlers.data_agent import plot_network
+from config import GenConfig, GenConfig1, GenConfig2
+from handlers import RunAgent
+from handlers.run_agent import plot_network
 from main import compute_average_error, generate_synthetic_network
 
-Config2.initialize()
+GenConfig2.initialize()
 BaseConfig.disable_saving("Sweeping Experiment")
 EXPERIMENT_PROJECT_NAME = "hyperparam-tuning"
 EXPERIMENT_NAME = "adjusting-node-and-edge-factors"
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 SIGINT_INFO = "SIGINT received. Terminating child process..."
 
 
-def generate_networks_multiprocess(data_agent: DataAgent, std_err_fea) -> Optional[float]:
+def generate_networks_multiprocess(data_agent: RunAgent, std_err_fea) -> Optional[float]:
     num_network, num_figures = BaseConfig.SYNTHETIC_NETWORK_NUMBER, BaseConfig.SYNTHETIC_GRAPH_NUMBER
     errors, futures = [], []
     from multiprocessing import Manager
@@ -75,7 +75,7 @@ def run_with_params(data_agent, ef, nf, std_err_fea):
 
 
 def run_for_each_set_resolution(set_name: SetName, resolution: Resolution) -> None:
-    data_agent = DataAgent(set_name=set_name, resolution=resolution)
+    data_agent = RunAgent(set_name=set_name, resolution=resolution)
     data_agent.prepare_data()
     std_err_fea = MultifractalAnalyzer(data_agent.get_original_network()).analyze_error_features()
 

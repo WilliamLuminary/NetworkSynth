@@ -9,8 +9,7 @@ from typing import Any, Optional, Union
 import cv2
 from numpy import ndarray
 
-from config import BaseConfig, DataType, FILE_CONFIGURATIONS, Resolution, SetName
-from config.enums import FileExtension, Mode
+from config import BaseConfig, DataType, FILE_CONFIGURATIONS, FileExtension, Mode, Resolution, SetName
 
 logger = logging.getLogger(__name__)
 
@@ -65,12 +64,12 @@ class Saver:
         if output_dir:
             assert not self.base_output_dir, "Output directory has been set. Don't call Saver.initialize()."
             self.output_dir = output_dir
-            self.mode = Mode.Analyze
+            self.mode = Mode.ANA
         else:
             assert self.base_output_dir, "Base output directory is not initialized.\nCall Saver.initialize() first."
             # Each output_dir is for each original network
             self.output_dir = os.path.join(self.base_output_dir, str(set_name), str(resolution))
-            self.mode = Mode.Generate
+            self.mode = Mode.GEN
 
         _ensure_directory(self.output_dir, exist_ok=True)
 
@@ -86,10 +85,10 @@ class Saver:
             return
 
         if result_dir:
-            cls.mode = Mode.Analyze
+            cls.mode = Mode.ANA
             cls.base_output_dir = os.path.join(BaseConfig.BASE_OUTPUT_PATH, result_dir)
         else:
-            cls.mode = Mode.Generate
+            cls.mode = Mode.GEN
             cls.base_output_dir = os.path.join(BaseConfig.BASE_OUTPUT_PATH,
                                                f'{BaseConfig.OUTPUT_DENOTE}_results_{Saver._time_id()}')
             _ensure_directory(cls.base_output_dir)
@@ -117,7 +116,7 @@ class Saver:
         file_config = FILE_CONFIGURATIONS.get(data_type, FILE_CONFIGURATIONS[DataType.DEFAULT_DATA])
         file_detail = file_config.detail
 
-        if self.mode == Mode.Generate or data_type.file_extension == FileExtension.PNG:
+        if self.mode == Mode.GEN or data_type.file_extension == FileExtension.PNG:
             file_name_identifier = self._time_id()
             rel_path = file_config.relative_dir
             file_detail = (file_detail + '_') if file_config.detail and file_config.detail[-1] != '_' else (
