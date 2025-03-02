@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class Config1(BaseConfig):
-    SETS = [SetName.A, SetName.B, SetName.C, SetName.D]
+    SETS = [SetName.A]
     RESOLUTIONS = [Resolution.X10K]
 
     DEFAULT_FRAME_SIZE = (510, 510)
