@@ -5,7 +5,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from config import BaseConfig, DataType
 from config import AttrConfig
 from graph import GraphGenerator
-from handlers import AttributesCalculator, DataAgent
+from handlers import AttributesCalculator, RunAgent
 from utils.utils import trim_graph
 
 AttrConfig.initialize()
@@ -47,7 +47,7 @@ def generate_synthetic_network(exit_event, attributes: AttributesCalculator):
     return None, float('inf')
 
 
-def generate_with_multiprocessing(data_agent: DataAgent):
+def generate_with_multiprocessing(data_agent: RunAgent):
     num_network, num_figures = BaseConfig.SYNTHETIC_NETWORK_NUMBER, BaseConfig.SYNTHETIC_GRAPH_NUMBER
     futures = []
     from multiprocessing import Manager
@@ -86,7 +86,7 @@ def generate_with_multiprocessing(data_agent: DataAgent):
 
 def run():
     logger.info(BaseConfig())
-    data_agent = DataAgent(attr_path=BaseConfig.ATTRIBUTES_DICT_DATA_PATH)
+    data_agent = RunAgent(attr_path=BaseConfig.ATTRIBUTES_DICT_DATA_PATH)
     data_agent.prepare_data()
 
     generate_with_multiprocessing(data_agent)

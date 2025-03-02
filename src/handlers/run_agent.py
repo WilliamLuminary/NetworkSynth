@@ -1,4 +1,4 @@
-# src/data/data_agent.py
+# src/data/run_agent.py
 import inspect
 import logging
 from typing import Optional
@@ -20,7 +20,7 @@ from .saver import Saver
 logger = logging.getLogger(__name__)
 
 
-class DataAgent:
+class RunAgent:
     def __init__(self,
                  *,
                  set_name: SetName = None,
