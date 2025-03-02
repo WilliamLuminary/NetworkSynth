@@ -8,7 +8,7 @@ import numpy as np
 from scipy.spatial.distance import euclidean
 
 from config import BaseConfig
-from handlers.attributes_calculator import AttributesCalculator
+from handlers import AttributesCalculator
 
 
 class GraphNode:
