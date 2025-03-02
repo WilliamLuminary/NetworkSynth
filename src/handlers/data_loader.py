@@ -18,14 +18,10 @@ def _resize_cv2_image(image: np.ndarray) -> np.ndarray:
     return image
 
 
-def _trim_cv2_image(image: np.ndarray, frame_range: Tuple[int, int] = None) -> np.ndarray:
-    frame_range = frame_range or BaseConfig.IMAGE_SIZE
-    target_size = min(frame_range)
-    height, width = image.shape[:2]
-
-    bottom = min(height, target_size)
-    right = min(width, target_size)
-    image = image[:bottom, :right]
+def _trim_cv2_image(image: np.ndarray, trim: Tuple[int, int, int, int] = None) -> np.ndarray:
+    trim = trim or BaseConfig.TRIM_SIZE
+    top, bottom, left, right = trim
+    image = image[top:image.shape[0] - bottom, left:image.shape[1] - right]
     return image
 
 
