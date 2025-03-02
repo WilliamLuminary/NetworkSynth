@@ -193,7 +193,7 @@ def plot_network(data_type: DataType,
     if data_type is DataType.ORIGINAL_GRAPH:
         image = kwargs['background']
         alpha = getattr(file_config, 'alpha', 1.0)
-        ax.imshow(image, cmap='gray', extent=(0, image.shape[0], 0, image.shape[1]), alpha=alpha)
+        ax.imshow(image, cmap='gray', alpha=alpha)
     else:
         ax.add_patch(
             plt.Rectangle(
