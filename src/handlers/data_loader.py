@@ -9,11 +9,11 @@ from config.enums import Mode
 from utils import build_graph
 
 
-def _resize_cv2_image(image: np.ndarray, frame_range: Tuple[int, int] = None) -> np.ndarray:
-    frame_range = frame_range or BaseConfig.DEFAULT_FRAME_SIZE
+def _resize_cv2_image(image: np.ndarray) -> np.ndarray:
+    frame_range = BaseConfig.DEFAULT_FRAME_SIZE
     height, width = image.shape[:2]
-    scaling_factor = min(frame_range) / min(height, width)
-    new_height, new_width = int(height * scaling_factor), int(width * scaling_factor)
+    scaling_factor = max(frame_range) / max(height, width)
+    new_height, new_width = round(height * scaling_factor), round(width * scaling_factor)
     image = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_LANCZOS4)
     return image
 
