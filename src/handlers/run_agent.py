@@ -28,20 +28,20 @@ class RunAgent:
                  networks_path: Optional[str] = None,
                  attr_path: Optional[str] = None):
         if networks_path:
-            self.mode = Mode.Analyze
-            self.data_loader = DataLoader(Mode.Analyze, path=networks_path)
+            self.mode = Mode.ANA
+            self.data_loader = DataLoader(Mode.ANA, path=networks_path)
             self.saver = Saver(output_dir=networks_path)
             self.batch_processor = None
         elif set_name and resolution:
-            self.mode = Mode.Generate
-            self.data_loader = DataLoader(Mode.Generate, set_name=set_name, resolution=resolution)
+            self.mode = Mode.GEN
+            self.data_loader = DataLoader(Mode.GEN, set_name=set_name, resolution=resolution)
             self.saver = Saver(set_name=set_name, resolution=resolution)
             self.attributes: Optional[AttributesCalculator] = None
             self.mapper: Optional[Mapper] = None
             self.batch_processor = None
         elif attr_path:
-            self.mode = Mode.ATTR_GENERATE
-            self.data_loader = DataLoader(Mode.ATTR_GENERATE, path=attr_path)
+            self.mode = Mode.ATR
+            self.data_loader = DataLoader(Mode.ATR, path=attr_path)
             self.saver = Saver(output_dir=attr_path)
             self.attributes: Optional[AttributesCalculator] = None
             self.mapper: Optional[Mapper] = None
@@ -50,31 +50,31 @@ class RunAgent:
             assert False, "Invalid arguments."
 
     def prepare_data(self):
-        if self.mode == Mode.Generate:
+        if self.mode == Mode.GEN:
             self.data_loader.load()
             original_network = self.data_loader.get_original_network()
             self.attributes = AttributesCalculator(original_network).analyze()
             self.mapper = Mapper(original_network)
 
-        elif self.mode == Mode.Analyze:
+        elif self.mode == Mode.ANA:
             self.data_loader.load()
             original_networks = self.data_loader.get_original_network()
             synthetic_networks = self.data_loader.get_synthetic_networks()
             self.batch_processor = MultifractalBatchProcessor(original_networks, synthetic_networks)
 
-        elif self.mode == Mode.ATTR_GENERATE:
+        elif self.mode == Mode.ATR:
             self.data_loader.load()
             self.attributes = AttributesCalculator.from_dict(self.data_loader.get_attr_dict())
 
     def multifractal_analysis_in_generate_mode(self):
-        assert self.mode == Mode.Generate, "This method is only available in Generate mode."
+        assert self.mode == Mode.GEN, "This method is only available in Generate mode."
         original_networks = [self.data_loader.get_original_network()]
         synthetic_networks = self.data_loader.get_synthetic_networks()
         self.batch_processor = MultifractalBatchProcessor(original_networks, synthetic_networks)
         self.multifractal_analysis()
 
     def multifractal_analysis(self):
-        assert self.mode == Mode.Analyze, "This method is only available in Analyze mode."
+        assert self.mode == Mode.ANA, "This method is only available in Analyze mode."
         assert self.batch_processor, "Batch processor is not initialized."
         self.batch_processor.process().plot()
 
@@ -96,17 +96,17 @@ class RunAgent:
                 file_name_prefix or '')
 
         if data_type == DataType.ORIGINAL_IMAGE:
-            assert self.mode == Mode.Generate, "This data type is only available in Generate mode."
+            assert self.mode == Mode.GEN, "This data type is only available in Generate mode."
             original_image = self.data_loader.get_original_image()
             self.saver.save_file(original_image, data_type, file_name_prefix)
 
         elif data_type == DataType.ORIGINAL_NETWORK:
-            assert self.mode == Mode.Generate, "This data type is only available in Generate mode."
+            assert self.mode == Mode.GEN, "This data type is only available in Generate mode."
             original_network = self.data_loader.get_original_network()
             self.saver.save_file(original_network, data_type, file_name_prefix)
 
         elif data_type == DataType.ORIGINAL_PROPERTY:
-            assert self.mode == Mode.Generate, "This data type is only available in Generate mode."
+            assert self.mode == Mode.GEN, "This data type is only available in Generate mode."
             self.saver.save_file(self.attributes.savable(), data_type, file_name_prefix)
 
         elif data_type == DataType.ORIGINAL_GRAPH:
@@ -138,14 +138,14 @@ class RunAgent:
             self.saver.save_file(synthetic_networks, data_type, file_name_prefix)
 
         elif data_type == DataType.ANALYSIS_DATA:
-            assert self.mode == Mode.Analyze, "This data type is only available in Analyze mode."
+            assert self.mode == Mode.ANA, "This data type is only available in Analyze mode."
             self.saver.save_file({'original_multifractal_analysis_results': self.batch_processor.get_original_data(),
                                   'synthetic_multifractal_analysis_results': self.batch_processor.get_synthetic_data()},
                                  data_type,
                                  file_name_prefix)
 
         elif data_type == DataType.ANALYSIS_FIGURE:
-            assert self.mode == Mode.Analyze, "This data type is only available in Analyze mode."
+            assert self.mode == Mode.ANA, "This data type is only available in Analyze mode."
             for image_name, image in self.batch_processor.get_images().items():
                 self.saver.save_file(image, data_type, f"{image_name}_")
 
