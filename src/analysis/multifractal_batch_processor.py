@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
 
 from analysis import MultifractalProcessor
-from utils.utils import finalize_plot
+from utils import finalize_plot
 
 logger = logging.getLogger(__name__)
 # noinspection SpellCheckingInspection
