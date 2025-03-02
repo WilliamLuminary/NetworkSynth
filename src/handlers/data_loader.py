@@ -18,14 +18,14 @@ class DataLoader:
         self._original_network = None
         self._synthetic_networks = []
 
-        if mode == Mode.Generate:
+        if mode == Mode.GEN:
             assert 'set_name' in kwargs and 'resolution' in kwargs, "set_name and resolution are required."
             self._set_name = kwargs['set_name']
             self._resolution = kwargs['resolution']
-        elif mode == Mode.Analyze:
+        elif mode == Mode.ANA:
             assert 'path' in kwargs, "path is required."
             self._both_networks_path = kwargs['path']
-        elif mode == Mode.ATTR_GENERATE:
+        elif mode == Mode.ATR:
             assert 'path' in kwargs, "path is required."
             self._attr_path = kwargs['path']
             self._attr = None
@@ -48,14 +48,14 @@ class DataLoader:
         self._synthetic_networks.append(graph)
 
     def load(self) -> None:
-        if self._mode == Mode.Generate:
+        if self._mode == Mode.GEN:
             self._original_network = self._load_original_network()
             self._original_image = self._load_original_image()
 
-        elif self._mode == Mode.Analyze:
+        elif self._mode == Mode.ANA:
             self._original_network, self._synthetic_networks = self._load_both_networks()
 
-        elif self._mode == Mode.ATTR_GENERATE:
+        elif self._mode == Mode.ATR:
             self._attr = self._load_attr()
 
     def _load_original_image(self):
