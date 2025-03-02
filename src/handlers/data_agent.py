@@ -4,7 +4,6 @@ import logging
 from typing import Optional
 
 import networkx as nx
-import numpy as np
 from matplotlib import pyplot as plt
 from numpy import ndarray
 
@@ -156,11 +155,10 @@ class DataAgent:
 
 def plot_network(data_type: DataType,
                  graph: nx.Graph,
-                 adjust_axis: bool = False, **kwargs) -> ndarray:
+                 **kwargs) -> ndarray:
     """
     :param data_type:
     :param graph: If provided, plot the graph directly.
-    :param adjust_axis:
     :param kwargs: Title, frame, plot_in_frame, background, image, alpha, edge_width, node_size, output_path
     """
     assert data_type.has_tag(FileTag.PLOT), f"{data_type} shouldn't call {inspect.currentframe().f_code.co_name}."
@@ -169,12 +167,6 @@ def plot_network(data_type: DataType,
     fig, ax = plt.subplots(figsize=(10, 10), dpi=300)
 
     position_dict = nx.get_node_attributes(graph, 'pos')
-    if adjust_axis and position_dict is not None:
-        positions_array = np.array([position_dict[node] for node in graph.nodes()])
-        positions_array[:, [1, 0]] = positions_array[:, [0, 1]]
-        positions_array[:, 1] = BaseConfig.DEFAULT_FRAME_SIZE - positions_array[:, 1]
-        position_dict = {node: pos for node, pos in zip(graph.nodes(), positions_array)}
-
     edge_width = file_config.line_width
     for u, v in graph.edges():
         pos_u = position_dict.get(u)
