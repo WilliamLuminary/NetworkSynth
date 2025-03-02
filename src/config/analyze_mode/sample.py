@@ -19,7 +19,7 @@ class SampleConfig(BaseConfig):
     def initialize(cls):
         super().initialize()
         cls.NETWORKS_FUNC = cls._load_networks_dict
-        cls._update_attrs_in_base_config()
+        cls._inject_dependencies()
 
     @staticmethod
     def _load_networks_dict(_both_networks_path) -> Tuple[List[nx.Graph], List[nx.Graph]]:

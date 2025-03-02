@@ -45,7 +45,7 @@ class SampleConfig(BaseConfig):
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
-        cls._update_attrs_in_base_config()
+        cls._inject_dependencies()
 
     @staticmethod
     def load_original_network(set_name, _):
