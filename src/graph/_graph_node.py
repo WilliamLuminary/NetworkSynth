@@ -197,7 +197,7 @@ class GraphNode:
         return (euclidean(position, p1) < self._closed_edges_thr or
                 euclidean(position, p2) < self._closed_edges_thr)
 
-    def _generate_angles_and_lengths(self) -> Tuple[list[float], list[float]]:
+    def _generate_angles_and_lengths(self) -> [list[float], ...]:
         if self.degree == 1:
             return [], []
         angles = random.choices(GraphNode._degree_angles[self.degree], k=self.degree - 1)
@@ -217,7 +217,7 @@ class GraphNode:
         return _cartesian_coord
 
     @staticmethod
-    def _check_intersection(new_edge) -> bool:
+    def _check_intersection(new_edge: Tuple[Tuple[float, float], Tuple[float, float]]) -> bool:
         edge_fractions = GraphNode._edge_spatial_hash(*new_edge)
         for edge_frac in edge_fractions:
             for edge in GraphNode.edge_grid[edge_frac]:
