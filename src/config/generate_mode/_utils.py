@@ -1,4 +1,4 @@
-# src/config/generate_mode/utils.py
+# src/config/generate_mode/_utils.py
 from typing import Tuple
 
 import cv2
