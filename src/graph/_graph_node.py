@@ -95,6 +95,7 @@ class GraphNode:
         return np.random.choice(degrees, p=probabilities)
 
     def _initialize_root_node(self) -> None:
+        """Initialize a root node by generating its first child."""
         length = random.choice(GraphNode._degree_edge_lengths[self.degree])
         child_position = self._polar_to_cartesian([length], [self.base_angle])[0]
         child = GraphNode(child_position, parent=self, parent_angle=self.base_angle)
@@ -104,6 +105,7 @@ class GraphNode:
         self._add_edge_to_grid((self.position, child_position))
 
     def _add_child(self, child) -> None:
+        """Add a child to this node."""
         assert len(self.children) < self.degree, f"{self} cannot have more than {self.degree} children."
         self.children.append(child)
         self._add_to_grid(child.position)
