@@ -1,4 +1,4 @@
-# src/properties_main.py
+# src/main_from_properties.py
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
