@@ -6,7 +6,7 @@ from config import BaseConfig, DataType
 from config import AttrConfig
 from graph import GraphGenerator
 from handlers import AttributesCalculator, RunAgent
-from utils.utils import trim_graph
+from utils import trim_graph
 
 AttrConfig.initialize()
 # Config.disable_saving("Preview")
