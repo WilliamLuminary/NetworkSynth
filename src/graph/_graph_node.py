@@ -1,5 +1,5 @@
 # src/graph/_graph_node.py
-
+import itertools
 import random
 from collections import defaultdict
 from typing import DefaultDict, List, Set, Tuple
@@ -12,7 +12,7 @@ from handlers import AttributesCalculator
 
 
 class GraphNode:
-    id_counter: int
+    id_counter = None
     node_grid: DefaultDict[tuple[float, float], set]
     edge_grid: DefaultDict[Tuple[int, int], Set[Tuple[Tuple[float, float], Tuple[float, float]]]]
     _aborted_edge: int
@@ -54,7 +54,7 @@ class GraphNode:
 
     @classmethod
     def reset(cls):
-        cls.id_counter = 0
+        cls.id_counter = itertools.count()
         cls.node_grid.clear()
         cls.edge_grid.clear()
         cls._aborted_edge = 0
@@ -65,8 +65,7 @@ class GraphNode:
         PRE: param parent and parent_angle must be provided together or not at all.
         POST: The first child of a non-root node is the parent.
         """
-        self.id: int = GraphNode.id_counter
-        GraphNode.id_counter += 1
+        self.id: int = next(GraphNode.id_counter)
 
         self.position: Tuple[float, float] = position  # position <- (x, y)
         self.clockwise = random.choice([True, False])
