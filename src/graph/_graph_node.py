@@ -80,7 +80,7 @@ class GraphNode:
             self.base_angle = random.uniform(0, 360)
             self._initialize_root_node()
         else:
-            assert False, "Parent and parent_angle must be provided together or not at all."
+            raise ValueError("Parent and parent_angle must be provided together or not at all.")
 
     @staticmethod
     def _choose_degree_random() -> int:
@@ -104,8 +104,7 @@ class GraphNode:
         self._add_edge_to_grid((self.position, child_position))
 
     def _add_child(self, child) -> None:
-        if len(self.children) >= self.degree:
-            raise Exception(f"{self} cannot have more than {self.degree} children.")
+        assert len(self.children) < self.degree, f"{self} cannot have more than {self.degree} children."
         self.children.append(child)
         self._add_to_grid(child.position)
 
