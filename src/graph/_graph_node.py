@@ -194,11 +194,8 @@ class GraphNode:
         if self.parent and (self.parent.position in edge or self.position in edge):
             return False  # Skip edges from the same parent
         p1, p2 = edge
-        _distances = [
-            euclidean(position, p1),
-            euclidean(position, p2)
-        ]
-        return any(_distance < self._closed_edges_thr for _distance in _distances)
+        return (euclidean(position, p1) < self._closed_edges_thr or
+                euclidean(position, p2) < self._closed_edges_thr)
 
     def _generate_angles_and_lengths(self) -> Tuple[list[float], list[float]]:
         if self.degree == 1:
