@@ -1,4 +1,4 @@
-# src/original_network/graph_generator.py
+# src/graph/graph_generator.py
 
 from collections import deque
 from typing import Optional, Tuple, Union
@@ -20,7 +20,7 @@ class GraphGenerator:
         frame_range = frame_range or BaseConfig.DEFAULT_FRAME_SIZE
 
         for _ in range(regenerate_times):
-            nodes, edges = self._generate_graph_by_nodes_and_edges(frame_range)
+            nodes, edges = self._bfs_network(frame_range)
             if nodes and len(nodes) > 100:
                 break
         else:
@@ -31,16 +31,17 @@ class GraphGenerator:
         synthetic_network = _filter_graph(_synthetic_network, frame)
         return synthetic_network
 
-    def _generate_graph_by_nodes_and_edges(self, frame_range: Optional[Tuple[int, int]] = None):
+    @staticmethod
+    def _bfs_network(frame_range: Optional[Tuple[int, int]] = None) -> Tuple[set, set]:
         frame_range = frame_range or BaseConfig.DEFAULT_FRAME_SIZE
 
         GraphNode.reset()
         root_node = GraphNode((0, 0))
         node_set, edge_set = {root_node}, set()
-        __scaled_frame_range = (round(frame_range[0] * 1.1), round(frame_range[1] * 1.1))
-        frame = calculate_frame(center_position=root_node.position, frame_range=__scaled_frame_range)
+        scaled_frame_range = (round(frame_range[0] * 1.1), round(frame_range[1] * 1.1))
+        frame = calculate_frame(center_position=root_node.position, frame_range=scaled_frame_range)
 
-        def __bfs(root):
+        def _bfs(root):
             node_queue = deque([root])
             while node_queue:
                 current_node = node_queue.popleft()
@@ -53,7 +54,7 @@ class GraphGenerator:
                             edge_set.add((current_node.position, child.position))
                             node_queue.append(child)
 
-        __bfs(root_node)
+        _bfs(root_node)
         return node_set, edge_set
 
 
