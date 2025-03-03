@@ -8,7 +8,7 @@ from numpy import ndarray
 
 from config import BaseConfig
 from handlers import AttributesCalculator
-from utils import build_graph, calculate_frame
+from utils import build_graph, calculate_frame, largest_connected_component
 from ._graph_node import GraphNode
 
 
@@ -28,7 +28,7 @@ class GraphGenerator:
 
         _synthetic_network = build_graph(nodes, edges)
         frame = calculate_frame(graph=_synthetic_network, frame_range=frame_range)
-        synthetic_network = self._filter_graph(_synthetic_network, frame)
+        synthetic_network = _filter_graph(_synthetic_network, frame)
         return synthetic_network
 
     def _generate_graph_by_nodes_and_edges(self, frame_range: Optional[Tuple[int, int]] = None):
@@ -44,7 +44,7 @@ class GraphGenerator:
             node_queue = deque([root])
             while node_queue:
                 current_node = node_queue.popleft()
-                if not self._within_frame(current_node.position, frame):
+                if not _within_frame(current_node.position, frame):
                     continue
                 if current_node.generate_children():
                     for child in current_node.children:
@@ -56,17 +56,15 @@ class GraphGenerator:
         __bfs(root_node)
         return node_set, edge_set
 
-    def _filter_graph(self, graph, frame):
-        nodes_to_keep = {node for node, pos in nx.get_node_attributes(graph, 'pos').items() if
-                         self._within_frame(pos, frame)}
-        filtered_graph = graph.subgraph(nodes_to_keep).copy()
-        if filtered_graph.number_of_nodes() > 0:
-            largest_cc = max(nx.connected_components(filtered_graph), key=len)
-            filtered_graph = filtered_graph.subgraph(largest_cc).copy()
-        return filtered_graph
 
-    @staticmethod
-    def _within_frame(position: Union[list, tuple, ndarray],
-                      frame: Union[list[any, any], tuple[any, any], ndarray[any, any]]) -> bool:
-        x, y = position
-        return frame[0][0] <= x <= frame[0][1] and frame[1][0] <= y <= frame[1][1]
+def _within_frame(position: Union[list, tuple, ndarray],
+                  frame: Union[list[any, any], tuple[any, any], ndarray[any, any]]) -> bool:
+    x, y = position
+    return frame[0][0] <= x <= frame[0][1] and frame[1][0] <= y <= frame[1][1]
+
+
+def _filter_graph(graph: nx.Graph, frame: [list[any, any], tuple[any, any]]) -> nx.Graph:
+    nodes_to_keep = {node for node, pos in nx.get_node_attributes(graph, 'pos').items() if
+                     _within_frame(pos, frame)}
+    filtered_fraction = graph.subgraph(nodes_to_keep)
+    return largest_connected_component(filtered_fraction)
