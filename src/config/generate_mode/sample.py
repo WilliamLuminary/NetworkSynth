@@ -8,7 +8,7 @@ import numpy as np
 from config.base_config import BaseConfig
 from config.enums import Resolution, SetName
 from utils import build_graph
-from .utils import _resize_cv2_image, _transpose_network_pos, _trim_cv2_image
+from ._utils import _resize_cv2_image, _transpose_network_pos, _trim_cv2_image
 
 logger = logging.getLogger(__name__)
 
