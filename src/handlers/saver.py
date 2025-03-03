@@ -14,26 +14,6 @@ from config import BaseConfig, DataType, FILE_CONFIGURATIONS, FileExtension, Mod
 logger = logging.getLogger(__name__)
 
 
-def _update_soft_link(link_path: str, target_path: str) -> None:
-    if os.path.exists(link_path) or os.path.islink(link_path):
-        try:
-            os.unlink(link_path)
-        except OSError as e:
-            logger.error(f"Failed to remove existing soft link: {link_path}. Error: {e}")
-            raise
-    try:
-        os.symlink(target_path, link_path)
-    except OSError as e:
-        logger.error(f"Failed to create soft link: {link_path}. Error: {e}")
-        raise
-
-
-def _ensure_directory(path: str, exist_ok=False) -> None:
-    if not exist_ok and not os.path.exists(path):
-        logger.info(f"Create new directory: {path}")
-    os.makedirs(path, exist_ok=exist_ok)
-
-
 class Saver:
     base_output_dir = None
     mode = None
@@ -90,7 +70,7 @@ class Saver:
         else:
             cls.mode = Mode.GEN
             cls.base_output_dir = os.path.join(BaseConfig.BASE_OUTPUT_PATH,
-                                               f'{BaseConfig.OUTPUT_DENOTE}_results_{Saver._time_id()}')
+                                               f'{BaseConfig.OUTPUT_DENOTE}_results_{_time_id()}')
             _ensure_directory(cls.base_output_dir)
             logger.info(f"Base Output directory: {cls.base_output_dir}")
             latest_link_path = os.path.join(BaseConfig.BASE_OUTPUT_PATH, 'latest_result')
@@ -99,7 +79,7 @@ class Saver:
     def save_file(self, content: Any, data_type: DataType, file_name_prefix: Optional[str] = None) -> None:
         """
         Saves the provided content to a file based on its configuration.
-    
+
         :param content: The data to be saved (e.g., image or pickled object).
         :param data_type: Specifies the data type and related save configurations.
         :param file_name_prefix: Optional prefix for the generated file name.
@@ -117,7 +97,7 @@ class Saver:
         file_detail = file_config.detail
 
         if self.mode == Mode.GEN or data_type.file_extension == FileExtension.PNG:
-            file_name_identifier = self._time_id()
+            file_name_identifier = _time_id()
             rel_path = file_config.relative_dir
             file_detail = (file_detail + '_') if file_config.detail and file_config.detail[-1] != '_' else (
                     file_config.detail or '')
@@ -150,6 +130,26 @@ class Saver:
             raise ValueError("Unsupported image format. Expected ndarray.")
         cv2.imwrite(filepath, image)
 
-    @staticmethod
-    def _time_id() -> str:
-        return time.strftime("%Y%m%d_%H%M%S")
+
+def _update_soft_link(link_path: str, target_path: str) -> None:
+    if os.path.exists(link_path) or os.path.islink(link_path):
+        try:
+            os.unlink(link_path)
+        except OSError as e:
+            logger.error(f"Failed to remove existing soft link: {link_path}. Error: {e}")
+            raise
+    try:
+        os.symlink(target_path, link_path)
+    except OSError as e:
+        logger.error(f"Failed to create soft link: {link_path}. Error: {e}")
+        raise
+
+
+def _ensure_directory(path: str, exist_ok=False) -> None:
+    if not exist_ok and not os.path.exists(path):
+        logger.info(f"Create new directory: {path}")
+    os.makedirs(path, exist_ok=exist_ok)
+
+
+def _time_id() -> str:
+    return time.strftime("%Y%m%d_%H%M%S")
