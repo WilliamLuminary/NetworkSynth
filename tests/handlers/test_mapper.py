@@ -24,8 +24,10 @@ def load_graph_from_pickle():
     return G
 
 
-def profile_mapper(mapper, graph, iterations=10):
-    """Profiles the runtime of a mapper's assign_weights method over multiple iterations."""
+def profile_mapper_time(mapper, graph, iterations=10):
+    """
+    :return Mean time, Standard deviation.
+    """
     times = []
     for _ in range(iterations):
         graph_copy = graph.copy()
@@ -40,15 +42,16 @@ def profile_mapper(mapper, graph, iterations=10):
 
 def compute_quality(mapper, graph):
     """
-    Computes quality metrics by comparing the original edge weights with the weights
-    assigned by the mapper. Returns Mean Absolute Error (MAE) and Pearson correlation.
+    :return: Mean Absolute Error (MAE), Pearson correlation.
     """
+    # noinspection PyProtectedMember
     original_lengths, original_weights = Mapper._compute_edge_metrics(graph)
     graph_copy = graph.copy()
-    # Remove weights to force re-assignment.
     for _, _, data in graph_copy.edges(data=True):
         data.pop('weight', None)
     mapper.assign_weights(graph_copy)
+
+    # noinspection PyProtectedMember
     new_lengths, new_weights = Mapper._compute_edge_metrics(graph_copy)
     mae = np.mean(np.abs(np.array(new_weights) - np.array(original_weights)))
     corr, _ = pearsonr(original_weights, new_weights)
@@ -58,13 +61,18 @@ def compute_quality(mapper, graph):
 def test_mapper(load_graph_from_pickle):
     sample_graph = load_graph_from_pickle
     mapper = Mapper(sample_graph)
-    ori_lengths, ori_weights = Mapper._compute_edge_metrics(sample_graph)
+    plot_map(mapper, sample_graph)
 
+
+def plot_map(mapper, sample_graph):
+    # noinspection PyProtectedMember
+    ori_lengths, ori_weights = Mapper._compute_edge_metrics(sample_graph)
     new_graph = sample_graph.copy()
     for _ in range(10):
         for u, v, data in new_graph.edges(data=True):
             del data['weight']
         mapper.assign_weights(new_graph)
+        # noinspection PyProtectedMember
         new_lengths, new_weights = Mapper._compute_edge_metrics(new_graph)
         plt.figure(figsize=(8, 6))
         plt.scatter(ori_lengths, ori_weights, c='blue', alpha=0.3, label='Original Data')
@@ -83,47 +91,25 @@ def test_mapper(load_graph_from_pickle):
 def test_enhanced_mapper(load_graph_from_pickle):
     sample_graph = load_graph_from_pickle
     mapper = EnhancedMapper(sample_graph)
-    ori_lengths, ori_weights = Mapper._compute_edge_metrics(sample_graph)
-
-    new_graph = sample_graph.copy()
-    for _ in range(10):
-        for u, v, data in new_graph.edges(data=True):
-            del data['weight']
-        mapper.assign_weights(new_graph)
-        new_lengths, new_weights = Mapper._compute_edge_metrics(new_graph)
-        plt.figure(figsize=(8, 6))
-        plt.scatter(ori_lengths, ori_weights, c='blue', alpha=0.3, label='Original Data')
-        plt.scatter(new_lengths, new_weights, c='orange', alpha=0.3, label='Mapped Weights')
-        plt.title('Edge Length vs Weight with Basket-Based Mapping')
-        plt.xlabel('Length')
-        plt.ylabel('Weight')
-        plt.legend()
-        plt.grid(False)
-        plt.show()
-        print("Check the plot for the comparison of original and mapped weights.")
-        plt.close()
-        sleep(0.1)
+    plot_map(mapper, sample_graph)
 
 
 def test_mapper_performance(load_graph_from_pickle):
-    """Compares the performance of Mapper and EnhancedMapper by measuring runtime."""
+    """Measures runtime."""
     sample_graph = load_graph_from_pickle
     mapper1 = Mapper(sample_graph)
     mapper2 = EnhancedMapper(sample_graph)
 
-    time1, std1 = profile_mapper(mapper1, sample_graph)
-    time2, std2 = profile_mapper(mapper2, sample_graph)
+    time1, std1 = profile_mapper_time(mapper1, sample_graph)
+    time2, std2 = profile_mapper_time(mapper2, sample_graph)
 
     print()
     print(f"Mapper: Avg Time = {time1:.4f}s ± {std1:.4f}s")
     print(f"Enhanced Mapper: Avg Time = {time2:.4f}s ± {std2:.4f}s")
-    # Optionally, you can include assertions based on expected performance thresholds.
-    # For example, if you expect EnhancedMapper to be faster:
-    # assert time2 < time1
 
 
 def test_mapper_quality(load_graph_from_pickle):
-    """Compares the quality of the weight assignment between Mapper and EnhancedMapper."""
+    """Measures Mean absolute error and Pearson correlation."""
     sample_graph = load_graph_from_pickle
     mapper1 = Mapper(sample_graph)
     mapper2 = EnhancedMapper(sample_graph)
@@ -134,6 +120,4 @@ def test_mapper_quality(load_graph_from_pickle):
     print()
     print(f"Mapper: MAE = {mae1:.4f}, Corr = {corr1:.4f}")
     print(f"Enhanced Mapper: MAE = {mae2:.4f}, Corr = {corr2:.4f}")
-    # Optionally, you can include assertions to ensure the quality metrics meet your criteria.
-    # For example:
     # assert abs(corr1 - corr2) < 0.1
