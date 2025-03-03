@@ -12,33 +12,26 @@ from handlers import AttributesCalculator
 
 
 class GraphNode:
-    id_counter: int = 0
-    node_grid: DefaultDict[tuple[float, float], set] = None
-    edge_grid: DefaultDict[Tuple[int, int], Set[Tuple[Tuple[float, float], Tuple[float, float]]]] = None
-    _aborted_edge: int = 0
-    _merged_edge: int = 0
+    id_counter: int
+    node_grid: DefaultDict[tuple[float, float], set]
+    edge_grid: DefaultDict[Tuple[int, int], Set[Tuple[Tuple[float, float], Tuple[float, float]]]]
+    _aborted_edge: int
+    _merged_edge: int
 
     # Class-level properties
-    _degree_dist = {}
-    _degree_trans_probs = {}
-    _degree_angles = {}
-    _degree_edge_lengths = {}
-    _avg_length: float = 0
+    _degree_dist = None
+    _degree_trans_probs = None
+    _degree_angles = None
+    _degree_edge_lengths = None
+    _avg_length: float
 
     # Class-level Parameters
-    _closed_nodes_thr = 0
-    _closed_edges_thr = 0
-    _closed_nodes_factor = 0
-    _closed_edges_factor = 0
-    _grid_size = 0
+    _closed_nodes_thr: float
+    _closed_edges_thr: float
+    _grid_size: float
 
-    @classmethod
-    def reset(cls):
-        cls.id_counter = 0
-        cls.node_grid.clear()
-        cls.edge_grid.clear()
-        cls._aborted_edge = 0
-        cls._merged_edge = 0
+    _closed_nodes_factor: float
+    _closed_edges_factor: float
 
     @classmethod
     def initialize(cls, graph_attributes: AttributesCalculator):
@@ -48,14 +41,24 @@ class GraphNode:
         cls._degree_edge_lengths = graph_attributes.degree_edge_lengths
         cls._avg_length = graph_attributes.average_edge_length
 
-        cls._closed_nodes_factor = BaseConfig.CLOSED_NODES_FACTOR
-        cls._closed_edges_factor = BaseConfig.CLOSED_EDGES_FACTOR
         cls._closed_nodes_thr = graph_attributes.average_edge_length * BaseConfig.CLOSED_NODES_FACTOR
         cls._closed_edges_thr = graph_attributes.average_edge_length * BaseConfig.CLOSED_EDGES_FACTOR
         cls._grid_size = graph_attributes.average_edge_length
 
+        cls._closed_nodes_factor = BaseConfig.CLOSED_NODES_FACTOR
+        cls._closed_edges_factor = BaseConfig.CLOSED_EDGES_FACTOR
+
         cls.node_grid = defaultdict(set)
         cls.edge_grid = defaultdict(set)
+        cls.reset()
+
+    @classmethod
+    def reset(cls):
+        cls.id_counter = 0
+        cls.node_grid.clear()
+        cls.edge_grid.clear()
+        cls._aborted_edge = 0
+        cls._merged_edge = 0
 
     def __init__(self, position, parent=None, parent_angle=None):
         """
@@ -128,7 +131,7 @@ class GraphNode:
         assert len(children_positions) == self.degree - 1
 
         for child_position, angle in zip(children_positions, angles):
-            if self._find_close_edge(child_position):  # Avoid closed edges
+            if self._any_close_edge(child_position):  # Avoid closed edges
                 GraphNode._aborted_edge += 1
                 continue
             close_node = self._get_closest_valid_node(child_position)
@@ -204,7 +207,7 @@ class GraphNode:
                         close_nodes_with_distances.append((node, distance))
         return close_nodes_with_distances
 
-    def _find_close_edge(self, position):
+    def _any_close_edge(self, position) -> bool:
         key = self._spatial_hash(position)
         neighboring_keys = [
             (key[0] + dx, key[1] + dy)
@@ -213,11 +216,11 @@ class GraphNode:
         ]
         for neighbor_key in neighboring_keys:
             for edge in GraphNode.edge_grid[neighbor_key]:
-                if self._is_non_sibling_edge(edge, position):
+                if self._is_interfering_edge(edge, position):
                     return True
         return False
 
-    def _is_non_sibling_edge(self, edge, position):
+    def _is_interfering_edge(self, edge, position) -> bool:
         if self.parent and (self.parent.position in edge or self.position in edge):
             return False  # Skip edges from the same parent
         p1, p2 = edge
@@ -253,7 +256,7 @@ class GraphNode:
             for edge in GraphNode.edge_grid[edge_frac]:
                 if new_edge[0] in edge or new_edge[1] in edge:
                     continue  # Skip edges with the same endpoint
-                if GraphNode._do_intersect(new_edge[0], new_edge[1], edge[0], edge[1]):
+                if _do_intersect(new_edge[0], new_edge[1], edge[0], edge[1]):
                     return True
         return False
 
@@ -272,28 +275,28 @@ class GraphNode:
                 for y in np.arange(y_min, y_max + grid_size, grid_size)}
         return keys
 
-    @staticmethod
-    def _do_intersect(p1: Tuple[float, float], q1: Tuple[float, float], p2: Tuple[float, float],
-                      q2: Tuple[float, float]) -> bool:
-        def orientation(p, q, r):
-            val = (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1])
-            return 0 if val == 0 else 1 if val > 0 else 2
-
-        def on_segment(p, q, r):
-            return min(p[0], r[0]) <= q[0] <= max(p[0], r[0]) and min(p[1], r[1]) <= q[1] <= max(p[1], r[1])
-
-        o1 = orientation(p1, q1, p2)
-        o2 = orientation(p1, q1, q2)
-        o3 = orientation(p2, q2, p1)
-        o4 = orientation(p2, q2, q1)
-        return ((o1 != o2 and o3 != o4) or
-                (o1 == 0 and on_segment(p1, p2, q1)) or
-                (o2 == 0 and on_segment(p1, q2, q1)) or
-                (o3 == 0 and on_segment(p2, p1, q2)) or
-                (o4 == 0 and on_segment(p2, q1, q2)))
-
     def __repr__(self):
         return f"GraphNode(id_counter={self.id})"
 
     def __str__(self):
         return f"Node No. {self.id}"
+
+
+def _do_intersect(p1: Tuple[float, float], q1: Tuple[float, float], p2: Tuple[float, float],
+                  q2: Tuple[float, float]) -> bool:
+    def _orientation(p, q, r):
+        val = (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1])
+        return 0 if val == 0 else 1 if val > 0 else 2
+
+    def _on_segment(p, q, r):
+        return min(p[0], r[0]) <= q[0] <= max(p[0], r[0]) and min(p[1], r[1]) <= q[1] <= max(p[1], r[1])
+
+    o1 = _orientation(p1, q1, p2)
+    o2 = _orientation(p1, q1, q2)
+    o3 = _orientation(p2, q2, p1)
+    o4 = _orientation(p2, q2, q1)
+    return ((o1 != o2 and o3 != o4) or
+            (o1 == 0 and _on_segment(p1, p2, q1)) or
+            (o2 == 0 and _on_segment(p1, q2, q1)) or
+            (o3 == 0 and _on_segment(p2, p1, q2)) or
+            (o4 == 0 and _on_segment(p2, q1, q2)))
