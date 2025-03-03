@@ -41,20 +41,17 @@ class GraphGenerator:
         scaled_frame_range = (round(frame_range[0] * 1.1), round(frame_range[1] * 1.1))
         frame = calculate_frame(center_position=root_node.position, frame_range=scaled_frame_range)
 
-        def _bfs(root):
-            node_queue = deque([root])
-            while node_queue:
-                current_node = node_queue.popleft()
-                if not _within_frame(current_node.position, frame):
-                    continue
-                if current_node.generate_children():
-                    for child in current_node.children:
-                        if child != current_node:
-                            node_set.add(child)
-                            edge_set.add((current_node.position, child.position))
-                            node_queue.append(child)
-
-        _bfs(root_node)
+        node_queue = deque([root_node])
+        while node_queue:
+            current_node = node_queue.popleft()
+            if not _within_frame(current_node.position, frame):
+                continue
+            if current_node.generate_children():
+                for child in current_node.children:
+                    if child != current_node:
+                        node_set.add(child)
+                        edge_set.add((current_node.position, child.position))
+                        node_queue.append(child)
         return node_set, edge_set
 
 
