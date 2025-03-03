@@ -12,7 +12,7 @@ from config import BaseConfig, DataType, Resolution, SetName
 from config import GenConfig, GenConfig1, GenConfig2
 from graph import GraphGenerator
 from handlers import AttributesCalculator, RunAgent, Mapper, Saver
-from utils.utils import trim_graph
+from utils import trim_graph
 
 GenConfig2.initialize()
 BaseConfig.disable_saving("Preview")
