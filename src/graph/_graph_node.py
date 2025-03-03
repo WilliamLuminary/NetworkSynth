@@ -68,7 +68,7 @@ class GraphNode:
         self.id: int = next(GraphNode.id_counter)
 
         self.position: Tuple[float, float] = position  # position <- (x, y)
-        self.clockwise = random.choice([True, False])
+        self.clockwise: bool = random.choice([True, False])
         self.parent: GraphNode = parent
         self.children: List[GraphNode] = []
         if parent is not None and parent_angle is not None:
