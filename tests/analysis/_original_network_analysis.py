@@ -53,6 +53,7 @@ def wnfd_nk(G, Q, weight=True, draw=False, fdigi=0):
         N_list.append(num)
 
     r_g_all = np.array(sorted(list(r_g_all_set)))
+    # noinspection DuplicatedCode
     Nw_mat = np.ones((len(N_list), len(r_g_all)))  # Num_r matrix: column: node, row: radius
 
     for i, num in enumerate(N_list):
@@ -102,6 +103,7 @@ def wnfd_nk(G, Q, weight=True, draw=False, fdigi=0):
 def nspectrum(tau_list, q_list, k, color):
     al_list = []
     fal_list = []
+    # noinspection DuplicatedCode
     for i in range(1, len(q_list)):
         al = (tau_list[i] - tau_list[i - 1]) / (q_list[i] - q_list[i - 1])
         al_list.append(al)
