@@ -1,4 +1,4 @@
-# src/multifractal_analysis_main.py
+# src/main_multifractal_analysis.py
 import logging
 import os
 from collections import deque
