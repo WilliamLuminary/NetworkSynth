@@ -1,4 +1,4 @@
-# src/sweeping_main.py
+# src/main_sweeping.py
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from itertools import product
