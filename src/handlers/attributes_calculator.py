@@ -1,6 +1,7 @@
 # src/handlers/attributes_calculator.py
 import logging
 from collections import Counter, defaultdict
+from dataclasses import dataclass, field
 from typing import Dict, List, Tuple
 
 import networkx as nx
@@ -10,50 +11,23 @@ from scipy.spatial.distance import euclidean
 logger = logging.getLogger(__name__)
 
 
+@dataclass(slots=True)
 class AttributesCalculator:
-    def __init__(self):
-        self.degree_distribution: Dict[int, float] = {}
-        self.degree_transition_probs: Dict[int, Dict[int, float]] = {}
-        self.degree_edge_lengths: Dict[int, List[float]] = {}
-        self.degree_angle_diffs: Dict[int, List[float]] = {}
-        self.average_edge_length: float = 0.0
-        self.average_degree: float = 0.0
+    degree_distribution: Dict[int, float] = field(default_factory=dict)
+    degree_transition_probs: Dict[int, Dict[int, float]] = field(default_factory=dict)
+    degree_edge_lengths: Dict[int, List[float]] = field(default_factory=dict)
+    degree_angle_diffs: Dict[int, List[float]] = field(default_factory=dict)
+    average_edge_length: float = 0.0
+    average_degree: float = 0.0
 
-    def analyze(self, graph: nx.Graph):
+    def analyze(self, graph: nx.Graph) -> "AttributesCalculator":
         self.degree_distribution = self._compute_degree_distribution(graph)
         self.degree_transition_probs = self._compute_degree_transition_probs(graph)
         self.average_degree = self._compute_average_degree(graph)
-
         (self.degree_edge_lengths,
          self.degree_angle_diffs,
          self.average_edge_length) = self._compute_edge_lengths_and_angle_diffs(graph)
-
         return self
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "AttributesCalculator":
-        agent = cls()
-        agent.degree_distribution = data['degree_distribution']
-        agent.degree_transition_probs = data['degree_transition_probs']
-        agent.degree_edge_lengths = data['degree_edge_lengths']
-        agent.degree_angle_diffs = data['degree_angle_diffs']
-        agent.average_edge_length = data['average_edge_length']
-        agent.average_degree = data['average_degree']
-
-        return agent
-
-    def _to_dict(self) -> dict:
-        return {
-            'degree_distribution': self.degree_distribution,
-            'degree_transition_probs': self.degree_transition_probs,
-            'degree_edge_lengths': self.degree_edge_lengths,
-            'degree_angle_diffs': self.degree_angle_diffs,
-            'average_edge_length': self.average_edge_length,
-            'average_degree': self.average_degree
-        }
-
-    def savable(self) -> dict:
-        return self._to_dict()
 
     @staticmethod
     def _compute_degree_distribution(graph: nx.Graph) -> Dict[int, float]:
