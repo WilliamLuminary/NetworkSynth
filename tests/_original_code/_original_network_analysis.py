@@ -159,7 +159,7 @@ def node_dimension(G, weight=True, fdigi=2):
     else:
         G_nk = nk.nxadapter.nx2nk(G, weightAttr='weight')
 
-    node_dimension = {}
+    node_dimension_ = {}
     for node in G.nodes():
         num_nodes = 0
         grow = nk.distance.Dijkstra(G_nk, int(node), storePaths=False).run().getDistances()
@@ -180,10 +180,10 @@ def node_dimension(G, weight=True, fdigi=2):
 
         if len(r_g) > 2:
             slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
-            node_dimension[node] = slope
+            node_dimension_[node] = slope
         else:
-            node_dimension[node] = 0
-    return node_dimension
+            node_dimension_[node] = 0
+    return node_dimension_
 
 
 def calculate_centralities(graph, weight_flag):
