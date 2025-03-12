@@ -7,45 +7,45 @@
 
 1. Run with Default Configuration
 
-```bash
-# Clone and install
-git clone https://github.com/WilliamLuminary/NetworkSynth.git
-cd NetworkSynth
-# Compatible with Python version 3.10.15
-pip install -r requirements.txt
-
-# Run with sample configuration
-python src/main.py
-```
+   ```bash
+   # Clone and install
+   git clone https://github.com/WilliamLuminary/NetworkSynth.git
+   cd NetworkSynth
+   # Compatible with Python version 3.10.15
+   pip install -r requirements.txt
+   
+   # Run with sample configuration
+   python src/main.py
+   ```
 
 2. Prepare Sample Data
 
-Create this structure in data/sample_input:
+   Create this structure in data/sample_input:
 
-```bash
-sample_input/
-├── sample_1_pos.npy    # Node positions
-├── sample_1_mat.npy    # Adjacency matrix
-└── sample_1_image.tif  # Base image
-```
+   ```bash
+   sample_input/
+   ├── sample_1_pos.npy    # Node positions
+   ├── sample_1_mat.npy    # Adjacency matrix
+   └── sample_1_image.tif  # Base image
+   ```
 
 3. Expected Output
 
-```bash
-results_YYYYMMDD_HHMM/
-├── sample_1/
-│   (no resolution dir since Resolution.NA)
-│   ├── origin/
-│   │   ├── original_graph_YYYYMMDD_HHMM.png
-│   │   ├── original_image_YYYYMMDD_HHMM.png
-│   │   ├── original_network_YYYYMMDD_HHMM.pkl
-│   │   └── original_property_YYYYMMDD_HHMM.pkl
-│   ├── synthetic/
-│   │   ├── nw_no_10_err_0.123_synthetic_network_YYYYMMDD_HHMM.pkl
-│   │   ├── synthetic_graph_YYYYMMDD_HHMM.png
-│   │   ├── synthetic_graph_YYYYMMDD_HHMM.png
-│   │   └── synthetic_graph_YYYYMMDD_HHMM.png
-```
+   ```bash
+   results_YYYYMMDD_HHMM/
+   ├── sample_1/
+   │   (no resolution dir since Resolution.NA)
+   │   ├── origin/
+   │   │   ├── original_graph_YYYYMMDD_HHMM.png
+   │   │   ├── original_image_YYYYMMDD_HHMM.png
+   │   │   ├── original_network_YYYYMMDD_HHMM.pkl
+   │   │   └── original_property_YYYYMMDD_HHMM.pkl
+   │   ├── synthetic/
+   │   │   ├── nw_no_10_err_0.123_synthetic_network_YYYYMMDD_HHMM.pkl
+   │   │   ├── synthetic_graph_YYYYMMDD_HHMM.png
+   │   │   ├── synthetic_graph_YYYYMMDD_HHMM.png
+   │   │   └── synthetic_graph_YYYYMMDD_HHMM.png
+   ```
 
 ## Basic Customization <small>(No Code Changes)</small>
 
@@ -64,12 +64,12 @@ class ConfigSample(Config):
 
 ### 2. Common Parameters
 | Parameter              | Typical Values               | Effect on Generation                   |
-|------------------------| ---------------------------- | -------------------------------------- |
+|------------------------|------------------------------|----------------------------------------|
 | CLOSED_NODES_FACTOR    | 0.5-2.0                      | Controls node merging likelihood       |
 | CLOSED_EDGES_FACTOR    | 0.5-2.0                      | Affects edge proximity tolerance       |
 | ERROR_TOLERANCE        | 0.1-0.5                      | Multifractal similarity threshold      |
 | SYNTHETIC_GRAPH_NUMBER | $\leq$ SYNTHETIC_NETWORK_NUM | Visualized network generated per batch |
-| ...                    | | |
+| ...                    |                              |                                        |
 
 ## Advanced Configuration
 
@@ -95,11 +95,11 @@ class ConfigCustom(Config):
 
 ### 2. Implement Data Loaders
 Required function signatures:
-```python
-def _load_positions(set_name, resolution) -> np.ndarray:  # Shape: [N,2]
-def _load_sparse_matrix(set_name, resolution) -> dict:     # {'rows':[], 'cols':[]}
-def _load_image(set_name, resolution) -> np.ndarray:       # CV2-compatible format
-```
+   ```python
+   def _load_positions(set_name, resolution) -> np.ndarray:  # Shape: [N,2]
+   def _load_sparse_matrix(set_name, resolution) -> dict:     # {'rows':[], 'cols':[]}
+   def _load_image(set_name, resolution) -> np.ndarray:       # CV2-compatible format
+   ```
 
 #### Input Data Requirements
 
@@ -137,11 +137,11 @@ class ConfigCustom(Config):
 ## Output Interpretation
 
 ### File Type Mapping
-| Pattern                     | Data Type                  | Visualization Example      |
-|-----------------------------|----------------------------|----------------------------|
-| `original_graph_*.png`      | Network topology           | [Sample Graph]             |
-| `original_property_*.pkl`   | Degree distributions       | {2: 0.6, 3: 0.3, 4: 0.1}  |
-| `synthetic_network_*.pkl`   | Generated network          | NetworkX Graph object      |
+| Pattern                   | Data Type            | Visualization Example    |
+|---------------------------|----------------------|--------------------------|
+| `original_graph_*.png`    | Network topology     | [Sample Graph]           |
+| `original_property_*.pkl` | Degree distributions | {2: 0.6, 3: 0.3, 4: 0.1} |
+| `synthetic_network_*.pkl` | Generated network    | NetworkX Graph object    |
 
 
 ## Troubleshooting
@@ -152,7 +152,7 @@ class ConfigCustom(Config):
    `{SetName}_pos.npy`, `{SetName}_mat.npy`, `{SetName}_image.tif`
 
 2. **Dimension Mismatch**  
-   Verify node positions (N,2) match adjacency matrix (N,N)
+   Verify node positions `(N,2)` match adjacency matrix `(N,N)`
 
 3. **Generation Failures**  
    Adjust thresholds:

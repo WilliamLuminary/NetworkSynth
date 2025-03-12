@@ -24,7 +24,6 @@ class Config2(BaseConfig):
 
     CLOSED_NODES_FACTOR = 1.2
     CLOSED_EDGES_FACTOR = 0.8
-    # For 10_kx image, node fac should be 1.5, and edge fac should be 1
 
     SYNTHETIC_GRAPH_NUMBER = 1
     SYNTHETIC_NETWORK_NUMBER = 1
