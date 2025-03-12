@@ -210,5 +210,7 @@ def plot_network(data_type: DataType,
     ax.set_xticks([])
     ax.set_yticks([])
     ax.axis('off')
-    show_on_the_fly = kwargs.get('show', False) or getattr(file_config, 'show_on_the_fly', False)
+
+
+    show_on_the_fly = kwargs['show'] if 'show' in kwargs else getattr(file_config, 'show_on_the_fly', True)
     return finalize_plot(fig, show_on_the_fly)
