@@ -14,8 +14,8 @@ from graph import GraphGenerator
 from handlers import AttributesCalculator, RunAgent, Mapper, Saver
 from utils import trim_graph
 
-GenConfig2.initialize()
-BaseConfig.disable_saving("Preview")
+GenConfig.initialize()
+# BaseConfig.disable_saving("Preview")
 
 logger = logging.getLogger(__name__)
 SIGINT_INFO = "SIGINT received. Terminating child process..."
