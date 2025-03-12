@@ -1,7 +1,7 @@
 # src/handlers/attributes_calculator.py
 import logging
 from collections import Counter, defaultdict
-from typing import Dict, Final, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import networkx as nx
 import numpy as np
@@ -11,8 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class AttributesCalculator:
-    def __init__(self, graph: Optional[nx.Graph]):
-        self._graph: Final[nx.Graph] = graph
+    def __init__(self):
         self.degree_distribution: Dict[int, float] = {}
         self.degree_transition_probs: Dict[int, Dict[int, float]] = {}
         self.degree_edge_lengths: Dict[int, List[float]] = {}
@@ -20,26 +19,20 @@ class AttributesCalculator:
         self.average_edge_length: float = 0.0
         self.average_degree: float = 0.0
 
-    def analyze(self):
-        if not hasattr(self, "_graph"):
-            logger.warning("Attributes have already been calculated. Skipping analysis.")
-            return self
-
-        self.degree_distribution = self._compute_degree_distribution(self._graph)
-        self.degree_transition_probs = self._compute_degree_transition_probs(self._graph)
-        self.average_degree = self._compute_average_degree(self._graph)
+    def analyze(self, graph: nx.Graph):
+        self.degree_distribution = self._compute_degree_distribution(graph)
+        self.degree_transition_probs = self._compute_degree_transition_probs(graph)
+        self.average_degree = self._compute_average_degree(graph)
 
         (self.degree_edge_lengths,
          self.degree_angle_diffs,
-         self.average_edge_length) = self._compute_edge_lengths_and_angle_diffs(self._graph)
+         self.average_edge_length) = self._compute_edge_lengths_and_angle_diffs(graph)
 
-        del self._graph
         return self
 
     @classmethod
     def from_dict(cls, data: dict) -> "AttributesCalculator":
-        agent = cls(None)
-
+        agent = cls()
         agent.degree_distribution = data['degree_distribution']
         agent.degree_transition_probs = data['degree_transition_probs']
         agent.degree_edge_lengths = data['degree_edge_lengths']
@@ -47,7 +40,6 @@ class AttributesCalculator:
         agent.average_edge_length = data['average_edge_length']
         agent.average_degree = data['average_degree']
 
-        del agent._graph
         return agent
 
     def _to_dict(self) -> dict:

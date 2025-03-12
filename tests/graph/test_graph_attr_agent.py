@@ -5,7 +5,7 @@ from typing import Dict
 import networkx as nx
 import pytest
 
-from graph import GraphAttrAgent
+from handlers import AttributesCalculator
 
 
 @pytest.fixture
@@ -19,8 +19,8 @@ def load_graph_from_pickle():
 
 def test_pickle_dump_graph_attr_agent(load_graph_from_pickle):
     sample_graph = load_graph_from_pickle
-    agent = GraphAttrAgent(sample_graph)
-    agent.analyze()
+    agent = AttributesCalculator()
+    agent.analyze(sample_graph)
     with open("attr_dict.pkl", "wb") as f:
         # noinspection PyTypeChecker
         pickle.dump(agent, f)
