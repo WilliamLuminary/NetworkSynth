@@ -20,7 +20,6 @@ class SampleConfig(BaseConfig):
     DEFAULT_FRAME_SIZE = (1887 // 4, 2048 // 4)
     CLOSED_NODES_FACTOR = 1.2
     CLOSED_EDGES_FACTOR = .8
-    # For 10_kx image, node fac should be 1.5, and edge fac should be 1
 
     SYNTHETIC_GRAPH_NUMBER = 0
     SYNTHETIC_NETWORK_NUMBER = 0

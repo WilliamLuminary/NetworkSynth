@@ -22,7 +22,7 @@ class Config1(BaseConfig):
     DEFAULT_FRAME_SIZE = (510, 510)
     CLOSED_NODES_FACTOR = 1.5
     CLOSED_EDGES_FACTOR = 1
-    # For 10_kx image, node fac should be 1.5, and edge fac should be 1
+    # For the 10_kx image, node fac should be 1.5, and edge fac should be 1
 
     SYNTHETIC_GRAPH_NUMBER = 1
     SYNTHETIC_NETWORK_NUMBER = 1
