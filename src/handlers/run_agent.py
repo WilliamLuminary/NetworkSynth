@@ -51,7 +51,7 @@ class RunAgent:
         if self.mode == Mode.GEN:
             self.data_loader.load()
             original_network = self.data_loader.get_original_network()
-            self.attributes = AttributesCalculator(original_network).analyze()
+            self.attributes = AttributesCalculator().analyze(original_network)
             self.mapper = Mapper(original_network)
 
         elif self.mode == Mode.ANA:
