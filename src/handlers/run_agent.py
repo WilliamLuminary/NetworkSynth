@@ -62,7 +62,7 @@ class RunAgent:
 
         elif self.mode == Mode.ATR:
             self.data_loader.load()
-            self.attributes = AttributesCalculator.from_dict(self.data_loader.get_attr_dict())
+            self.attributes = AttributesCalculator(**self.data_loader.get_attr_dict())
 
     def multifractal_analysis_in_generate_mode(self):
         assert self.mode == Mode.GEN, "This method is only available in Generate mode."
@@ -105,7 +105,8 @@ class RunAgent:
 
         elif data_type == DataType.ORIGINAL_PROPERTY:
             assert self.mode == Mode.GEN, "This data type is only available in Generate mode."
-            self.saver.save_file(self.attributes.savable(), data_type, file_name_prefix)
+            import dataclasses
+            self.saver.save_file(dataclasses.asdict(self.attributes), data_type, file_name_prefix)
 
         elif data_type == DataType.ORIGINAL_GRAPH:
             original_network = self.data_loader.get_original_network()
