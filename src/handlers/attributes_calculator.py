@@ -1,17 +1,18 @@
 # src/handlers/attributes_calculator.py
-
+import logging
 from collections import Counter, defaultdict
-from typing import Dict, Final, List, Tuple
+from typing import Dict, Final, List, Optional, Tuple
 
 import networkx as nx
 import numpy as np
 from scipy.spatial.distance import euclidean
 
+logger = logging.getLogger(__name__)
+
 
 class AttributesCalculator:
-    def __init__(self, graph: nx.Graph):
+    def __init__(self, graph: Optional[nx.Graph]):
         self._graph: Final[nx.Graph] = graph
-        self.node_positions: Dict[int, Tuple[float, float]] = {}
         self.degree_distribution: Dict[int, float] = {}
         self.degree_transition_probs: Dict[int, Dict[int, float]] = {}
         self.degree_edge_lengths: Dict[int, List[float]] = {}
@@ -20,22 +21,25 @@ class AttributesCalculator:
         self.average_degree: float = 0.0
 
     def analyze(self):
-        self.node_positions = nx.get_node_attributes(self._graph, 'pos')
+        if not hasattr(self, "_graph"):
+            logger.warning("Attributes have already been calculated. Skipping analysis.")
+            return self
+
         self.degree_distribution = self._compute_degree_distribution(self._graph)
         self.degree_transition_probs = self._compute_degree_transition_probs(self._graph)
+        self.average_degree = self._compute_average_degree(self._graph)
+
         (self.degree_edge_lengths,
          self.degree_angle_diffs,
          self.average_edge_length) = self._compute_edge_lengths_and_angle_diffs(self._graph)
-        self.average_degree = self._compute_average_degree(self._graph)
+
         del self._graph
         return self
 
     @classmethod
     def from_dict(cls, data: dict) -> "AttributesCalculator":
-        graph = nx.Graph()
-        agent = cls(graph)
+        agent = cls(None)
 
-        agent.node_positions = data['node_positions']
         agent.degree_distribution = data['degree_distribution']
         agent.degree_transition_probs = data['degree_transition_probs']
         agent.degree_edge_lengths = data['degree_edge_lengths']
@@ -48,7 +52,6 @@ class AttributesCalculator:
 
     def _to_dict(self) -> dict:
         return {
-            'node_positions': self.node_positions,
             'degree_distribution': self.degree_distribution,
             'degree_transition_probs': self.degree_transition_probs,
             'degree_edge_lengths': self.degree_edge_lengths,
@@ -90,27 +93,28 @@ class AttributesCalculator:
                 }
         return transition_probs
 
+    @staticmethod
     def _compute_edge_lengths_and_angle_diffs(
-            self, graph: nx.Graph
+            graph: nx.Graph
     ) -> Tuple[Dict[int, List[float]], Dict[int, List[float]], float]:
+        node_positions = nx.get_node_attributes(graph, 'pos')
         degree_to_lengths = defaultdict(list)
         degree_to_angle_diffs = defaultdict(list)
 
         total_length = 0.0
         total_edges_count = 0
-
         for node in graph.nodes():
             neighbors = list(graph.neighbors(node))
             if not neighbors:
                 continue
 
-            node_pos = np.array(self.node_positions[node], dtype=np.float64)
+            node_pos = np.array(node_positions[node], dtype=np.float64)
 
             lengths = []
             angles = []
 
             for neighbor in neighbors:
-                neighbor_pos = np.array(self.node_positions[neighbor], dtype=np.float64)
+                neighbor_pos = np.array(node_positions[neighbor], dtype=np.float64)
 
                 length = euclidean(node_pos, neighbor_pos)
                 lengths.append(length)
