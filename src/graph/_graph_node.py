@@ -22,7 +22,7 @@ class GraphNode:
     _degree_dist = None
     _degree_trans_probs = None
     _degree_angles = None
-    _degree_edge_lengths = None
+    _degree_lengths = None
     _avg_length: float
 
     # Class-level Parameters
@@ -37,13 +37,13 @@ class GraphNode:
     def initialize(cls, graph_attributes: AttributesCalculator):
         cls._degree_dist = graph_attributes.degree_distribution
         cls._degree_trans_probs = graph_attributes.degree_transition_probs
-        cls._degree_angles = graph_attributes.degree_angle_diffs
-        cls._degree_edge_lengths = graph_attributes.degree_edge_lengths
-        cls._avg_length = graph_attributes.average_edge_length
+        cls._degree_angles = graph_attributes.degree_angles
+        cls._degree_lengths = graph_attributes.degree_lengths
+        cls._avg_length = graph_attributes.average_length
 
-        cls._closed_nodes_thr = graph_attributes.average_edge_length * BaseConfig.CLOSED_NODES_FACTOR
-        cls._closed_edges_thr = graph_attributes.average_edge_length * BaseConfig.CLOSED_EDGES_FACTOR
-        cls._grid_size = graph_attributes.average_edge_length
+        cls._closed_nodes_thr = cls._avg_length * BaseConfig.CLOSED_NODES_FACTOR
+        cls._closed_edges_thr = cls._avg_length * BaseConfig.CLOSED_EDGES_FACTOR
+        cls._grid_size = cls._avg_length
 
         cls._closed_nodes_factor = BaseConfig.CLOSED_NODES_FACTOR
         cls._closed_edges_factor = BaseConfig.CLOSED_EDGES_FACTOR
@@ -96,7 +96,7 @@ class GraphNode:
 
     def _initialize_root_node(self) -> None:
         """Initialize a root node by generating its first child."""
-        length = random.choice(GraphNode._degree_edge_lengths[self.degree])
+        length = random.choice(GraphNode._degree_lengths[self.degree])
         child_position = self._polar_to_cartesian([length], [self.base_angle])[0]
         child = GraphNode(child_position, parent=self, parent_angle=self.base_angle)
         self._add_child(child)
@@ -203,7 +203,7 @@ class GraphNode:
         angles = random.choices(GraphNode._degree_angles[self.degree], k=self.degree - 1)
         angles = np.cumsum(angles) if self.clockwise else np.cumsum([-angle for angle in angles])
         angles = (angles + self.base_angle).tolist()
-        lengths = random.choices(GraphNode._degree_edge_lengths[self.degree], k=self.degree - 1)
+        lengths = random.choices(GraphNode._degree_lengths[self.degree], k=self.degree - 1)
         return angles, lengths
 
     def _polar_to_cartesian(self, lengths: List[float], angles: List[float]) -> List[Tuple[float, float]]:
