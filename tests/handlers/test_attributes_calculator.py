@@ -40,28 +40,40 @@ def test_attributes_calculators_equivalence(load_weighted_test_nx_graph):
     old_calc = AttributesCalculator().analyze(graph)
     new_calc = NewAttributesCalculator().analyze(graph)
     assert old_calc.average_degree == pytest.approx(new_calc.average_degree, abs=1e-7)
-    assert old_calc.average_edge_length == pytest.approx(new_calc.average_edge_length, abs=1e-7)
+    assert old_calc.average_edge_length == pytest.approx(new_calc.average_length, abs=1e-7)
     compare_dicts_of_floats(old_calc.degree_distribution, new_calc.degree_distribution)
     compare_dicts_of_dicts_of_floats(old_calc.degree_transition_probs, new_calc.degree_transition_probs)
-    compare_dicts_of_lists_of_floats(old_calc.degree_edge_lengths, new_calc.degree_edge_lengths)
-    compare_dicts_of_lists_of_floats(old_calc.degree_angle_diffs, new_calc.degree_angle_diffs)
+    compare_dicts_of_lists_of_floats(old_calc.degree_edge_lengths, new_calc.degree_lengths)
+    compare_dicts_of_lists_of_floats(old_calc.degree_angle_diffs, new_calc.degree_angles)
     print("All calculator attributes matched (within numerical tolerance) between old and new implementations.")
 
 
-def test_pickle_dict(load_unweighted_test_nx_graph):
+def test_pickle_io(load_unweighted_test_nx_graph):
     sample_graph = load_unweighted_test_nx_graph
     attr_cal = AttributesCalculator()
     attr_cal.analyze(sample_graph)
-    with open("../data/attr_dict.pkl", "wb") as f:
+    pickle_file_path = os.path.join("..", "data", "attr_dict.pkl")
+    _test_dump(attr_cal, pickle_file_path)
+    loaded_data = _test_dump_type(pickle_file_path)
+    _test_reconstruction(attr_cal, loaded_data)
+
+
+def _test_reconstruction(attr_cal, loaded_data):
+    reconstructed_attr_cal = AttributesCalculator(**loaded_data)
+    assert attr_cal == reconstructed_attr_cal
+
+
+def _test_dump(attr_cal, pickle_file_path):
+    with open(pickle_file_path, "wb") as f:
         import dataclasses
         # noinspection PyTypeChecker
         pickle.dump(dataclasses.asdict(attr_cal), f)
-    assert os.path.exists("../data/attr_dict.pkl")
+    assert os.path.exists(pickle_file_path)
 
-    with open("../data/attr_dict.pkl", "rb") as f:
+
+def _test_dump_type(pickle_file_path):
+    with open(pickle_file_path, "rb") as f:
         load_file = pickle.load(f)
     from typing import Dict
     assert isinstance(load_file, Dict)
-
-    reconstructed_attr_cal = AttributesCalculator(**load_file)
-    assert attr_cal == reconstructed_attr_cal
+    return load_file
