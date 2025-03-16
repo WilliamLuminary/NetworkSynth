@@ -35,9 +35,12 @@ class MultifractalAnalyzer:
 
     def __init__(self, graph: nx.Graph):
         self.graph = graph
-        self.weighted = BaseConfig.MEASURE_WEIGHTED
         self.f_digit = 0
         self.Q = None
+        valid_weighted_analysis = all('weight' in data for _, _, data in graph.edges(data=True))
+        self.weighted = BaseConfig.MEASURE_WEIGHTED if valid_weighted_analysis else False
+        if BaseConfig.MEASURE_WEIGHTED is not self.weighted:
+            print("Unweighted graph! Can't perform weighted analysis.")
 
     def analyze_error_features(self) -> MultifractalErrorFeatures:
         # Use a small Q range for error analysis
@@ -53,6 +56,7 @@ class MultifractalAnalyzer:
 
     def _compute_multifractal_taus(self):
         graph = nx.convert_node_labels_to_integers(self.graph)
+
         if self.weighted:
             G_nk = nk.nxadapter.nx2nk(graph, weightAttr='weight')
         else:
