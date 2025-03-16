@@ -21,12 +21,17 @@ class AttributesCalculator:
     average_degree: float = 0.0
 
     def analyze(self, graph: nx.Graph) -> "AttributesCalculator":
-        self.degree_distribution = self._compute_degree_distribution(graph)
-        self.degree_transition_probs = self._compute_degree_transition_probs(graph)
+        if graph.number_of_nodes() == 0:
+            return self
+
+        self.degree_distribution = dict(self._compute_degree_distribution(graph))
+        self.degree_transition_probs = dict(self._compute_degree_transition_probs(graph))
         self.average_degree = self._compute_average_degree(graph)
-        (self.degree_edge_lengths,
-         self.degree_angle_diffs,
+        (degree_edge_lengths,
+         degree_angle_diffs,
          self.average_edge_length) = self._compute_edge_lengths_and_angle_diffs(graph)
+        self.degree_edge_lengths = dict(degree_edge_lengths)
+        self.degree_angle_diffs = dict(degree_angle_diffs)
         return self
 
     @staticmethod
