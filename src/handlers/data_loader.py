@@ -13,10 +13,10 @@ class DataLoader:
         self._resolution = None
         self._both_networks_path = None
 
-        self._original_image = None
+        self.__original_image = None
 
-        self._original_network = None
-        self._synthetic_networks = []
+        self.__original_network = None
+        self.__synthetic_networks = []
 
         if mode == Mode.GEN:
             assert 'set_name' in kwargs and 'resolution' in kwargs, "set_name and resolution are required."
@@ -28,35 +28,35 @@ class DataLoader:
         elif mode == Mode.ATR:
             assert 'path' in kwargs, "path is required."
             self._attr_path = kwargs['path']
-            self._attr = None
+            self.__attr = None
 
-        self._mode = mode
+        self.__mode = mode
 
     def get_original_image(self) -> np.ndarray:
-        return self._original_image
+        return self.__original_image
 
     def get_original_network(self) -> Union[nx.Graph, List[nx.Graph]]:
-        return self._original_network
+        return self.__original_network
 
     def get_attr_dict(self) -> Dict:
-        return self._attr
+        return self.__attr
 
     def get_synthetic_networks(self) -> List[nx.Graph]:
-        return self._synthetic_networks
+        return self.__synthetic_networks
 
     def add_synthetic_graph(self, graph: nx.Graph) -> None:
-        self._synthetic_networks.append(graph)
+        self.__synthetic_networks.append(graph)
 
     def load(self) -> None:
-        if self._mode == Mode.GEN:
-            self._original_network = self._load_original_network()
-            self._original_image = self._load_original_image()
+        if self.__mode == Mode.GEN:
+            self.__original_network = self._load_original_network()
+            self.__original_image = self._load_original_image()
 
-        elif self._mode == Mode.ANA:
-            self._original_network, self._synthetic_networks = self._load_both_networks()
+        elif self.__mode == Mode.ANA:
+            self.__original_network, self.__synthetic_networks = self._load_both_networks()
 
-        elif self._mode == Mode.ATR:
-            self._attr = self._load_attr()
+        elif self.__mode == Mode.ATR:
+            self.__attr = self._load_attr()
 
     def _load_original_image(self):
         return BaseConfig.ORIGINAL_IMAGE_FUNC(str(self._set_name), str(self._resolution))
