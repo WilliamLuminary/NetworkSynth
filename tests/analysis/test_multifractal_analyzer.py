@@ -1,39 +1,21 @@
 # tests/analysis/test_multifractal_analyzer.py
-import os
-import pickle
 
 import networkx as nx
 import numpy as np
 import pytest
 
-from .._original_code import (
-    original_n_spectrum,
-    original_calculate_multifractal_taus,
-    original_n_dimension,
-    original_node_dimension,
-    original_calculate_centralities,
-    original_calculate_betweenness,
-    original_calculate_ollivier_ricci_curvature,
-    original_calculate_assortativity,
-    original_calculate_eigenvector_centrality
-)
 from analysis.multifractal_analyzer import MultifractalAnalyzer
-from config import BaseConfig, AnaConfig
+from config import AnaConfig, BaseConfig
+from .._original_code import (original_calculate_assortativity, original_calculate_betweenness,
+                              original_calculate_centralities, original_calculate_eigenvector_centrality,
+                              original_calculate_multifractal_taus, original_calculate_ollivier_ricci_curvature,
+                              original_n_dimension, original_n_spectrum, original_node_dimension)
 
 AnaConfig.initialize()
 
 
-@pytest.fixture
-def load_graph_from_pickle():
-    file_path = os.path.realpath(os.path.join("..", "data", "sample1_unweighted_network.pkl"))
-    with open(file_path, "rb") as f:
-        G = pickle.load(f)
-    assert isinstance(G, nx.Graph)
-    return G
-
-
-def test_calculate_multifractal_taus(load_graph_from_pickle):
-    sample_graph = load_graph_from_pickle
+def test_calculate_multifractal_taus(load_unweighted_test_nx_graph):
+    sample_graph = load_unweighted_test_nx_graph
     analyzer = MultifractalAnalyzer(sample_graph)
     tau_list, zq_list = analyzer._compute_multifractal_taus()
 
@@ -51,8 +33,8 @@ def test_calculate_multifractal_taus(load_graph_from_pickle):
     assert np.array_equal(zq_list, correct_zq_list)
 
 
-def test_n_spectrum(load_graph_from_pickle):
-    sample_graph = load_graph_from_pickle
+def test_n_spectrum(load_unweighted_test_nx_graph):
+    sample_graph = load_unweighted_test_nx_graph
     n_tau, _, _, _ = original_calculate_multifractal_taus(sample_graph, MultifractalAnalyzer.full_q, weight=False)
     analyzer = MultifractalAnalyzer(sample_graph)
     alpha_0, width, al_list, fal_list = analyzer._compute_n_spectrum(n_tau)
@@ -65,8 +47,8 @@ def test_n_spectrum(load_graph_from_pickle):
     # assert np.array_equal(min_al_val, correct_fal_list)
 
 
-def test_n_dimension(load_graph_from_pickle):
-    sample_graph = load_graph_from_pickle
+def test_n_dimension(load_unweighted_test_nx_graph):
+    sample_graph = load_unweighted_test_nx_graph
     Q = MultifractalAnalyzer.full_q
     n_tau, _, _, _ = original_calculate_multifractal_taus(sample_graph, Q, weight=False)
     analyzer = MultifractalAnalyzer(sample_graph)
@@ -78,8 +60,8 @@ def test_n_dimension(load_graph_from_pickle):
     assert np.array_equal(valid_q, correct_valid_q)
 
 
-def test_node_dimension(load_graph_from_pickle):
-    sample_graph = load_graph_from_pickle
+def test_node_dimension(load_unweighted_test_nx_graph):
+    sample_graph = load_unweighted_test_nx_graph
     analyzer = MultifractalAnalyzer(sample_graph)
     analyzer.f_digit = 2
     node_dimension = analyzer._compute_node_dimension()
@@ -88,8 +70,8 @@ def test_node_dimension(load_graph_from_pickle):
     assert node_dimension == correct_node_dimension
 
 
-def test_centralities(load_graph_from_pickle):
-    sample_graph = load_graph_from_pickle
+def test_centralities(load_unweighted_test_nx_graph):
+    sample_graph = load_unweighted_test_nx_graph
     analyzer = MultifractalAnalyzer(sample_graph)
     centralities_dict = analyzer._compute_centralities()
     correct_centralities_dict = original_calculate_centralities(sample_graph, False)
@@ -97,8 +79,8 @@ def test_centralities(load_graph_from_pickle):
     assert centralities_dict == correct_centralities_dict
 
 
-def test_betweenness(load_graph_from_pickle):
-    sample_graph = load_graph_from_pickle
+def test_betweenness(load_unweighted_test_nx_graph):
+    sample_graph = load_unweighted_test_nx_graph
     analyzer = MultifractalAnalyzer(sample_graph)
     betweenness_dict = analyzer._compute_betweenness()
     correct_betweenness_dict = original_calculate_betweenness(sample_graph, False)
@@ -106,8 +88,8 @@ def test_betweenness(load_graph_from_pickle):
     assert np.allclose(betweenness_dict, correct_betweenness_dict, atol=1e-18)
 
 
-def test_ricci_curvature(load_graph_from_pickle):
-    sample_graph = load_graph_from_pickle
+def test_ricci_curvature(load_unweighted_test_nx_graph):
+    sample_graph = load_unweighted_test_nx_graph
     analyzer = MultifractalAnalyzer(sample_graph)
     ricci_curvature = analyzer._compute_ollivier_ricci_curvature()
     correct_ricci_curvature = original_calculate_ollivier_ricci_curvature(sample_graph, False)
@@ -115,8 +97,8 @@ def test_ricci_curvature(load_graph_from_pickle):
     assert ricci_curvature == correct_ricci_curvature
 
 
-def test_assortativity(load_graph_from_pickle):
-    sample_graph = load_graph_from_pickle
+def test_assortativity(load_unweighted_test_nx_graph):
+    sample_graph = load_unweighted_test_nx_graph
     analyzer = MultifractalAnalyzer(sample_graph)
     assortativity = analyzer._compute_assortativity()
     correct_assortativity = original_calculate_assortativity(sample_graph, False)
@@ -124,8 +106,8 @@ def test_assortativity(load_graph_from_pickle):
     assert assortativity == correct_assortativity
 
 
-def test_eigenvector_centrality(load_graph_from_pickle):
-    sample_graph = load_graph_from_pickle
+def test_eigenvector_centrality(load_unweighted_test_nx_graph):
+    sample_graph = load_unweighted_test_nx_graph
     analyzer = MultifractalAnalyzer(sample_graph)
     eigenvector_centrality = analyzer._compute_eigenvector_centrality()
     correct_eigenvector_centrality = original_calculate_eigenvector_centrality(sample_graph, False)
@@ -133,11 +115,11 @@ def test_eigenvector_centrality(load_graph_from_pickle):
     assert eigenvector_centrality == correct_eigenvector_centrality
 
 
-def test_diameter(load_graph_from_pickle):
+def test_diameter(load_unweighted_test_nx_graph):
     if not BaseConfig.MEASURE_WEIGHTED:
         return pytest.skip("Test only for weighted graphs")
 
-    sample_graph = load_graph_from_pickle
+    sample_graph = load_unweighted_test_nx_graph
     analyzer = MultifractalAnalyzer(sample_graph)
     diameter = analyzer._compute_diameter()
     correct_diameter = nx.diameter(sample_graph, True)

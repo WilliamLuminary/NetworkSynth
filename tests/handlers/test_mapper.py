@@ -1,11 +1,7 @@
-import os
-import pickle
 import time
 from time import sleep
 
-import networkx as nx
 import numpy as np
-import pytest
 from matplotlib import pyplot as plt
 from scipy.stats import pearsonr
 
@@ -13,15 +9,6 @@ from config import GenConfig1
 from handlers import EnhancedMapper, Mapper
 
 GenConfig1.initialize()
-
-
-@pytest.fixture
-def load_graph_from_pickle():
-    file_path = os.path.realpath(os.path.join("..", "data", "A_10kX_weighted_network.pkl"))
-    with open(file_path, "rb") as f:
-        G = pickle.load(f)
-    assert isinstance(G, nx.Graph)
-    return G
 
 
 def profile_mapper_time(mapper, graph, iterations=10):
@@ -58,12 +45,6 @@ def compute_quality(mapper, graph):
     return mae, corr
 
 
-def test_mapper(load_graph_from_pickle):
-    sample_graph = load_graph_from_pickle
-    mapper = Mapper(sample_graph)
-    plot_map(mapper, sample_graph)
-
-
 def plot_map(mapper, sample_graph):
     # noinspection PyProtectedMember
     ori_lengths, ori_weights = Mapper._compute_edge_metrics(sample_graph)
@@ -88,15 +69,21 @@ def plot_map(mapper, sample_graph):
         sleep(0.1)
 
 
-def test_enhanced_mapper(load_graph_from_pickle):
-    sample_graph = load_graph_from_pickle
+def test_mapper(load_weighted_test_nx_graph):
+    sample_graph = load_weighted_test_nx_graph
+    mapper = Mapper(sample_graph)
+    plot_map(mapper, sample_graph)
+
+
+def test_enhanced_mapper(load_weighted_test_nx_graph):
+    sample_graph = load_weighted_test_nx_graph
     mapper = EnhancedMapper(sample_graph)
     plot_map(mapper, sample_graph)
 
 
-def test_mapper_performance(load_graph_from_pickle):
+def test_mapper_performance(load_weighted_test_nx_graph):
     """Measures runtime."""
-    sample_graph = load_graph_from_pickle
+    sample_graph = load_weighted_test_nx_graph
     mapper1 = Mapper(sample_graph)
     mapper2 = EnhancedMapper(sample_graph)
 
@@ -108,9 +95,9 @@ def test_mapper_performance(load_graph_from_pickle):
     print(f"Enhanced Mapper: Avg Time = {time2:.4f}s ± {std2:.4f}s")
 
 
-def test_mapper_quality(load_graph_from_pickle):
+def test_mapper_quality(load_weighted_test_nx_graph):
     """Measures Mean absolute error and Pearson correlation."""
-    sample_graph = load_graph_from_pickle
+    sample_graph = load_weighted_test_nx_graph
     mapper1 = Mapper(sample_graph)
     mapper2 = EnhancedMapper(sample_graph)
 
