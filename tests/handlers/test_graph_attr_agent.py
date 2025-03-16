@@ -2,19 +2,9 @@ import os
 import pickle
 from typing import Dict
 
-import networkx as nx
-import pytest
-
 from handlers import AttributesCalculator
 
 
-@pytest.fixture
-def load_graph_from_pickle():
-    file_path = os.path.realpath(os.path.join("..", "data", "A_10kX_weighted_network.pkl"))
-    with open(file_path, "rb") as f:
-        G = pickle.load(f)
-    assert isinstance(G, nx.Graph)
-    return G
 
 
 def test_pickle_dump_graph_attr_agent(load_graph_from_pickle):
