@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
-class AttributesCalculator:
+class OldAttributesCalculator:
     degree_distribution: Dict[int, float] = field(default_factory=dict)
     degree_transition_probs: Dict[int, Dict[int, float]] = field(default_factory=dict)
     degree_edge_lengths: Dict[int, List[float]] = field(default_factory=dict)
@@ -20,7 +20,7 @@ class AttributesCalculator:
     average_edge_length: float = 0.0
     average_degree: float = 0.0
 
-    def analyze(self, graph: nx.Graph) -> "AttributesCalculator":
+    def analyze(self, graph: nx.Graph) -> "OldAttributesCalculator":
         if graph.number_of_nodes() == 0:
             return self
 
@@ -117,7 +117,7 @@ class AttributesCalculator:
 
 
 @dataclass(slots=True)
-class NewAttributesCalculator:
+class AttributesCalculator:
     degree_distribution: Dict[int, float] = field(default_factory=dict)
     degree_transition_probs: Dict[int, Dict[int, float]] = field(default_factory=dict)
     degree_lengths: Dict[int, List[float]] = field(default_factory=dict)
@@ -125,12 +125,13 @@ class NewAttributesCalculator:
     average_length: float = 0.0
     average_degree: float = 0.0
 
-    def analyze(self, graph: nx.Graph) -> "NewAttributesCalculator":
+    def analyze(self, graph: nx.Graph) -> "AttributesCalculator":
         """
         Analyze the graph to compute degree distribution, transition probabilities,
         edge lengths, angle differences, average edge length, and average degree.
         """
         if graph.number_of_nodes() == 0:
+            logger.warning("Graph is empty. Skipping analysis.")
             return self
 
         precomputed_data = self._precompute_graph_data(graph)
@@ -153,7 +154,7 @@ class NewAttributesCalculator:
 
     @staticmethod
     def _precompute_graph_data(graph: nx.Graph):
-        degrees: Dict[int, int] = dict(graph.degree())
+        degrees: Dict[int, int] = dict(graph.degree())  # type: ignore
         positions = nx.get_node_attributes(graph, "pos")
         degree_neighbors = defaultdict(list)
         degree_to_lengths = defaultdict(list)
