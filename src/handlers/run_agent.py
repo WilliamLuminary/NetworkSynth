@@ -105,8 +105,9 @@ class RunAgent:
 
         elif data_type == DataType.ORIGINAL_PROPERTY:
             assert self.mode == Mode.GEN, "This data type is only available in Generate mode."
+            assert self.attributes, "Attributes are not initialized."
             import dataclasses
-            self.saver.save_file(dataclasses.asdict(self.attributes), data_type, file_name_prefix)
+            self.saver.save_file(dataclasses.asdict(self.attributes), data_type, file_name_prefix)  # type: ignore
 
         elif data_type == DataType.ORIGINAL_GRAPH:
             original_network = self.data_loader.get_original_network()
@@ -211,7 +212,6 @@ def plot_network(data_type: DataType,
     ax.set_xticks([])
     ax.set_yticks([])
     ax.axis('off')
-
 
     show_on_the_fly = kwargs['show'] if 'show' in kwargs else getattr(file_config, 'show_on_the_fly', True)
     return finalize_plot(fig, show_on_the_fly)
