@@ -14,6 +14,13 @@ logger = logging.getLogger(__name__)
 NUM_BINS: Final[int] = 100
 
 
+def _length_generator(graph) -> Generator[tuple, None, None]:
+    for u, v, data in graph.edges(data=True):
+        if 'length' not in data:
+            data['length'] = euclidean(graph.nodes[u]['pos'], graph.nodes[v]['pos'])
+        yield u, v, data
+
+
 class Mapper:
     def __init__(self, graph: nx.Graph):
         if all('weight' in data for _, _, data in graph.edges(data=True)):
@@ -36,13 +43,6 @@ class Mapper:
             lengths.append(data['length'])
             weights.append(data.get('weight', 1.0))
         return lengths, weights
-
-    @staticmethod
-    def _length_generator(graph) -> Generator[tuple, None, None]:
-        for u, v, data in graph.edges(data=True):
-            if 'length' not in data:
-                data['length'] = euclidean(graph.nodes[u]['pos'], graph.nodes[v]['pos'])
-            yield u, v, data
 
     @staticmethod
     def _create_mapping_metrics(lengths, weights) -> Tuple[np.ndarray, DefaultDict[int, list]]:
