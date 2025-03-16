@@ -39,7 +39,7 @@ class Mapper:
     @staticmethod
     def _compute_edge_metrics(graph: nx.Graph):
         lengths, weights = [], []
-        for _, _, data in _length_generator():
+        for _, _, data in _length_generator(graph):
             lengths.append(data['length'])
             weights.append(data.get('weight', 1.0))
         return lengths, weights
