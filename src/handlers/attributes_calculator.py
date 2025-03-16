@@ -120,9 +120,9 @@ class AttributesCalculator:
 class NewAttributesCalculator:
     degree_distribution: Dict[int, float] = field(default_factory=dict)
     degree_transition_probs: Dict[int, Dict[int, float]] = field(default_factory=dict)
-    degree_edge_lengths: Dict[int, List[float]] = field(default_factory=dict)
-    degree_angle_diffs: Dict[int, List[float]] = field(default_factory=dict)
-    average_edge_length: float = 0.0
+    degree_lengths: Dict[int, List[float]] = field(default_factory=dict)
+    degree_angles: Dict[int, List[float]] = field(default_factory=dict)
+    average_length: float = 0.0
     average_degree: float = 0.0
 
     def analyze(self, graph: nx.Graph) -> "NewAttributesCalculator":
@@ -137,57 +137,39 @@ class NewAttributesCalculator:
 
         self.degree_distribution = self._compute_degree_distribution(
             precomputed_data["degrees"],
-            precomputed_data["num_nodes"]
+            graph.number_of_nodes()
         )
         self.degree_transition_probs = self._compute_degree_transition_probs(
             precomputed_data["degree_neighbors"]
         )
-        self.average_degree = self._compute_average_degree(
-            num_edges=graph.number_of_edges(),
-            num_nodes=precomputed_data["num_nodes"]
-        )
-        self.degree_edge_lengths = dict(precomputed_data["degree_to_lengths"])
-        self.degree_angle_diffs = self._compute_degree_angle_diffs(
+        self.degree_lengths = dict(precomputed_data["degree_to_lengths"])
+        self.degree_angles = self._compute_degree_angles(
             precomputed_data["node_angles"],
             precomputed_data["degrees"]
         )
-        self.average_edge_length = self._compute_average_edge_length(
-            precomputed_data["degree_to_lengths"]
-        )
+        self.average_length = self._compute_average_edge_length(precomputed_data["degree_to_lengths"])
+        self.average_degree = self._compute_average_degree(graph.number_of_edges(), graph.number_of_nodes())
         return self
 
     @staticmethod
     def _precompute_graph_data(graph: nx.Graph):
-        """
-        Collect relevant data in one pass:
-         - degrees per node
-         - neighbor degrees
-         - edge lengths grouped by node degree
-         - angles grouped by node
-        """
-        degrees = dict(graph.degree())
-        num_nodes = graph.number_of_nodes()
-
+        degrees: Dict[int, int] = dict(graph.degree())
         positions = nx.get_node_attributes(graph, "pos")
         degree_neighbors = defaultdict(list)
         degree_to_lengths = defaultdict(list)
         node_angles = defaultdict(list)
-
         for node_u, node_v in graph.edges():
             degree_u = degrees[node_u]
             degree_v = degrees[node_v]
             degree_neighbors[degree_u].append(degree_v)
             degree_neighbors[degree_v].append(degree_u)
 
-            # If positions exist, record the edge lengths and angles
             if (node_u in positions) and (node_v in positions):
                 u_pos = np.array(positions[node_u], dtype=np.float64)
                 v_pos = np.array(positions[node_v], dtype=np.float64)
-
                 length = euclidean(u_pos, v_pos)
                 degree_to_lengths[degree_u].append(length)
                 degree_to_lengths[degree_v].append(length)
-
                 angle_u_to_v = np.arctan2(
                     v_pos[1] - u_pos[1],
                     v_pos[0] - u_pos[0]
@@ -196,13 +178,11 @@ class NewAttributesCalculator:
                     u_pos[1] - v_pos[1],
                     u_pos[0] - v_pos[0]
                 ) * 180 / np.pi
-
                 node_angles[node_u].append(angle_u_to_v)
                 node_angles[node_v].append(angle_v_to_u)
 
         return {
             "degrees": degrees,
-            "num_nodes": num_nodes,
             "degree_neighbors": degree_neighbors,
             "degree_to_lengths": degree_to_lengths,
             "node_angles": node_angles,
@@ -216,41 +196,33 @@ class NewAttributesCalculator:
         """
         Count how many nodes have each degree, then normalize by total node count.
         """
-        if num_nodes == 0:
-            return {}
-        degree_counts = Counter(degrees.values())
-        return {deg: count / num_nodes for deg, count in degree_counts.items()}
+        return {deg: count / num_nodes for deg, count in Counter(degrees.values()).items()}
 
     @staticmethod
     def _compute_degree_transition_probs(
             degree_neighbors: Dict[int, List[int]]
     ) -> Dict[int, Dict[int, float]]:
         """
-        For each degree d, gather the distribution of neighbor degrees,
+        For each degree d, gather the distribution of neighbor degrees
         and convert counts to probabilities.
         """
-        transition_probs = {}
-        for degree, neighbors_list in degree_neighbors.items():
-            total_neighbors = len(neighbors_list)
-            if total_neighbors == 0:
-                transition_probs[degree] = {}
-            else:
-                neighbor_counts = Counter(neighbors_list)
-                transition_probs[degree] = {
-                    neighbor_degree: count / total_neighbors
-                    for neighbor_degree, count in neighbor_counts.items()
-                }
-        return transition_probs
+        return {
+            degree: {
+                neighbor_degree: count / len(neighbors_list)
+                for neighbor_degree, count in Counter(neighbors_list).items()
+            } if neighbors_list else {}
+            for degree, neighbors_list in degree_neighbors.items()
+        }
 
     @staticmethod
     def _compute_average_degree(num_edges: int, num_nodes: int) -> float:
         """
         For undirected graphs, average_degree = (2 * E) / N.
         """
-        return (2.0 * num_edges / num_nodes) if num_nodes else 0.0
+        return 2.0 * num_edges / num_nodes
 
     @staticmethod
-    def _compute_degree_angle_diffs(
+    def _compute_degree_angles(
             node_angles: Dict[int, List[float]],
             degrees: Dict[int, int]
     ) -> Dict[int, List[float]]:
@@ -284,4 +256,4 @@ class NewAttributesCalculator:
         for length_list in degree_to_lengths.values():
             total_length += sum(length_list)
             total_count += len(length_list)
-        return (total_length / total_count) if total_count else 0.0
+        return total_length / total_count
