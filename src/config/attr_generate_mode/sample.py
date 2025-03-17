@@ -4,7 +4,7 @@ import os
 import pickle
 from typing import Dict
 
-from config.base_config import BaseConfig
+from ..base_config import BaseConfig
 
 logger = logging.getLogger(__name__)
 

@@ -5,10 +5,9 @@ import os
 import cv2
 import numpy as np
 
-from config.base_config import BaseConfig
-from config.enums import Resolution, SetName
-from utils import build_graph
-from ._utils import _resize_cv2_image, _transpose_network_pos, _trim_cv2_image
+from .._utils import _resize_cv2_image, _transpose_network_pos, _trim_cv2_image
+from ..base_config import BaseConfig
+from ..enums import Resolution, SetName
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +49,7 @@ class SampleConfig(BaseConfig):
     def load_original_network(set_name, _):
         positions = _load_positions(set_name)
         mat = _load_sparse_matrix(set_name)
+        from utils import build_graph
         original_network = build_graph(positions, mat)
         _transpose_network_pos(original_network)
         return original_network
