@@ -2,7 +2,7 @@ import os
 from typing import Optional
 
 
-def find_file_with_pattern(directory_path, pattern, details='', must_exist=True) -> Optional[str]:
+def _find_file_with_pattern(directory_path, pattern, details='', must_exist=True) -> Optional[str]:
     if not os.path.exists(directory_path):
         raise FileNotFoundError(f"Directory not found: {directory_path}")
 
