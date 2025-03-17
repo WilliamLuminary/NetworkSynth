@@ -5,39 +5,42 @@ from typing import DefaultDict, Final, Generator, Tuple
 
 import networkx as nx
 import numpy as np
-from scipy.spatial.distance import euclidean
-from scipy.stats import gaussian_kde
-from sklearn.neighbors import NearestNeighbors
 
 logger = logging.getLogger(__name__)
 
 NUM_BINS: Final[int] = 100
 
 
+def _length_generator(graph) -> Generator[tuple, None, None]:
+    from scipy.spatial.distance import euclidean
+    for u, v, data in graph.edges(data=True):
+        if 'length' not in data:
+            data['length'] = euclidean(graph.nodes[u]['pos'], graph.nodes[v]['pos'])
+        yield u, v, data
+
+
 class Mapper:
     def __init__(self, graph: nx.Graph):
-        lengths, weights = self._compute_edge_metrics(graph)
-        self.avg_weights: Final = np.mean(weights)
-        bins, dist = self._create_mapping_metrics(lengths, weights)
-        self.length_bins: Final = bins
-        self.weight_distributions: Final = dist
-        self.original_lengths = np.array(lengths)
-        self.original_weights = np.array(weights)
+        if all('weight' in data for _, _, data in graph.edges(data=True)):
+            lengths, weights = self._compute_edge_metrics(graph)
+            self.avg_weights: Final = np.mean(weights)
+            bins, dist = self._create_mapping_metrics(lengths, weights)
+            self.length_bins: Final = bins
+            self.weight_distributions: Final = dist
+            self.original_lengths = np.array(lengths)
+            self.original_weights = np.array(weights)
+            self.skipped = False
+        else:
+            self.skipped = True
+            logger.info('Input graph has no \'weight\'.')
 
     @staticmethod
     def _compute_edge_metrics(graph: nx.Graph):
         lengths, weights = [], []
-        for _, _, data in Mapper._length_generator(graph):
+        for _, _, data in _length_generator(graph):
             lengths.append(data['length'])
             weights.append(data.get('weight', 1.0))
         return lengths, weights
-
-    @staticmethod
-    def _length_generator(graph) -> Generator[tuple, None, None]:
-        for u, v, data in graph.edges(data=True):
-            if 'length' not in data:
-                data['length'] = euclidean(graph.nodes[u]['pos'], graph.nodes[v]['pos'])
-            yield u, v, data
 
     @staticmethod
     def _create_mapping_metrics(lengths, weights) -> Tuple[np.ndarray, DefaultDict[int, list]]:
@@ -79,12 +82,15 @@ class Mapper:
         # Postcondition:
         The graph is modified in place.
         """
+        if self.skipped:
+            return
+
         if nx.get_edge_attributes(graph, 'weight'):
             raise ValueError('Graph already has edge weights assigned')
 
         weights = {
             (u, v): self._length_to_weight(data['length'])
-            for u, v, data in self._length_generator(graph)
+            for u, v, data in _length_generator(graph)
         }
         nx.set_edge_attributes(graph, weights, 'weight')
 
@@ -108,7 +114,9 @@ class EnhancedMapper(Mapper):
         lengths = np.array(self.original_lengths)
         weights = np.array(self.original_weights)
 
+        from scipy.stats import gaussian_kde
         self.kde = gaussian_kde(np.vstack([lengths, weights]))
+        from sklearn.neighbors import NearestNeighbors
         self.nn_model = NearestNeighbors(n_neighbors=50).fit(np.vstack([lengths, weights]).T)
 
         self.bandwidth = self.mix_intensity * np.std(lengths) * 2
@@ -126,7 +134,7 @@ class EnhancedMapper(Mapper):
             raise ValueError('Graph already has edge weights assigned')
 
         weights = {}
-        for u, v, data in self._length_generator(graph):
+        for u, v, data in _length_generator(graph):
             length = data['length']
 
             if np.random.random() < self.mix_intensity:
@@ -137,4 +145,3 @@ class EnhancedMapper(Mapper):
             weights[(u, v)] = weight
 
         nx.set_edge_attributes(graph, weights, 'weight')
-

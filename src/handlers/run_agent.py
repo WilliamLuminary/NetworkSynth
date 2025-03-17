@@ -7,12 +7,8 @@ import networkx as nx
 from matplotlib import pyplot as plt
 from numpy import ndarray
 
-from analysis import MultifractalBatchProcessor
 from config import BaseConfig, DataType, FILE_CONFIGURATIONS, FileTag, Mode, Resolution, SetName
-from utils import calculate_frame, finalize_plot
-from .attributes_calculator import AttributesCalculator
 from .data_loader import DataLoader
-from .mapper import Mapper
 from .saver import Saver
 
 logger = logging.getLogger(__name__)
@@ -34,15 +30,15 @@ class RunAgent:
             self.mode = Mode.GEN
             self.data_loader = DataLoader(Mode.GEN, set_name=set_name, resolution=resolution)
             self.saver = Saver(set_name=set_name, resolution=resolution)
-            self.attributes: Optional[AttributesCalculator] = None
-            self.mapper: Optional[Mapper] = None
+            self.attributes = None
+            self.mapper = None
             self.batch_processor = None
         elif attr_path:
             self.mode = Mode.ATR
             self.data_loader = DataLoader(Mode.ATR, path=attr_path)
             self.saver = Saver(output_dir=attr_path)
-            self.attributes: Optional[AttributesCalculator] = None
-            self.mapper: Optional[Mapper] = None
+            self.attributes = None
+            self.mapper = None
             self.batch_processor = None
         else:
             assert False, "Invalid arguments."
@@ -51,23 +47,30 @@ class RunAgent:
         if self.mode == Mode.GEN:
             self.data_loader.load()
             original_network = self.data_loader.get_original_network()
+
+            from .attributes_calculator import AttributesCalculator
             self.attributes = AttributesCalculator().analyze(original_network)
+
+            from .mapper import Mapper
             self.mapper = Mapper(original_network)
 
         elif self.mode == Mode.ANA:
             self.data_loader.load()
             original_networks = self.data_loader.get_original_network()
             synthetic_networks = self.data_loader.get_synthetic_networks()
+            from analysis import MultifractalBatchProcessor
             self.batch_processor = MultifractalBatchProcessor(original_networks, synthetic_networks)
 
         elif self.mode == Mode.ATR:
             self.data_loader.load()
-            self.attributes = AttributesCalculator.from_dict(self.data_loader.get_attr_dict())
+            from .attributes_calculator import AttributesCalculator
+            self.attributes = AttributesCalculator(**self.data_loader.get_attr_dict())
 
     def multifractal_analysis_in_generate_mode(self):
         assert self.mode == Mode.GEN, "This method is only available in Generate mode."
         original_networks = [self.data_loader.get_original_network()]
         synthetic_networks = self.data_loader.get_synthetic_networks()
+        from analysis import MultifractalBatchProcessor
         self.batch_processor = MultifractalBatchProcessor(original_networks, synthetic_networks)
         self.multifractal_analysis()
 
@@ -105,7 +108,9 @@ class RunAgent:
 
         elif data_type == DataType.ORIGINAL_PROPERTY:
             assert self.mode == Mode.GEN, "This data type is only available in Generate mode."
-            self.saver.save_file(self.attributes.savable(), data_type, file_name_prefix)
+            assert self.attributes, "Attributes are not initialized."
+            import dataclasses
+            self.saver.save_file(dataclasses.asdict(self.attributes), data_type, file_name_prefix)  # type: ignore
 
         elif data_type == DataType.ORIGINAL_GRAPH:
             original_network = self.data_loader.get_original_network()
@@ -183,6 +188,7 @@ def plot_network(data_type: DataType,
     if data_type is DataType.ORIGINAL_GRAPH:
         frame = (0, BaseConfig.DEFAULT_FRAME_SIZE[0]), (0, BaseConfig.DEFAULT_FRAME_SIZE[1])
     else:
+        from utils import calculate_frame
         frame = calculate_frame(graph)
 
     ax.set_xlim(frame[0])
@@ -211,6 +217,6 @@ def plot_network(data_type: DataType,
     ax.set_yticks([])
     ax.axis('off')
 
-
     show_on_the_fly = kwargs['show'] if 'show' in kwargs else getattr(file_config, 'show_on_the_fly', True)
+    from utils import finalize_plot
     return finalize_plot(fig, show_on_the_fly)

@@ -2,6 +2,6 @@
 
 from .attributes_calculator import AttributesCalculator
 from .data_loader import DataLoader
-from .mapper import EnhancedMapper, Mapper
-from .run_agent import RunAgent
+from .mapper import Mapper
+from .run_agent import RunAgent, plot_network
 from .saver import Saver

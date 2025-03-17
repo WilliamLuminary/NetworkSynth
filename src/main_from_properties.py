@@ -1,9 +1,8 @@
 # src/main_from_properties.py
 import logging
-from concurrent.futures import ProcessPoolExecutor, as_completed
 
-from config import BaseConfig, DataType
 from config import AttrConfig
+from config import BaseConfig, DataType
 from graph import GraphGenerator
 from handlers import AttributesCalculator, RunAgent
 from utils import trim_graph
@@ -53,6 +52,7 @@ def generate_with_multiprocessing(data_agent: RunAgent):
     from multiprocessing import Manager
     exit_event = Manager().Event()
     try:
+        from concurrent.futures import ProcessPoolExecutor, as_completed
         with ProcessPoolExecutor() as executor:
             futures = [executor.submit(generate_synthetic_network, exit_event,
                                        data_agent.attributes) for _ in range(num_network)]
