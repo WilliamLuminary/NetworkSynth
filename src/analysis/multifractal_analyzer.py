@@ -5,16 +5,11 @@ from contextlib import contextmanager
 from dataclasses import astuple, dataclass
 from typing import Dict, List
 
-import math
 import networkit as nk
 import networkx as nx
 import numpy as np
-from GraphRicciCurvature.OllivierRicci import OllivierRicci
-from scipy.spatial.distance import euclidean
-from scipy.stats import linregress
 
 from config import BaseConfig
-from utils import largest_connected_component
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +47,7 @@ class MultifractalAnalyzer:
     @staticmethod
     def analyze_error(this, other) -> float:
         assert this and other, "Invalid input."
+        from scipy.spatial.distance import euclidean
         return euclidean(astuple(this), astuple(other))
 
     def _compute_multifractal_taus(self):
@@ -70,6 +66,7 @@ class MultifractalAnalyzer:
             grow = [d for d in distances if 0 < d < 99999]
             grow.sort()
             if self.f_digit == 0:
+                import math
                 grow = [math.ceil(d) for d in grow]
             else:
                 grow = [round(d, self.f_digit) for d in grow if round(d, self.f_digit) != 0]
@@ -98,6 +95,7 @@ class MultifractalAnalyzer:
             zq = np.sum(row_sums, axis=0)
             zq_list.append(zq)
 
+        from scipy.stats import linregress
         tau_list = []
         for idx, q in enumerate(self.Q):
             x = np.log(r_g_all / diameter)
@@ -160,6 +158,7 @@ class MultifractalAnalyzer:
             if len(unique_dist) > 2:
                 x = np.log(unique_dist)
                 y = np.log(cum_count)
+                from scipy.stats import linregress
                 slope, _, _, _, _ = linregress(x, y)
                 node_dimensions[node] = slope
             else:
@@ -202,6 +201,7 @@ class MultifractalAnalyzer:
 
     def _compute_ollivier_ricci_curvature(self) -> List[float]:
         graph_copy = self.graph.copy()
+        from GraphRicciCurvature.OllivierRicci import OllivierRicci
         if self.weighted:
             for u, v, d in graph_copy.edges(data=True):
                 if d.get('weight', 0) != 0:
@@ -225,6 +225,7 @@ class MultifractalAnalyzer:
         if nx.is_connected(self.graph):
             G_lcc = self.graph
         else:
+            from utils import largest_connected_component
             G_lcc = largest_connected_component(self.graph)
 
         try:
@@ -240,6 +241,7 @@ class MultifractalAnalyzer:
         if nx.is_connected(self.graph):
             return nx.diameter(self.graph)
         else:
+            from utils import largest_connected_component
             return nx.diameter(largest_connected_component(self.graph))
 
     def analyze_graph(self) -> Dict[str, List]:
