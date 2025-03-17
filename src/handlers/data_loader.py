@@ -3,8 +3,7 @@ from typing import Dict, List, Tuple, Union
 import networkx as nx
 import numpy as np
 
-from config import BaseConfig
-from config.enums import Mode
+from config import BaseConfig, Mode
 
 
 class DataLoader:
