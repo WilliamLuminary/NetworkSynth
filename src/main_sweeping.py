@@ -11,8 +11,7 @@ from analysis import MultifractalAnalyzer
 from config import BaseConfig, DataType, Resolution, SetName
 # noinspection PyUnresolvedReferences
 from config import GenConfig, GenConfig1, GenConfig2
-from handlers import RunAgent
-from handlers.run_agent import plot_network
+from handlers import RunAgent, plot_network
 from main import compute_average_error, generate_synthetic_network
 
 GenConfig2.initialize()

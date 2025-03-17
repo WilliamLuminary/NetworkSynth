@@ -6,7 +6,7 @@ from typing import List, Tuple
 
 import networkx as nx
 
-from config.base_config import BaseConfig
+from ..base_config import BaseConfig
 
 logger = logging.getLogger(__name__)
 

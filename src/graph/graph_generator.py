@@ -1,20 +1,19 @@
 # src/graph/graph_generator.py
 
-from collections import deque
 from typing import Optional, Tuple, Union
 
 import networkx as nx
 from numpy import ndarray
 
 from config import BaseConfig
-from handlers import AttributesCalculator
 from utils import build_graph, calculate_frame, largest_connected_component
 from ._graph_node import GraphNode
 
 
 class GraphGenerator:
-    def __init__(self, attributes: AttributesCalculator):
-        GraphNode.initialize(attributes)
+    from handlers import AttributesCalculator
+    def __init__(self, attributes_calculator: AttributesCalculator):
+        GraphNode.initialize(attributes_calculator)
 
     def generate_network(self, frame_range: Optional[Tuple[int, int]] = None, regenerate_times: int = 100):
         frame_range = frame_range or BaseConfig.DEFAULT_FRAME_SIZE
@@ -41,6 +40,7 @@ class GraphGenerator:
         scaled_frame_range = (round(frame_range[0] * 1.1), round(frame_range[1] * 1.1))
         frame = calculate_frame(center_position=root_node.position, frame_range=scaled_frame_range)
 
+        from collections import deque
         node_queue = deque([root_node])
         while node_queue:
             current_node = node_queue.popleft()

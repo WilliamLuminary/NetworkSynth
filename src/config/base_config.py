@@ -1,5 +1,4 @@
 # src/config/base_config.py
-import inspect
 import logging
 import os
 from typing import Tuple, Union
@@ -117,6 +116,7 @@ class BaseConfig:
 
     def __str__(self):
         def is_method_like(attr_value):
+            import inspect
             return (inspect.isfunction(attr_value)
                     or inspect.ismethod(attr_value)
                     or isinstance(attr_value, staticmethod)

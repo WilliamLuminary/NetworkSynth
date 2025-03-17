@@ -8,9 +8,7 @@ from typing import Tuple, Union
 import networkx as nx
 import numpy as np
 from matplotlib import pyplot as plt
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from numpy import ndarray
-from scipy.sparse import spmatrix
 
 from config import BaseConfig
 
@@ -45,7 +43,7 @@ def build_graph(*args):
 
 
 @build_graph.register
-def _(positions: np.ndarray, adjacency_matrix: spmatrix) -> nx.Graph:
+def _(positions: np.ndarray, adjacency_matrix) -> nx.Graph:
     # noinspection PyUnresolvedReferences
     graph = nx.from_scipy_sparse_array(adjacency_matrix, edge_attribute='weight')
     for i, pos in enumerate(positions):
@@ -115,6 +113,7 @@ def finalize_plot(fig: plt.Figure, show: bool = False) -> np.ndarray:
 
 
 def figure_to_ndarray(fig: plt.Figure, swap_channels: bool = False) -> ndarray:
+    from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
     canvas = FigureCanvas(fig)
     canvas.draw()
     buf = canvas.buffer_rgba()

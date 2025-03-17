@@ -1,6 +1,5 @@
 # src/main.py
 import logging
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from itertools import product
 from typing import List
 
@@ -11,7 +10,7 @@ from config import BaseConfig, DataType, Resolution, SetName
 # noinspection PyUnresolvedReferences
 from config import GenConfig, GenConfig1, GenConfig2
 from graph import GraphGenerator
-from handlers import AttributesCalculator, RunAgent, Mapper, Saver
+from handlers import AttributesCalculator, Mapper, RunAgent, Saver
 from utils import trim_graph
 
 GenConfig.initialize()
@@ -63,6 +62,7 @@ def generate_with_multiprocessing(data_agent: RunAgent, std_err_fea):
     from multiprocessing import Manager
     exit_event = Manager().Event()
     try:
+        from concurrent.futures import ProcessPoolExecutor, as_completed
         with ProcessPoolExecutor() as executor:
             futures = [executor.submit(generate_synthetic_network, exit_event, std_err_fea,
                                        data_agent.attributes, data_agent.mapper) for _ in range(num_network)]
@@ -97,6 +97,7 @@ def generate_with_multiprocessing(data_agent: RunAgent, std_err_fea):
         data_agent.multifractal_analysis_in_generate_mode()
         data_agent.save(data_type=DataType.ANALYSIS_DATA)
         data_agent.save(data_type=DataType.ANALYSIS_FIGURE)
+
 
 def compute_average_error(errors: List) -> float:
     valid_errors = [e for e in errors if not np.isinf(e)]

@@ -3,7 +3,6 @@ from typing import Dict, List
 
 import numpy as np
 from matplotlib import pyplot as plt
-from matplotlib.lines import Line2D
 
 from utils import finalize_plot
 from .multifractal_processor import MultifractalProcessor
@@ -145,6 +144,7 @@ class MultifractalBatchProcessor:
                 lw=style['lw']
             )
 
+        from matplotlib.lines import Line2D
         legend.append(Line2D(
             [0], [0],
             color=cmap(np.mean(color_values)),
