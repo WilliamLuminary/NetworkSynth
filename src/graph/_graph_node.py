@@ -2,19 +2,18 @@
 import itertools
 import random
 from collections import defaultdict
-from typing import DefaultDict, List, Set, Tuple
+from typing import Dict, List, Set, Tuple
 
 import numpy as np
 from scipy.spatial.distance import euclidean
 
 from config import BaseConfig
-from handlers import AttributesCalculator
 
 
 class GraphNode:
     id_counter = None
-    node_grid: DefaultDict[tuple[float, float], set]
-    edge_grid: DefaultDict[Tuple[int, int], Set[Tuple[Tuple[float, float], Tuple[float, float]]]]
+    node_grid: Dict[tuple[float, float], set]
+    edge_grid: Dict[Tuple[int, int], Set[Tuple[Tuple[float, float], Tuple[float, float]]]]
     _aborted_edge: int
     _merged_edge: int
 
@@ -34,12 +33,12 @@ class GraphNode:
     _closed_edges_factor: float
 
     @classmethod
-    def initialize(cls, graph_attributes: AttributesCalculator):
-        cls._degree_dist = graph_attributes.degree_distribution
-        cls._degree_trans_probs = graph_attributes.degree_transition_probs
-        cls._degree_angles = graph_attributes.degree_angles
-        cls._degree_lengths = graph_attributes.degree_lengths
-        cls._avg_length = graph_attributes.average_length
+    def initialize(cls, attrs):
+        cls._degree_dist = attrs.degree_distribution
+        cls._degree_trans_probs = attrs.degree_transition_probs
+        cls._degree_angles = attrs.degree_angles
+        cls._degree_lengths = attrs.degree_lengths
+        cls._avg_length = attrs.average_length
 
         cls._closed_nodes_thr = cls._avg_length * BaseConfig.CLOSED_NODES_FACTOR
         cls._closed_edges_thr = cls._avg_length * BaseConfig.CLOSED_EDGES_FACTOR
