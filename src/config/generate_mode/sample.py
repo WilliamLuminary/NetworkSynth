@@ -62,9 +62,6 @@ class SampleConfig(BaseConfig):
         return image
 
 
-# TODO: If generate networks from the original network, modify based on this config.
-
-
 def _load_positions(set_name):
     file_path = os.path.join(SampleConfig.POSITION_DATA_DIR, f"{str(set_name)}_pos.npy")
 
