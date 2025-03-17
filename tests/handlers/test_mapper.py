@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 from scipy.stats import pearsonr
 
 from config import GenConfig1
-from handlers import EnhancedMapper, Mapper
+from handlers import Mapper
 
 GenConfig1.initialize()
 
@@ -75,36 +75,24 @@ def test_mapper(load_weighted_test_nx_graph):
     plot_map(mapper, sample_graph)
 
 
-def test_enhanced_mapper(load_weighted_test_nx_graph):
-    sample_graph = load_weighted_test_nx_graph
-    mapper = EnhancedMapper(sample_graph)
-    plot_map(mapper, sample_graph)
-
-
 def test_mapper_performance(load_weighted_test_nx_graph):
     """Measures runtime."""
     sample_graph = load_weighted_test_nx_graph
     mapper1 = Mapper(sample_graph)
-    mapper2 = EnhancedMapper(sample_graph)
 
     time1, std1 = profile_mapper_time(mapper1, sample_graph)
-    time2, std2 = profile_mapper_time(mapper2, sample_graph)
 
     print()
     print(f"Mapper: Avg Time = {time1:.4f}s ± {std1:.4f}s")
-    print(f"Enhanced Mapper: Avg Time = {time2:.4f}s ± {std2:.4f}s")
 
 
 def test_mapper_quality(load_weighted_test_nx_graph):
     """Measures Mean absolute error and Pearson correlation."""
     sample_graph = load_weighted_test_nx_graph
     mapper1 = Mapper(sample_graph)
-    mapper2 = EnhancedMapper(sample_graph)
 
     mae1, corr1 = compute_quality(mapper1, sample_graph)
-    mae2, corr2 = compute_quality(mapper2, sample_graph)
 
     print()
     print(f"Mapper: MAE = {mae1:.4f}, Corr = {corr1:.4f}")
-    print(f"Enhanced Mapper: MAE = {mae2:.4f}, Corr = {corr2:.4f}")
     # assert abs(corr1 - corr2) < 0.1
