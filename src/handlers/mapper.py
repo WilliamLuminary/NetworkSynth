@@ -5,9 +5,6 @@ from typing import DefaultDict, Final, Generator, Tuple
 
 import networkx as nx
 import numpy as np
-from scipy.spatial.distance import euclidean
-from scipy.stats import gaussian_kde
-from sklearn.neighbors import NearestNeighbors
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +12,7 @@ NUM_BINS: Final[int] = 100
 
 
 def _length_generator(graph) -> Generator[tuple, None, None]:
+    from scipy.spatial.distance import euclidean
     for u, v, data in graph.edges(data=True):
         if 'length' not in data:
             data['length'] = euclidean(graph.nodes[u]['pos'], graph.nodes[v]['pos'])
@@ -116,7 +114,9 @@ class EnhancedMapper(Mapper):
         lengths = np.array(self.original_lengths)
         weights = np.array(self.original_weights)
 
+        from scipy.stats import gaussian_kde
         self.kde = gaussian_kde(np.vstack([lengths, weights]))
+        from sklearn.neighbors import NearestNeighbors
         self.nn_model = NearestNeighbors(n_neighbors=50).fit(np.vstack([lengths, weights]).T)
 
         self.bandwidth = self.mix_intensity * np.std(lengths) * 2
