@@ -9,7 +9,6 @@ from ..base_config import BaseConfig
 logger = logging.getLogger(__name__)
 
 
-# TODO: If generate networks from attributes/properties, modify based on this config.
 class SampleConfig(BaseConfig):
     DEFAULT_FRAME_SIZE = (1887 // 4, 2048 // 4)
     CLOSED_NODES_FACTOR = 1.2
@@ -22,8 +21,6 @@ class SampleConfig(BaseConfig):
 
     BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, 'sample_input', 'generate_mode')
     ATTRIBUTES_DICT_DATA_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, 'sample_input', 'property_generate_mode')
-
-    # TODO: The current implementation is would save the data in the same directory as the input data.
 
     @classmethod
     def initialize(cls):
