@@ -2,12 +2,7 @@
 
 import logging
 import os
-import pickle
-import time
-from typing import Any, Optional, Union
-
-import cv2
-from numpy import ndarray
+from typing import Any, Optional
 
 from config import BaseConfig, DataType, FILE_CONFIGURATIONS, FileExtension, Mode, Resolution, SetName
 
@@ -121,13 +116,16 @@ class Saver:
     @staticmethod
     def _save_pickle(obj: Any, filepath: str) -> None:
         with open(filepath, 'wb') as f:
+            import pickle
             # noinspection PyTypeChecker
             pickle.dump(obj, f)
 
     @staticmethod
-    def _save_png_image(image: Union[ndarray], filepath: str) -> None:
-        if not isinstance(image, ndarray):
-            raise ValueError("Unsupported image format. Expected ndarray.")
+    def _save_png_image(image, filepath: str) -> None:
+        from numpy import ndarray
+        assert isinstance(image, ndarray), "Unsupported image format. Expected ndarray."
+
+        import cv2
         cv2.imwrite(filepath, image)
 
 
@@ -152,4 +150,5 @@ def _ensure_directory(path: str, exist_ok=False) -> None:
 
 
 def _time_id() -> str:
+    import time
     return time.strftime("%Y%m%d_%H%M%S")
