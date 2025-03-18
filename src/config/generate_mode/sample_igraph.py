@@ -49,7 +49,7 @@ class SampleConfig(BaseConfig):
         return graph
 
     @staticmethod
-    def load_original_image(_):
+    def load_original_image(*_):
         # image = _load_raw_image(_)
         # image = _trim_cv2_image(image)
         # image = _resize_cv2_image(image)
@@ -65,10 +65,10 @@ def _load_igraph(set_name):
     file_path = _find_file_with_pattern(SampleConfig.BASE_INPUT_PATH, file_pattern, details='igraph')
     with open(file_path, 'rb') as f:
         graph = pickle.load(f)
-    import igraph
-    assert isinstance(graph, igraph.Graph)
+    import igraph as ig
+    assert isinstance(graph, ig.Graph)
     # noinspection PyUnresolvedReferences
-    graph = graph.to_networkx()
+    graph = ig.to_networkx(graph)
     return graph
 
 
