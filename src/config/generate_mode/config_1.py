@@ -59,14 +59,9 @@ class Config1(BaseConfig):
 
 def _load_positions(set_name, resolution):
     directory_path = Config1.POSITION_DATA_DIR
-    pattern = re.compile(
-        rf"{re.escape(set_name)}_{re.escape(resolution)}.*\.npy",
-        re.IGNORECASE
-    )
     file_path = _find_file_with_pattern(directory_path,
-                                        pattern,
-                                        f'positions_of_nodes for {set_name}'
-                                        )
+                                        rf"{re.escape(set_name)}_{re.escape(resolution)}.*\.npy",
+                                        f'positions_of_nodes for {set_name}')
     logger.info(f"Positions file loaded: {file_path}")
     positions = np.load(file_path, allow_pickle=True)
     return positions
@@ -74,14 +69,9 @@ def _load_positions(set_name, resolution):
 
 def _load_sparse_matrix(set_name, resolution):
     directory_path = Config1.ADJ_MATRIX_DATA_DIR
-    pattern = re.compile(
-        rf"sparse_matrices_{re.escape(resolution)}.*\.npz",
-        re.IGNORECASE
-    )
     file_path = _find_file_with_pattern(directory_path,
-                                        pattern,
-                                        'sparse matrix'
-                                        )
+                                        rf"sparse_matrices_{re.escape(resolution)}.*\.npz",
+                                        'sparse matrix')
     matrix_data = np.load(file_path, allow_pickle=True)
 
     set_name = set_name
@@ -107,20 +97,13 @@ def _load_sparse_matrix(set_name, resolution):
 
 def _load_raw_image(set_name, resolution):
     directory_path = os.path.join(Config1.IMAGES_DIR, set_name)
-
     if set_name == 'B':
         directory_path = os.path.join(directory_path, '1811')
         logger.warning("For set B, using the 1811 subdirectory for images.")
 
-    pattern = re.compile(
-        rf"\b{re.escape(resolution)}\b.*\.(tif|png|jpg)",
-        re.IGNORECASE
-    )
-
     file_path = _find_file_with_pattern(directory_path,
-                                        pattern,
-                                        f'image for {set_name}'
-                                        )
+                                        rf"\b{re.escape(resolution)}\b.*\.(tif|png|jpg)"
+                                        , f'image for {set_name}')
     if file_path is None:
         logger.warning(f"Background image is None.")
         return None
