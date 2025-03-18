@@ -7,7 +7,7 @@ RED='\033[38;5;196m'
 RESET='\033[0m'
 
 #----------------- Github token -----------------#
-TOKEN_FILE="$SCRIPT_DIR/../credentials/github_token"
+TOKEN_FILE="$SCRIPT_DIR/../../credentials/github_token"
 
 echo -e "${BLUE}Setting up GitHub credentials...${RESET}"
 
