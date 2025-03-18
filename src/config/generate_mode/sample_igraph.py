@@ -63,18 +63,16 @@ def _load_igraph(set_name):
     """
     file_pattern = rf"{set_name}_igraph\.pkl"
     file_path = _find_file_with_pattern(SampleConfig.BASE_INPUT_PATH, file_pattern, details='igraph')
-    import numpy
-    logger.info(f"Numpy version: {numpy.__version__}")
     with open(file_path, 'rb') as f:
         graph = pickle.load(f)
+
     import igraph as ig
     assert isinstance(graph, ig.Graph)
-    # noinspection PyUnresolvedReferences
-    graph = ig.to_networkx(graph)
+    graph = graph.to_networkx()
     return graph
 
 
-def _load_raw_image(_):
+def _load_raw_image(*_):
     """
     Load the raw image from the specified directory.
     :return:
