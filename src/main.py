@@ -8,12 +8,12 @@ import numpy as np
 from analysis import MultifractalAnalyzer
 from config import BaseConfig, DataType, Resolution, SetName
 # noinspection PyUnresolvedReferences
-from config import GenConfig, GenConfig1, GenConfig2
+from config import GenConfig, GenConfig1, GenConfig2, IgraphGenConfig
 from graph import GraphGenerator
 from handlers import AttributesCalculator, Mapper, RunAgent, Saver
 from utils import trim_graph
 
-GenConfig.initialize()
+IgraphGenConfig.initialize()
 # BaseConfig.disable_saving("Preview")
 
 logger = logging.getLogger(__name__)
