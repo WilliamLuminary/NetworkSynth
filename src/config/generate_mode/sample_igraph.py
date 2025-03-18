@@ -63,6 +63,8 @@ def _load_igraph(set_name):
     """
     file_pattern = rf"{set_name}_igraph\.pkl"
     file_path = _find_file_with_pattern(SampleConfig.BASE_INPUT_PATH, file_pattern, details='igraph')
+    import numpy
+    logger.info(f"Numpy version: {numpy.__version__}")
     with open(file_path, 'rb') as f:
         graph = pickle.load(f)
     import igraph as ig
