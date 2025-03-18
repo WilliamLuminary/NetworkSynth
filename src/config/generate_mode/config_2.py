@@ -61,14 +61,10 @@ class Config2(BaseConfig):
 
 def _load_positions(set_name, resolution):
     directory_path = os.path.join(Config2.POSITION_DATA_DIR, resolution)
-    pattern = re.compile(
-        rf"W-\d+-\d+-\d+_{re.escape(str(set_name))}_postion\.npy",
-        re.IGNORECASE
-    )  # Only difference
+    # noinspection SpellCheckingInspection
     file_path = _find_file_with_pattern(directory_path,
-                                        pattern,
-                                        f'positions_of_nodes for {set_name}'
-                                        )
+                                        rf"W-\d+-\d+-\d+_{re.escape(str(set_name))}_postion\.npy",
+                                        f'positions_of_nodes for {set_name}')
     logger.info(f"Positions file loaded: {file_path}")
     positions = np.load(file_path, allow_pickle=True)
     return positions
@@ -76,12 +72,7 @@ def _load_positions(set_name, resolution):
 
 def _load_sparse_matrix(set_name, resolution):
     directory_path = os.path.join(Config2.ADJ_MATRIX_DATA_DIR, resolution)
-    pattern = re.compile(r"sparse_matrices\.npz", re.IGNORECASE)
-
-    file_path = _find_file_with_pattern(directory_path,
-                                        pattern,
-                                        details="sparse matrix"
-                                        )
+    file_path = _find_file_with_pattern(directory_path, r"sparse_matrices\.npz", details="sparse matrix")
     matrix_data = np.load(file_path, allow_pickle=True)
 
     key_pattern = rf"W-\d+-\d+-\d+_{re.escape(str(set_name))}_EL"
@@ -111,10 +102,7 @@ def _load_raw_image(set_name, resolution):
         re.IGNORECASE
     )
 
-    file_path = _find_file_with_pattern(directory_path,
-                                        pattern,
-                                        f'image for {set_name}'
-                                        )
+    file_path = _find_file_with_pattern(directory_path, pattern, f'image for {set_name}')
     if file_path is None:
         logger.warning(f"Background image is None.")
         return
