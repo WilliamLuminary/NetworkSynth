@@ -1,4 +1,4 @@
-# src/config/generate_mode/sample.py
+# src/config/generate_mode/sample_pos_and_mat.py
 import logging
 import os
 
