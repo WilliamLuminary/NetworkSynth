@@ -13,10 +13,10 @@ logger = logging.getLogger(__name__)
 
 
 class SampleConfig(BaseConfig):
-    SETS = [SetName.IgraphSample1]  # TODO: Add more sets in the src/config/enum.py
+    SETS = [SetName.IgraphSample1]
     RESOLUTIONS = [Resolution.NA]
 
-    DEFAULT_FRAME_SIZE = (1887 // 4, 2048 // 4)  # TODO: Set the size manually
+    DEFAULT_FRAME_SIZE = (1766, 2046)
     CLOSED_NODES_FACTOR = 1.2  # You may need to sweep
     CLOSED_EDGES_FACTOR = .8  # You may need to sweep
 
@@ -48,6 +48,8 @@ class SampleConfig(BaseConfig):
         edge_list = _load_edge_list(set_name)
         from utils import build_graph
         original_network = build_graph(positions, edge_list, arg_type='edge_list')
+        from utils import calculate_frame
+        frame_ = calculate_frame(original_network)
         return original_network
 
     @staticmethod
@@ -59,16 +61,28 @@ class SampleConfig(BaseConfig):
 
 
 def _load_positions(*_):
-    file_path = os.path.join(SampleConfig.BASE_INPUT_PATH, f"sample_lin_pos.npy")
+    file_path = os.path.join(SampleConfig.BASE_INPUT_PATH, "nod_pos.csv")
     logger.info(f"Loading positions from {file_path}")
-    return np.load(file_path, allow_pickle=True)
+    return np.loadtxt(file_path, delimiter=',')
 
 
 def _load_edge_list(*_):
-    file_path = os.path.join(SampleConfig.BASE_INPUT_PATH, "sample_lin_mat.npy")
+    file_path = os.path.join(SampleConfig.BASE_INPUT_PATH, "edls.csv")
     logger.info(f"Loading edge list from {file_path}")
-    # Assuming the file contains an edge list in which the first two columns represent the source and target.
-    return np.load(file_path, allow_pickle=True)[:, :2]
+    return np.loadtxt(file_path, delimiter=',', dtype=int)[:, :2]
+
+
+# def _load_positions(*_):
+#     file_path = os.path.join(SampleConfig.BASE_INPUT_PATH, f"sample_lin_pos.npy")
+#     logger.info(f"Loading positions from {file_path}")
+#     return np.load(file_path, allow_pickle=True)
+#
+#
+# def _load_edge_list(*_):
+#     file_path = os.path.join(SampleConfig.BASE_INPUT_PATH, "sample_lin_mat.npy")
+#     logger.info(f"Loading edge list from {file_path}")
+#     # Assuming the file contains an edge list in which the first two columns represent the source and target.
+#     return np.load(file_path, allow_pickle=True)[:, :2]
 
 
 def _load_igraph(set_name):
