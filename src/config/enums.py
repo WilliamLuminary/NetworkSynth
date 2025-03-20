@@ -24,7 +24,7 @@ class SetName(Enum):
     Sample2 = "sample_2"
     Sample3 = "sample_3"
 
-    IgraphSample1 = "sample_1"
+    LinSample1 = "lin_1"
 
     NA = ""
 
