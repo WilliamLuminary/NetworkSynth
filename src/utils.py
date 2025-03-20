@@ -2,7 +2,6 @@
 import functools
 import logging
 import time
-from functools import singledispatch
 from typing import Tuple, Union
 
 import networkx as nx
@@ -37,13 +36,18 @@ def calculate_frame(graph: nx.Graph = None,
     return frame
 
 
-@singledispatch
-def build_graph(*args):
-    raise TypeError(f"Unsupported input types: {tuple(type(arg) for arg in args)}")
+def build_graph(*args, arg_type: str = 'adjacency_matrix') -> nx.Graph:
+    if arg_type == 'adjacency_matrix':
+        return _from_adjacency_matrix(*args)
+    elif arg_type == 'graphnode':
+        return _from_graphnode(*args)
+    elif arg_type == 'edge_list':
+        return _from_edge_list(*args)
+    else:
+        raise TypeError(f"Unsupported Type: {arg_type} from function {build_graph.__name__}.")
 
 
-@build_graph.register
-def _(positions: np.ndarray, adjacency_matrix) -> nx.Graph:
+def _from_adjacency_matrix(positions: np.ndarray, adjacency_matrix) -> nx.Graph:
     # noinspection PyUnresolvedReferences
     graph = nx.from_scipy_sparse_array(adjacency_matrix, edge_attribute='weight')
     for i, pos in enumerate(positions):
@@ -54,8 +58,7 @@ def _(positions: np.ndarray, adjacency_matrix) -> nx.Graph:
     return graph
 
 
-@build_graph.register
-def _(nodes: set, edges: set) -> nx.Graph:
+def _from_graphnode(nodes: set, edges: set) -> nx.Graph:
     graph = nx.Graph()
     position_map = {node.position: node for node in nodes}
 
@@ -67,6 +70,21 @@ def _(nodes: set, edges: set) -> nx.Graph:
         graph.add_edge(u, v)
 
     graph = largest_connected_component(graph)
+    return graph
+
+
+def _from_edge_list(positions: np.ndarray, edge_list: np.ndarray) -> nx.Graph:
+    graph = nx.Graph()
+
+    for i, pos in enumerate(positions):
+        graph.add_node(i, pos=pos)
+
+    for edge in edge_list:
+        u, v = int(edge[0]), int(edge[1])
+        graph.add_edge(u, v)
+
+    graph = largest_connected_component(graph)
+    graph = nx.convert_node_labels_to_integers(graph, label_attribute='old_label')
     return graph
 
 
