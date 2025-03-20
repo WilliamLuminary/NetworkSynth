@@ -5,4 +5,4 @@
 from .config_1 import Config1 as GenConfig1
 from .config_2 import Config2 as GenConfig2
 from .sample_pos_and_mat import SampleConfig as GenConfig
-from .sample_lin import SampleConfig as LinGenConfig
+from .sample_lin import LinSampleConfig as LinGenConfig

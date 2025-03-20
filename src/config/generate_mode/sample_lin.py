@@ -12,16 +12,16 @@ from ..enums import Resolution, SetName
 logger = logging.getLogger(__name__)
 
 
-class SampleConfig(BaseConfig):
-    SETS = [SetName.IgraphSample1]
+class LinSampleConfig(BaseConfig):
+    SETS = [SetName.LinSample1]
     RESOLUTIONS = [Resolution.NA]
 
     DEFAULT_FRAME_SIZE = (1766, 2046)
     CLOSED_NODES_FACTOR = 1.2  # You may need to sweep
     CLOSED_EDGES_FACTOR = .8  # You may need to sweep
 
-    SYNTHETIC_GRAPH_NUMBER = 0  # Please set this yourself
-    SYNTHETIC_NETWORK_NUMBER = 0  # Please set this yourself
+    SYNTHETIC_GRAPH_NUMBER = 1  # Please set this yourself
+    SYNTHETIC_NETWORK_NUMBER = 10  # Please set this yourself
 
     MAX_ATTEMPTS = 10
     ERROR_TOLERANCE = .15
@@ -61,28 +61,15 @@ class SampleConfig(BaseConfig):
 
 
 def _load_positions(*_):
-    file_path = os.path.join(SampleConfig.BASE_INPUT_PATH, "nod_pos.csv")
+    file_path = os.path.join(LinSampleConfig.BASE_INPUT_PATH, "nod_pos.csv")
     logger.info(f"Loading positions from {file_path}")
     return np.loadtxt(file_path, delimiter=',')
 
 
 def _load_edge_list(*_):
-    file_path = os.path.join(SampleConfig.BASE_INPUT_PATH, "edls.csv")
+    file_path = os.path.join(LinSampleConfig.BASE_INPUT_PATH, "edls.csv")
     logger.info(f"Loading edge list from {file_path}")
     return np.loadtxt(file_path, delimiter=',', dtype=int)[:, :2]
-
-
-# def _load_positions(*_):
-#     file_path = os.path.join(SampleConfig.BASE_INPUT_PATH, f"sample_lin_pos.npy")
-#     logger.info(f"Loading positions from {file_path}")
-#     return np.load(file_path, allow_pickle=True)
-#
-#
-# def _load_edge_list(*_):
-#     file_path = os.path.join(SampleConfig.BASE_INPUT_PATH, "sample_lin_mat.npy")
-#     logger.info(f"Loading edge list from {file_path}")
-#     # Assuming the file contains an edge list in which the first two columns represent the source and target.
-#     return np.load(file_path, allow_pickle=True)[:, :2]
 
 
 def _load_igraph(set_name):
@@ -91,7 +78,7 @@ def _load_igraph(set_name):
     :return: The igraph object.
     """
     file_pattern = rf"{set_name}_igraph\.pkl"
-    file_path = _find_file_with_pattern(SampleConfig.BASE_INPUT_PATH, file_pattern, details='igraph')
+    file_path = _find_file_with_pattern(LinSampleConfig.BASE_INPUT_PATH, file_pattern, details='igraph')
     with open(file_path, 'rb') as f:
         graph = pickle.load(f)
 
