@@ -1,9 +1,11 @@
-# src/config/generate_mode/sample_igraph.py
+# src/config/generate_mode/sample_lin.py
 import logging
 import os
 import pickle
 
-from .._utils import _find_file_with_pattern, _transpose_network_pos
+import numpy as np
+
+from .._utils import _find_file_with_pattern
 from ..base_config import BaseConfig
 from ..enums import Resolution, SetName
 
@@ -26,9 +28,7 @@ class SampleConfig(BaseConfig):
 
     MEASURE_WEIGHTED = False
 
-    BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, 'sample_input', 'generate_mode')
-    GRAPHS_DIR = os.path.join(BASE_INPUT_PATH, 'graph')
-    IMAGES_DIR = os.path.join(BASE_INPUT_PATH, 'images')
+    BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, 'linlin_input')
 
     # BASE_INPUT_PATH
     # ├── POSITION_DATA_DIR
@@ -44,9 +44,11 @@ class SampleConfig(BaseConfig):
 
     @staticmethod
     def load_original_network(set_name, _):
-        graph = _load_igraph(set_name)
-        _transpose_network_pos(graph)
-        return graph
+        positions = _load_positions(set_name)
+        edge_list = _load_edge_list(set_name)
+        from utils import build_graph
+        original_network = build_graph(positions, edge_list, arg_type='edge_list')
+        return original_network
 
     @staticmethod
     def load_original_image(*_):
@@ -54,6 +56,19 @@ class SampleConfig(BaseConfig):
         # image = _trim_cv2_image(image)
         # image = _resize_cv2_image(image)
         return None
+
+
+def _load_positions(*_):
+    file_path = os.path.join(SampleConfig.BASE_INPUT_PATH, f"sample_lin_pos.npy")
+    logger.info(f"Loading positions from {file_path}")
+    return np.load(file_path, allow_pickle=True)
+
+
+def _load_edge_list(*_):
+    file_path = os.path.join(SampleConfig.BASE_INPUT_PATH, "sample_lin_mat.npy")
+    logger.info(f"Loading edge list from {file_path}")
+    # Assuming the file contains an edge list in which the first two columns represent the source and target.
+    return np.load(file_path, allow_pickle=True)[:, :2]
 
 
 def _load_igraph(set_name):
@@ -66,9 +81,8 @@ def _load_igraph(set_name):
     with open(file_path, 'rb') as f:
         graph = pickle.load(f)
 
-    import igraph as ig
-    assert isinstance(graph, ig.Graph)
-    graph = graph.to_networkx()
+    import networkx as nx
+    assert isinstance(graph, nx.Graph)
     return graph
 
 
