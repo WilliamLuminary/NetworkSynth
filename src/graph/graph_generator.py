@@ -25,7 +25,7 @@ class GraphGenerator:
         else:
             raise Exception("Failed to generate a original_network within the specified attempts.")
 
-        _synthetic_network = build_graph(nodes, edges)
+        _synthetic_network = build_graph(nodes, edges, arg_type='edge_list')
         frame = calculate_frame(graph=_synthetic_network, frame_range=frame_range)
         synthetic_network = _filter_graph(_synthetic_network, frame)
         return synthetic_network
