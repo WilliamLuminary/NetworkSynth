@@ -56,10 +56,8 @@ data/output/*
 !data/output/.keep
 
 # Keep some files in the data/input/sample_input directory
-data/input/sample_input/property_generate_mode/**/*.png
-data/input/sample_input/property_generate_mode/synthetic_network.pkl
 !data/input/sample_input/
-!data/input/sample_input/generate_mode
+!data/input/linlin_input/
 
 wandb/
 
