@@ -194,10 +194,12 @@ def plot_network(data_type: DataType,
     ax.set_xlim(frame[0])
     ax.set_ylim(frame[1])
 
-    if data_type is DataType.ORIGINAL_GRAPH:
-        image = kwargs['background']
-        alpha = getattr(file_config, 'alpha', 1.0)
-        ax.imshow(image, cmap='gray', alpha=alpha)
+    if data_type is DataType.ORIGINAL_GRAPH :
+        if image := kwargs.get('background', None):
+            alpha = getattr(file_config, 'alpha', 1.0)
+            ax.imshow(image, cmap='gray', alpha=alpha)  # type: ignore
+        else:
+            logger.info("No background image provided.")
     else:
         ax.add_patch(
             plt.Rectangle(
