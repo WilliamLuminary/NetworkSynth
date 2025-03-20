@@ -50,7 +50,7 @@ def generate_synthetic_network(exit_event, std_err_fea, attributes: AttributesCa
             logger.info(SIGINT_INFO)
             raise
         except Exception as exc:
-            logger.error(f"Exception occurred: {exc}. Retrying...")
+            logger.error(f"Exception occurred: {exc}. Retrying...", exc_info=True)
 
     logger.warning("Max attempts reached. Aborting!")
     return None, float('inf')
