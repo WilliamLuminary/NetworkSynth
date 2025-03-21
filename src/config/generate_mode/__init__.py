@@ -5,4 +5,3 @@
 from .config_1 import Config1 as GenConfig1
 from .config_2 import Config2 as GenConfig2
 from .config_sample import SampleConfig as GenConfig
-from .config_linlin import ConfigLinlin as GenConfigLinlin
