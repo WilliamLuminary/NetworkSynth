@@ -93,7 +93,7 @@ class RunAgent:
         if not self.saver and not data_type.has_tag(FileTag.PLOT):
             return
 
-        file_name_prefix = f"{file_name_prefix}" if file_name_prefix and file_name_prefix[-1] != '_' else (
+        file_name_prefix = f"{file_name_prefix}_" if file_name_prefix and file_name_prefix[-1] != '_' else (
                 file_name_prefix or '')
 
         if data_type == DataType.ORIGINAL_IMAGE:
@@ -195,7 +195,8 @@ def plot_network(data_type: DataType,
     ax.set_ylim(frame[1])
 
     if data_type is DataType.ORIGINAL_GRAPH :
-        if image := kwargs.get('background', None):
+        image = kwargs.get('background', None)
+        if image is not None:
             alpha = getattr(file_config, 'alpha', 1.0)
             ax.imshow(image, cmap='gray', alpha=alpha)  # type: ignore
         else:
