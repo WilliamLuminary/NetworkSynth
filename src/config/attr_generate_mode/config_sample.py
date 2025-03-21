@@ -1,4 +1,4 @@
-# src/config/attr_generate_mode/sample.py
+# src/config/attr_generate_mode/config_sample.py
 import logging
 import os
 import pickle
