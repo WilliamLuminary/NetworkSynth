@@ -1,4 +1,4 @@
-# src/config/generate_mode/sample_pos_and_mat.py
+# src/config/generate_mode/config_sample.py
 import logging
 import os
 
@@ -7,14 +7,13 @@ import numpy as np
 
 from .._utils import _resize_cv2_image, _transpose_network_pos, _trim_cv2_image
 from ..base_config import BaseConfig
-from ..enums import Resolution, SetName
+from ..enums import IdleResolution, SampleSet
 
 logger = logging.getLogger(__name__)
 
 
 class SampleConfig(BaseConfig):
-    SETS = [SetName.Sample1, SetName.Sample2, SetName.Sample3]
-    RESOLUTIONS = [Resolution.NA]
+    SETS = [SampleSet.Sample1, SampleSet.Sample2, SampleSet.Sample3]
 
     DEFAULT_FRAME_SIZE = (1887 // 4, 2048 // 4)
     CLOSED_NODES_FACTOR = 1.2

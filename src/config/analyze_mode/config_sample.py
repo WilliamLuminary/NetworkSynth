@@ -1,4 +1,4 @@
-# src/config/analyze_mode/sample.py
+# src/config/analyze_mode/config_sample.py
 import logging
 import os
 import pickle
