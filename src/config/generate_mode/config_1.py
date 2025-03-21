@@ -7,10 +7,9 @@ import cv2
 import numpy as np
 
 from utils import build_graph
-from .. import SetName
 from .._utils import _find_file_with_pattern, _resize_cv2_image, _transpose_network_pos, _trim_cv2_image
 from ..base_config import BaseConfig
-from ..enums import LinlinSet, OldResolution, OldSet
+from ..enums import OldResolution, OldSet
 
 logger = logging.getLogger(__name__)
 
