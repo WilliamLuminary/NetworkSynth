@@ -7,12 +7,12 @@ import numpy as np
 
 from analysis import MultifractalAnalyzer
 from config import BaseConfig, DataType, Resolution, SetName
-from config import GenConfigLinlin
+from config import GenConfig
 from graph import GraphGenerator
 from handlers import AttributesCalculator, Mapper, RunAgent, Saver
 from utils import trim_graph
 
-GenConfigLinlin.initialize()
+GenConfig.initialize()
 # BaseConfig.disable_saving("debug")
 
 logger = logging.getLogger(__name__)
