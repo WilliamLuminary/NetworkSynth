@@ -1,27 +1,24 @@
-# src/config/generate_mode/sample_lin.py
+# src/config/generate_mode/config_linlin.py
 import logging
 import os
-import pickle
 
 import numpy as np
 
-from .._utils import _find_file_with_pattern
 from ..base_config import BaseConfig
-from ..enums import Resolution, SetName
+from ..enums import LinlinSet
 
 logger = logging.getLogger(__name__)
 
 
-class LinSampleConfig(BaseConfig):
-    SETS = [SetName.LinSample1]
-    RESOLUTIONS = [Resolution.NA]
+class ConfigLinlin(BaseConfig):
+    SETS = [member for member in LinlinSet]
 
-    DEFAULT_FRAME_SIZE = (1766, 2046)
+    DEFAULT_FRAME_SIZE = (1536, 1024)
     CLOSED_NODES_FACTOR = 1.2  # You may need to sweep
     CLOSED_EDGES_FACTOR = .8  # You may need to sweep
 
-    SYNTHETIC_GRAPH_NUMBER = 1  # Please set this yourself
-    SYNTHETIC_NETWORK_NUMBER = 10  # Please set this yourself
+    SYNTHETIC_GRAPH_NUMBER = 0  # Please set this yourself
+    SYNTHETIC_NETWORK_NUMBER = 0  # Please set this yourself
 
     MAX_ATTEMPTS = 10
     ERROR_TOLERANCE = .15
@@ -48,48 +45,38 @@ class LinSampleConfig(BaseConfig):
         edge_list = _load_edge_list(set_name)
         from utils import build_graph
         original_network = build_graph(positions, edge_list, arg_type='edge_list')
-        from utils import calculate_frame
-        frame_ = calculate_frame(original_network)
+        from config._utils import _transpose_network_pos
+        _transpose_network_pos(original_network)
         return original_network
 
     @staticmethod
-    def load_original_image(*_):
-        # image = _load_raw_image(_)
-        # image = _trim_cv2_image(image)
-        # image = _resize_cv2_image(image)
-        return None
+    def load_original_image(set_name, _):
+        image = _load_raw_image(set_name)
+        return image
 
 
-def _load_positions(*_):
-    file_path = os.path.join(LinSampleConfig.BASE_INPUT_PATH, "nod_pos.csv")
+def _load_positions(set_name):
+    file_path = os.path.join(ConfigLinlin.BASE_INPUT_PATH, str(set_name), "nod_pos.csv")
     logger.info(f"Loading positions from {file_path}")
     return np.loadtxt(file_path, delimiter=',')
 
 
-def _load_edge_list(*_):
-    file_path = os.path.join(LinSampleConfig.BASE_INPUT_PATH, "edls.csv")
+def _load_edge_list(set_name):
+    # noinspection SpellCheckingInspection
+    file_path = os.path.join(ConfigLinlin.BASE_INPUT_PATH, str(set_name), "edls.csv")
     logger.info(f"Loading edge list from {file_path}")
     return np.loadtxt(file_path, delimiter=',', dtype=int)[:, :2]
 
 
-def _load_igraph(set_name):
-    """
-    Load the igraph object from the specified directory.
-    :return: The igraph object.
-    """
-    file_pattern = rf"{set_name}_igraph\.pkl"
-    file_path = _find_file_with_pattern(LinSampleConfig.BASE_INPUT_PATH, file_pattern, details='igraph')
-    with open(file_path, 'rb') as f:
-        graph = pickle.load(f)
-
-    import networkx as nx
-    assert isinstance(graph, nx.Graph)
-    return graph
-
-
-def _load_raw_image(*_):
-    """
-    Load the raw image from the specified directory.
-    :return:
-    """
-    return None
+def _load_raw_image(set_name):
+    if str(set_name) == "1-0":
+        file_path = os.path.join(ConfigLinlin.BASE_INPUT_PATH, str(set_name), "1.tif")
+    else:
+        file_path = os.path.join(ConfigLinlin.BASE_INPUT_PATH, str(set_name), f"{str(set_name)}.tif")
+    import cv2
+    image = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        err_msg = f"Failed to load image from file: {file_path}"
+        logger.error(err_msg)
+        return None
+    return image

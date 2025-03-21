@@ -7,16 +7,17 @@ import cv2
 import numpy as np
 
 from utils import build_graph
+from .. import SetName
 from .._utils import _find_file_with_pattern, _resize_cv2_image, _transpose_network_pos, _trim_cv2_image
 from ..base_config import BaseConfig
-from ..enums import Resolution, SetName
+from ..enums import LinlinSet, OldResolution, OldSet
 
 logger = logging.getLogger(__name__)
 
 
 class Config1(BaseConfig):
-    SETS = [SetName.A]
-    RESOLUTIONS = [Resolution.X10K]
+    SETS = [OldSet.A]
+    RESOLUTIONS = [OldResolution.X10K]
 
     DEFAULT_FRAME_SIZE = (510, 510)
     CLOSED_NODES_FACTOR = 1.5
@@ -113,6 +114,6 @@ def _load_raw_image(set_name, resolution):
     image = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
     if image is None:
         err_msg = f"Failed to load image from file: {file_path}"
-        logger.warning(err_msg)
+        logger.error(err_msg)
         return None
     return image
