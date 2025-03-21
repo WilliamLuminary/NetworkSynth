@@ -9,14 +9,13 @@ import numpy as np
 from utils import build_graph
 from .._utils import _find_file_with_pattern, _resize_cv2_image, _transpose_network_pos, _trim_cv2_image
 from ..base_config import BaseConfig
-from ..enums import Resolution, SetName
+from ..enums import IdleResolution, NewSet
 
 logger = logging.getLogger(__name__)
 
 
 class Config2(BaseConfig):
-    SETS = [SetName.S4]
-    RESOLUTIONS = [Resolution.NA]
+    SETS = [NewSet.S4]
 
     TRIM_SIZE = (0, 116, 0, 0)  # (Top, Bottom, Left, Right)
     DEFAULT_FRAME_SIZE = (1887 // 4, 2048 // 4)
@@ -111,7 +110,7 @@ def _load_raw_image(set_name, resolution):
     logger.info(f"Image file loaded: {file_path}")
     if image is None:
         err_msg = f"Failed to load image from file: {file_path}"
-        logger.warning(err_msg)
+        logger.error(err_msg)
         return None
 
     return image

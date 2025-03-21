@@ -5,6 +5,8 @@ from typing import Tuple, Union
 
 import numpy as np
 
+from config.enums import IdleResolution
+
 logger = logging.getLogger(__name__)
 
 
@@ -18,7 +20,7 @@ class BaseConfig:
     """ Define base paths, this config file must be in the subdirectory of the project root"""
 
     SETS: Union[list, np.ndarray]
-    RESOLUTIONS = Union[list, np.ndarray]
+    RESOLUTIONS: Union[list, np.ndarray] = [IdleResolution.NA]
 
     TRIM_SIZE: Tuple[int, int] = (0, 0, 0, 0)
     DEFAULT_FRAME_SIZE: Tuple[int, int] = None

@@ -2,4 +2,4 @@
 
 # Sample configuration is named as ".*Config$"
 # Others are named as ".*Config\d+"
-from .sample import SampleConfig as AnaConfig
+from .config_sample import SampleConfig as AnaConfig

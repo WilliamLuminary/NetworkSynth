@@ -4,11 +4,23 @@ from typing import Set, Union
 
 
 class SetName(Enum):
+    def __str__(self):
+        return self.value
+
+    def __lt__(self, other):
+        if type(self) is not type(other):
+            raise TypeError("Comparisons between different Set types are not allowed.")
+        return self.value < other.value
+
+
+class OldSet(SetName):
     A = "A"
     B = "B"
     C = "C"
     D = "D"
 
+
+class NewSet(SetName):
     S4 = "004"
     S8 = "008"
     S11 = "011"
@@ -20,59 +32,52 @@ class SetName(Enum):
     S29 = "029"
     S32 = "032"
 
+
+class SampleSet(SetName):
     Sample1 = "sample_1"
     Sample2 = "sample_2"
     Sample3 = "sample_3"
 
-    LinSample1 = "lin_1"
 
-    NA = ""
+def _generate_linlin_members():
+    return {f"S1_{i}": f"1-{i}" for i in range(0, 224)}
 
+
+######
+# class LinlinSet(SetName):
+#     S1_1 = "1-1"
+#     ...
+######
+LinlinSet = Enum("LinlinSet", _generate_linlin_members(), type=SetName)
+
+
+class Resolution(Enum):
     def __str__(self):
         return self.value
 
     def __lt__(self, other):
-        if not isinstance(other, SetName):
-            return NotImplemented
-        return self._sort_key() < other._sort_key()
-
-    def _sort_key(self):
-        if self is SetName.NA:
-            return 2, 0
-        value = self.value
-        if value in {'A', 'B', 'C', 'D'}:
-            order = {'A': 0, 'B': 1, 'C': 2, 'D': 3}[value]
-            return 0, order
-        else:
-            return 1, int(value)
+        if type(self) is not type(other):
+            raise TypeError("Comparisons between different Set types are not allowed.")
+        return self.value < other.value
 
 
-class Resolution(Enum):
+class IdleResolution(Resolution):
+    NA = ""
+
+
+class OldResolution(Resolution):
+    NA = ""
     X10K = "10kX"
     X15K = "15kX"
     X20K = "20kX"
     X30K = "30kX"
 
+
+class SampleResolution(Resolution):
+    NA = ""
     Sample1 = "sample_1"
     Sample2 = "sample_2"
     Sample3 = "sample_3"
-
-    NA = ""
-
-    def __str__(self):
-        return self.value
-
-    def __lt__(self, other):
-        if not isinstance(other, Resolution):
-            return NotImplemented
-        return self._sort_key() < other._sort_key()
-
-    def _sort_key(self):
-        if self is Resolution.NA:
-            return 0
-        # noinspection PyTypeChecker
-        digits = ''.join(filter(str.isdigit, self.value))
-        return int(digits) if digits else 0
 
 
 class FileExtension(Enum):
