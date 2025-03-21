@@ -7,7 +7,7 @@ import numpy as np
 
 from .._utils import _resize_cv2_image, _transpose_network_pos, _trim_cv2_image
 from ..base_config import BaseConfig
-from ..enums import IdleResolution, SampleSet
+from ..enums import SampleSet
 
 logger = logging.getLogger(__name__)
 
