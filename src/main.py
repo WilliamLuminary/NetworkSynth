@@ -7,14 +7,13 @@ import numpy as np
 
 from analysis import MultifractalAnalyzer
 from config import BaseConfig, DataType, Resolution, SetName
-# noinspection PyUnresolvedReferences
-from config import GenConfig, GenConfig1, GenConfig2, LinGenConfig
+from config import GenConfigLinlin
 from graph import GraphGenerator
 from handlers import AttributesCalculator, Mapper, RunAgent, Saver
 from utils import trim_graph
 
-LinGenConfig.initialize()
-# BaseConfig.disable_saving("Preview")
+GenConfigLinlin.initialize()
+# BaseConfig.disable_saving("debug")
 
 logger = logging.getLogger(__name__)
 SIGINT_INFO = "SIGINT received. Terminating child process..."
