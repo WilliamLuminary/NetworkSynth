@@ -46,7 +46,7 @@ class MultifractalAnalyzer:
 
     @staticmethod
     def analyze_error(this, other) -> float:
-        assert this and other, "Invalid input."
+        assert this and other, "Invalid input: One error feature is None."
         from scipy.spatial.distance import euclidean
         return euclidean(astuple(this), astuple(other))
 
