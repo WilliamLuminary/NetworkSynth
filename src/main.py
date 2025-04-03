@@ -55,11 +55,13 @@ def generate_synthetic_network(exit_event, std_err_fea, attributes: AttributesCa
     return None, float('inf')
 
 
-def generate_with_multiprocessing(data_agent: RunAgent, std_err_fea):
+def generate_with_multiprocessing(data_agent: RunAgent):
     num_network, num_figures = BaseConfig.SYNTHETIC_NETWORK_NUMBER, BaseConfig.SYNTHETIC_GRAPH_NUMBER
     errors, futures = [], []
     from multiprocessing import Manager
     exit_event = Manager().Event()
+    std_err_fea = None if BaseConfig.SYNTHETIC_NETWORK_NUMBER == 0 else MultifractalAnalyzer(
+        data_agent.get_original_network()).analyze_error_features()
     try:
         from concurrent.futures import ProcessPoolExecutor, as_completed
         with ProcessPoolExecutor() as executor:
@@ -117,9 +119,7 @@ def run_for_each_set_resolution(set_name: SetName, resolution: Resolution):
     data_agent.save(DataType.ORIGINAL_PROPERTY)
     data_agent.save(DataType.ORIGINAL_GRAPH)
 
-    std_err_fea = None if BaseConfig.SYNTHETIC_NETWORK_NUMBER == 0 else MultifractalAnalyzer(
-        data_agent.get_original_network()).analyze_error_features()
-    generate_with_multiprocessing(data_agent, std_err_fea)
+    generate_with_multiprocessing(data_agent)
 
 
 def main():
