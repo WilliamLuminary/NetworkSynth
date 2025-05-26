@@ -39,8 +39,8 @@ def calculate_frame(graph: nx.Graph = None,
 def build_graph(*args, arg_type: str = 'adjacency_matrix') -> nx.Graph:
     if arg_type == 'adjacency_matrix':
         return _from_adjacency_matrix(*args)
-    elif arg_type == 'graphnode':
-        return _from_graphnode(*args)
+    elif arg_type == 'graph_node':
+        return _from_graph_node(*args)
     elif arg_type == 'edge_list':
         return _from_edge_list(*args)
     else:
@@ -58,7 +58,7 @@ def _from_adjacency_matrix(positions: np.ndarray, adjacency_matrix) -> nx.Graph:
     return graph
 
 
-def _from_graphnode(nodes: set, edges: set) -> nx.Graph:
+def _from_graph_node(nodes: set, edges: set) -> nx.Graph:
     graph = nx.Graph()
     position_map = {node.position: node for node in nodes}
 
