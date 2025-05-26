@@ -23,6 +23,7 @@ class BaseConfig:
     RESOLUTIONS: Union[list, np.ndarray] = [IdleResolution.NA]
 
     TRIM_SIZE: Tuple[int, int] = (0, 0, 0, 0)
+    DEFAULT_FIGURE_SIZE: Tuple[int, int] = None
     DEFAULT_FRAME_SIZE: Tuple[int, int] = None
 
     CLOSED_NODES_FACTOR: float

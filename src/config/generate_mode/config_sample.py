@@ -16,6 +16,7 @@ class SampleConfig(BaseConfig):
     SETS = [SampleSet.Sample1, SampleSet.Sample2, SampleSet.Sample3]
 
     DEFAULT_FRAME_SIZE = (1887 // 4, 2048 // 4)
+    DEFAULT_FIGURE_SIZE = DEFAULT_FRAME_SIZE
     CLOSED_NODES_FACTOR = 1.2
     CLOSED_EDGES_FACTOR = .8
 
