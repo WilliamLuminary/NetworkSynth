@@ -186,7 +186,7 @@ def plot_network(data_type: DataType,
             ax.plot(pos[0], pos[1], 'bo', markersize=node_size, zorder=2)
 
     if data_type is DataType.ORIGINAL_GRAPH:
-        frame = (0, BaseConfig.DEFAULT_FRAME_SIZE[0]), (0, BaseConfig.DEFAULT_FRAME_SIZE[1])
+        frame = (0, BaseConfig.DEFAULT_FIGURE_SIZE[0]), (0, BaseConfig.DEFAULT_FIGURE_SIZE[1])
     else:
         from utils import calculate_frame
         frame = calculate_frame(graph)
