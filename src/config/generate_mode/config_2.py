@@ -19,6 +19,7 @@ class Config2(BaseConfig):
 
     TRIM_SIZE = (0, 116, 0, 0)  # (Top, Bottom, Left, Right)
     DEFAULT_FRAME_SIZE = (1887 // 4, 2048 // 4)
+    DEFAULT_FIGURE_SIZE = DEFAULT_FRAME_SIZE
 
     CLOSED_NODES_FACTOR = 1.2
     CLOSED_EDGES_FACTOR = 0.8
@@ -104,7 +105,7 @@ def _load_raw_image(set_name, resolution):
     file_path = _find_file_with_pattern(directory_path, pattern, f'image for {set_name}')
     if file_path is None:
         logger.warning(f"Background image is None.")
-        return
+        return None
 
     image = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
     logger.info(f"Image file loaded: {file_path}")
