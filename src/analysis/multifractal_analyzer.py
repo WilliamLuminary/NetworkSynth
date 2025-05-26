@@ -31,7 +31,7 @@ class MultifractalAnalyzer:
     def __init__(self, graph: nx.Graph):
         self.graph = graph
         self.f_digit = 0
-        self.Q = None
+        self.q_ = None
         valid_weighted_analysis = all('weight' in data for _, _, data in graph.edges(data=True))
         self.weighted = BaseConfig.MEASURE_WEIGHTED if valid_weighted_analysis else False
         if BaseConfig.MEASURE_WEIGHTED is not self.weighted:
@@ -54,15 +54,15 @@ class MultifractalAnalyzer:
         graph = nx.convert_node_labels_to_integers(self.graph)
 
         if self.weighted:
-            G_nk = nk.nxadapter.nx2nk(graph, weightAttr='weight')
+            graph_nk = nk.nxadapter.nx2nk(graph, weightAttr='weight')
         else:
-            G_nk = nk.nxadapter.nx2nk(graph)
+            graph_nk = nk.nxadapter.nx2nk(graph)
 
-        N_list = []
+        n_list = []
         r_g_all_set = set()
         for node in graph.nodes():
             # noinspection PyUnresolvedReferences
-            distances = nk.distance.Dijkstra(G_nk, node, storePaths=False).run().getDistances()
+            distances = nk.distance.Dijkstra(graph_nk, node, storePaths=False).run().getDistances()
             grow = [d for d in distances if 0 < d < 99999]
             grow.sort()
             if self.f_digit == 0:
@@ -72,32 +72,32 @@ class MultifractalAnalyzer:
                 grow = [round(d, self.f_digit) for d in grow if round(d, self.f_digit) != 0]
             num = Counter(grow)
             r_g_all_set.update(num.keys())
-            N_list.append(num)
+            n_list.append(num)
 
         r_g_all = np.array(sorted(list(r_g_all_set)))
         if len(r_g_all) < 2:
-            return [0.0 for _ in self.Q]
+            return [0.0 for _ in self.q_]
 
         diameter = r_g_all[-1]
-        Nw_mat = np.ones((len(N_list), len(r_g_all)))
-        for i, num_counter in enumerate(N_list):
+        ntw_mat = np.ones((len(n_list), len(r_g_all)))
+        for i, num_counter in enumerate(n_list):
             for j, r_val in enumerate(r_g_all):
-                Nw_mat[i, j] += sum(count for dist_, count in num_counter.items() if dist_ <= r_val)
+                ntw_mat[i, j] += sum(count for dist_, count in num_counter.items() if dist_ <= r_val)
 
         zq_list = []
-        for q in self.Q:
+        for q in self.q_:
             row_sums = []
-            for i in range(len(Nw_mat)):
-                if Nw_mat[i, -1] == 0:
+            for i in range(len(ntw_mat)):
+                if ntw_mat[i, -1] == 0:
                     row_sums.append(0)
                 else:
-                    row_sums.append((Nw_mat[i, :] / Nw_mat[i, -1]) ** q)
+                    row_sums.append((ntw_mat[i, :] / ntw_mat[i, -1]) ** q)
             zq = np.sum(row_sums, axis=0)
             zq_list.append(zq)
 
         from scipy.stats import linregress
         tau_list = []
-        for idx, q in enumerate(self.Q):
+        for idx, q in enumerate(self.q_):
             x = np.log(r_g_all / diameter)
             y = np.log(zq_list[idx])
             slope, _, _, _, _ = linregress(x, y)
@@ -105,20 +105,20 @@ class MultifractalAnalyzer:
         return tau_list, zq_list
 
     def _compute_n_spectrum(self, tau_list):
-        Q_ = self.Q
+        q_ = self.q_
         al_list, fal_list = [], []
-        for i in range(1, len(Q_)):
-            al = (tau_list[i] - tau_list[i - 1]) / (Q_[i] - Q_[i - 1])
+        for i in range(1, len(q_)):
+            al = (tau_list[i] - tau_list[i - 1]) / (q_[i] - q_[i - 1])
             al_list.append(al)
-        for j in range(len(Q_) - 1):
-            fal = Q_[j] * al_list[j] - tau_list[j]
+        for j in range(len(q_) - 1):
+            fal = q_[j] * al_list[j] - tau_list[j]
             fal_list.append(fal)
         alpha_0 = al_list[np.argmax(fal_list)]
         width = np.max(al_list) - np.min(al_list)
         return alpha_0, width, al_list, fal_list
 
     def _compute_n_dimension(self, tau_list):
-        q_list = self.Q
+        q_list = self.q_
         valid_pairs = [(q, tau) for q, tau in zip(q_list, tau_list) if q != 0]
         valid_q, valid_tau = zip(*valid_pairs)
         dim_list = [tau / q for q, tau in zip(valid_q, valid_tau)]
@@ -134,14 +134,14 @@ class MultifractalAnalyzer:
             for _, _, d in graph.edges(data=True):
                 if d.get('weight', 0) != 0:
                     d['weight'] = 1.0 / d['weight']
-            G_nk = nk.nxadapter.nx2nk(graph, weightAttr='weight')
+            graph_nk = nk.nxadapter.nx2nk(graph, weightAttr='weight')
         else:
-            G_nk = nk.nxadapter.nx2nk(graph)
+            graph_nk = nk.nxadapter.nx2nk(graph)
 
         node_dimensions = {}
         for node in graph.nodes():
             # noinspection PyUnresolvedReferences
-            distances = nk.distance.Dijkstra(G_nk, int(node), storePaths=False).run().getDistances()
+            distances = nk.distance.Dijkstra(graph_nk, int(node), storePaths=False).run().getDistances()
             distances.sort()
             if self.weighted:
                 distances = [round(d, self.f_digit) for d in distances if round(d, self.f_digit) != 0]
@@ -192,11 +192,11 @@ class MultifractalAnalyzer:
             graph_copy = self.graph.copy()
             for _, _, d in graph_copy.edges(data=True):
                 d['weight'] = 1.0 / d['weight'] if d.get('weight', 0) != 0 else float('inf')
-            G_nk = nk.nxadapter.nx2nk(graph_copy, weightAttr='weight')
+            graph_nk = nk.nxadapter.nx2nk(graph_copy, weightAttr='weight')
         else:
-            G_nk = nk.nxadapter.nx2nk(self.graph, weightAttr=None)
+            graph_nk = nk.nxadapter.nx2nk(self.graph, weightAttr=None)
         # noinspection PyUnresolvedReferences
-        bt = nk.centrality.Betweenness(G_nk, normalized=True).run().scores()
+        bt = nk.centrality.Betweenness(graph_nk, normalized=True).run().scores()
         return bt
 
     def _compute_ollivier_ricci_curvature(self) -> List[float]:
@@ -223,19 +223,19 @@ class MultifractalAnalyzer:
 
     def _compute_eigenvector_centrality(self) -> List[float]:
         if nx.is_connected(self.graph):
-            G_lcc = self.graph
+            graph_lcc = self.graph
         else:
             from utils import largest_connected_component
-            G_lcc = largest_connected_component(self.graph)
+            graph_lcc = largest_connected_component(self.graph)
 
         try:
             if self.weighted:
-                ec_dict = nx.eigenvector_centrality(G_lcc, max_iter=1000, weight='weight')
+                ec_dict = nx.eigenvector_centrality(graph_lcc, max_iter=1000, weight='weight')
             else:
-                ec_dict = nx.eigenvector_centrality(G_lcc, max_iter=1000)
+                ec_dict = nx.eigenvector_centrality(graph_lcc, max_iter=1000)
             return list(ec_dict.values())
         except nx.PowerIterationFailedConvergence:
-            return [float('nan')] * G_lcc.number_of_nodes()
+            return [float('nan')] * graph_lcc.number_of_nodes()
 
     def _compute_diameter(self) -> float:
         if nx.is_connected(self.graph):
@@ -288,12 +288,12 @@ class MultifractalAnalyzer:
 
     @contextmanager
     def set_q(self, q_list):
-        original_Q = self.Q
+        original_q = self.q_
         try:
-            self.Q = q_list
+            self.q_ = q_list
             yield
         finally:
-            self.Q = original_Q
+            self.q_ = original_q
 
     @contextmanager
     def set_f_digit(self, f_digit_value):
