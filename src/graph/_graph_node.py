@@ -196,7 +196,7 @@ class GraphNode:
         return (euclidean(position, p1) < self._closed_edges_thr or
                 euclidean(position, p2) < self._closed_edges_thr)
 
-    def _generate_angles_and_lengths(self) -> [list[float], ...]:
+    def _generate_angles_and_lengths(self) -> Tuple[list[float], ...]:
         if self.degree == 1:
             return [], []
         angles = random.choices(GraphNode._degree_angles[self.degree], k=self.degree - 1)
