@@ -19,6 +19,7 @@ class Config1(BaseConfig):
     RESOLUTIONS = [OldResolution.X10K]
 
     DEFAULT_FRAME_SIZE = (510, 510)
+    DEFAULT_FIGURE_SIZE = DEFAULT_FRAME_SIZE
     CLOSED_NODES_FACTOR = 1.5
     CLOSED_EDGES_FACTOR = 1
     # For the 10_kx image, node fac should be 1.5, and edge fac should be 1
