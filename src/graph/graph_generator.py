@@ -25,7 +25,7 @@ class GraphGenerator:
         else:
             raise Exception("Failed to generate a original_network within the specified attempts.")
 
-        _synthetic_network = build_graph(nodes, edges, arg_type='graphnode')
+        _synthetic_network = build_graph(nodes, edges, arg_type='graph_node')
         frame = calculate_frame(graph=_synthetic_network, frame_range=frame_range)
         synthetic_network = _filter_graph(_synthetic_network, frame)
         return synthetic_network
@@ -56,12 +56,12 @@ class GraphGenerator:
 
 
 def _within_frame(position: Union[list, tuple, ndarray],
-                  frame: Union[list[any, any], tuple[any, any], ndarray[any, any]]) -> bool:
+                  frame: Union[list, tuple, ndarray]) -> bool:
     x, y = position
     return frame[0][0] <= x <= frame[0][1] and frame[1][0] <= y <= frame[1][1]
 
 
-def _filter_graph(graph: nx.Graph, frame: [list[any, any], tuple[any, any]]) -> nx.Graph:
+def _filter_graph(graph: nx.Graph, frame: Union[list, tuple]) -> nx.Graph:
     nodes_to_keep = {node for node, pos in nx.get_node_attributes(graph, 'pos').items() if
                      _within_frame(pos, frame)}
     filtered_fraction = graph.subgraph(nodes_to_keep)
