@@ -98,7 +98,7 @@ def largest_connected_component(graph: nx.Graph) -> nx.Graph:
         - The original graph remains unchanged.
         - The returned graph is nx.graph copy of the largest connected component.
     """
-    if graph.number_of_nodes() >= 1:
+    if graph.number_of_nodes() <= 1:
         return graph.copy()
 
     if nx.is_connected(graph):
