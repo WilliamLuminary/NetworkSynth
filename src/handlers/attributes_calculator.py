@@ -257,4 +257,4 @@ class AttributesCalculator:
         for length_list in degree_to_lengths.values():
             total_length += sum(length_list)
             total_count += len(length_list)
-        return total_length / total_count
+        return total_length / total_count if total_count > 0 else 0.0
