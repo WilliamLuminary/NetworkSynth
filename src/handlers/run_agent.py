@@ -75,7 +75,7 @@ class RunAgent:
         self.multifractal_analysis()
 
     def multifractal_analysis(self):
-        assert self.mode == Mode.ANA, "This method is only available in Analyze mode."
+        assert self.mode in (Mode.ANA, Mode.GEN), "This method is only available in Analyze or Generate mode."
         assert self.batch_processor, "Batch processor is not initialized."
         self.batch_processor.process().plot()
 
