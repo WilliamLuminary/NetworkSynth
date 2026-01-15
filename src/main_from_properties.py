@@ -23,7 +23,7 @@ def _should_exit(exit_event) -> bool:
 
 def generate_synthetic_network(exit_event, attributes: AttributesCalculator):
     if _should_exit(exit_event):
-        return None, float('inf')
+        return None
 
     generator = GraphGenerator(attributes)
     for attempt in range(BaseConfig.MAX_ATTEMPTS):
@@ -31,7 +31,7 @@ def generate_synthetic_network(exit_event, attributes: AttributesCalculator):
             synthetic_graph = generator.generate_network()
 
             if _should_exit(exit_event):
-                return None, float('inf')
+                return None
 
             synthetic_graph = trim_graph(synthetic_graph, attributes.average_degree)
             return synthetic_graph
@@ -43,7 +43,7 @@ def generate_synthetic_network(exit_event, attributes: AttributesCalculator):
             logger.error(f"Exception occurred: {exc}. Retrying...")
 
     logger.warning("Max attempts reached. Aborting!")
-    return None, float('inf')
+    return None
 
 
 def generate_with_multiprocessing(data_agent: RunAgent):
