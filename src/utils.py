@@ -106,25 +106,31 @@ def _from_edge_list(positions: np.ndarray, edge_list: np.ndarray) -> nx.Graph:
     return graph
 
 
-def largest_connected_component(graph: nx.Graph) -> nx.Graph:
+def largest_connected_component(graph: nx.Graph, reindex: bool = True) -> nx.Graph:
     """
     Keep only the largest connected component of the graph.
     :param graph: A networkx graph, possibly with multiple connected components.
+    :param reindex: If True, reindex node labels to 0..n-1 (storing old labels in 'old_label' attribute).
     :return: A networkx graph with only the largest connected component.
 
     Post condition:
         - The original graph remains unchanged.
         - The returned graph is nx.graph copy of the largest connected component.
+        - If reindex=True, node labels are converted to integers 0..n-1.
     """
     if graph.number_of_nodes() <= 1:
-        return graph.copy()
+        result = graph.copy()
+    elif nx.is_connected(graph):
+        result = graph.copy()
+    else:
+        largest_cc = max(nx.connected_components(graph), key=len)
+        # noinspection PyTypeChecker
+        result = graph.subgraph(largest_cc).copy()
 
-    if nx.is_connected(graph):
-        return graph.copy()
+    if reindex:
+        result = nx.convert_node_labels_to_integers(result, label_attribute="old_label")
 
-    largest_cc = max(nx.connected_components(graph), key=len)
-    # noinspection PyTypeChecker
-    return graph.subgraph(largest_cc).copy()
+    return result
 
 
 def timer(func):
@@ -157,8 +163,7 @@ def figure_to_ndarray(fig: plt.Figure, swap_channels: bool = False) -> ndarray:
     canvas.draw()
     buf = canvas.buffer_rgba()
     image_array = np.asarray(buf)
-    image_array = image_array[..., [2, 1, 0, 3]
-                              ] if swap_channels else image_array
+    image_array = image_array[..., [2, 1, 0, 3]] if swap_channels else image_array
     return image_array
 
 
