@@ -3,160 +3,155 @@
 ![Network Analysis](https://img.shields.io/badge/network-analysis-blue)
 ![Synthetic Generation](https://img.shields.io/badge/synthetic-generation-green)
 
-## Quick start
+## Quick Start
 
-1. Run with Default Configuration
+1. **Install and Run**
 
    ```bash
-   # Clone and install
    git clone https://github.com/WilliamLuminary/NetworkSynth.git
    cd NetworkSynth
-   # Compatible with Python version 3.10.15
-   pip install -r requirements.txt
+   pip install -r requirements.txt  # Python 3.10+
    
-   # Run with sample configuration
    python src/main.py
    ```
 
-2. Prepare Sample Data
+2. **Prepare Sample Data**
 
-   Create this structure in data/sample_input:
-
-   ```bash
-   sample_input/
-   ├── sample_1_pos.npy    # Node positions
+   ```
+   data/input/sample_input/generate_mode/
+   ├── sample_1_pos.npy    # Node positions (N, 2)
    ├── sample_1_mat.npy    # Adjacency matrix
-   └── sample_1_image.tif  # Base image
+   └── sample_1_image.tif  # Background image (optional)
    ```
 
-3. Expected Output
+3. **Expected Output**
 
-   ```bash
-   results_YYYYMMDD_HHMM/
-   ├── sample_1/
-   │   (no resolution dir since Resolution.NA)
-   │   ├── origin/
-   │   │   ├── original_graph_YYYYMMDD_HHMM.png
-   │   │   ├── original_image_YYYYMMDD_HHMM.png
-   │   │   ├── original_network_YYYYMMDD_HHMM.pkl
-   │   │   └── original_property_YYYYMMDD_HHMM.pkl
-   │   ├── synthetic/
-   │   │   ├── nw_no_10_err_0.123_synthetic_network_YYYYMMDD_HHMM.pkl
-   │   │   ├── synthetic_graph_YYYYMMDD_HHMM.png
-   │   │   ├── synthetic_graph_YYYYMMDD_HHMM.png
-   │   │   └── synthetic_graph_YYYYMMDD_HHMM.png
+   ```
+   data/output/ConfigName_results_YYYYMMDD_HHMMSS/
+   └── sample_1/
+       ├── original/
+       │   ├── original_graph_*.png
+       │   ├── original_image_*.png
+       │   ├── original_network_*.pkl
+       │   └── original_property_*.pkl
+       └── synthetic/
+           ├── len_10_err_0.123_synthetic_network_*.pkl
+           └── synthetic_graph_*.png
    ```
 
-## Basic Customization <small>(No Code Changes)</small>
+## Configuration System
 
-### 1. Modify Key Parameters
+### DatasetId
 
-Edit `src/config/config_sample.py`:
+The unified `DatasetId` class replaces the old `SetName`/`Resolution` enum system:
 
 ```python
-class ConfigSample(Config):
-    # Generation parameters
-    CLOSED_NODES_FACTOR = 1.5    # Original: 1.2
-    CLOSED_EDGES_FACTOR = 1.0    # Original: 0.8
-    SYNTHETIC_NETWORK_NUMBER = 50# Original: 10
-    ...
+from config import DatasetId
+
+# Single-level dataset (e.g., nanowires)
+dataset = DatasetId("1-0")
+dataset.path    # "1-0"
+dataset[0]      # "1-0"
+
+# Multi-level dataset (e.g., set + resolution)
+dataset = DatasetId("A", "10kX")
+dataset.path    # "A/10kX" (OS-appropriate)
+dataset[0]      # "A"
+dataset[1]      # "10kX"
 ```
 
-### 2. Common Parameters
-| Parameter              | Typical Values               | Effect on Generation                   |
-|------------------------|------------------------------|----------------------------------------|
-| CLOSED_NODES_FACTOR    | 0.5-2.0                      | Controls node merging likelihood       |
-| CLOSED_EDGES_FACTOR    | 0.5-2.0                      | Affects edge proximity tolerance       |
-| ERROR_TOLERANCE        | 0.1-0.5                      | Multifractal similarity threshold      |
-| SYNTHETIC_GRAPH_NUMBER | $\leq$ SYNTHETIC_NETWORK_NUM | Visualized network generated per batch |
-| ...                    |                              |                                        |
+### Creating a New Config
 
-## Advanced Configuration
+1. Create `src/config/generate_mode/config_mydata.py`:
 
-### 1. Add New Dataset Type
 ```python
-# src/config/enums.py
-class SetName(Enum):
-    MY_SET = "my_set"  # Add new dataset identifier
+from typing import List
+from ..base_config import BaseConfig
+from ..enums import DatasetId
+
+def _generate_datasets() -> List[DatasetId]:
+    return [DatasetId("set_1"), DatasetId("set_2")]
+
+class ConfigMydata(BaseConfig):
+    DATASETS = _generate_datasets()
     
-class Resolution(Enum):
-    MY_RES = "my_res"  # Add new dataset identifier
+    IMAGE_SIZE = (1024, 1024)
+    FRAME_SIZE = (512, 512)
+    SYNTHETIC_FRAME_SIZE = (1536, 1536)
     
-# src/config/config_custom.py
-class ConfigCustom(Config):
-    SETS = [SetName.MY_SET]
-    RESOLUTIONS = [Resolution.NA]
-    # If no need for two levels of identifiers, use NA.
+    CLOSED_NODES_FACTOR = 1.2
+    CLOSED_EDGES_FACTOR = 0.8
+    SYNTHETIC_NETWORK_NUMBER = 10
+    SYNTHETIC_GRAPH_NUMBER = 3
+    ERROR_TOLERANCE = 0.15
     
+    @classmethod
+    def initialize(cls):
+        super().initialize()
+        cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
+        cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
+        cls._inject_dependencies()
+
     @staticmethod
-    def _load_positions(set_name, resolution):
-        return np.load(f'data/{set_name}/positions.npy')
-```
+    def load_original_network(dataset_id: DatasetId):
+        # Load and return networkx.Graph with 'pos' node attribute
+        ...
 
-### 2. Implement Data Loaders
-Required function signatures:
-   ```python
-   def _load_positions(set_name, resolution) -> np.ndarray:  # Shape: [N,2]
-   def _load_sparse_matrix(set_name, resolution) -> dict:     # {'rows':[], 'cols':[]}
-   def _load_image(set_name, resolution) -> np.ndarray:       # CV2-compatible format
-   ```
-
-#### Input Data Requirements
-
-| Functions             | Return Type         | Return Requirements                              |
-|-----------------------|---------------------|--------------------------------------------------|
-| _load_positions()     | list or numpy array | Shape of (N, 2)                                  |
-| _load_sparse_matrix() | (the same as above) | Recognized by networkx.from_scipy_sparse_array() |
-| _load_image()         | (the same as above) | Recognized by cv2.imread()                       |
-
-
-## Configuration Workflow
-
-### 1. Choose Base Template
-
-```python
-# In src/main.py
-ConfigSample.initialize()  # Simple template
-# ConfigCustom.initialize()  # Custom configuration
-```
-
-### 2. Implement Data Loaders
-
-Copy from any `config_[NAME].py` file, then only modify the **name of the class** and **values of variables**
-(`_load_[DATA]()` functions are also required).
-
-```python
-class ConfigCustom(Config):
     @staticmethod
-    def _load_positions(set_name, resolution):
-        """Custom position loader for your data"""
-        file_path = f"data/positions/{set_name}_nodes.npy"
-        return np.load(file_path)
-    ... # implement other 
+    def load_original_image(dataset_id: DatasetId):
+        # Load and return image as numpy array (or None)
+        ...
 ```
-## Output Interpretation
 
-### File Type Mapping
-| Pattern                   | Data Type            | Visualization Example    |
-|---------------------------|----------------------|--------------------------|
-| `original_graph_*.png`    | Network topology     | [Sample Graph]           |
-| `original_property_*.pkl` | Degree distributions | {2: 0.6, 3: 0.3, 4: 0.1} |
-| `synthetic_network_*.pkl` | Generated network    | NetworkX Graph object    |
+2. Update `src/main.py`:
 
+```python
+from config.generate_mode import GenConfigMydata as GenConfig
+GenConfig.initialize()
+```
+
+The config is automatically exported as `GenConfigMydata` based on the naming convention.
+
+### Config Naming Convention
+
+| File Name | Class Name | Exported As |
+|-----------|------------|-------------|
+| `config_sample.py` | `SampleConfig` | `GenConfig` |
+| `config_nanowires.py` | `ConfigNanowires` | `GenConfigNanowires` |
+| `config_mydata.py` | `ConfigMydata` | `GenConfigMydata` |
+
+## Key Parameters
+
+| Parameter | Typical Values | Description |
+|-----------|----------------|-------------|
+| `CLOSED_NODES_FACTOR` | 0.5-2.0 | Node merging likelihood |
+| `CLOSED_EDGES_FACTOR` | 0.5-2.0 | Edge proximity tolerance |
+| `ERROR_TOLERANCE` | 0.1-0.5 | Multifractal similarity threshold |
+| `SYNTHETIC_NETWORK_NUMBER` | 1-100 | Networks to generate per dataset |
+| `SYNTHETIC_GRAPH_NUMBER` | 0-10 | Graphs to visualize (≤ network count) |
+| `MAX_ATTEMPTS` | 5-20 | Retry attempts per network |
+
+## Data Loader Requirements
+
+| Function | Return Type | Requirements |
+|----------|-------------|--------------|
+| `load_original_network(dataset_id)` | `nx.Graph` | Nodes must have `pos` attribute |
+| `load_original_image(dataset_id)` | `np.ndarray` or `None` | CV2-compatible grayscale |
 
 ## Troubleshooting
 
-### Common Issues
-1. **Missing Input Files**  
-   Ensure files follow naming convention:  
-   `{SetName}_pos.npy`, `{SetName}_mat.npy`, `{SetName}_image.tif`
+**Missing Input Files**
+- Check file paths match your `BASE_INPUT_PATH` and dataset IDs
 
-2. **Dimension Mismatch**  
-   Verify node positions `(N,2)` match adjacency matrix `(N,N)`
+**Dimension Mismatch**
+- Node positions shape `(N, 2)` must match adjacency matrix `(N, N)`
 
-3. **Generation Failures**  
-   Adjust thresholds:
-   ```python
-   CLOSED_NODES_FACTOR *= 1.2  # Allow more node merging
-   ERROR_TOLERANCE *= 1.5       # Accept less similar networks
-   ```
+**Generation Failures**
+```python
+CLOSED_NODES_FACTOR *= 1.2  # Allow more node merging
+ERROR_TOLERANCE *= 1.5      # Accept less similar networks
+MAX_ATTEMPTS = 20           # More retry attempts
+```
+
+**Import Errors**
+- Ensure config class follows naming convention: `ConfigXxx` in `config_xxx.py`
