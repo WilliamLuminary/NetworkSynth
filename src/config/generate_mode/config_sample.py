@@ -15,23 +15,26 @@ logger = logging.getLogger(__name__)
 class SampleConfig(BaseConfig):
     SETS = [SampleSet.Sample1, SampleSet.Sample2, SampleSet.Sample3]
 
-    DEFAULT_FRAME_SIZE = (1887 // 4, 2048 // 4)
-    DEFAULT_FIGURE_SIZE = DEFAULT_FRAME_SIZE
+    IMAGE_SIZE = (1887, 2048)
+    FRAME_SIZE = (1887 // 4, 2048 // 4)
+    SYNTHETIC_FRAME_SIZE = FRAME_SIZE
     CLOSED_NODES_FACTOR = 1.2
-    CLOSED_EDGES_FACTOR = .8
+    CLOSED_EDGES_FACTOR = 0.8
 
     SYNTHETIC_GRAPH_NUMBER = 0
     SYNTHETIC_NETWORK_NUMBER = 0
 
     MAX_ATTEMPTS = 10
-    ERROR_TOLERANCE = .15
+    ERROR_TOLERANCE = 0.15
 
     MEASURE_WEIGHTED = False
 
-    BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, 'sample_input', 'generate_mode')
-    POSITION_DATA_DIR = os.path.join(BASE_INPUT_PATH, '')
-    ADJ_MATRIX_DATA_DIR = os.path.join(BASE_INPUT_PATH, '')
-    IMAGES_DIR = os.path.join(BASE_INPUT_PATH, '')
+    BASE_INPUT_PATH = os.path.join(
+        BaseConfig.BASE_INPUT_PATH, "sample_input", "generate_mode"
+    )
+    POSITION_DATA_DIR = os.path.join(BASE_INPUT_PATH, "")
+    ADJ_MATRIX_DATA_DIR = os.path.join(BASE_INPUT_PATH, "")
+    IMAGES_DIR = os.path.join(BASE_INPUT_PATH, "")
 
     # BASE_INPUT_PATH
     # ├── POSITION_DATA_DIR
@@ -50,6 +53,7 @@ class SampleConfig(BaseConfig):
         positions = _load_positions(set_name)
         mat = _load_sparse_matrix(set_name)
         from utils import build_graph
+
         original_network = build_graph(positions, mat)
         _transpose_network_pos(original_network)
         return original_network
@@ -75,7 +79,9 @@ def _load_positions(set_name):
 
 
 def _load_sparse_matrix(set_name):
-    file_path = os.path.join(SampleConfig.ADJ_MATRIX_DATA_DIR, f"{str(set_name)}_mat.npy")
+    file_path = os.path.join(
+        SampleConfig.ADJ_MATRIX_DATA_DIR, f"{str(set_name)}_mat.npy"
+    )
 
     if not os.path.exists(file_path):
         msg = f"Sparse matrix file does not exist: {file_path}"

@@ -7,7 +7,15 @@ import networkx as nx
 from matplotlib import pyplot as plt
 from numpy import ndarray
 
-from config import BaseConfig, DataType, FILE_CONFIGURATIONS, FileTag, Mode, Resolution, SetName
+from config import (
+    BaseConfig,
+    DataType,
+    FILE_CONFIGURATIONS,
+    FileTag,
+    Mode,
+    Resolution,
+    SetName,
+)
 from .data_loader import DataLoader
 from .saver import Saver
 
@@ -15,12 +23,14 @@ logger = logging.getLogger(__name__)
 
 
 class RunAgent:
-    def __init__(self,
-                 *,
-                 set_name: SetName = None,
-                 resolution: Resolution = None,
-                 networks_path: Optional[str] = None,
-                 attr_path: Optional[str] = None):
+    def __init__(
+        self,
+        *,
+        set_name: SetName = None,
+        resolution: Resolution = None,
+        networks_path: Optional[str] = None,
+        attr_path: Optional[str] = None,
+    ):
         if networks_path:
             self.mode = Mode.ANA
             self.data_loader = DataLoader(Mode.ANA, path=networks_path)
@@ -28,7 +38,9 @@ class RunAgent:
             self.batch_processor = None
         elif set_name and resolution:
             self.mode = Mode.GEN
-            self.data_loader = DataLoader(Mode.GEN, set_name=set_name, resolution=resolution)
+            self.data_loader = DataLoader(
+                Mode.GEN, set_name=set_name, resolution=resolution
+            )
             self.saver = Saver(set_name=set_name, resolution=resolution)
             self.attributes = None
             self.mapper = None
@@ -49,9 +61,11 @@ class RunAgent:
             original_network = self.data_loader.get_original_network()
 
             from .attributes_calculator import AttributesCalculator
+
             self.attributes = AttributesCalculator().analyze(original_network)
 
             from .mapper import Mapper
+
             self.mapper = Mapper(original_network)
 
         elif self.mode == Mode.ANA:
@@ -59,11 +73,15 @@ class RunAgent:
             original_networks = self.data_loader.get_original_network()
             synthetic_networks = self.data_loader.get_synthetic_networks()
             from analysis import MultifractalBatchProcessor
-            self.batch_processor = MultifractalBatchProcessor(original_networks, synthetic_networks)
+
+            self.batch_processor = MultifractalBatchProcessor(
+                original_networks, synthetic_networks
+            )
 
         elif self.mode == Mode.ATR:
             self.data_loader.load()
             from .attributes_calculator import AttributesCalculator
+
             self.attributes = AttributesCalculator(**self.data_loader.get_attr_dict())
 
     def multifractal_analysis_in_generate_mode(self):
@@ -71,11 +89,17 @@ class RunAgent:
         original_networks = [self.data_loader.get_original_network()]
         synthetic_networks = self.data_loader.get_synthetic_networks()
         from analysis import MultifractalBatchProcessor
-        self.batch_processor = MultifractalBatchProcessor(original_networks, synthetic_networks)
+
+        self.batch_processor = MultifractalBatchProcessor(
+            original_networks, synthetic_networks
+        )
         self.multifractal_analysis()
 
     def multifractal_analysis(self):
-        assert self.mode in (Mode.ANA, Mode.GEN), "This method is only available in Analyze or Generate mode."
+        assert self.mode in (
+            Mode.ANA,
+            Mode.GEN,
+        ), "This method is only available in Analyze or Generate mode."
         assert self.batch_processor, "Batch processor is not initialized."
         self.batch_processor.process().plot()
 
@@ -89,27 +113,39 @@ class RunAgent:
     def get_original_network(self):
         return self.data_loader.get_original_network()
 
-    def save(self, data_type: DataType, file_name_prefix: Optional[str] = None, arg=None):
+    def save(
+        self, data_type: DataType, file_name_prefix: Optional[str] = None, arg=None
+    ):
         if not self.saver and not data_type.has_tag(FileTag.PLOT):
             return
 
-        file_name_prefix = f"{file_name_prefix}_" if file_name_prefix and file_name_prefix[-1] != '_' else (
-                file_name_prefix or '')
+        file_name_prefix = (
+            f"{file_name_prefix}_"
+            if file_name_prefix and file_name_prefix[-1] != "_"
+            else (file_name_prefix or "")
+        )
 
         if data_type == DataType.ORIGINAL_IMAGE:
-            assert self.mode == Mode.GEN, "This data type is only available in Generate mode."
+            assert (
+                self.mode == Mode.GEN
+            ), "This data type is only available in Generate mode."
             original_image = self.data_loader.get_original_image()
             self.saver.save_file(original_image, data_type, file_name_prefix)
 
         elif data_type == DataType.ORIGINAL_NETWORK:
-            assert self.mode == Mode.GEN, "This data type is only available in Generate mode."
+            assert (
+                self.mode == Mode.GEN
+            ), "This data type is only available in Generate mode."
             original_network = self.data_loader.get_original_network()
             self.saver.save_file(original_network, data_type, file_name_prefix)
 
         elif data_type == DataType.ORIGINAL_PROPERTY:
-            assert self.mode == Mode.GEN, "This data type is only available in Generate mode."
+            assert (
+                self.mode == Mode.GEN
+            ), "This data type is only available in Generate mode."
             assert self.attributes, "Attributes are not initialized."
             import dataclasses
+
             self.saver.save_file(dataclasses.asdict(self.attributes), data_type, file_name_prefix)  # type: ignore
 
         elif data_type == DataType.ORIGINAL_GRAPH:
@@ -120,35 +156,47 @@ class RunAgent:
                 data_type=DataType.ORIGINAL_GRAPH,
                 graph=original_network,
                 background=original_image,
-                show=True
+                show=True,
             )
             if self.saver:
                 self.saver.save_file(original_figure, data_type, file_name_prefix)
 
         elif data_type == DataType.SYNTHETIC_GRAPH:
-            assert isinstance(arg, nx.Graph), "Must be a networkx.Graph synthetic network."
+            assert isinstance(
+                arg, nx.Graph
+            ), "Must be a networkx.Graph synthetic network."
             show_figure_if_not_saving: bool = not self.saver and arg
             synthetic_figure = plot_network(
                 data_type=DataType.SYNTHETIC_GRAPH,
                 graph=arg,
-                show=show_figure_if_not_saving
+                show=show_figure_if_not_saving,
             )
             if not show_figure_if_not_saving:
-                self.saver.save_file(synthetic_figure, DataType.SYNTHETIC_GRAPH, file_name_prefix)
+                self.saver.save_file(
+                    synthetic_figure, DataType.SYNTHETIC_GRAPH, file_name_prefix
+                )
 
         elif data_type == DataType.SYNTHETIC_NETWORK:
             synthetic_networks = self.data_loader.get_synthetic_networks()
             self.saver.save_file(synthetic_networks, data_type, file_name_prefix)
 
         elif data_type == DataType.ANALYSIS_DATA:
-            assert self.mode == Mode.ANA, "This data type is only available in Analyze mode."
-            self.saver.save_file({'original_multifractal_analysis_results': self.batch_processor.get_original_data(),
-                                  'synthetic_multifractal_analysis_results': self.batch_processor.get_synthetic_data()},
-                                 data_type,
-                                 file_name_prefix)
+            assert (
+                self.mode == Mode.ANA
+            ), "This data type is only available in Analyze mode."
+            self.saver.save_file(
+                {
+                    "original_multifractal_analysis_results": self.batch_processor.get_original_data(),
+                    "synthetic_multifractal_analysis_results": self.batch_processor.get_synthetic_data(),
+                },
+                data_type,
+                file_name_prefix,
+            )
 
         elif data_type == DataType.ANALYSIS_FIGURE:
-            assert self.mode == Mode.ANA, "This data type is only available in Analyze mode."
+            assert (
+                self.mode == Mode.ANA
+            ), "This data type is only available in Analyze mode."
             for image_name, image in self.batch_processor.get_images().items():
                 self.saver.save_file(image, data_type, f"{image_name}_")
 
@@ -156,20 +204,20 @@ class RunAgent:
             logger.error(f"Please configure save() for {data_type}.")
 
 
-def plot_network(data_type: DataType,
-                 graph: nx.Graph,
-                 **kwargs) -> ndarray:
+def plot_network(data_type: DataType, graph: nx.Graph, **kwargs) -> ndarray:
     """
     :param data_type:
     :param graph: If provided, plot the graph directly.
     :param kwargs: Title, frame, plot_in_frame, background, image, alpha, edge_width, node_size, output_path
     """
-    assert data_type.has_tag(FileTag.PLOT), f"{data_type} shouldn't call {inspect.currentframe().f_code.co_name}."
+    assert data_type.has_tag(
+        FileTag.PLOT
+    ), f"{data_type} shouldn't call {inspect.currentframe().f_code.co_name}."
 
     file_config = FILE_CONFIGURATIONS.get(data_type)
     fig, ax = plt.subplots(figsize=(10, 10), dpi=300)
 
-    position_dict = nx.get_node_attributes(graph, 'pos')
+    position_dict = nx.get_node_attributes(graph, "pos")
     edge_width = file_config.line_width
     for u, v in graph.edges():
         pos_u = position_dict.get(u)
@@ -177,28 +225,29 @@ def plot_network(data_type: DataType,
         if pos_u is not None and pos_v is not None:
             x_values = [pos_u[0], pos_v[0]]
             y_values = [pos_u[1], pos_v[1]]
-            ax.plot(x_values, y_values, 'r-', linewidth=edge_width, zorder=2)
+            ax.plot(x_values, y_values, "r-", linewidth=edge_width, zorder=2)
 
     node_size = file_config.node_size
     for node in graph.nodes():
         pos = position_dict.get(node)
         if pos is not None:
-            ax.plot(pos[0], pos[1], 'bo', markersize=node_size, zorder=2)
+            ax.plot(pos[0], pos[1], "bo", markersize=node_size, zorder=2)
 
     if data_type is DataType.ORIGINAL_GRAPH:
-        frame = (0, BaseConfig.DEFAULT_FIGURE_SIZE[0]), (0, BaseConfig.DEFAULT_FIGURE_SIZE[1])
+        frame = (0, BaseConfig.FRAME_SIZE[0]), (0, BaseConfig.FRAME_SIZE[1])
     else:
         from utils import calculate_frame
+
         frame = calculate_frame(graph)
 
     ax.set_xlim(frame[0])
     ax.set_ylim(frame[1])
 
-    if data_type is DataType.ORIGINAL_GRAPH :
-        image = kwargs.get('background', None)
+    if data_type is DataType.ORIGINAL_GRAPH:
+        image = kwargs.get("background", None)
         if image is not None:
-            alpha = getattr(file_config, 'alpha', 1.0)
-            ax.imshow(image, cmap='gray', alpha=alpha)  # type: ignore
+            alpha = getattr(file_config, "alpha", 1.0)
+            ax.imshow(image, cmap="gray", alpha=alpha)  # type: ignore
         else:
             logger.info("No background image provided.")
     else:
@@ -207,19 +256,25 @@ def plot_network(data_type: DataType,
                 (frame[0][0], frame[1][0]),
                 frame[0][1] - frame[0][0],
                 frame[1][1] - frame[1][0],
-                facecolor='none',
+                facecolor="none",
                 edgecolor=(0, 0, 0, 0.8),
                 linewidth=2,
-                zorder=1
-            ))
+                zorder=1,
+            )
+        )
 
-    if 'title' in kwargs:
-        plt.title(kwargs['title'])
+    if "title" in kwargs:
+        plt.title(kwargs["title"])
 
     ax.set_xticks([])
     ax.set_yticks([])
-    ax.axis('off')
+    ax.axis("off")
 
-    show_on_the_fly = kwargs['show'] if 'show' in kwargs else getattr(file_config, 'show_on_the_fly', True)
+    show_on_the_fly = (
+        kwargs["show"]
+        if "show" in kwargs
+        else getattr(file_config, "show_on_the_fly", True)
+    )
     from utils import finalize_plot
+
     return finalize_plot(fig, show_on_the_fly)
