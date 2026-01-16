@@ -4,7 +4,15 @@ import logging
 import os
 from typing import Any, Optional
 
-from config import BaseConfig, DataType, FILE_CONFIGURATIONS, FileExtension, Mode, Resolution, SetName
+from config import (
+    BaseConfig,
+    DataType,
+    FILE_CONFIGURATIONS,
+    FileExtension,
+    Mode,
+    Resolution,
+    SetName,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -15,15 +23,19 @@ class Saver:
 
     def __new__(cls, *args, **kwargs):
         if BaseConfig.DISABLE_SAVING:
-            logger.info(f"Saving is disabled. No Saver will be instantiated. {BaseConfig.DISABLE_SAVING_NOTE}")
+            logger.info(
+                f"Saving is disabled. No Saver will be instantiated. {BaseConfig.DISABLE_SAVING_NOTE}"
+            )
             return None
         return super().__new__(cls)
 
-    def __init__(self,
-                 set_name: Optional[SetName] = None,
-                 resolution: Optional[Resolution] = None,
-                 *,
-                 output_dir: str = None):
+    def __init__(
+        self,
+        set_name: Optional[SetName] = None,
+        resolution: Optional[Resolution] = None,
+        *,
+        output_dir: str = None,
+    ):
         """
         Initialize the Saver object.
         :param output_dir:
@@ -37,13 +49,19 @@ class Saver:
         """
         assert not BaseConfig.DISABLE_SAVING, "Saving is disabled."
         if output_dir:
-            assert not self.base_output_dir, "Output directory has been set. Don't call Saver.initialize()."
+            assert (
+                not self.base_output_dir
+            ), "Output directory has been set. Don't call Saver.initialize()."
             self.output_dir = output_dir
             self.mode = Mode.ANA
         else:
-            assert self.base_output_dir, "Base output directory is not initialized.\nCall Saver.initialize() first."
+            assert (
+                self.base_output_dir
+            ), "Base output directory is not initialized.\nCall Saver.initialize() first."
             # Each output_dir is for each original network
-            self.output_dir = os.path.join(self.base_output_dir, str(set_name), str(resolution))
+            self.output_dir = os.path.join(
+                self.base_output_dir, str(set_name), str(resolution)
+            )
             self.mode = Mode.GEN
 
         _ensure_directory(self.output_dir, exist_ok=True)
@@ -55,8 +73,7 @@ class Saver:
         :return: None
         """
         if BaseConfig.DISABLE_SAVING:
-            logger.info(
-                f"Saving is disabled. {BaseConfig.DISABLE_SAVING_NOTE}.")
+            logger.info(f"Saving is disabled. {BaseConfig.DISABLE_SAVING_NOTE}.")
             return
 
         if result_dir:
@@ -64,14 +81,20 @@ class Saver:
             cls.base_output_dir = os.path.join(BaseConfig.BASE_OUTPUT_PATH, result_dir)
         else:
             cls.mode = Mode.GEN
-            cls.base_output_dir = os.path.join(BaseConfig.BASE_OUTPUT_PATH,
-                                               f'{BaseConfig.OUTPUT_DENOTE}_results_{_time_id()}')
+            cls.base_output_dir = os.path.join(
+                BaseConfig.BASE_OUTPUT_PATH,
+                f"{BaseConfig.OUTPUT_DENOTE}_results_{_time_id()}",
+            )
             _ensure_directory(cls.base_output_dir)
             logger.info(f"Base Output directory: {cls.base_output_dir}")
-            latest_link_path = os.path.join(BaseConfig.BASE_OUTPUT_PATH, 'latest_result')
+            latest_link_path = os.path.join(
+                BaseConfig.BASE_OUTPUT_PATH, "latest_result"
+            )
             _update_soft_link(latest_link_path, cls.base_output_dir)
 
-    def save_file(self, content: Any, data_type: DataType, file_name_prefix: Optional[str] = None) -> None:
+    def save_file(
+        self, content: Any, data_type: DataType, file_name_prefix: Optional[str] = None
+    ) -> None:
         """
         Saves the provided content to a file based on its configuration.
 
@@ -88,17 +111,22 @@ class Saver:
             logger.warning(f"{BaseConfig.DISABLE_SAVING_NOTE} Saving is disabled. ")
             return
 
-        file_config = FILE_CONFIGURATIONS.get(data_type, FILE_CONFIGURATIONS[DataType.DEFAULT_DATA])
+        file_config = FILE_CONFIGURATIONS.get(
+            data_type, FILE_CONFIGURATIONS[DataType.DEFAULT_DATA]
+        )
         file_detail = file_config.detail
 
         if self.mode == Mode.GEN or data_type.file_extension == FileExtension.PNG:
             file_name_identifier = _time_id()
             rel_path = file_config.relative_dir
-            file_detail = (file_detail + '_') if file_config.detail and file_config.detail[-1] != '_' else (
-                    file_config.detail or '')
+            file_detail = (
+                (file_detail + "_")
+                if file_config.detail and file_config.detail[-1] != "_"
+                else (file_config.detail or "")
+            )
         else:
-            file_name_identifier = ''
-            rel_path = ''
+            file_name_identifier = ""
+            rel_path = ""
 
         file_name = f"{file_name_prefix}{file_detail}{file_name_identifier}.{file_config.file_extension}"
         abs_path = os.path.join(self.output_dir, rel_path, file_name)
@@ -115,17 +143,20 @@ class Saver:
 
     @staticmethod
     def _save_pickle(obj: Any, filepath: str) -> None:
-        with open(filepath, 'wb') as f:
+        with open(filepath, "wb") as f:
             import pickle
+
             # noinspection PyTypeChecker
             pickle.dump(obj, f)
 
     @staticmethod
     def _save_png_image(image, filepath: str) -> None:
         from numpy import ndarray
+
         assert isinstance(image, ndarray), "Unsupported image format. Expected ndarray."
 
         import cv2
+
         cv2.imwrite(filepath, image)
 
 
@@ -134,13 +165,16 @@ def _update_soft_link(link_path: str, target_path: str) -> None:
         try:
             os.unlink(link_path)
         except OSError as e:
-            logger.error(f"Failed to remove existing soft link: {link_path}. Error: {e}")
-            raise
+            logger.warning(
+                f"Failed to remove existing soft link: {link_path}. Error: {e}"
+            )
+            return
     try:
         os.symlink(target_path, link_path)
     except OSError as e:
-        logger.error(f"Failed to create soft link: {link_path}. Error: {e}")
-        raise
+        # On Windows, symlinks require admin privileges or Developer Mode
+        logger.warning(f"Failed to create soft link: {link_path}. Error: {e}")
+        return
 
 
 def _ensure_directory(path: str, exist_ok=False) -> None:
@@ -151,4 +185,5 @@ def _ensure_directory(path: str, exist_ok=False) -> None:
 
 def _time_id() -> str:
     import time
+
     return time.strftime("%Y%m%d_%H%M%S")
