@@ -7,7 +7,7 @@ import numpy as np
 
 from analysis import MultifractalAnalyzer
 from config import BaseConfig, DataType, Resolution, SetName
-from config import GenConfig
+from config.generate_mode import GenConfigNanowires as GenConfig
 from graph import GraphGenerator
 from handlers import AttributesCalculator, Mapper, RunAgent, Saver
 from utils import trim_graph
@@ -55,6 +55,15 @@ def generate_synthetic_network(exit_event, std_err_fea, attributes: AttributesCa
     return None, float('inf')
 
 
+def _get_worker_count(num_network: int) -> int:
+    """Determine the number of workers for multiprocessing."""
+    import os
+    if num_network < 20:
+        return 1
+    cpu_count = os.cpu_count() or 1
+    return max(1, cpu_count - 1)
+
+
 def generate_with_multiprocessing(data_agent: RunAgent):
     num_network, num_figures = BaseConfig.SYNTHETIC_NETWORK_NUMBER, BaseConfig.SYNTHETIC_GRAPH_NUMBER
     errors, futures = [], []
@@ -62,9 +71,13 @@ def generate_with_multiprocessing(data_agent: RunAgent):
     exit_event = Manager().Event()
     std_err_fea = None if BaseConfig.SYNTHETIC_NETWORK_NUMBER == 0 else MultifractalAnalyzer(
         data_agent.get_original_network()).analyze_error_features()
+
+    max_workers = _get_worker_count(num_network)
+    logger.info(f"Using {max_workers} worker(s) for {num_network} networks")
+
     try:
         from concurrent.futures import ProcessPoolExecutor, as_completed
-        with ProcessPoolExecutor() as executor:
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
             futures = [executor.submit(generate_synthetic_network, exit_event, std_err_fea,
                                        data_agent.attributes, data_agent.mapper) for _ in range(num_network)]
             next_log = 0
