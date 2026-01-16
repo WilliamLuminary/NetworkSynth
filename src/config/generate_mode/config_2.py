@@ -9,9 +9,22 @@ import numpy as np
 from utils import build_graph
 from .._utils import _find_file_with_pattern, _resize_cv2_image, _transpose_network_pos, _trim_cv2_image
 from ..base_config import BaseConfig
-from ..enums import NewSet
+from ..enums import SetName
 
 logger = logging.getLogger(__name__)
+
+
+class NewSet(SetName):
+    S4 = "004"
+    S8 = "008"
+    S11 = "011"
+    S14 = "014"
+    S17 = "017"
+    S20 = "020"
+    S23 = "023"
+    S26 = "026"
+    S29 = "029"
+    S32 = "032"
 
 
 class Config2(BaseConfig):
