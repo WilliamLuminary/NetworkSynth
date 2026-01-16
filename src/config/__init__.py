@@ -1,10 +1,21 @@
-# src/config/__init__.py
+from .base_config import BaseConfig  # noqa: F401
+from .enums import (  # noqa: F401
+    AnalysisMode,
+    DatasetId,
+    DataType,
+    FileExtension,
+    FileTag,
+    Mode,
+)
+from .file_definitions import (  # noqa: F401
+    FILE_CONFIGURATIONS,
+    FileConfig,
+    ImageConfig,
+    PlotConfig,
+)
 
-from .analyze_mode import AnaConfig
-from .attr_generate_mode import AttrConfig
-from .base_config import BaseConfig
-from .enums import (AnalysisMode, DatasetId, DataType, FileExtension, FileTag,
-                    Mode)
-from .file_definitions import (FILE_CONFIGURATIONS, FileConfig, ImageConfig,
-                               PlotConfig)
-from .generate_mode import GenConfig, GenConfig1, GenConfig2
+from . import analyze_mode, attr_generate_mode, generate_mode
+
+for _module in (analyze_mode, attr_generate_mode, generate_mode):
+    for _name in getattr(_module, "__all__", []):
+        globals()[_name] = getattr(_module, _name)
