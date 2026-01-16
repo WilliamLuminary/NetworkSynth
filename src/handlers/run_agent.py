@@ -215,7 +215,20 @@ def plot_network(data_type: DataType, graph: nx.Graph, **kwargs) -> ndarray:
     ), f"{data_type} shouldn't call {inspect.currentframe().f_code.co_name}."
 
     file_config = FILE_CONFIGURATIONS.get(data_type)
-    fig, ax = plt.subplots(figsize=(10, 10), dpi=300)
+
+    if data_type is DataType.ORIGINAL_GRAPH:
+        frame = (0, BaseConfig.FRAME_SIZE[0]), (0, BaseConfig.FRAME_SIZE[1])
+    else:
+        from utils import calculate_frame
+
+        frame = calculate_frame(graph)
+
+    frame_width = frame[0][1] - frame[0][0]
+    frame_height = frame[1][1] - frame[1][0]
+    aspect_ratio = frame_width / frame_height
+    fig_height = 10
+    fig_width = fig_height * aspect_ratio
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height), dpi=300)
 
     position_dict = nx.get_node_attributes(graph, "pos")
     edge_width = file_config.line_width
@@ -233,13 +246,6 @@ def plot_network(data_type: DataType, graph: nx.Graph, **kwargs) -> ndarray:
         if pos is not None:
             ax.plot(pos[0], pos[1], "bo", markersize=node_size, zorder=2)
 
-    if data_type is DataType.ORIGINAL_GRAPH:
-        frame = (0, BaseConfig.FRAME_SIZE[0]), (0, BaseConfig.FRAME_SIZE[1])
-    else:
-        from utils import calculate_frame
-
-        frame = calculate_frame(graph)
-
     ax.set_xlim(frame[0])
     ax.set_ylim(frame[1])
 
@@ -247,7 +253,14 @@ def plot_network(data_type: DataType, graph: nx.Graph, **kwargs) -> ndarray:
         image = kwargs.get("background", None)
         if image is not None:
             alpha = getattr(file_config, "alpha", 1.0)
-            ax.imshow(image, cmap="gray", alpha=alpha)  # type: ignore
+            img_height, img_width = image.shape[:2]
+            ax.imshow(
+                image,
+                cmap="gray",
+                alpha=alpha,
+                extent=(0, img_width, img_height, 0),
+                aspect="auto",
+            )
         else:
             logger.info("No background image provided.")
     else:
