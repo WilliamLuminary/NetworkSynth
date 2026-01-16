@@ -4,6 +4,8 @@ from typing import Set, Union
 
 
 class SetName(Enum):
+    """Base class for all config-specific set enums."""
+
     def __str__(self):
         return self.value
 
@@ -13,45 +15,9 @@ class SetName(Enum):
         return self.value < other.value
 
 
-class OldSet(SetName):
-    A = "A"
-    B = "B"
-    C = "C"
-    D = "D"
-
-
-class NewSet(SetName):
-    S4 = "004"
-    S8 = "008"
-    S11 = "011"
-    S14 = "014"
-    S17 = "017"
-    S20 = "020"
-    S23 = "023"
-    S26 = "026"
-    S29 = "029"
-    S32 = "032"
-
-
-class SampleSet(SetName):
-    Sample1 = "sample_1"
-    Sample2 = "sample_2"
-    Sample3 = "sample_3"
-
-
-def _generate_linlin_members():
-    return {f"S1_{i}": f"1-{i}" for i in range(0, 224)}
-
-
-######
-# class LinlinSet(SetName):
-#     S1_1 = "1-1"
-#     ...
-######
-LinlinSet = Enum("LinlinSet", _generate_linlin_members(), type=SetName)
-
-
 class Resolution(Enum):
+    """Base class for all config-specific resolution enums."""
+
     def __str__(self):
         return self.value
 
@@ -62,22 +28,9 @@ class Resolution(Enum):
 
 
 class IdleResolution(Resolution):
+    """Default resolution used when no specific resolution is needed."""
+
     NA = ""
-
-
-class OldResolution(Resolution):
-    NA = ""
-    X10K = "10kX"
-    X15K = "15kX"
-    X20K = "20kX"
-    X30K = "30kX"
-
-
-class SampleResolution(Resolution):
-    NA = ""
-    Sample1 = "sample_1"
-    Sample2 = "sample_2"
-    Sample3 = "sample_3"
 
 
 class FileExtension(Enum):

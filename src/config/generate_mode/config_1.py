@@ -9,9 +9,24 @@ import numpy as np
 from utils import build_graph
 from .._utils import _find_file_with_pattern, _resize_cv2_image, _transpose_network_pos, _trim_cv2_image
 from ..base_config import BaseConfig
-from ..enums import OldResolution, OldSet
+from ..enums import Resolution, SetName
 
 logger = logging.getLogger(__name__)
+
+
+class OldSet(SetName):
+    A = "A"
+    B = "B"
+    C = "C"
+    D = "D"
+
+
+class OldResolution(Resolution):
+    NA = ""
+    X10K = "10kX"
+    X15K = "15kX"
+    X20K = "20kX"
+    X30K = "30kX"
 
 
 class Config1(BaseConfig):
