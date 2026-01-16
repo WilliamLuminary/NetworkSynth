@@ -1,8 +1,7 @@
 # src/main_from_properties.py
 import logging
 
-from config import AttrConfig
-from config import BaseConfig, DataType
+from config import AttrConfig, BaseConfig, DataType
 from graph import GraphGenerator
 from handlers import AttributesCalculator, RunAgent
 from utils import trim_graph
@@ -33,7 +32,8 @@ def generate_synthetic_network(exit_event, attributes: AttributesCalculator):
             if _should_exit(exit_event):
                 return None
 
-            synthetic_graph = trim_graph(synthetic_graph, attributes.average_degree)
+            synthetic_graph = trim_graph(
+                synthetic_graph, attributes.average_degree)
             return synthetic_graph
 
         except KeyboardInterrupt:
@@ -47,26 +47,39 @@ def generate_synthetic_network(exit_event, attributes: AttributesCalculator):
 
 
 def generate_with_multiprocessing(data_agent: RunAgent):
-    num_network, num_figures = BaseConfig.SYNTHETIC_NETWORK_NUMBER, BaseConfig.SYNTHETIC_GRAPH_NUMBER
+    num_network, num_figures = (
+        BaseConfig.SYNTHETIC_NETWORK_NUMBER,
+        BaseConfig.SYNTHETIC_GRAPH_NUMBER,
+    )
     futures = []
     from multiprocessing import Manager
+
     exit_event = Manager().Event()
     try:
         from concurrent.futures import ProcessPoolExecutor, as_completed
+
         with ProcessPoolExecutor() as executor:
-            futures = [executor.submit(generate_synthetic_network, exit_event,
-                                       data_agent.attributes) for _ in range(num_network)]
+            futures = [
+                executor.submit(
+                    generate_synthetic_network, exit_event, data_agent.attributes
+                )
+                for _ in range(num_network)
+            ]
             next_log = 0
             for idx, future in enumerate(as_completed(futures), start=1):
                 synthetic_graph = future.result()
                 if not synthetic_graph:
                     break
 
-                if (progress := round(idx / num_network * 100, 2)) >= (next_log := next_log + 10):
+                if (progress := round(idx / num_network * 100, 2)) >= (
+                    next_log := next_log + 10
+                ):
                     logger.info(f"({progress}%) Synthetic graph generated.")
 
                 if (num_figures := num_figures - 1) >= 0:
-                    data_agent.save(data_type=DataType.SYNTHETIC_GRAPH, arg=synthetic_graph)
+                    data_agent.save(
+                        data_type=DataType.SYNTHETIC_GRAPH, arg=synthetic_graph
+                    )
                 data_agent.add_synthetic_graph(synthetic_graph)
 
     except KeyboardInterrupt:
@@ -99,5 +112,5 @@ def main():
         logger.critical("MAIN PROCESS: Forcing immediate shutdown!")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
