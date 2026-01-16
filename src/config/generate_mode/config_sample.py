@@ -78,7 +78,8 @@ class SampleConfig(BaseConfig):
 def _load_positions(dataset_id: DatasetId) -> np.ndarray:
     """Load node positions. dataset_id[0] = set_name"""
     set_name = dataset_id[0]
-    file_path = os.path.join(SampleConfig.POSITION_DATA_DIR, f"{set_name}_pos.npy")
+    file_path = os.path.join(
+        SampleConfig.POSITION_DATA_DIR, f"{set_name}_pos.npy")
 
     if not os.path.exists(file_path):
         msg = f"Positions file does not exist: {file_path}"
@@ -92,7 +93,8 @@ def _load_positions(dataset_id: DatasetId) -> np.ndarray:
 def _load_sparse_matrix(dataset_id: DatasetId):
     """Load sparse matrix. dataset_id[0] = set_name"""
     set_name = dataset_id[0]
-    file_path = os.path.join(SampleConfig.ADJ_MATRIX_DATA_DIR, f"{set_name}_mat.npy")
+    file_path = os.path.join(
+        SampleConfig.ADJ_MATRIX_DATA_DIR, f"{set_name}_mat.npy")
 
     if not os.path.exists(file_path):
         msg = f"Sparse matrix file does not exist: {file_path}"

@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 
 from utils import build_graph
+
 from .._utils import _transpose_network_pos
 from ..base_config import BaseConfig
 from ..enums import DatasetId
@@ -46,7 +47,8 @@ class NanowiresConfig(BaseConfig):
     MEASURE_WEIGHTED = False
     FULL_ANALYSIS = False
 
-    BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, _NANOWIRES_INPUT_DIR)
+    BASE_INPUT_PATH = os.path.join(
+        BaseConfig.BASE_INPUT_PATH, _NANOWIRES_INPUT_DIR)
 
     @classmethod
     def initialize(cls):
@@ -60,7 +62,8 @@ class NanowiresConfig(BaseConfig):
         """Load original network from position and edge list files."""
         positions = _load_positions(dataset_id)
         edge_list = _load_edge_list(dataset_id)
-        original_network = build_graph(positions, edge_list, arg_type="edge_list")
+        original_network = build_graph(
+            positions, edge_list, arg_type="edge_list")
         _transpose_network_pos(original_network)
         return original_network
 
@@ -71,12 +74,15 @@ class NanowiresConfig(BaseConfig):
         Add any image operations here (trim, resize, etc.) as needed.
         """
         # For nanowires, dataset_id has single level: "1-0", "1-1", etc.
-        directory = os.path.join(NanowiresConfig.BASE_INPUT_PATH, dataset_id[0])
+        directory = os.path.join(
+            NanowiresConfig.BASE_INPUT_PATH, dataset_id[0])
 
         # Find any .tif file in the directory (naming varies: 1.tif, 1-1.tif, etc.)
-        tif_files = [f for f in os.listdir(directory) if f.lower().endswith(".tif")]
+        tif_files = [f for f in os.listdir(
+            directory) if f.lower().endswith(".tif")]
         if not tif_files:
-            logger.warning(f"No .tif image found in {directory}. Returning None.")
+            logger.warning(
+                f"No .tif image found in {directory}. Returning None.")
             return None
 
         file_path = os.path.join(directory, tif_files[0])

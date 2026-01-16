@@ -8,12 +8,9 @@ import cv2
 import numpy as np
 
 from utils import build_graph
-from .._utils import (
-    _find_file_with_pattern,
-    _resize_cv2_image,
-    _transpose_network_pos,
-    _trim_cv2_image,
-)
+
+from .._utils import (_find_file_with_pattern, _resize_cv2_image,
+                      _transpose_network_pos, _trim_cv2_image)
 from ..base_config import BaseConfig
 from ..enums import DatasetId
 
@@ -96,7 +93,9 @@ def _load_sparse_matrix(dataset_id: DatasetId):
     set_name, resolution = dataset_id[0], dataset_id[1]
     directory_path = Config1.ADJ_MATRIX_DATA_DIR
     file_path = _find_file_with_pattern(
-        directory_path, rf"sparse_matrices_{re.escape(resolution)}.*\.npz", "sparse matrix"
+        directory_path,
+        rf"sparse_matrices_{re.escape(resolution)}.*\.npz",
+        "sparse matrix",
     )
     matrix_data = np.load(file_path, allow_pickle=True)
 

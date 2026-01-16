@@ -18,12 +18,12 @@ class DataLoader:
 
         if mode == Mode.GEN:
             # New approach: use dataset_id
-            if 'dataset_id' in kwargs:
-                self._dataset_id = kwargs['dataset_id']
+            if "dataset_id" in kwargs:
+                self._dataset_id = kwargs["dataset_id"]
             # Legacy fallback: set_name and resolution
-            elif 'set_name' in kwargs:
-                set_str = str(kwargs['set_name'])
-                res_str = str(kwargs.get('resolution', ''))
+            elif "set_name" in kwargs:
+                set_str = str(kwargs["set_name"])
+                res_str = str(kwargs.get("resolution", ""))
                 if res_str:
                     self._dataset_id = DatasetId(set_str, res_str)
                 else:
@@ -31,11 +31,11 @@ class DataLoader:
             else:
                 raise ValueError("Either dataset_id or set_name is required")
         elif mode == Mode.ANA:
-            assert 'path' in kwargs, "path is required."
-            self._both_networks_path = kwargs['path']
+            assert "path" in kwargs, "path is required."
+            self._both_networks_path = kwargs["path"]
         elif mode == Mode.ATR:
-            assert 'path' in kwargs, "path is required."
-            self._attr_path = kwargs['path']
+            assert "path" in kwargs, "path is required."
+            self._attr_path = kwargs["path"]
             self.__attr = None
 
         self.__mode = mode
@@ -61,7 +61,9 @@ class DataLoader:
             self.__original_image = self._load_original_image()
 
         elif self.__mode == Mode.ANA:
-            self.__original_network, self.__synthetic_networks = self._load_both_networks()
+            self.__original_network, self.__synthetic_networks = (
+                self._load_both_networks()
+            )
 
         elif self.__mode == Mode.ATR:
             self.__attr = self._load_attr()

@@ -8,10 +8,9 @@ import cv2
 import wandb
 
 from analysis import MultifractalAnalyzer
-from config import BaseConfig, DatasetId, DataType
-
 # noinspection PyUnresolvedReferences
-from config import GenConfig, GenConfig1, GenConfig2
+from config import (BaseConfig, DatasetId, DataType, GenConfig, GenConfig1,
+                    GenConfig2)
 from handlers import RunAgent, plot_network
 from main import compute_average_error, generate_synthetic_network
 
@@ -64,8 +63,10 @@ def generate_networks_multiprocess(
                     synthetic_graph_image = plot_network(
                         data_type=DataType.SYNTHETIC_GRAPH, graph=synthetic_graph
                     )
-                    _, img_encoded = cv2.imencode(".png", synthetic_graph_image)
-                    wandb.log({"synthetic_graph": wandb.Image(img_encoded.tobytes())})
+                    _, img_encoded = cv2.imencode(
+                        ".png", synthetic_graph_image)
+                    wandb.log(
+                        {"synthetic_graph": wandb.Image(img_encoded.tobytes())})
                 data_agent.add_synthetic_graph(synthetic_graph)
                 errors.append(error)
 
@@ -107,7 +108,8 @@ def run_for_dataset(dataset_id: DatasetId) -> None:
         if error is not None:
             table.add_data(nf, ef, error)
         else:
-            logger.warning(f"Error is None for node_factor {nf}, edge_factor {ef}")
+            logger.warning(
+                f"Error is None for node_factor {nf}, edge_factor {ef}")
 
     wandb.log(
         {
@@ -127,7 +129,9 @@ def main():
 
     wandb.login()
     wandb.init(
-        project=EXPERIMENT_PROJECT_NAME, name=EXPERIMENT_NAME, dir=BaseConfig.PROJECT_ROOT
+        project=EXPERIMENT_PROJECT_NAME,
+        name=EXPERIMENT_NAME,
+        dir=BaseConfig.PROJECT_ROOT,
     )
     try:
         for dataset_id in BaseConfig.get_datasets():

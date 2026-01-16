@@ -14,7 +14,8 @@ logger = logging.getLogger(__name__)
 @dataclass(slots=True)
 class OldAttributesCalculator:
     degree_distribution: Dict[int, float] = field(default_factory=dict)
-    degree_transition_probs: Dict[int, Dict[int, float]] = field(default_factory=dict)
+    degree_transition_probs: Dict[int, Dict[int, float]] = field(
+        default_factory=dict)
     degree_edge_lengths: Dict[int, List[float]] = field(default_factory=dict)
     degree_angle_diffs: Dict[int, List[float]] = field(default_factory=dict)
     average_edge_length: float = 0.0
@@ -24,12 +25,15 @@ class OldAttributesCalculator:
         if graph.number_of_nodes() == 0:
             return self
 
-        self.degree_distribution = dict(self._compute_degree_distribution(graph))
-        self.degree_transition_probs = dict(self._compute_degree_transition_probs(graph))
+        self.degree_distribution = dict(
+            self._compute_degree_distribution(graph))
+        self.degree_transition_probs = dict(
+            self._compute_degree_transition_probs(graph)
+        )
         self.average_degree = self._compute_average_degree(graph)
-        (degree_edge_lengths,
-         degree_angle_diffs,
-         self.average_edge_length) = self._compute_edge_lengths_and_angle_diffs(graph)
+        (degree_edge_lengths, degree_angle_diffs, self.average_edge_length) = (
+            self._compute_edge_lengths_and_angle_diffs(graph)
+        )
         self.degree_edge_lengths = dict(degree_edge_lengths)
         self.degree_angle_diffs = dict(degree_angle_diffs)
         return self
@@ -41,10 +45,14 @@ class OldAttributesCalculator:
         degree_counts = Counter(degrees)
         if total_nodes == 0:
             return {}
-        return {int(degree): count / total_nodes for degree, count in degree_counts.items()}
+        return {
+            int(degree): count / total_nodes for degree, count in degree_counts.items()
+        }
 
     @staticmethod
-    def _compute_degree_transition_probs(graph: nx.Graph) -> Dict[int, Dict[int, float]]:
+    def _compute_degree_transition_probs(
+        graph: nx.Graph,
+    ) -> Dict[int, Dict[int, float]]:
         degrees = dict(graph.degree())
         degree_neighbors = defaultdict(list)
         for node, adjacency_dict in graph.adjacency():
@@ -60,15 +68,16 @@ class OldAttributesCalculator:
                 transition_probs[degree] = {}
             else:
                 transition_probs[degree] = {
-                    neighbor_degree: count / total for neighbor_degree, count in counts.items()
+                    neighbor_degree: count / total
+                    for neighbor_degree, count in counts.items()
                 }
         return transition_probs
 
     @staticmethod
     def _compute_edge_lengths_and_angle_diffs(
-            graph: nx.Graph
+        graph: nx.Graph,
     ) -> Tuple[Dict[int, List[float]], Dict[int, List[float]], float]:
-        node_positions = nx.get_node_attributes(graph, 'pos')
+        node_positions = nx.get_node_attributes(graph, "pos")
         degree_to_lengths = defaultdict(list)
         degree_to_angle_diffs = defaultdict(list)
 
@@ -85,12 +94,20 @@ class OldAttributesCalculator:
             angles = []
 
             for neighbor in neighbors:
-                neighbor_pos = np.array(node_positions[neighbor], dtype=np.float64)
+                neighbor_pos = np.array(
+                    node_positions[neighbor], dtype=np.float64)
 
                 length = euclidean(node_pos, neighbor_pos)
                 lengths.append(length)
 
-                angle = np.arctan2(neighbor_pos[1] - node_pos[1], neighbor_pos[0] - node_pos[0]) * 180 / np.pi
+                angle = (
+                    np.arctan2(
+                        neighbor_pos[1] -
+                        node_pos[1], neighbor_pos[0] - node_pos[0]
+                    )
+                    * 180
+                    / np.pi
+                )
                 angles.append(angle)
 
             node_degree = graph.degree[node]
@@ -102,7 +119,9 @@ class OldAttributesCalculator:
             if len(angles) > 1:
                 sorted_angles = np.sort(angles)
                 angles_diff = np.diff(sorted_angles)
-                angles_diff = np.append(angles_diff, 360.0 + sorted_angles[0] - sorted_angles[-1])
+                angles_diff = np.append(
+                    angles_diff, 360.0 + sorted_angles[0] - sorted_angles[-1]
+                )
                 degree_to_angle_diffs[node_degree].extend(angles_diff)
 
         avg_length = total_length / total_edges_count if total_edges_count > 0 else 0.0
@@ -119,7 +138,8 @@ class OldAttributesCalculator:
 @dataclass(slots=True)
 class AttributesCalculator:
     degree_distribution: Dict[int, float] = field(default_factory=dict)
-    degree_transition_probs: Dict[int, Dict[int, float]] = field(default_factory=dict)
+    degree_transition_probs: Dict[int, Dict[int, float]] = field(
+        default_factory=dict)
     degree_lengths: Dict[int, List[float]] = field(default_factory=dict)
     degree_angles: Dict[int, List[float]] = field(default_factory=dict)
     average_length: float = 0.0
@@ -137,19 +157,21 @@ class AttributesCalculator:
         precomputed_data = self._precompute_graph_data(graph)
 
         self.degree_distribution = self._compute_degree_distribution(
-            precomputed_data["degrees"],
-            graph.number_of_nodes()
+            precomputed_data["degrees"], graph.number_of_nodes()
         )
         self.degree_transition_probs = self._compute_degree_transition_probs(
             precomputed_data["degree_neighbors"]
         )
         self.degree_lengths = dict(precomputed_data["degree_to_lengths"])
         self.degree_angles = self._compute_degree_angles(
-            precomputed_data["node_angles"],
-            precomputed_data["degrees"]
+            precomputed_data["node_angles"], precomputed_data["degrees"]
         )
-        self.average_length = self._compute_average_edge_length(precomputed_data["degree_to_lengths"])
-        self.average_degree = self._compute_average_degree(graph.number_of_edges(), graph.number_of_nodes())
+        self.average_length = self._compute_average_edge_length(
+            precomputed_data["degree_to_lengths"]
+        )
+        self.average_degree = self._compute_average_degree(
+            graph.number_of_edges(), graph.number_of_nodes()
+        )
         return self
 
     @staticmethod
@@ -171,14 +193,14 @@ class AttributesCalculator:
                 length = euclidean(u_pos, v_pos)
                 degree_to_lengths[degree_u].append(length)
                 degree_to_lengths[degree_v].append(length)
-                angle_u_to_v = np.arctan2(
-                    v_pos[1] - u_pos[1],
-                    v_pos[0] - u_pos[0]
-                ) * 180 / np.pi
-                angle_v_to_u = np.arctan2(
-                    u_pos[1] - v_pos[1],
-                    u_pos[0] - v_pos[0]
-                ) * 180 / np.pi
+                angle_u_to_v = (
+                    np.arctan2(v_pos[1] - u_pos[1],
+                               v_pos[0] - u_pos[0]) * 180 / np.pi
+                )
+                angle_v_to_u = (
+                    np.arctan2(u_pos[1] - v_pos[1],
+                               u_pos[0] - v_pos[0]) * 180 / np.pi
+                )
                 node_angles[node_u].append(angle_u_to_v)
                 node_angles[node_v].append(angle_v_to_u)
 
@@ -191,27 +213,32 @@ class AttributesCalculator:
 
     @staticmethod
     def _compute_degree_distribution(
-            degrees: Dict[int, int],
-            num_nodes: int
+        degrees: Dict[int, int], num_nodes: int
     ) -> Dict[int, float]:
         """
         Count how many nodes have each degree, then normalize by total node count.
         """
-        return {deg: count / num_nodes for deg, count in Counter(degrees.values()).items()}
+        return {
+            deg: count / num_nodes for deg, count in Counter(degrees.values()).items()
+        }
 
     @staticmethod
     def _compute_degree_transition_probs(
-            degree_neighbors: Dict[int, List[int]]
+        degree_neighbors: Dict[int, List[int]],
     ) -> Dict[int, Dict[int, float]]:
         """
         For each degree d, gather the distribution of neighbor degrees
         and convert counts to probabilities.
         """
         return {
-            degree: {
-                neighbor_degree: count / len(neighbors_list)
-                for neighbor_degree, count in Counter(neighbors_list).items()
-            } if neighbors_list else {}
+            degree: (
+                {
+                    neighbor_degree: count / len(neighbors_list)
+                    for neighbor_degree, count in Counter(neighbors_list).items()
+                }
+                if neighbors_list
+                else {}
+            )
             for degree, neighbors_list in degree_neighbors.items()
         }
 
@@ -224,8 +251,7 @@ class AttributesCalculator:
 
     @staticmethod
     def _compute_degree_angles(
-            node_angles: Dict[int, List[float]],
-            degrees: Dict[int, int]
+        node_angles: Dict[int, List[float]], degrees: Dict[int, int]
     ) -> Dict[int, List[float]]:
         """
         For each node, compute the angular differences between sorted angles
@@ -246,7 +272,7 @@ class AttributesCalculator:
 
     @staticmethod
     def _compute_average_edge_length(
-            degree_to_lengths: Dict[int, List[float]]
+        degree_to_lengths: Dict[int, List[float]],
     ) -> float:
         """
         Compute the mean edge length from the 'degree_to_lengths' dictionary.

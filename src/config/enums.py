@@ -99,7 +99,8 @@ class SetName(Enum):
 
     def __lt__(self, other):
         if type(self) is not type(other):
-            raise TypeError("Comparisons between different Set types are not allowed.")
+            raise TypeError(
+                "Comparisons between different Set types are not allowed.")
         return self.value < other.value
 
     def to_dataset_id(self) -> DatasetId:
@@ -118,7 +119,8 @@ class Resolution(Enum):
 
     def __lt__(self, other):
         if type(self) is not type(other):
-            raise TypeError("Comparisons between different Set types are not allowed.")
+            raise TypeError(
+                "Comparisons between different Set types are not allowed.")
         return self.value < other.value
 
 
@@ -151,7 +153,8 @@ class FileTag(Enum):
 
 class DataType(Enum):
     DEFAULT_DATA = ("", {FileTag.DATA}, FileExtension.PKL)
-    ORIGINAL_IMAGE = ("Original Image", {FileTag.FIG, FileTag.ORI}, FileExtension.PNG)
+    ORIGINAL_IMAGE = ("Original Image", {
+                      FileTag.FIG, FileTag.ORI}, FileExtension.PNG)
     ORIGINAL_GRAPH = (
         "Original Graph",
         {FileTag.FIG, FileTag.PLOT, FileTag.ORI},
@@ -177,7 +180,8 @@ class DataType(Enum):
         {FileTag.DATA, FileTag.SYN},
         FileExtension.PKL,
     )
-    ANALYSIS_DATA = ("Analysis Data", {FileTag.DATA, FileTag.ANA}, FileExtension.PKL)
+    ANALYSIS_DATA = ("Analysis Data", {
+                     FileTag.DATA, FileTag.ANA}, FileExtension.PKL)
     ANALYSIS_FIGURE = (
         "Analysis Figure",
         {FileTag.FIG, FileTag.PLOT, FileTag.ANA},

@@ -8,12 +8,9 @@ import cv2
 import numpy as np
 
 from utils import build_graph
-from .._utils import (
-    _find_file_with_pattern,
-    _resize_cv2_image,
-    _transpose_network_pos,
-    _trim_cv2_image,
-)
+
+from .._utils import (_find_file_with_pattern, _resize_cv2_image,
+                      _transpose_network_pos, _trim_cv2_image)
 from ..base_config import BaseConfig
 from ..enums import DatasetId
 
@@ -22,7 +19,8 @@ logger = logging.getLogger(__name__)
 
 def _generate_new_datasets() -> List[DatasetId]:
     """Generate DatasetId list for new dataset format: 004, 008, 011, etc."""
-    set_names = ["004", "008", "011", "014", "017", "020", "023", "026", "029", "032"]
+    set_names = ["004", "008", "011", "014",
+                 "017", "020", "023", "026", "029", "032"]
     return [DatasetId(s) for s in set_names]
 
 
@@ -99,13 +97,17 @@ def _load_sparse_matrix(dataset_id: DatasetId):
     matrix_data = np.load(file_path, allow_pickle=True)
 
     key_pattern = rf"W-\d+-\d+-\d+_{re.escape(set_name)}_EL"
-    matching_keys = [key for key in matrix_data.keys() if re.fullmatch(key_pattern, key)]
+    matching_keys = [
+        key for key in matrix_data.keys() if re.fullmatch(key_pattern, key)
+    ]
 
     if len(matching_keys) == 1:
         logger.info(f"Sparse matrix loaded: {matching_keys[0]}")
         return matrix_data[matching_keys[0]].item()
     elif len(matching_keys) > 1:
-        raise FileExistsError(f"Multiple matching sparse matrices found: {matching_keys}")
+        raise FileExistsError(
+            f"Multiple matching sparse matrices found: {matching_keys}"
+        )
     else:
         available_keys = list(matrix_data.keys())
         raise KeyError(

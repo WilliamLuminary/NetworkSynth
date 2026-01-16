@@ -7,16 +7,9 @@ import networkx as nx
 from matplotlib import pyplot as plt
 from numpy import ndarray
 
-from config import (
-    BaseConfig,
-    DatasetId,
-    DataType,
-    FILE_CONFIGURATIONS,
-    FileTag,
-    Mode,
-    Resolution,
-    SetName,
-)
+from config import (FILE_CONFIGURATIONS, BaseConfig, DatasetId, DataType,
+                    FileTag, Mode, Resolution, SetName)
+
 from .data_loader import DataLoader
 from .saver import Saver
 
@@ -65,7 +58,9 @@ class RunAgent:
             self.mapper = None
             self.batch_processor = None
         else:
-            raise ValueError("Invalid arguments: provide dataset_id, set_name, networks_path, or attr_path")
+            raise ValueError(
+                "Invalid arguments: provide dataset_id, set_name, networks_path, or attr_path"
+            )
 
     def prepare_data(self):
         if self.mode == Mode.GEN:
@@ -94,7 +89,8 @@ class RunAgent:
             self.data_loader.load()
             from .attributes_calculator import AttributesCalculator
 
-            self.attributes = AttributesCalculator(**self.data_loader.get_attr_dict())
+            self.attributes = AttributesCalculator(
+                **self.data_loader.get_attr_dict())
 
     def multifractal_analysis_in_generate_mode(self):
         assert self.mode == Mode.GEN, "This method is only available in Generate mode."
@@ -158,7 +154,8 @@ class RunAgent:
             assert self.attributes, "Attributes are not initialized."
             import dataclasses
 
-            self.saver.save_file(dataclasses.asdict(self.attributes), data_type, file_name_prefix)  # type: ignore
+            self.saver.save_file(dataclasses.asdict(
+                self.attributes), data_type, file_name_prefix)  # type: ignore
 
         elif data_type == DataType.ORIGINAL_GRAPH:
             original_network = self.data_loader.get_original_network()
@@ -171,7 +168,8 @@ class RunAgent:
                 show=True,
             )
             if self.saver:
-                self.saver.save_file(original_figure, data_type, file_name_prefix)
+                self.saver.save_file(
+                    original_figure, data_type, file_name_prefix)
 
         elif data_type == DataType.SYNTHETIC_GRAPH:
             assert isinstance(
@@ -190,7 +188,8 @@ class RunAgent:
 
         elif data_type == DataType.SYNTHETIC_NETWORK:
             synthetic_networks = self.data_loader.get_synthetic_networks()
-            self.saver.save_file(synthetic_networks, data_type, file_name_prefix)
+            self.saver.save_file(synthetic_networks,
+                                 data_type, file_name_prefix)
 
         elif data_type == DataType.ANALYSIS_DATA:
             assert (

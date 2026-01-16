@@ -7,6 +7,7 @@ from numpy import ndarray
 
 from config import BaseConfig
 from utils import build_graph, calculate_frame, largest_connected_component
+
 from ._graph_node import GraphNode
 
 
@@ -31,7 +32,8 @@ class GraphGenerator:
             )
 
         _synthetic_network = build_graph(nodes, edges, arg_type="graph_node")
-        frame = calculate_frame(graph=_synthetic_network, frame_range=frame_range)
+        frame = calculate_frame(graph=_synthetic_network,
+                                frame_range=frame_range)
         synthetic_network = _filter_graph(_synthetic_network, frame)
         return synthetic_network
 
@@ -42,7 +44,8 @@ class GraphGenerator:
         GraphNode.reset()
         root_node = GraphNode((0, 0))
         node_set, edge_set = {root_node}, set()
-        scaled_frame_range = (round(frame_range[0] * 1.1), round(frame_range[1] * 1.1))
+        scaled_frame_range = (
+            round(frame_range[0] * 1.1), round(frame_range[1] * 1.1))
         frame = calculate_frame(
             center_position=root_node.position, frame_range=scaled_frame_range
         )

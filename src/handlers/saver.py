@@ -4,16 +4,8 @@ import logging
 import os
 from typing import Any, Optional, Union
 
-from config import (
-    BaseConfig,
-    DatasetId,
-    DataType,
-    FILE_CONFIGURATIONS,
-    FileExtension,
-    Mode,
-    Resolution,
-    SetName,
-)
+from config import (FILE_CONFIGURATIONS, BaseConfig, DatasetId, DataType,
+                    FileExtension, Mode, Resolution, SetName)
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +62,8 @@ class Saver:
             # Handle both new DatasetId and legacy set_name/resolution
             if dataset_id is not None:
                 # New approach: use DatasetId.path for directory structure
-                self.output_dir = os.path.join(self.base_output_dir, dataset_id.path)
+                self.output_dir = os.path.join(
+                    self.base_output_dir, dataset_id.path)
             elif set_name is not None:
                 # Legacy fallback
                 res_str = str(resolution) if resolution else ""
@@ -79,9 +72,11 @@ class Saver:
                         self.base_output_dir, str(set_name), res_str
                     )
                 else:
-                    self.output_dir = os.path.join(self.base_output_dir, str(set_name))
+                    self.output_dir = os.path.join(
+                        self.base_output_dir, str(set_name))
             else:
-                raise ValueError("Either dataset_id or set_name must be provided")
+                raise ValueError(
+                    "Either dataset_id or set_name must be provided")
 
             self.mode = Mode.GEN
 
@@ -94,12 +89,14 @@ class Saver:
         :return: None
         """
         if BaseConfig.DISABLE_SAVING:
-            logger.info(f"Saving is disabled. {BaseConfig.DISABLE_SAVING_NOTE}.")
+            logger.info(
+                f"Saving is disabled. {BaseConfig.DISABLE_SAVING_NOTE}.")
             return
 
         if result_dir:
             cls.mode = Mode.ANA
-            cls.base_output_dir = os.path.join(BaseConfig.BASE_OUTPUT_PATH, result_dir)
+            cls.base_output_dir = os.path.join(
+                BaseConfig.BASE_OUTPUT_PATH, result_dir)
         else:
             cls.mode = Mode.GEN
             cls.base_output_dir = os.path.join(
@@ -129,7 +126,8 @@ class Saver:
             return
 
         if BaseConfig.DISABLE_SAVING:
-            logger.warning(f"{BaseConfig.DISABLE_SAVING_NOTE} Saving is disabled. ")
+            logger.warning(
+                f"{BaseConfig.DISABLE_SAVING_NOTE} Saving is disabled. ")
             return
 
         file_config = FILE_CONFIGURATIONS.get(
@@ -174,7 +172,8 @@ class Saver:
     def _save_png_image(image, filepath: str) -> None:
         from numpy import ndarray
 
-        assert isinstance(image, ndarray), "Unsupported image format. Expected ndarray."
+        assert isinstance(
+            image, ndarray), "Unsupported image format. Expected ndarray."
 
         import cv2
 
