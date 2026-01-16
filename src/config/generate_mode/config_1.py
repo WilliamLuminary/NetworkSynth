@@ -28,8 +28,7 @@ def _generate_old_datasets() -> List[DatasetId]:
 
 
 class Config1(BaseConfig):
-    # Use DATASETS with two-level DatasetId: (set_name, resolution)
-    DATASETS = [DatasetId("A", "10kX")]  # Default: single dataset for testing
+    DATASETS = [DatasetId("A", "10kX")]
 
     IMAGE_SIZE = (510, 510)
     FRAME_SIZE = (510, 510)

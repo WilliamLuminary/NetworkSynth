@@ -191,7 +191,10 @@ class MultifractalAnalyzer:
 
     def _compute_centralities(self) -> Dict[str, List[float]]:
         if self.weighted:
-            def closeness_distance(u, v, d): return 1 / d["weight"]
+
+            def closeness_distance(u, v, d):
+                return 1 / d["weight"]
+
             degree_attr = "weight"
             clustering_attr = "weight"
         else:

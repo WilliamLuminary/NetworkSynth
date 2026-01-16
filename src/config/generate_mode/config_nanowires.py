@@ -24,14 +24,10 @@ _NANOWIRES_INPUT_DIR = "Nanowires-20250222-255-input"
 
 
 class NanowiresConfig(BaseConfig):
-    # Use DATASETS with DatasetId - the new flexible approach
-    # Each dataset has a single level: "1-0", "1-1", etc.
-    DATASETS = _generate_nanowires_datasets()[:5]  # Use [:5] for testing
+    DATASETS = _generate_nanowires_datasets()
 
     IMAGE_SIZE: Tuple[int, int] = (1024, 1536)
-
     FRAME_SIZE: Tuple[int, int] = (1536, 1024)
-
     SCALE_FACTOR: int = 3
     SYNTHETIC_FRAME_SIZE: Tuple[int, int] = (
         FRAME_SIZE[0] * SCALE_FACTOR,

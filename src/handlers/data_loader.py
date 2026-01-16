@@ -17,19 +17,9 @@ class DataLoader:
         self.__synthetic_networks = []
 
         if mode == Mode.GEN:
-            # New approach: use dataset_id
-            if "dataset_id" in kwargs:
-                self._dataset_id = kwargs["dataset_id"]
-            # Legacy fallback: set_name and resolution
-            elif "set_name" in kwargs:
-                set_str = str(kwargs["set_name"])
-                res_str = str(kwargs.get("resolution", ""))
-                if res_str:
-                    self._dataset_id = DatasetId(set_str, res_str)
-                else:
-                    self._dataset_id = DatasetId(set_str)
-            else:
-                raise ValueError("Either dataset_id or set_name is required")
+            if "dataset_id" not in kwargs:
+                raise ValueError("dataset_id is required for GEN mode")
+            self._dataset_id = kwargs["dataset_id"]
         elif mode == Mode.ANA:
             assert "path" in kwargs, "path is required."
             self._both_networks_path = kwargs["path"]

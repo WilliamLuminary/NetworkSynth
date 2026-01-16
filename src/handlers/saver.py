@@ -1,11 +1,11 @@
-# src/utils/saver.py
+# src/handlers/saver.py
 
 import logging
 import os
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 from config import (FILE_CONFIGURATIONS, BaseConfig, DatasetId, DataType,
-                    FileExtension, Mode, Resolution, SetName)
+                    FileExtension, Mode)
 
 logger = logging.getLogger(__name__)
 
@@ -27,17 +27,12 @@ class Saver:
         self,
         dataset_id: Optional[DatasetId] = None,
         *,
-        # Legacy parameters - kept for backward compatibility
-        set_name: Optional[SetName] = None,
-        resolution: Optional[Resolution] = None,
         output_dir: str = None,
     ):
         """
         Initialize the Saver object.
 
-        :param dataset_id: DatasetId identifying the dataset (new approach)
-        :param set_name: [DEPRECATED] Use dataset_id instead
-        :param resolution: [DEPRECATED] Use dataset_id instead
+        :param dataset_id: DatasetId identifying the dataset
         :param output_dir: Direct output directory path (for analysis mode)
 
         Preconditions:
@@ -59,25 +54,11 @@ class Saver:
                 self.base_output_dir
             ), "Base output directory is not initialized.\nCall Saver.initialize() first."
 
-            # Handle both new DatasetId and legacy set_name/resolution
-            if dataset_id is not None:
-                # New approach: use DatasetId.path for directory structure
-                self.output_dir = os.path.join(
-                    self.base_output_dir, dataset_id.path)
-            elif set_name is not None:
-                # Legacy fallback
-                res_str = str(resolution) if resolution else ""
-                if res_str:
-                    self.output_dir = os.path.join(
-                        self.base_output_dir, str(set_name), res_str
-                    )
-                else:
-                    self.output_dir = os.path.join(
-                        self.base_output_dir, str(set_name))
-            else:
-                raise ValueError(
-                    "Either dataset_id or set_name must be provided")
+            if dataset_id is None:
+                raise ValueError("dataset_id must be provided")
 
+            self.output_dir = os.path.join(
+                self.base_output_dir, dataset_id.path)
             self.mode = Mode.GEN
 
         _ensure_directory(self.output_dir, exist_ok=True)

@@ -8,12 +8,9 @@ class DatasetId:
     """
     Flexible multi-level dataset identifier.
 
-    Replaces the old SetName/Resolution system with an extensible array-based
-    approach that supports any number of hierarchy levels.
-
     Examples:
-        DatasetId("1-0")              # Single level (like NanowiresSet)
-        DatasetId("A", "10kX")        # Two levels (like OldSet + OldResolution)
+        DatasetId("1-0")              # Single level
+        DatasetId("A", "10kX")        # Two levels
         DatasetId("exp1", "set_a", "high_res")  # Three levels
 
     Usage:
@@ -85,49 +82,6 @@ class DatasetId:
 
     def __setattr__(self, name, value):
         raise AttributeError("DatasetId is immutable")
-
-
-# Legacy support - kept for backward compatibility with existing configs
-class SetName(Enum):
-    """
-    [DEPRECATED] Base class for config-specific set enums.
-    Use DatasetId instead for new configs.
-    """
-
-    def __str__(self):
-        return self.value
-
-    def __lt__(self, other):
-        if type(self) is not type(other):
-            raise TypeError(
-                "Comparisons between different Set types are not allowed.")
-        return self.value < other.value
-
-    def to_dataset_id(self) -> DatasetId:
-        """Convert to DatasetId for compatibility."""
-        return DatasetId(str(self))
-
-
-class Resolution(Enum):
-    """
-    [DEPRECATED] Base class for config-specific resolution enums.
-    Use DatasetId instead for new configs.
-    """
-
-    def __str__(self):
-        return self.value
-
-    def __lt__(self, other):
-        if type(self) is not type(other):
-            raise TypeError(
-                "Comparisons between different Set types are not allowed.")
-        return self.value < other.value
-
-
-class IdleResolution(Resolution):
-    """Default resolution used when no specific resolution is needed."""
-
-    NA = ""
 
 
 class FileExtension(Enum):
