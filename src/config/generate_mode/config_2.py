@@ -17,9 +17,9 @@ logger = logging.getLogger(__name__)
 class Config2(BaseConfig):
     SETS = [NewSet.S4]
 
-    TRIM_SIZE = (0, 116, 0, 0)  # (Top, Bottom, Left, Right)
-    DEFAULT_FRAME_SIZE = (1887 // 4, 2048 // 4)
-    DEFAULT_FIGURE_SIZE = DEFAULT_FRAME_SIZE
+    IMAGE_SIZE = (1887, 2048)
+    FRAME_SIZE = (1887 // 4, 2048 // 4)
+    SYNTHETIC_FRAME_SIZE = FRAME_SIZE
 
     CLOSED_NODES_FACTOR = 1.2
     CLOSED_EDGES_FACTOR = 0.8
