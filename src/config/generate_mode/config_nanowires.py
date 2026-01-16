@@ -23,7 +23,7 @@ def _generate_nanowires_datasets(count: int = 225) -> List[DatasetId]:
 _NANOWIRES_INPUT_DIR = "Nanowires-20250222-255-input"
 
 
-class NanowiresConfig(BaseConfig):
+class ConfigNanowires(BaseConfig):
     DATASETS = _generate_nanowires_datasets()
 
     IMAGE_SIZE: Tuple[int, int] = (1024, 1536)
@@ -43,8 +43,7 @@ class NanowiresConfig(BaseConfig):
     MEASURE_WEIGHTED = False
     FULL_ANALYSIS = False
 
-    BASE_INPUT_PATH = os.path.join(
-        BaseConfig.BASE_INPUT_PATH, _NANOWIRES_INPUT_DIR)
+    BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, _NANOWIRES_INPUT_DIR)
 
     @classmethod
     def initialize(cls):
@@ -58,8 +57,7 @@ class NanowiresConfig(BaseConfig):
         """Load original network from position and edge list files."""
         positions = _load_positions(dataset_id)
         edge_list = _load_edge_list(dataset_id)
-        original_network = build_graph(
-            positions, edge_list, arg_type="edge_list")
+        original_network = build_graph(positions, edge_list, arg_type="edge_list")
         _transpose_network_pos(original_network)
         return original_network
 
@@ -70,15 +68,12 @@ class NanowiresConfig(BaseConfig):
         Add any image operations here (trim, resize, etc.) as needed.
         """
         # For nanowires, dataset_id has single level: "1-0", "1-1", etc.
-        directory = os.path.join(
-            NanowiresConfig.BASE_INPUT_PATH, dataset_id[0])
+        directory = os.path.join(ConfigNanowires.BASE_INPUT_PATH, dataset_id[0])
 
         # Find any .tif file in the directory (naming varies: 1.tif, 1-1.tif, etc.)
-        tif_files = [f for f in os.listdir(
-            directory) if f.lower().endswith(".tif")]
+        tif_files = [f for f in os.listdir(directory) if f.lower().endswith(".tif")]
         if not tif_files:
-            logger.warning(
-                f"No .tif image found in {directory}. Returning None.")
+            logger.warning(f"No .tif image found in {directory}. Returning None.")
             return None
 
         file_path = os.path.join(directory, tif_files[0])
@@ -93,7 +88,7 @@ class NanowiresConfig(BaseConfig):
 
 def _load_positions(dataset_id: DatasetId) -> np.ndarray:
     """Load node positions from CSV file."""
-    directory = os.path.join(NanowiresConfig.BASE_INPUT_PATH, dataset_id[0])
+    directory = os.path.join(ConfigNanowires.BASE_INPUT_PATH, dataset_id[0])
     file_path = os.path.join(directory, "nod_pos.csv")
 
     if not os.path.exists(file_path):
@@ -105,7 +100,7 @@ def _load_positions(dataset_id: DatasetId) -> np.ndarray:
 
 def _load_edge_list(dataset_id: DatasetId) -> np.ndarray:
     """Load edge list from CSV file."""
-    directory = os.path.join(NanowiresConfig.BASE_INPUT_PATH, dataset_id[0])
+    directory = os.path.join(ConfigNanowires.BASE_INPUT_PATH, dataset_id[0])
     file_path = os.path.join(directory, "edls.csv")
 
     if not os.path.exists(file_path):

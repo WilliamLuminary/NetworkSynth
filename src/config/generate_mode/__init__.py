@@ -1,8 +1,20 @@
-# src/config/generate_mode/__init__.py
+"""
+Generate mode configurations - dynamically loads all config_*.py files.
 
-# Sample configuration is named as ".*Config$"
-# Others are named as ".*Config\d+"
-from .config_1 import Config1 as GenConfig1
-from .config_2 import Config2 as GenConfig2
-from .config_nanowires import NanowiresConfig as GenConfigNanowires
-from .config_sample import SampleConfig as GenConfig
+Naming convention:
+    config_sample.py (SampleConfig) -> GenConfig
+    config_xxx.py (ConfigXxx) -> GenConfigXxx
+"""
+
+from pathlib import Path
+
+from .._loader import get_all_config_names, load_configs_from_directory
+
+_configs = load_configs_from_directory(
+    directory=Path(__file__).parent,
+    package_name=__name__,
+    mode_prefix="Gen",
+)
+
+globals().update(_configs)
+__all__ = get_all_config_names(_configs)
