@@ -7,9 +7,15 @@ import numpy as np
 
 from .._utils import _resize_cv2_image, _transpose_network_pos, _trim_cv2_image
 from ..base_config import BaseConfig
-from ..enums import SampleSet
+from ..enums import SetName
 
 logger = logging.getLogger(__name__)
+
+
+class SampleSet(SetName):
+    Sample1 = "sample_1"
+    Sample2 = "sample_2"
+    Sample3 = "sample_3"
 
 
 class SampleConfig(BaseConfig):
