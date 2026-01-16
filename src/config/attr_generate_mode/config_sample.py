@@ -10,7 +10,9 @@ logger = logging.getLogger(__name__)
 
 
 class SampleConfig(BaseConfig):
-    DEFAULT_FRAME_SIZE = (1887 // 4, 2048 // 4)
+    IMAGE_SIZE = (1887, 2048)
+    FRAME_SIZE = (1887 // 4, 2048 // 4)
+    SYNTHETIC_FRAME_SIZE = FRAME_SIZE
     CLOSED_NODES_FACTOR = 1.2
     CLOSED_EDGES_FACTOR = .8
 

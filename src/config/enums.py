@@ -104,15 +104,41 @@ class FileTag(Enum):
 class DataType(Enum):
     DEFAULT_DATA = ("", {FileTag.DATA}, FileExtension.PKL)
     ORIGINAL_IMAGE = ("Original Image", {FileTag.FIG, FileTag.ORI}, FileExtension.PNG)
-    ORIGINAL_GRAPH = ("Original Graph", {FileTag.FIG, FileTag.PLOT, FileTag.ORI}, FileExtension.PNG)
-    ORIGINAL_PROPERTY = ("Original Property", {FileTag.ORI, FileTag.DATA}, FileExtension.PKL)
-    ORIGINAL_NETWORK = ("Original Network", {FileTag.DATA, FileTag.ORI}, FileExtension.PKL)
-    SYNTHETIC_GRAPH = ("Synthetic Graph", {FileTag.FIG, FileTag.PLOT, FileTag.SYN}, FileExtension.PNG)
-    SYNTHETIC_NETWORK = ("Synthetic Network", {FileTag.DATA, FileTag.SYN}, FileExtension.PKL)
+    ORIGINAL_GRAPH = (
+        "Original Graph",
+        {FileTag.FIG, FileTag.PLOT, FileTag.ORI},
+        FileExtension.PNG,
+    )
+    ORIGINAL_PROPERTY = (
+        "Original Property",
+        {FileTag.ORI, FileTag.DATA},
+        FileExtension.PKL,
+    )
+    ORIGINAL_NETWORK = (
+        "Original Network",
+        {FileTag.DATA, FileTag.ORI},
+        FileExtension.PKL,
+    )
+    SYNTHETIC_GRAPH = (
+        "Synthetic Graph",
+        {FileTag.FIG, FileTag.PLOT, FileTag.SYN},
+        FileExtension.PNG,
+    )
+    SYNTHETIC_NETWORK = (
+        "Synthetic Network",
+        {FileTag.DATA, FileTag.SYN},
+        FileExtension.PKL,
+    )
     ANALYSIS_DATA = ("Analysis Data", {FileTag.DATA, FileTag.ANA}, FileExtension.PKL)
-    ANALYSIS_FIGURE = ("Analysis Figure", {FileTag.FIG, FileTag.PLOT, FileTag.ANA}, FileExtension.PNG)
+    ANALYSIS_FIGURE = (
+        "Analysis Figure",
+        {FileTag.FIG, FileTag.PLOT, FileTag.ANA},
+        FileExtension.PNG,
+    )
 
-    def __init__(self, description: str, tags: Set[FileTag], file_extension: FileExtension):
+    def __init__(
+        self, description: str, tags: Set[FileTag], file_extension: FileExtension
+    ):
         self.description = description
         self.tags = tags
         self.file_extension = file_extension
