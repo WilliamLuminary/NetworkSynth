@@ -1,4 +1,4 @@
-# src/data/run_agent.py
+# src/handlers/run_agent.py
 import inspect
 import logging
 from typing import Optional
@@ -7,15 +7,9 @@ import networkx as nx
 from matplotlib import pyplot as plt
 from numpy import ndarray
 
-from config import (
-    BaseConfig,
-    DataType,
-    FILE_CONFIGURATIONS,
-    FileTag,
-    Mode,
-    Resolution,
-    SetName,
-)
+from config import (FILE_CONFIGURATIONS, BaseConfig, DatasetId, DataType,
+                    FileTag, Mode)
+
 from .data_loader import DataLoader
 from .saver import Saver
 
@@ -26,8 +20,7 @@ class RunAgent:
     def __init__(
         self,
         *,
-        set_name: SetName = None,
-        resolution: Resolution = None,
+        dataset_id: Optional[DatasetId] = None,
         networks_path: Optional[str] = None,
         attr_path: Optional[str] = None,
     ):
@@ -36,12 +29,10 @@ class RunAgent:
             self.data_loader = DataLoader(Mode.ANA, path=networks_path)
             self.saver = Saver(output_dir=networks_path)
             self.batch_processor = None
-        elif set_name and resolution:
+        elif dataset_id is not None:
             self.mode = Mode.GEN
-            self.data_loader = DataLoader(
-                Mode.GEN, set_name=set_name, resolution=resolution
-            )
-            self.saver = Saver(set_name=set_name, resolution=resolution)
+            self.data_loader = DataLoader(Mode.GEN, dataset_id=dataset_id)
+            self.saver = Saver(dataset_id=dataset_id)
             self.attributes = None
             self.mapper = None
             self.batch_processor = None
@@ -53,7 +44,9 @@ class RunAgent:
             self.mapper = None
             self.batch_processor = None
         else:
-            assert False, "Invalid arguments."
+            raise ValueError(
+                "Invalid arguments: provide dataset_id, networks_path, or attr_path"
+            )
 
     def prepare_data(self):
         if self.mode == Mode.GEN:
@@ -82,7 +75,8 @@ class RunAgent:
             self.data_loader.load()
             from .attributes_calculator import AttributesCalculator
 
-            self.attributes = AttributesCalculator(**self.data_loader.get_attr_dict())
+            self.attributes = AttributesCalculator(
+                **self.data_loader.get_attr_dict())
 
     def multifractal_analysis_in_generate_mode(self):
         assert self.mode == Mode.GEN, "This method is only available in Generate mode."
@@ -146,7 +140,10 @@ class RunAgent:
             assert self.attributes, "Attributes are not initialized."
             import dataclasses
 
-            self.saver.save_file(dataclasses.asdict(self.attributes), data_type, file_name_prefix)  # type: ignore
+            self.saver.save_file(
+                dataclasses.asdict(
+                    self.attributes), data_type, file_name_prefix
+            )  # type: ignore
 
         elif data_type == DataType.ORIGINAL_GRAPH:
             original_network = self.data_loader.get_original_network()
@@ -159,7 +156,8 @@ class RunAgent:
                 show=True,
             )
             if self.saver:
-                self.saver.save_file(original_figure, data_type, file_name_prefix)
+                self.saver.save_file(
+                    original_figure, data_type, file_name_prefix)
 
         elif data_type == DataType.SYNTHETIC_GRAPH:
             assert isinstance(
@@ -178,7 +176,8 @@ class RunAgent:
 
         elif data_type == DataType.SYNTHETIC_NETWORK:
             synthetic_networks = self.data_loader.get_synthetic_networks()
-            self.saver.save_file(synthetic_networks, data_type, file_name_prefix)
+            self.saver.save_file(synthetic_networks,
+                                 data_type, file_name_prefix)
 
         elif data_type == DataType.ANALYSIS_DATA:
             assert (

@@ -36,24 +36,24 @@ FILE_CONFIGURATIONS = {
         relative_dir=ORIGINAL_DIR,
         data_type=DataType.ORIGINAL_IMAGE,
         alpha=0.6,
-        detail="original_image"
+        detail="original_image",
     ),
     DataType.ORIGINAL_GRAPH: PlotConfig(
         relative_dir=ORIGINAL_DIR,
         node_size=6.0,
         line_width=3.0,
         data_type=DataType.ORIGINAL_GRAPH,
-        detail="original_graph"
+        detail="original_graph",
     ),
     DataType.ORIGINAL_NETWORK: FileConfig(
         relative_dir=ORIGINAL_DIR,
         data_type=DataType.ORIGINAL_NETWORK,
-        detail="original_network"
+        detail="original_network",
     ),
     DataType.ORIGINAL_PROPERTY: FileConfig(
         relative_dir=ORIGINAL_DIR,
         data_type=DataType.ORIGINAL_PROPERTY,
-        detail="original_property"
+        detail="original_property",
     ),
     DataType.SYNTHETIC_GRAPH: PlotConfig(
         relative_dir=SYNTHETIC_DIR,
@@ -81,5 +81,5 @@ FILE_CONFIGURATIONS = {
     DataType.DEFAULT_DATA: FileConfig(
         relative_dir="",
         data_type=DataType.DEFAULT_DATA,
-    )
+    ),
 }

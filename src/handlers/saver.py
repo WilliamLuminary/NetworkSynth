@@ -1,18 +1,11 @@
-# src/utils/saver.py
+# src/handlers/saver.py
 
 import logging
 import os
 from typing import Any, Optional
 
-from config import (
-    BaseConfig,
-    DataType,
-    FILE_CONFIGURATIONS,
-    FileExtension,
-    Mode,
-    Resolution,
-    SetName,
-)
+from config import (FILE_CONFIGURATIONS, BaseConfig, DatasetId, DataType,
+                    FileExtension, Mode)
 
 logger = logging.getLogger(__name__)
 
@@ -24,28 +17,30 @@ class Saver:
     def __new__(cls, *args, **kwargs):
         if BaseConfig.DISABLE_SAVING:
             logger.info(
-                f"Saving is disabled. No Saver will be instantiated. {BaseConfig.DISABLE_SAVING_NOTE}"
+                f"Saving is disabled. No Saver will be instantiated. "
+                f"{BaseConfig.DISABLE_SAVING_NOTE}"
             )
             return None
         return super().__new__(cls)
 
     def __init__(
         self,
-        set_name: Optional[SetName] = None,
-        resolution: Optional[Resolution] = None,
+        dataset_id: Optional[DatasetId] = None,
         *,
         output_dir: str = None,
     ):
         """
         Initialize the Saver object.
-        :param output_dir:
-        :param set_name: If empty, then skip this level of directory
-        :param resolution: If NA, then skip this level of directory
+
+        :param dataset_id: DatasetId identifying the dataset
+        :param output_dir: Direct output directory path (for analysis mode)
+
         Preconditions:
             - Saving must be enabled (Config.DISABLE_SAVING must be False)
             - Saver.initialize() must be called before creating an instance
+
         Postconditions:
-            - The directory for each set and resolution is created.
+            - The directory for the dataset is created.
         """
         assert not BaseConfig.DISABLE_SAVING, "Saving is disabled."
         if output_dir:
@@ -58,10 +53,12 @@ class Saver:
             assert (
                 self.base_output_dir
             ), "Base output directory is not initialized.\nCall Saver.initialize() first."
-            # Each output_dir is for each original network
+
+            if dataset_id is None:
+                raise ValueError("dataset_id must be provided")
+
             self.output_dir = os.path.join(
-                self.base_output_dir, str(set_name), str(resolution)
-            )
+                self.base_output_dir, dataset_id.path)
             self.mode = Mode.GEN
 
         _ensure_directory(self.output_dir, exist_ok=True)
@@ -73,12 +70,14 @@ class Saver:
         :return: None
         """
         if BaseConfig.DISABLE_SAVING:
-            logger.info(f"Saving is disabled. {BaseConfig.DISABLE_SAVING_NOTE}.")
+            logger.info(
+                f"Saving is disabled. {BaseConfig.DISABLE_SAVING_NOTE}.")
             return
 
         if result_dir:
             cls.mode = Mode.ANA
-            cls.base_output_dir = os.path.join(BaseConfig.BASE_OUTPUT_PATH, result_dir)
+            cls.base_output_dir = os.path.join(
+                BaseConfig.BASE_OUTPUT_PATH, result_dir)
         else:
             cls.mode = Mode.GEN
             cls.base_output_dir = os.path.join(
@@ -108,7 +107,8 @@ class Saver:
             return
 
         if BaseConfig.DISABLE_SAVING:
-            logger.warning(f"{BaseConfig.DISABLE_SAVING_NOTE} Saving is disabled. ")
+            logger.warning(
+                f"{BaseConfig.DISABLE_SAVING_NOTE} Saving is disabled. ")
             return
 
         file_config = FILE_CONFIGURATIONS.get(
@@ -153,7 +153,8 @@ class Saver:
     def _save_png_image(image, filepath: str) -> None:
         from numpy import ndarray
 
-        assert isinstance(image, ndarray), "Unsupported image format. Expected ndarray."
+        assert isinstance(
+            image, ndarray), "Unsupported image format. Expected ndarray."
 
         import cv2
 

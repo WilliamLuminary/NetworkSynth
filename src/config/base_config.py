@@ -1,11 +1,9 @@
 # src/config/base_config.py
 import logging
 import os
-from typing import Tuple, Union
+from typing import List, Optional, Tuple
 
-import numpy as np
-
-from config.enums import IdleResolution
+from config.enums import DatasetId
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +17,14 @@ def load_idle(*_, **__):
 class BaseConfig:
     """Define base paths, this config file must be in the subdirectory of the project root"""
 
-    SETS: Union[list, np.ndarray]
-    RESOLUTIONS: Union[list, np.ndarray] = [IdleResolution.NA]
+    DATASETS: Optional[List[DatasetId]] = None
+
+    @classmethod
+    def get_datasets(cls) -> List[DatasetId]:
+        """Get all datasets to process."""
+        if cls.DATASETS is None:
+            raise ValueError("DATASETS must be defined in the config")
+        return cls.DATASETS
 
     # IMAGE_SIZE: Background image dimensions (height, width) in pixels
     IMAGE_SIZE: Tuple[int, int] = None
