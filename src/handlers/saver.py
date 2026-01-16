@@ -2,10 +2,11 @@
 
 import logging
 import os
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from config import (
     BaseConfig,
+    DatasetId,
     DataType,
     FILE_CONFIGURATIONS,
     FileExtension,
@@ -24,28 +25,35 @@ class Saver:
     def __new__(cls, *args, **kwargs):
         if BaseConfig.DISABLE_SAVING:
             logger.info(
-                f"Saving is disabled. No Saver will be instantiated. {BaseConfig.DISABLE_SAVING_NOTE}"
+                f"Saving is disabled. No Saver will be instantiated. "
+                f"{BaseConfig.DISABLE_SAVING_NOTE}"
             )
             return None
         return super().__new__(cls)
 
     def __init__(
         self,
+        dataset_id: Optional[DatasetId] = None,
+        *,
+        # Legacy parameters - kept for backward compatibility
         set_name: Optional[SetName] = None,
         resolution: Optional[Resolution] = None,
-        *,
         output_dir: str = None,
     ):
         """
         Initialize the Saver object.
-        :param output_dir:
-        :param set_name: If empty, then skip this level of directory
-        :param resolution: If NA, then skip this level of directory
+
+        :param dataset_id: DatasetId identifying the dataset (new approach)
+        :param set_name: [DEPRECATED] Use dataset_id instead
+        :param resolution: [DEPRECATED] Use dataset_id instead
+        :param output_dir: Direct output directory path (for analysis mode)
+
         Preconditions:
             - Saving must be enabled (Config.DISABLE_SAVING must be False)
             - Saver.initialize() must be called before creating an instance
+
         Postconditions:
-            - The directory for each set and resolution is created.
+            - The directory for the dataset is created.
         """
         assert not BaseConfig.DISABLE_SAVING, "Saving is disabled."
         if output_dir:
@@ -58,10 +66,23 @@ class Saver:
             assert (
                 self.base_output_dir
             ), "Base output directory is not initialized.\nCall Saver.initialize() first."
-            # Each output_dir is for each original network
-            self.output_dir = os.path.join(
-                self.base_output_dir, str(set_name), str(resolution)
-            )
+
+            # Handle both new DatasetId and legacy set_name/resolution
+            if dataset_id is not None:
+                # New approach: use DatasetId.path for directory structure
+                self.output_dir = os.path.join(self.base_output_dir, dataset_id.path)
+            elif set_name is not None:
+                # Legacy fallback
+                res_str = str(resolution) if resolution else ""
+                if res_str:
+                    self.output_dir = os.path.join(
+                        self.base_output_dir, str(set_name), res_str
+                    )
+                else:
+                    self.output_dir = os.path.join(self.base_output_dir, str(set_name))
+            else:
+                raise ValueError("Either dataset_id or set_name must be provided")
+
             self.mode = Mode.GEN
 
         _ensure_directory(self.output_dir, exist_ok=True)

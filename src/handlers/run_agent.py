@@ -9,6 +9,7 @@ from numpy import ndarray
 
 from config import (
     BaseConfig,
+    DatasetId,
     DataType,
     FILE_CONFIGURATIONS,
     FileTag,
@@ -26,6 +27,8 @@ class RunAgent:
     def __init__(
         self,
         *,
+        dataset_id: Optional[DatasetId] = None,
+        # Legacy parameters - kept for backward compatibility
         set_name: SetName = None,
         resolution: Resolution = None,
         networks_path: Optional[str] = None,
@@ -36,7 +39,16 @@ class RunAgent:
             self.data_loader = DataLoader(Mode.ANA, path=networks_path)
             self.saver = Saver(output_dir=networks_path)
             self.batch_processor = None
-        elif set_name and resolution:
+        elif dataset_id is not None:
+            # New approach: use DatasetId
+            self.mode = Mode.GEN
+            self.data_loader = DataLoader(Mode.GEN, dataset_id=dataset_id)
+            self.saver = Saver(dataset_id=dataset_id)
+            self.attributes = None
+            self.mapper = None
+            self.batch_processor = None
+        elif set_name is not None:
+            # Legacy fallback
             self.mode = Mode.GEN
             self.data_loader = DataLoader(
                 Mode.GEN, set_name=set_name, resolution=resolution
@@ -53,7 +65,7 @@ class RunAgent:
             self.mapper = None
             self.batch_processor = None
         else:
-            assert False, "Invalid arguments."
+            raise ValueError("Invalid arguments: provide dataset_id, set_name, networks_path, or attr_path")
 
     def prepare_data(self):
         if self.mode == Mode.GEN:

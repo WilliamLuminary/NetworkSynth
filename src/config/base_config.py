@@ -1,11 +1,12 @@
 # src/config/base_config.py
 import logging
 import os
-from typing import Tuple, Union
+from itertools import product
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 
-from config.enums import IdleResolution
+from config.enums import DatasetId, IdleResolution
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +20,38 @@ def load_idle(*_, **__):
 class BaseConfig:
     """Define base paths, this config file must be in the subdirectory of the project root"""
 
-    SETS: Union[list, np.ndarray]
+    # New flexible dataset identifier system - use this for new configs
+    DATASETS: Optional[List[DatasetId]] = None
+
+    # Legacy support - kept for backward compatibility
+    SETS: Union[list, np.ndarray] = None
     RESOLUTIONS: Union[list, np.ndarray] = [IdleResolution.NA]
+
+    @classmethod
+    def get_datasets(cls) -> List[DatasetId]:
+        """
+        Get all datasets to process.
+
+        If DATASETS is defined, returns it directly.
+        Otherwise, creates DatasetId objects from SETS x RESOLUTIONS (legacy).
+        """
+        if cls.DATASETS is not None:
+            return cls.DATASETS
+
+        # Legacy fallback: combine SETS and RESOLUTIONS
+        if cls.SETS is None:
+            raise ValueError("Either DATASETS or SETS must be defined")
+
+        datasets = []
+        for set_name, resolution in product(cls.SETS, cls.RESOLUTIONS):
+            set_str = str(set_name)
+            res_str = str(resolution)
+            # Filter out empty resolution (like IdleResolution.NA)
+            if res_str:
+                datasets.append(DatasetId(set_str, res_str))
+            else:
+                datasets.append(DatasetId(set_str))
+        return datasets
 
     # IMAGE_SIZE: Background image dimensions (height, width) in pixels
     IMAGE_SIZE: Tuple[int, int] = None

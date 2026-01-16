@@ -1,8 +1,7 @@
 # src/config/generate_mode/config_nanowires.py
 import logging
 import os
-from enum import Enum
-from typing import Tuple
+from typing import List, Tuple
 
 import cv2
 import numpy as np
@@ -10,26 +9,27 @@ import numpy as np
 from utils import build_graph
 from .._utils import _transpose_network_pos
 from ..base_config import BaseConfig
-from ..enums import SetName
+from ..enums import DatasetId
 
 logger = logging.getLogger(__name__)
 
 
-# Generate NanowiresSet enum with members S1_0="1-0" through S1_224="1-224"
-NanowiresSet = Enum(
-    "NanowiresSet", {f"S1_{i}": f"1-{i}" for i in range(0, 225)}, type=SetName
-)
+def _generate_nanowires_datasets(count: int = 225) -> List[DatasetId]:
+    """Generate DatasetId list for nanowires: DatasetId("1-0") through DatasetId("1-224")."""
+    return [DatasetId(f"1-{i}") for i in range(count)]
+
 
 _NANOWIRES_INPUT_DIR = "Nanowires-20250222-255-input"
 
 
 class NanowiresConfig(BaseConfig):
-    SETS = list(NanowiresSet)[:5]  # Use [:5] for testing, remove for full run
+    # Use DATASETS with DatasetId - the new flexible approach
+    # Each dataset has a single level: "1-0", "1-1", etc.
+    DATASETS = _generate_nanowires_datasets()[:5]  # Use [:5] for testing
 
     IMAGE_SIZE: Tuple[int, int] = (1024, 1536)
 
     FRAME_SIZE: Tuple[int, int] = (1536, 1024)
-
 
     SCALE_FACTOR: int = 3
     SYNTHETIC_FRAME_SIZE: Tuple[int, int] = (
@@ -46,7 +46,6 @@ class NanowiresConfig(BaseConfig):
     MEASURE_WEIGHTED = False
     FULL_ANALYSIS = False
 
-
     BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, _NANOWIRES_INPUT_DIR)
 
     @classmethod
@@ -57,21 +56,22 @@ class NanowiresConfig(BaseConfig):
         cls._inject_dependencies()
 
     @staticmethod
-    def load_original_network(set_name, _):
+    def load_original_network(dataset_id: DatasetId):
         """Load original network from position and edge list files."""
-        positions = _load_positions(set_name)
-        edge_list = _load_edge_list(set_name)
+        positions = _load_positions(dataset_id)
+        edge_list = _load_edge_list(dataset_id)
         original_network = build_graph(positions, edge_list, arg_type="edge_list")
         _transpose_network_pos(original_network)
         return original_network
 
     @staticmethod
-    def load_original_image(set_name, _):
+    def load_original_image(dataset_id: DatasetId):
         """
         Load and process the background image.
         Add any image operations here (trim, resize, etc.) as needed.
         """
-        directory = os.path.join(NanowiresConfig.BASE_INPUT_PATH, str(set_name))
+        # For nanowires, dataset_id has single level: "1-0", "1-1", etc.
+        directory = os.path.join(NanowiresConfig.BASE_INPUT_PATH, dataset_id[0])
 
         # Find any .tif file in the directory (naming varies: 1.tif, 1-1.tif, etc.)
         tif_files = [f for f in os.listdir(directory) if f.lower().endswith(".tif")]
@@ -89,9 +89,9 @@ class NanowiresConfig(BaseConfig):
         return image
 
 
-def _load_positions(set_name) -> np.ndarray:
+def _load_positions(dataset_id: DatasetId) -> np.ndarray:
     """Load node positions from CSV file."""
-    directory = os.path.join(NanowiresConfig.BASE_INPUT_PATH, str(set_name))
+    directory = os.path.join(NanowiresConfig.BASE_INPUT_PATH, dataset_id[0])
     file_path = os.path.join(directory, "nod_pos.csv")
 
     if not os.path.exists(file_path):
@@ -101,9 +101,9 @@ def _load_positions(set_name) -> np.ndarray:
     return np.loadtxt(file_path, delimiter=",")
 
 
-def _load_edge_list(set_name) -> np.ndarray:
+def _load_edge_list(dataset_id: DatasetId) -> np.ndarray:
     """Load edge list from CSV file."""
-    directory = os.path.join(NanowiresConfig.BASE_INPUT_PATH, str(set_name))
+    directory = os.path.join(NanowiresConfig.BASE_INPUT_PATH, dataset_id[0])
     file_path = os.path.join(directory, "edls.csv")
 
     if not os.path.exists(file_path):

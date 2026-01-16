@@ -2,33 +2,33 @@
 import logging
 import os
 import re
+from typing import List
 
 import cv2
 import numpy as np
 
 from utils import build_graph
-from .._utils import _find_file_with_pattern, _resize_cv2_image, _transpose_network_pos, _trim_cv2_image
+from .._utils import (
+    _find_file_with_pattern,
+    _resize_cv2_image,
+    _transpose_network_pos,
+    _trim_cv2_image,
+)
 from ..base_config import BaseConfig
-from ..enums import SetName
+from ..enums import DatasetId
 
 logger = logging.getLogger(__name__)
 
 
-class NewSet(SetName):
-    S4 = "004"
-    S8 = "008"
-    S11 = "011"
-    S14 = "014"
-    S17 = "017"
-    S20 = "020"
-    S23 = "023"
-    S26 = "026"
-    S29 = "029"
-    S32 = "032"
+def _generate_new_datasets() -> List[DatasetId]:
+    """Generate DatasetId list for new dataset format: 004, 008, 011, etc."""
+    set_names = ["004", "008", "011", "014", "017", "020", "023", "026", "029", "032"]
+    return [DatasetId(s) for s in set_names]
 
 
 class Config2(BaseConfig):
-    SETS = [NewSet.S4]
+    # Use DATASETS with single-level DatasetId: (set_name)
+    DATASETS = [DatasetId("004")]  # Default: single dataset for testing
 
     IMAGE_SIZE = (1887, 2048)
     FRAME_SIZE = (1887 // 4, 2048 // 4)
@@ -42,12 +42,12 @@ class Config2(BaseConfig):
 
     MEASURE_WEIGHTED = False
     FULL_ANALYSIS = False
-    ERROR_TOLERANCE = .3
+    ERROR_TOLERANCE = 0.3
 
-    BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, 'new_input')
-    POSITION_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'position')
-    ADJ_MATRIX_DATA_DIR = os.path.join(BASE_INPUT_PATH, 'sparse_matrices')
-    IMAGES_DIR = os.path.join(BASE_INPUT_PATH, 'Original Graphs')
+    BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, "new_input")
+    POSITION_DATA_DIR = os.path.join(BASE_INPUT_PATH, "position")
+    ADJ_MATRIX_DATA_DIR = os.path.join(BASE_INPUT_PATH, "sparse_matrices")
+    IMAGES_DIR = os.path.join(BASE_INPUT_PATH, "Original Graphs")
 
     @classmethod
     def initialize(cls):
@@ -57,42 +57,49 @@ class Config2(BaseConfig):
         cls._inject_dependencies()
 
     @staticmethod
-    def load_original_network(set_name, resolution):
-        positions = _load_positions(set_name, resolution)
-        mat = _load_sparse_matrix(set_name, resolution)
+    def load_original_network(dataset_id: DatasetId):
+        """Load original network. dataset_id has single level: [set_name]"""
+        positions = _load_positions(dataset_id)
+        mat = _load_sparse_matrix(dataset_id)
         original_network = build_graph(positions, mat)
         _transpose_network_pos(original_network)
         return original_network
 
     @staticmethod
-    def load_original_image(set_name, resolution):
-        image = _load_raw_image(set_name, resolution)
+    def load_original_image(dataset_id: DatasetId):
+        """Load original image. dataset_id has single level: [set_name]"""
+        image = _load_raw_image(dataset_id)
         image = _trim_cv2_image(image)
         image = _resize_cv2_image(image)
         return image
 
 
-def _load_positions(set_name, resolution):
-    directory_path = os.path.join(Config2.POSITION_DATA_DIR, resolution)
+def _load_positions(dataset_id: DatasetId) -> np.ndarray:
+    """Load node positions. dataset_id[0] = set_name"""
+    set_name = dataset_id[0]
+    directory_path = Config2.POSITION_DATA_DIR
     # noinspection SpellCheckingInspection
-    file_path = _find_file_with_pattern(directory_path,
-                                        rf"W-\d+-\d+-\d+_{re.escape(str(set_name))}_postion\.npy",
-                                        f'positions_of_nodes for {set_name}')
+    file_path = _find_file_with_pattern(
+        directory_path,
+        rf"W-\d+-\d+-\d+_{re.escape(set_name)}_postion\.npy",
+        f"positions_of_nodes for {set_name}",
+    )
     logger.info(f"Positions file loaded: {file_path}")
     positions = np.load(file_path, allow_pickle=True)
     return positions
 
 
-def _load_sparse_matrix(set_name, resolution):
-    directory_path = os.path.join(Config2.ADJ_MATRIX_DATA_DIR, resolution)
-    file_path = _find_file_with_pattern(directory_path, r"sparse_matrices\.npz", details="sparse matrix")
+def _load_sparse_matrix(dataset_id: DatasetId):
+    """Load sparse matrix. dataset_id[0] = set_name"""
+    set_name = dataset_id[0]
+    directory_path = Config2.ADJ_MATRIX_DATA_DIR
+    file_path = _find_file_with_pattern(
+        directory_path, r"sparse_matrices\.npz", details="sparse matrix"
+    )
     matrix_data = np.load(file_path, allow_pickle=True)
 
-    key_pattern = rf"W-\d+-\d+-\d+_{re.escape(str(set_name))}_EL"
-    matching_keys = [
-        key for key in matrix_data.keys()
-        if re.fullmatch(key_pattern, key)
-    ]
+    key_pattern = rf"W-\d+-\d+-\d+_{re.escape(set_name)}_EL"
+    matching_keys = [key for key in matrix_data.keys() if re.fullmatch(key_pattern, key)]
 
     if len(matching_keys) == 1:
         logger.info(f"Sparse matrix loaded: {matching_keys[0]}")
@@ -107,17 +114,20 @@ def _load_sparse_matrix(set_name, resolution):
         )
 
 
-def _load_raw_image(set_name, resolution):
-    directory_path = os.path.join(Config2.IMAGES_DIR, resolution)
+def _load_raw_image(dataset_id: DatasetId):
+    """Load raw image. dataset_id[0] = set_name"""
+    set_name = dataset_id[0]
+    directory_path = Config2.IMAGES_DIR
 
     pattern = re.compile(
-        rf"W-\d+-\d+-\d+_{re.escape(str(set_name))}\.(tif|png|jpg)",
-        re.IGNORECASE
+        rf"W-\d+-\d+-\d+_{re.escape(set_name)}\.(tif|png|jpg)", re.IGNORECASE
     )
 
-    file_path = _find_file_with_pattern(directory_path, pattern, f'image for {set_name}')
+    file_path = _find_file_with_pattern(
+        directory_path, pattern, f"image for {set_name}"
+    )
     if file_path is None:
-        logger.warning(f"Background image is None.")
+        logger.warning("Background image is None.")
         return None
 
     image = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)

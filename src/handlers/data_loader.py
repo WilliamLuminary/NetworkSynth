@@ -1,15 +1,14 @@
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import networkx as nx
 import numpy as np
 
-from config import BaseConfig, Mode
+from config import BaseConfig, DatasetId, Mode
 
 
 class DataLoader:
     def __init__(self, mode, **kwargs):
-        self._set_name = None
-        self._resolution = None
+        self._dataset_id: Optional[DatasetId] = None
         self._both_networks_path = None
 
         self.__original_image = None
@@ -18,9 +17,19 @@ class DataLoader:
         self.__synthetic_networks = []
 
         if mode == Mode.GEN:
-            assert 'set_name' in kwargs and 'resolution' in kwargs, "set_name and resolution are required."
-            self._set_name = kwargs['set_name']
-            self._resolution = kwargs['resolution']
+            # New approach: use dataset_id
+            if 'dataset_id' in kwargs:
+                self._dataset_id = kwargs['dataset_id']
+            # Legacy fallback: set_name and resolution
+            elif 'set_name' in kwargs:
+                set_str = str(kwargs['set_name'])
+                res_str = str(kwargs.get('resolution', ''))
+                if res_str:
+                    self._dataset_id = DatasetId(set_str, res_str)
+                else:
+                    self._dataset_id = DatasetId(set_str)
+            else:
+                raise ValueError("Either dataset_id or set_name is required")
         elif mode == Mode.ANA:
             assert 'path' in kwargs, "path is required."
             self._both_networks_path = kwargs['path']
@@ -58,10 +67,10 @@ class DataLoader:
             self.__attr = self._load_attr()
 
     def _load_original_image(self):
-        return BaseConfig.ORIGINAL_IMAGE_FUNC(str(self._set_name), str(self._resolution))
+        return BaseConfig.ORIGINAL_IMAGE_FUNC(self._dataset_id)
 
     def _load_original_network(self):
-        return BaseConfig.ORIGINAL_NETWORK_FUNC(str(self._set_name), str(self._resolution))
+        return BaseConfig.ORIGINAL_NETWORK_FUNC(self._dataset_id)
 
     def _load_both_networks(self) -> Tuple[List[nx.Graph], List[nx.Graph]]:
         return BaseConfig.NETWORKS_FUNC(self._both_networks_path)
