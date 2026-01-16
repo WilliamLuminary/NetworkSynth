@@ -5,36 +5,40 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 from utils import finalize_plot
+
 from .multifractal_processor import MultifractalProcessor
 
 logger = logging.getLogger(__name__)
 # noinspection SpellCheckingInspection
 _PLOT_CONFIG = {
-    'font.size': 24,
-    'axes.linewidth': 2,
-    'axes.spines.right': False,
-    'axes.spines.top': False,
-    'xtick.minor.visible': True,
-    'ytick.minor.visible': True
+    "font.size": 24,
+    "axes.linewidth": 2,
+    "axes.spines.right": False,
+    "axes.spines.top": False,
+    "xtick.minor.visible": True,
+    "ytick.minor.visible": True,
 }
 
 _CMAP_RANGES = {
-    'synthetic': {'name': 'Blues', 'start': 0.4, 'end': 0.8},
-    'original': {'name': 'Reds', 'start': 0.8, 'end': 1}
+    "synthetic": {"name": "Blues", "start": 0.4, "end": 0.8},
+    "original": {"name": "Reds", "start": 0.8, "end": 1},
 }
 
 _PLOT_STYLE = {
-    'synthetic': {'alpha': 0.6, 'lw': 3},
-    'original': {'alpha': 1.0, 'lw': 3}
+    "synthetic": {"alpha": 0.6, "lw": 3},
+    "original": {"alpha": 1.0, "lw": 3},
 }
 
 
 class MultifractalBatchProcessor:
 
-    def __init__(self, original: List = None,
-                 synthetic: List = None,
-                 original_processed: bool = False,
-                 synthetic_processed: bool = False):
+    def __init__(
+        self,
+        original: List = None,
+        synthetic: List = None,
+        original_processed: bool = False,
+        synthetic_processed: bool = False,
+    ):
         self._original_data = original
         self._original_processed: bool = original_processed
         self._synthetic_data = synthetic
@@ -43,10 +47,7 @@ class MultifractalBatchProcessor:
 
     @classmethod
     def from_dict(cls, data_: Dict):
-        return cls(
-            original=data_['original'],
-            synthetic=data_['synthetic']
-        )
+        return cls(original=data_["original"], synthetic=data_["synthetic"])
 
     def process(self):
         if not self._original_processed:
@@ -81,31 +82,39 @@ class MultifractalBatchProcessor:
         return processor.get_summary_data()
 
     def plot(self):
-        self._images.update({
-            'spectra': self._plot_spectra(),
-            'dimensions': self._plot_dimensions(),
-        })
+        self._images.update(
+            {
+                "spectra": self._plot_spectra(),
+                "dimensions": self._plot_dimensions(),
+            }
+        )
 
     def get_images(self) -> Dict[str, np.ndarray]:
         return self._images
 
     def _plot_spectra(self):
-        return self._create_plot('al_list', 'fal_list',
-                                 r'$\alpha$ (Hölder Exponent)',
-                                 r'$f(\alpha)$ (Multifractal Spectrum)')
+        return self._create_plot(
+            "al_list",
+            "fal_list",
+            r"$\alpha$ (Hölder Exponent)",
+            r"$f(\alpha)$ (Multifractal Spectrum)",
+        )
 
     def _plot_dimensions(self):
-        return self._create_plot('valid_q', 'dim_list',
-                                 r'Distorting Exponent $q$',
-                                 r'Generalized Fractal Dimension $D(q)$')
+        return self._create_plot(
+            "valid_q",
+            "dim_list",
+            r"Distorting Exponent $q$",
+            r"Generalized Fractal Dimension $D(q)$",
+        )
 
     def _create_plot(self, x_key, y_key, x_label, y_label):
         plt.rcParams.update(_PLOT_CONFIG)
         fig, ax = plt.subplots(figsize=(10, 8), dpi=150)
         legend = []
 
-        for data_type in ['synthetic', 'original']:
-            results = getattr(self, f'_{data_type}_data', [])
+        for data_type in ["synthetic", "original"]:
+            results = getattr(self, f"_{data_type}_data", [])
             assert results, f"No {data_type} data available."
 
             self._plot_dataset(
@@ -114,12 +123,12 @@ class MultifractalBatchProcessor:
                 data_type=data_type,
                 x_key=x_key,
                 y_key=y_key,
-                legend=legend
+                legend=legend,
             )
 
-        ax.set_xlabel(x_label, fontweight='bold')
-        ax.set_ylabel(y_label, fontweight='bold')
-        ax.legend(handles=legend, loc='upper right', frameon=False)
+        ax.set_xlabel(x_label, fontweight="bold")
+        ax.set_ylabel(y_label, fontweight="bold")
+        ax.legend(handles=legend, loc="upper right", frameon=False)
 
         return finalize_plot(fig)
 
@@ -127,12 +136,10 @@ class MultifractalBatchProcessor:
     def _plot_dataset(ax, entries, data_type, x_key, y_key, legend):
         cmap_config = _CMAP_RANGES[data_type]
         style = _PLOT_STYLE[data_type]
-        cmap = plt.get_cmap(cmap_config['name'])
+        cmap = plt.get_cmap(cmap_config["name"])
 
         color_values = np.linspace(
-            cmap_config['start'],
-            cmap_config['end'],
-            len(entries)
+            cmap_config["start"], cmap_config["end"], len(entries)
         )
 
         for idx, entry in enumerate(entries):
@@ -140,14 +147,18 @@ class MultifractalBatchProcessor:
                 entry[x_key],
                 entry[y_key],
                 color=cmap(color_values[idx]),
-                alpha=style['alpha'],
-                lw=style['lw']
+                alpha=style["alpha"],
+                lw=style["lw"],
             )
 
         from matplotlib.lines import Line2D
-        legend.append(Line2D(
-            [0], [0],
-            color=cmap(np.mean(color_values)),
-            lw=4,
-            label=f"{data_type.capitalize()} (n={len(entries)})"
-        ))
+
+        legend.append(
+            Line2D(
+                [0],
+                [0],
+                color=cmap(np.mean(color_values)),
+                lw=4,
+                label=f"{data_type.capitalize()} (n={len(entries)})",
+            )
+        )

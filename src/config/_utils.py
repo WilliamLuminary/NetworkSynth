@@ -48,7 +48,8 @@ def _resize_cv2_image(image: ndarray, target_size: Tuple[int, int] = None) -> nd
     )
     import cv2
 
-    image = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_LANCZOS4)
+    image = cv2.resize(image, (new_width, new_height),
+                       interpolation=cv2.INTER_LANCZOS4)
     return image
 
 
@@ -60,7 +61,7 @@ def _trim_cv2_image(
     if not any([top, bottom, left, right]):
         return image
     h, w = image.shape[:2]
-    return image[top : h - bottom if bottom else h, left : w - right if right else w]
+    return image[top: h - bottom if bottom else h, left: w - right if right else w]
 
 
 def _transpose_network_pos(network: Graph) -> None:
