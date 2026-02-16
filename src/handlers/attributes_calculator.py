@@ -14,8 +14,7 @@ logger = logging.getLogger(__name__)
 @dataclass(slots=True)
 class OldAttributesCalculator:
     degree_distribution: Dict[int, float] = field(default_factory=dict)
-    degree_transition_probs: Dict[int, Dict[int, float]] = field(
-        default_factory=dict)
+    degree_transition_probs: Dict[int, Dict[int, float]] = field(default_factory=dict)
     degree_edge_lengths: Dict[int, List[float]] = field(default_factory=dict)
     degree_angle_diffs: Dict[int, List[float]] = field(default_factory=dict)
     average_edge_length: float = 0.0
@@ -25,8 +24,7 @@ class OldAttributesCalculator:
         if graph.number_of_nodes() == 0:
             return self
 
-        self.degree_distribution = dict(
-            self._compute_degree_distribution(graph))
+        self.degree_distribution = dict(self._compute_degree_distribution(graph))
         self.degree_transition_probs = dict(
             self._compute_degree_transition_probs(graph)
         )
@@ -94,16 +92,14 @@ class OldAttributesCalculator:
             angles = []
 
             for neighbor in neighbors:
-                neighbor_pos = np.array(
-                    node_positions[neighbor], dtype=np.float64)
+                neighbor_pos = np.array(node_positions[neighbor], dtype=np.float64)
 
                 length = euclidean(node_pos, neighbor_pos)
                 lengths.append(length)
 
                 angle = (
                     np.arctan2(
-                        neighbor_pos[1] -
-                        node_pos[1], neighbor_pos[0] - node_pos[0]
+                        neighbor_pos[1] - node_pos[1], neighbor_pos[0] - node_pos[0]
                     )
                     * 180
                     / np.pi
@@ -138,8 +134,7 @@ class OldAttributesCalculator:
 @dataclass(slots=True)
 class AttributesCalculator:
     degree_distribution: Dict[int, float] = field(default_factory=dict)
-    degree_transition_probs: Dict[int, Dict[int, float]] = field(
-        default_factory=dict)
+    degree_transition_probs: Dict[int, Dict[int, float]] = field(default_factory=dict)
     degree_lengths: Dict[int, List[float]] = field(default_factory=dict)
     degree_angles: Dict[int, List[float]] = field(default_factory=dict)
     average_length: float = 0.0
@@ -194,12 +189,10 @@ class AttributesCalculator:
                 degree_to_lengths[degree_u].append(length)
                 degree_to_lengths[degree_v].append(length)
                 angle_u_to_v = (
-                    np.arctan2(v_pos[1] - u_pos[1],
-                               v_pos[0] - u_pos[0]) * 180 / np.pi
+                    np.arctan2(v_pos[1] - u_pos[1], v_pos[0] - u_pos[0]) * 180 / np.pi
                 )
                 angle_v_to_u = (
-                    np.arctan2(u_pos[1] - v_pos[1],
-                               u_pos[0] - v_pos[0]) * 180 / np.pi
+                    np.arctan2(u_pos[1] - v_pos[1], u_pos[0] - v_pos[0]) * 180 / np.pi
                 )
                 node_angles[node_u].append(angle_u_to_v)
                 node_angles[node_v].append(angle_v_to_u)

@@ -2,11 +2,9 @@
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from itertools import product
-from typing import Optional, Tuple
+from typing import Tuple
 
-import numpy as np
 import wandb
-
 from analysis import MultifractalAnalyzer
 
 # noinspection PyUnresolvedReferences

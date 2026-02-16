@@ -13,8 +13,7 @@ logger = logging.getLogger(__name__)
 
 class SampleConfig(BaseConfig):
     MEASURE_WEIGHTED = False
-    NETWORKS_DATA_PATH = os.path.join(
-        BaseConfig.BASE_OUTPUT_PATH, "results_multi")
+    NETWORKS_DATA_PATH = os.path.join(BaseConfig.BASE_OUTPUT_PATH, "results_multi")
 
     @classmethod
     def initialize(cls):

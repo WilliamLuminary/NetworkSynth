@@ -1,7 +1,7 @@
 # src/config/enums.py
 import os
 from enum import Enum, auto
-from typing import List, Set, Tuple, Union
+from typing import Set, Tuple, Union
 
 
 class DatasetId:
