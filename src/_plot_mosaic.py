@@ -23,7 +23,7 @@ else:
 print(f"Graph: {graph.number_of_nodes():,} nodes, {graph.number_of_edges():,} edges")
 
 print("Plotting (LineCollection + scatter)...")
-from main_mosaic import plot_mosaic_network
+from main_mosaic import plot_mosaic_network  # noqa: E402
 
 img = plot_mosaic_network(graph)
 
@@ -32,7 +32,7 @@ out_path = (
     r"\A\20kX\synthetic"
     r"\mosaic_100x100_graph_replot.png"
 )
-import cv2
+import cv2  # noqa: E402
 
 cv2.imwrite(out_path, img)
 print(f"Saved plot to {out_path}")
