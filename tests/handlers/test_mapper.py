@@ -20,7 +20,7 @@ def profile_mapper_time(mapper, graph, iterations=10):
         graph_copy = graph.copy()
         # Remove weights for a fair test.
         for _, _, data in graph_copy.edges(data=True):
-            data.pop('weight', None)
+            data.pop("weight", None)
         start = time.perf_counter()
         mapper.assign_weights(graph_copy)
         times.append(time.perf_counter() - start)
@@ -35,7 +35,7 @@ def compute_quality(mapper, graph):
     original_lengths, original_weights = Mapper._compute_edge_metrics(graph)
     graph_copy = graph.copy()
     for _, _, data in graph_copy.edges(data=True):
-        data.pop('weight', None)
+        data.pop("weight", None)
     mapper.assign_weights(graph_copy)
 
     # noinspection PyProtectedMember
@@ -51,16 +51,20 @@ def plot_map(mapper, sample_graph):
     new_graph = sample_graph.copy()
     for _ in range(10):
         for u, v, data in new_graph.edges(data=True):
-            del data['weight']
+            del data["weight"]
         mapper.assign_weights(new_graph)
         # noinspection PyProtectedMember
         new_lengths, new_weights = Mapper._compute_edge_metrics(new_graph)
         plt.figure(figsize=(8, 6))
-        plt.scatter(ori_lengths, ori_weights, c='blue', alpha=0.3, label='Original Data')
-        plt.scatter(new_lengths, new_weights, c='orange', alpha=0.3, label='Mapped Weights')
-        plt.title('Edge Length vs Weight with Basket-Based Mapping')
-        plt.xlabel('Length')
-        plt.ylabel('Weight')
+        plt.scatter(
+            ori_lengths, ori_weights, c="blue", alpha=0.3, label="Original Data"
+        )
+        plt.scatter(
+            new_lengths, new_weights, c="orange", alpha=0.3, label="Mapped Weights"
+        )
+        plt.title("Edge Length vs Weight with Basket-Based Mapping")
+        plt.xlabel("Length")
+        plt.ylabel("Weight")
         plt.legend()
         plt.grid(False)
         plt.show()

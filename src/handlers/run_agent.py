@@ -7,14 +7,7 @@ import networkx as nx
 from matplotlib import pyplot as plt
 from numpy import ndarray
 
-from config import (
-    FILE_CONFIGURATIONS,
-    BaseConfig,
-    DatasetId,
-    DataType,
-    FileTag,
-    Mode,
-)
+from config import FILE_CONFIGURATIONS, BaseConfig, DatasetId, DataType, FileTag, Mode
 
 from .data_loader import DataLoader
 from .saver import Saver
