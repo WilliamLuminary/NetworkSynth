@@ -2,24 +2,27 @@
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from itertools import product
-from typing import Optional
+from typing import Optional, Tuple
 
-import cv2
+import numpy as np
 import wandb
 
 from analysis import MultifractalAnalyzer
+
 # noinspection PyUnresolvedReferences
-from config import (BaseConfig, DatasetId, DataType, GenConfig, GenConfig1,
-                    GenConfig2)
-from handlers import RunAgent, plot_network
+from config import BaseConfig, DatasetId
+from config import GenConfig1 as GenConfig
+from handlers import RunAgent
 from main import compute_average_error, generate_synthetic_network
 
-GenConfig2.initialize()
+GenConfig.initialize()
+BaseConfig.SYNTHETIC_NETWORK_NUMBER = 20
+BaseConfig.SYNTHETIC_GRAPH_NUMBER = 0
 BaseConfig.disable_saving("Sweeping Experiment")
 EXPERIMENT_PROJECT_NAME = "hyperparam-tuning"
 EXPERIMENT_NAME = "adjusting-node-and-edge-factors"
-NODE_FACTORS = [round(0.1 + 0.1 * i, 1) for i in range(20)]
-EDGE_FACTORS = [round(0.1 + 0.1 * i, 1) for i in range(20)]
+NODE_FACTORS = [round(0.3 + 0.1 * i, 1) for i in range(18)]
+EDGE_FACTORS = [round(0.3 + 0.1 * i, 1) for i in range(18)]
 
 logger = logging.getLogger(__name__)
 SIGINT_INFO = "SIGINT received. Terminating child process..."
@@ -27,17 +30,16 @@ SIGINT_INFO = "SIGINT received. Terminating child process..."
 
 def generate_networks_multiprocess(
     data_agent: RunAgent, std_err_fea
-) -> Optional[float]:
-    num_network, num_figures = (
-        BaseConfig.SYNTHETIC_NETWORK_NUMBER,
-        BaseConfig.SYNTHETIC_GRAPH_NUMBER,
-    )
+) -> Tuple[float, float]:
+    """Return (average_error, success_rate)."""
+    num_network = BaseConfig.SYNTHETIC_NETWORK_NUMBER
     errors, futures = [], []
     from multiprocessing import Manager
 
     exit_event = Manager().Event()
+    max_workers = BaseConfig.get_max_workers(num_network)
     try:
-        with ProcessPoolExecutor() as executor:
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
             futures = [
                 executor.submit(
                     generate_synthetic_network,
@@ -59,15 +61,6 @@ def generate_networks_multiprocess(
                 ):
                     logger.info(f"({progress}%) Synthetic graph generated.")
 
-                if (num_figures := num_figures - 1) >= 0:
-                    synthetic_graph_image = plot_network(
-                        data_type=DataType.SYNTHETIC_GRAPH, graph=synthetic_graph
-                    )
-                    _, img_encoded = cv2.imencode(
-                        ".png", synthetic_graph_image)
-                    wandb.log(
-                        {"synthetic_graph": wandb.Image(img_encoded.tobytes())})
-                data_agent.add_synthetic_graph(synthetic_graph)
                 errors.append(error)
 
     except KeyboardInterrupt:
@@ -82,15 +75,16 @@ def generate_networks_multiprocess(
             future.cancel()
         executor.shutdown(wait=True, cancel_futures=True)
 
-    return compute_average_error(errors)
+    success_rate = len(errors) / num_network if num_network > 0 else 0.0
+    avg_error = compute_average_error(errors)
+    return avg_error, success_rate
 
 
 def run_with_params(data_agent, ef, nf, std_err_fea):
     BaseConfig.set_node_factor(nf)
     BaseConfig.set_edge_factor(ef)
     logger.info(BaseConfig())
-    error = generate_networks_multiprocess(data_agent, std_err_fea)
-    return error
+    return generate_networks_multiprocess(data_agent, std_err_fea)
 
 
 def run_for_dataset(dataset_id: DatasetId) -> None:
@@ -102,14 +96,20 @@ def run_for_dataset(dataset_id: DatasetId) -> None:
         data_agent.get_original_network()
     ).analyze_error_features()
 
-    table = wandb.Table(columns=["node_factor", "edge_factor", "error"])
+    table = wandb.Table(columns=["node_factor", "edge_factor", "error", "success_rate"])
     for nf, ef in product(NODE_FACTORS, EDGE_FACTORS):
-        error = run_with_params(data_agent, ef, nf, std_err_fea)
-        if error is not None:
-            table.add_data(nf, ef, error)
-        else:
-            logger.warning(
-                f"Error is None for node_factor {nf}, edge_factor {ef}")
+        error, success_rate = run_with_params(data_agent, ef, nf, std_err_fea)
+        if error is None:
+            error = float("inf")
+        table.add_data(nf, ef, error, success_rate)
+        wandb.log(
+            {
+                "node_factor": nf,
+                "edge_factor": ef,
+                "error": error,
+                "success_rate": success_rate,
+            }
+        )
 
     wandb.log(
         {

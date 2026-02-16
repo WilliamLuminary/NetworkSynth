@@ -9,8 +9,12 @@ import numpy as np
 
 from utils import build_graph
 
-from .._utils import (_find_file_with_pattern, _resize_cv2_image,
-                      _transpose_network_pos, _trim_cv2_image)
+from .._utils import (
+    _find_file_with_pattern,
+    _resize_cv2_image,
+    _transpose_network_pos,
+    _trim_cv2_image,
+)
 from ..base_config import BaseConfig
 from ..enums import DatasetId
 
@@ -28,14 +32,15 @@ def _generate_old_datasets() -> List[DatasetId]:
 
 
 class Config1(BaseConfig):
-    DATASETS = [DatasetId("A", "10kX")]
+    DATASETS = [DatasetId("A", "20kX")]
 
     IMAGE_SIZE = (510, 510)
     FRAME_SIZE = (510, 510)
     SYNTHETIC_FRAME_SIZE = FRAME_SIZE
-    CLOSED_NODES_FACTOR = 1.5
-    CLOSED_EDGES_FACTOR = 1
-    # For the 10_kx image, node fac should be 1.5, and edge fac should be 1
+    CLOSED_NODES_FACTOR = 1.0
+    CLOSED_EDGES_FACTOR = 1.5
+    # For the 10_kx image, node fac should be 1.5, and edge fac should be 1; 2 ~ 0.6 is also good
+    MAX_ATTEMPTS = 100
 
     SYNTHETIC_GRAPH_NUMBER = 1
     SYNTHETIC_NETWORK_NUMBER = 1
