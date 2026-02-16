@@ -64,6 +64,15 @@ class BaseConfig:
     ATTRIBUTES_DICT_FUNC = load_idle
 
     @classmethod
+    def get_max_workers(cls, num_tasks: int = None) -> int:
+        """Return number of worker processes, leaving 1 CPU for the OS."""
+        cpu_count = os.cpu_count() or 1
+        max_workers = max(1, cpu_count - 1)
+        if num_tasks is not None:
+            max_workers = min(max_workers, num_tasks)
+        return max_workers
+
+    @classmethod
     def initialize(cls):
         cls._setup_logger(details=cls.__name__)
         cls.OUTPUT_DENOTE = cls.__name__
