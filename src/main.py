@@ -6,7 +6,7 @@ import numpy as np
 
 from analysis import MultifractalAnalyzer
 from config import BaseConfig, DatasetId, DataType
-from config.generate_mode import GenConfigNanowires as GenConfig
+from config.generate_mode import GenConfig1 as GenConfig
 from graph import GraphGenerator
 from handlers import AttributesCalculator, Mapper, RunAgent, Saver
 from utils import trim_graph
@@ -35,15 +35,13 @@ def generate_synthetic_network(
     for attempt in range(BaseConfig.MAX_ATTEMPTS):
         try:
             synthetic_graph = generator.generate_network()
-            synthetic_graph = trim_graph(
-                synthetic_graph, attributes.average_degree)
+            synthetic_graph = trim_graph(synthetic_graph, attributes.average_degree)
             mapper.assign_weights(synthetic_graph)
 
             if _should_exit(exit_event):
                 return None, float("inf")
 
-            err_fea = MultifractalAnalyzer(
-                synthetic_graph).analyze_error_features()
+            err_fea = MultifractalAnalyzer(synthetic_graph).analyze_error_features()
             error_ = MultifractalAnalyzer.analyze_error(err_fea, std_err_fea)
             if error_ < BaseConfig.ERROR_TOLERANCE:
                 return synthetic_graph, error_
@@ -52,21 +50,10 @@ def generate_synthetic_network(
             logger.info(SIGINT_INFO)
             raise
         except Exception as exc:
-            logger.error(
-                f"Exception occurred: {exc}. Retrying...", exc_info=True)
+            logger.error(f"Exception occurred: {exc}. Retrying...", exc_info=True)
 
     logger.warning("Max attempts reached. Aborting!")
     return None, float("inf")
-
-
-def _get_worker_count(num_network: int) -> int:
-    """Determine the number of workers for multiprocessing."""
-    import os
-
-    if num_network < 20:
-        return 1
-    cpu_count = os.cpu_count() or 1
-    return max(1, cpu_count - 1)
 
 
 def generate_with_multiprocessing(data_agent: RunAgent):
@@ -86,7 +73,7 @@ def generate_with_multiprocessing(data_agent: RunAgent):
         ).analyze_error_features()
     )
 
-    max_workers = _get_worker_count(num_network)
+    max_workers = BaseConfig.get_max_workers(num_network)
     logger.info(f"Using {max_workers} worker(s) for {num_network} networks")
 
     try:
