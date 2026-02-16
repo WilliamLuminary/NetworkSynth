@@ -4,8 +4,14 @@ import logging
 import os
 from typing import Any, Optional
 
-from config import (FILE_CONFIGURATIONS, BaseConfig, DatasetId, DataType,
-                    FileExtension, Mode)
+from config import (
+    FILE_CONFIGURATIONS,
+    BaseConfig,
+    DatasetId,
+    DataType,
+    FileExtension,
+    Mode,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -57,8 +63,7 @@ class Saver:
             if dataset_id is None:
                 raise ValueError("dataset_id must be provided")
 
-            self.output_dir = os.path.join(
-                self.base_output_dir, dataset_id.path)
+            self.output_dir = os.path.join(self.base_output_dir, dataset_id.path)
             self.mode = Mode.GEN
 
         _ensure_directory(self.output_dir, exist_ok=True)
@@ -70,14 +75,12 @@ class Saver:
         :return: None
         """
         if BaseConfig.DISABLE_SAVING:
-            logger.info(
-                f"Saving is disabled. {BaseConfig.DISABLE_SAVING_NOTE}.")
+            logger.info(f"Saving is disabled. {BaseConfig.DISABLE_SAVING_NOTE}.")
             return
 
         if result_dir:
             cls.mode = Mode.ANA
-            cls.base_output_dir = os.path.join(
-                BaseConfig.BASE_OUTPUT_PATH, result_dir)
+            cls.base_output_dir = os.path.join(BaseConfig.BASE_OUTPUT_PATH, result_dir)
         else:
             cls.mode = Mode.GEN
             cls.base_output_dir = os.path.join(
@@ -107,8 +110,7 @@ class Saver:
             return
 
         if BaseConfig.DISABLE_SAVING:
-            logger.warning(
-                f"{BaseConfig.DISABLE_SAVING_NOTE} Saving is disabled. ")
+            logger.warning(f"{BaseConfig.DISABLE_SAVING_NOTE} Saving is disabled. ")
             return
 
         file_config = FILE_CONFIGURATIONS.get(
@@ -172,8 +174,7 @@ class Saver:
     def _save_png_image(image, filepath: str) -> None:
         from numpy import ndarray
 
-        assert isinstance(
-            image, ndarray), "Unsupported image format. Expected ndarray."
+        assert isinstance(image, ndarray), "Unsupported image format. Expected ndarray."
 
         import cv2
 

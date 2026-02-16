@@ -29,8 +29,7 @@ def calculate_frame(
             raise ValueError(
                 "Only synthetic_graph or center_position must be provided."
             )
-        _positions = np.array(
-            list(nx.get_node_attributes(graph, "pos").values()))
+        _positions = np.array(list(nx.get_node_attributes(graph, "pos").values()))
         _center_x, _center_y = _positions[:, 0].mean(), _positions[:, 1].mean()
 
     _half_range = (frame_range[0] / 2, frame_range[1] / 2)
@@ -64,14 +63,12 @@ def build_graph(*args, arg_type: str = "adjacency_matrix") -> nx.Graph:
 
 def _from_adjacency_matrix(positions: np.ndarray, adjacency_matrix) -> nx.Graph:
     # noinspection PyUnresolvedReferences
-    graph = nx.from_scipy_sparse_array(
-        adjacency_matrix, edge_attribute="weight")
+    graph = nx.from_scipy_sparse_array(adjacency_matrix, edge_attribute="weight")
     for i, pos in enumerate(positions):
         graph.nodes[i]["pos"] = pos
 
     graph = largest_connected_component(graph)
-    graph = nx.convert_node_labels_to_integers(
-        graph, label_attribute="old_label")
+    graph = nx.convert_node_labels_to_integers(graph, label_attribute="old_label")
     return graph
 
 
@@ -101,8 +98,7 @@ def _from_edge_list(positions: np.ndarray, edge_list: np.ndarray) -> nx.Graph:
         graph.add_edge(u, v)
 
     graph = largest_connected_component(graph)
-    graph = nx.convert_node_labels_to_integers(
-        graph, label_attribute="old_label")
+    graph = nx.convert_node_labels_to_integers(graph, label_attribute="old_label")
     return graph
 
 

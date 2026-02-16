@@ -39,8 +39,7 @@ def find_pkl_containers(base_dir: str, max_depth: int = 3) -> Dict[str, str]:
             for entry in os.listdir(current_dir):
                 entry_path = os.path.join(current_dir, entry)
                 if os.path.isdir(entry_path):
-                    new_rel = os.path.join(
-                        rel_path, entry) if rel_path else entry
+                    new_rel = os.path.join(rel_path, entry) if rel_path else entry
                     queue.append((entry_path, depth + 1, new_rel))
 
     logger.info(f"Found {len(containers)} container directories.")

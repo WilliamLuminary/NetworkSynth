@@ -88,8 +88,7 @@ class GraphNode:
     @staticmethod
     def _choose_degree_by_parent(parent_degree) -> int:
         degrees = list(GraphNode._degree_trans_probs[parent_degree].keys())
-        probabilities = list(
-            GraphNode._degree_trans_probs[parent_degree].values())
+        probabilities = list(GraphNode._degree_trans_probs[parent_degree].values())
         return np.random.choice(degrees, p=probabilities)
 
     @staticmethod
@@ -101,10 +100,8 @@ class GraphNode:
     def _initialize_root_node(self) -> None:
         """Initialize a root node by generating its first child."""
         length = random.choice(GraphNode._degree_lengths[self.degree])
-        child_position = self._polar_to_cartesian(
-            [length], [self.base_angle])[0]
-        child = GraphNode(child_position, parent=self,
-                          parent_angle=self.base_angle)
+        child_position = self._polar_to_cartesian([length], [self.base_angle])[0]
+        child = GraphNode(child_position, parent=self, parent_angle=self.base_angle)
         self._add_child(child)
         self._add_to_grid(self.position)
         self._add_to_grid(child.position)

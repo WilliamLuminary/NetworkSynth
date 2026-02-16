@@ -221,15 +221,13 @@ class MultifractalAnalyzer:
             graph_copy = self.graph.copy()
             for _, _, d in graph_copy.edges(data=True):
                 d["weight"] = (
-                    1.0 / d["weight"] if d.get("weight",
-                                               0) != 0 else float("inf")
+                    1.0 / d["weight"] if d.get("weight", 0) != 0 else float("inf")
                 )
             graph_nk = nk.nxadapter.nx2nk(graph_copy, weightAttr="weight")
         else:
             graph_nk = nk.nxadapter.nx2nk(self.graph, weightAttr=None)
         # noinspection PyUnresolvedReferences
-        bt = nk.centrality.Betweenness(
-            graph_nk, normalized=True).run().scores()
+        bt = nk.centrality.Betweenness(graph_nk, normalized=True).run().scores()
         return bt
 
     def _compute_ollivier_ricci_curvature(self) -> List[float]:
@@ -298,8 +296,7 @@ class MultifractalAnalyzer:
             with self.set_f_digit(1):
                 tau_list, zq_list = self._compute_multifractal_taus()
 
-            alpha_0, width, al_list, fal_list = self._compute_n_spectrum(
-                tau_list)
+            alpha_0, width, al_list, fal_list = self._compute_n_spectrum(tau_list)
 
             with self.set_f_digit(2):
                 dim_list, dim_max, dim_min, dim_diff, valid_q = (

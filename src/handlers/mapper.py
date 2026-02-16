@@ -16,8 +16,7 @@ def _length_generator(graph) -> Generator[tuple, None, None]:
 
     for u, v, data in graph.edges(data=True):
         if "length" not in data:
-            data["length"] = euclidean(
-                graph.nodes[u]["pos"], graph.nodes[v]["pos"])
+            data["length"] = euclidean(graph.nodes[u]["pos"], graph.nodes[v]["pos"])
         yield u, v, data
 
 
@@ -106,8 +105,7 @@ class Mapper:
 
     def _length_to_weight(self, length: float) -> float:
         bin_idx = np.clip(
-            np.digitize(length, self.length_bins) -
-            1, 0, len(self.length_bins) - 2
+            np.digitize(length, self.length_bins) - 1, 0, len(self.length_bins) - 2
         )
         distribution = self.weight_distributions.get(bin_idx)
         return random.choice(distribution) if distribution else self.avg_weights
