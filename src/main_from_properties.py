@@ -55,10 +55,11 @@ def generate_with_multiprocessing(data_agent: RunAgent):
     from multiprocessing import Manager
 
     exit_event = Manager().Event()
+    max_workers = BaseConfig.get_max_workers(num_network)
     try:
         from concurrent.futures import ProcessPoolExecutor, as_completed
 
-        with ProcessPoolExecutor() as executor:
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
             futures = [
                 executor.submit(
                     generate_synthetic_network, exit_event, data_agent.attributes
