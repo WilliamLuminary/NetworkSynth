@@ -68,6 +68,21 @@ FILE_CONFIGURATIONS = {
         data_type=DataType.SYNTHETIC_NETWORK,
         detail="synthetic_network",
     ),
+    DataType.SYNTHETIC_EDGELIST: FileConfig(
+        relative_dir=SYNTHETIC_DIR,
+        data_type=DataType.SYNTHETIC_EDGELIST,
+        detail="synthetic_edgelist",
+    ),
+    DataType.SYNTHETIC_POSITIONS: FileConfig(
+        relative_dir=SYNTHETIC_DIR,
+        data_type=DataType.SYNTHETIC_POSITIONS,
+        detail="synthetic_positions",
+    ),
+    DataType.SYNTHETIC_NETWORK_NKI: FileConfig(
+        relative_dir=SYNTHETIC_DIR,
+        data_type=DataType.SYNTHETIC_NETWORK_NKI,
+        detail="synthetic_network_nki",
+    ),
     DataType.ANALYSIS_DATA: FileConfig(
         relative_dir=INPLACE_DIR,
         data_type=DataType.ANALYSIS_DATA,

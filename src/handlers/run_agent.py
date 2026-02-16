@@ -7,8 +7,14 @@ import networkx as nx
 from matplotlib import pyplot as plt
 from numpy import ndarray
 
-from config import (FILE_CONFIGURATIONS, BaseConfig, DatasetId, DataType,
-                    FileTag, Mode)
+from config import (
+    FILE_CONFIGURATIONS,
+    BaseConfig,
+    DatasetId,
+    DataType,
+    FileTag,
+    Mode,
+)
 
 from .data_loader import DataLoader
 from .saver import Saver
@@ -75,8 +81,7 @@ class RunAgent:
             self.data_loader.load()
             from .attributes_calculator import AttributesCalculator
 
-            self.attributes = AttributesCalculator(
-                **self.data_loader.get_attr_dict())
+            self.attributes = AttributesCalculator(**self.data_loader.get_attr_dict())
 
     def multifractal_analysis_in_generate_mode(self):
         assert self.mode == Mode.GEN, "This method is only available in Generate mode."
@@ -106,6 +111,20 @@ class RunAgent:
 
     def get_original_network(self):
         return self.data_loader.get_original_network()
+
+    def save_synthetic_outputs(self, prefix: str):
+        """Save synthetic networks in formats specified by BaseConfig.OUTPUT_FORMATS."""
+        fmts = {f.lower() for f in BaseConfig.OUTPUT_FORMATS}
+        if "pkl" in fmts:
+            self.save(DataType.SYNTHETIC_NETWORK, prefix)
+        graphs = self.data_loader.get_synthetic_networks()
+        for i, g in enumerate(graphs):
+            g_prefix = f"{prefix}_n{i}_"
+            if "csv" in fmts:
+                self.save(DataType.SYNTHETIC_EDGELIST, g_prefix, arg=g)
+                self.save(DataType.SYNTHETIC_POSITIONS, g_prefix, arg=g)
+            if "nkbin" in fmts:
+                self.save(DataType.SYNTHETIC_NETWORK_NKI, g_prefix, arg=g)
 
     def save(
         self, data_type: DataType, file_name_prefix: Optional[str] = None, arg=None
@@ -141,8 +160,7 @@ class RunAgent:
             import dataclasses
 
             self.saver.save_file(
-                dataclasses.asdict(
-                    self.attributes), data_type, file_name_prefix
+                dataclasses.asdict(self.attributes), data_type, file_name_prefix
             )  # type: ignore
 
         elif data_type == DataType.ORIGINAL_GRAPH:
@@ -156,8 +174,7 @@ class RunAgent:
                 show=True,
             )
             if self.saver:
-                self.saver.save_file(
-                    original_figure, data_type, file_name_prefix)
+                self.saver.save_file(original_figure, data_type, file_name_prefix)
 
         elif data_type == DataType.SYNTHETIC_GRAPH:
             assert isinstance(
@@ -176,8 +193,22 @@ class RunAgent:
 
         elif data_type == DataType.SYNTHETIC_NETWORK:
             synthetic_networks = self.data_loader.get_synthetic_networks()
-            self.saver.save_file(synthetic_networks,
-                                 data_type, file_name_prefix)
+            self.saver.save_file(synthetic_networks, data_type, file_name_prefix)
+
+        elif data_type == DataType.SYNTHETIC_EDGELIST:
+            assert isinstance(arg, nx.Graph), "arg must be a networkx.Graph."
+            edgelist = _nx_to_edgelist_csv(arg)
+            self.saver.save_file(edgelist, data_type, file_name_prefix)
+
+        elif data_type == DataType.SYNTHETIC_POSITIONS:
+            assert isinstance(arg, nx.Graph), "arg must be a networkx.Graph."
+            positions = _nx_to_positions_csv(arg)
+            self.saver.save_file(positions, data_type, file_name_prefix)
+
+        elif data_type == DataType.SYNTHETIC_NETWORK_NKI:
+            assert isinstance(arg, nx.Graph), "arg must be a networkx.Graph."
+            nk_graph = _nx_to_networkit(arg)
+            self.saver.save_file(nk_graph, data_type, file_name_prefix)
 
         elif data_type == DataType.ANALYSIS_DATA:
             assert (
@@ -290,3 +321,33 @@ def plot_network(data_type: DataType, graph: nx.Graph, **kwargs) -> ndarray:
     from utils import finalize_plot
 
     return finalize_plot(fig, show_on_the_fly)
+
+
+def _nx_to_edgelist_csv(graph: nx.Graph):
+    pos = nx.get_node_attributes(graph, "pos")
+    rows = [["source_x", "source_y", "target_x", "target_y", "weight"]]
+    for u, v, d in graph.edges(data=True):
+        rows.append([*pos[u], *pos[v], d.get("weight", 1.0)])
+    return rows
+
+
+def _nx_to_positions_csv(graph: nx.Graph):
+    pos = nx.get_node_attributes(graph, "pos")
+    rows = [["x", "y"]]
+    for p in pos.values():
+        rows.append([p[0], p[1]])
+    return rows
+
+
+def _nx_to_networkit(graph: nx.Graph):
+    import networkit as nk
+
+    n = graph.number_of_nodes()
+    weighted = any("weight" in d for _, _, d in graph.edges(data=True))
+    nk_graph = nk.Graph(n, weighted=weighted)
+    node_map = {node: idx for idx, node in enumerate(graph.nodes())}
+    for u, v, d in graph.edges(data=True):
+        nk_graph.addEdge(
+            node_map[u], node_map[v], d.get("weight", 1.0) if weighted else 1.0
+        )
+    return nk_graph

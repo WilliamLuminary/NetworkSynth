@@ -1,7 +1,7 @@
 # src/config/base_config.py
 import logging
 import os
-from typing import List, Optional, Tuple
+from typing import List, Optional, Set, Tuple
 
 from config.enums import DatasetId
 
@@ -54,6 +54,9 @@ class BaseConfig:
 
     MAX_ATTEMPTS = 10
     ERROR_TOLERANCE = 0.15  # Generally should be 0.15
+
+    # Supported: "pkl", "csv", "nkbin" (case-insensitive)
+    OUTPUT_FORMATS: Set[str] = {"nkbin"}
 
     DISABLE_SAVING: bool = False
     DISABLE_SAVING_NOTE: str = ""

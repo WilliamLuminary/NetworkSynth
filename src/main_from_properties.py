@@ -32,8 +32,7 @@ def generate_synthetic_network(exit_event, attributes: AttributesCalculator):
             if _should_exit(exit_event):
                 return None
 
-            synthetic_graph = trim_graph(
-                synthetic_graph, attributes.average_degree)
+            synthetic_graph = trim_graph(synthetic_graph, attributes.average_degree)
             return synthetic_graph
 
         except KeyboardInterrupt:
@@ -95,7 +94,7 @@ def generate_with_multiprocessing(data_agent: RunAgent):
             future.cancel()
         executor.shutdown(wait=True, cancel_futures=True)
 
-    data_agent.save(data_type=DataType.SYNTHETIC_NETWORK)
+    data_agent.save_synthetic_outputs("")
 
 
 def run():

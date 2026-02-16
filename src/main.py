@@ -120,10 +120,9 @@ def generate_with_multiprocessing(data_agent: RunAgent):
         executor.shutdown(wait=True, cancel_futures=True)
 
     avg_err = compute_average_error(errors)
-    data_agent.save(
-        data_type=DataType.SYNTHETIC_NETWORK,
-        file_name_prefix=f"len_{len(errors)}_err_{avg_err:.3f}",
-    )
+    prefix = f"len_{len(errors)}_err_{avg_err:.3f}"
+    data_agent.save_synthetic_outputs(prefix)
+
     if BaseConfig.FULL_ANALYSIS:
         data_agent.multifractal_analysis_in_generate_mode()
         data_agent.save(data_type=DataType.ANALYSIS_DATA)
