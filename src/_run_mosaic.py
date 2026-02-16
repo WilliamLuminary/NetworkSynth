@@ -1,0 +1,7 @@
+"""Temporary launcher for mosaic pipeline."""
+import sys
+import os
+sys.path.insert(0, os.path.dirname(__file__))
+
+import main_mosaic
+main_mosaic.main()
