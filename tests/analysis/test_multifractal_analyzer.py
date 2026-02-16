@@ -6,10 +6,18 @@ import pytest
 
 from analysis.multifractal_analyzer import MultifractalAnalyzer
 from config import AnaConfig, BaseConfig
-from .._original_code import (original_calculate_assortativity, original_calculate_betweenness,
-                              original_calculate_centralities, original_calculate_eigenvector_centrality,
-                              original_calculate_multifractal_taus, original_calculate_ollivier_ricci_curvature,
-                              original_n_dimension, original_n_spectrum, original_node_dimension)
+
+from .._original_code import (
+    original_calculate_assortativity,
+    original_calculate_betweenness,
+    original_calculate_centralities,
+    original_calculate_eigenvector_centrality,
+    original_calculate_multifractal_taus,
+    original_calculate_ollivier_ricci_curvature,
+    original_n_dimension,
+    original_n_spectrum,
+    original_node_dimension,
+)
 
 AnaConfig.initialize()
 
@@ -25,9 +33,10 @@ def test_calculate_multifractal_taus(load_unweighted_test_nx_graph):
     assert len(tau_list) == len(MultifractalAnalyzer.full_q)
 
     correct_tau_list, correct_r_g_all, correct_diameter, correct_zq_list = (
-        original_calculate_multifractal_taus(sample_graph,
-                                             MultifractalAnalyzer.full_q,
-                                             weight=False))
+        original_calculate_multifractal_taus(
+            sample_graph, MultifractalAnalyzer.full_q, weight=False
+        )
+    )
 
     assert np.array_equal(tau_list, correct_tau_list)
     assert np.array_equal(zq_list, correct_zq_list)
@@ -35,11 +44,15 @@ def test_calculate_multifractal_taus(load_unweighted_test_nx_graph):
 
 def test_n_spectrum(load_unweighted_test_nx_graph):
     sample_graph = load_unweighted_test_nx_graph
-    n_tau, _, _, _ = original_calculate_multifractal_taus(sample_graph, MultifractalAnalyzer.full_q, weight=False)
+    n_tau, _, _, _ = original_calculate_multifractal_taus(
+        sample_graph, MultifractalAnalyzer.full_q, weight=False
+    )
     analyzer = MultifractalAnalyzer(sample_graph)
     alpha_0, width, al_list, fal_list = analyzer._compute_n_spectrum(n_tau)
 
-    correct_alpha_0, correct_width = original_n_spectrum(n_tau, MultifractalAnalyzer.full_q, 0, 'b')
+    correct_alpha_0, correct_width = original_n_spectrum(
+        n_tau, MultifractalAnalyzer.full_q, 0, "b"
+    )
 
     assert np.array_equal(alpha_0, correct_alpha_0)
     assert np.array_equal(width, correct_width)
@@ -92,7 +105,9 @@ def test_ricci_curvature(load_unweighted_test_nx_graph):
     sample_graph = load_unweighted_test_nx_graph
     analyzer = MultifractalAnalyzer(sample_graph)
     ricci_curvature = analyzer._compute_ollivier_ricci_curvature()
-    correct_ricci_curvature = original_calculate_ollivier_ricci_curvature(sample_graph, False)
+    correct_ricci_curvature = original_calculate_ollivier_ricci_curvature(
+        sample_graph, False
+    )
 
     assert ricci_curvature == correct_ricci_curvature
 
@@ -110,7 +125,9 @@ def test_eigenvector_centrality(load_unweighted_test_nx_graph):
     sample_graph = load_unweighted_test_nx_graph
     analyzer = MultifractalAnalyzer(sample_graph)
     eigenvector_centrality = analyzer._compute_eigenvector_centrality()
-    correct_eigenvector_centrality = original_calculate_eigenvector_centrality(sample_graph, False)
+    correct_eigenvector_centrality = original_calculate_eigenvector_centrality(
+        sample_graph, False
+    )
 
     assert eigenvector_centrality == correct_eigenvector_centrality
 

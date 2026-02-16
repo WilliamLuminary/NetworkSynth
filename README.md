@@ -11,7 +11,7 @@
    git clone https://github.com/WilliamLuminary/NetworkSynth.git
    cd NetworkSynth
    pip install -r requirements.txt  # Python 3.10+
-   
+
    python src/main.py
    ```
 
@@ -74,17 +74,17 @@ def _generate_datasets() -> List[DatasetId]:
 
 class ConfigMydata(BaseConfig):
     DATASETS = _generate_datasets()
-    
+
     IMAGE_SIZE = (1024, 1024)
     FRAME_SIZE = (512, 512)
     SYNTHETIC_FRAME_SIZE = (1536, 1536)
-    
+
     CLOSED_NODES_FACTOR = 1.2
     CLOSED_EDGES_FACTOR = 0.8
     SYNTHETIC_NETWORK_NUMBER = 10
     SYNTHETIC_GRAPH_NUMBER = 3
     ERROR_TOLERANCE = 0.15
-    
+
     @classmethod
     def initialize(cls):
         super().initialize()

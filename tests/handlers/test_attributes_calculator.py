@@ -7,15 +7,20 @@ import pytest
 from handlers.attributes_calculator import AttributesCalculator
 
 
-def compare_dicts_of_floats(dict_a: dict[int, float], dict_b: dict[int, float], abs_tol: float = 1e-7):
+def compare_dicts_of_floats(
+    dict_a: dict[int, float], dict_b: dict[int, float], abs_tol: float = 1e-7
+):
     assert set(dict_a.keys()) == set(dict_b.keys())
     for key, val_a in dict_a.items():
         val_b = dict_b[key]
         assert val_a == pytest.approx(val_b, abs=abs_tol)
 
 
-def compare_dicts_of_dicts_of_floats(dict_a: dict[int, dict[int, float]], dict_b: dict[int, dict[int, float]],
-                                     abs_tol: float = 1e-7):
+def compare_dicts_of_dicts_of_floats(
+    dict_a: dict[int, dict[int, float]],
+    dict_b: dict[int, dict[int, float]],
+    abs_tol: float = 1e-7,
+):
     assert set(dict_a.keys()) == set(dict_b.keys())
     for key, subdict_a in dict_a.items():
         subdict_b = dict_b[key]
@@ -25,8 +30,9 @@ def compare_dicts_of_dicts_of_floats(dict_a: dict[int, dict[int, float]], dict_b
             assert val_a == pytest.approx(val_b, abs=abs_tol)
 
 
-def compare_dicts_of_lists_of_floats(dict_a: dict[int, list[float]], dict_b: dict[int, list[float]],
-                                     atol: float = 1e-7):
+def compare_dicts_of_lists_of_floats(
+    dict_a: dict[int, list[float]], dict_b: dict[int, list[float]], atol: float = 1e-7
+):
     assert set(dict_a.keys()) == set(dict_b.keys())
     for key, list_a in dict_a.items():
         list_b = dict_b[key]
@@ -44,7 +50,9 @@ def test_attributes_calculators_equivalence(load_weighted_test_nx_graph):
     # compare_dicts_of_dicts_of_floats(old_calc.degree_transition_probs, new_calc.degree_transition_probs)
     # compare_dicts_of_lists_of_floats(old_calc.degree_lengths, new_calc.degree_lengths)
     # compare_dicts_of_lists_of_floats(old_calc.degree_angles, new_calc.degree_angles)
-    print("All calculator attributes matched (within numerical tolerance) between old and new implementations.")
+    print(
+        "All calculator attributes matched (within numerical tolerance) between old and new implementations."
+    )
 
 
 def test_pickle_io(load_unweighted_test_nx_graph):
@@ -65,6 +73,7 @@ def _test_reconstruction(attr_cal, loaded_data):
 def _test_dump(attr_cal, pickle_file_path):
     with open(pickle_file_path, "wb") as f:
         import dataclasses
+
         # noinspection PyTypeChecker
         pickle.dump(dataclasses.asdict(attr_cal), f)
     assert os.path.exists(pickle_file_path)
@@ -74,5 +83,6 @@ def _test_dump_type(pickle_file_path):
     with open(pickle_file_path, "rb") as f:
         load_file = pickle.load(f)
     from typing import Dict
+
     assert isinstance(load_file, Dict)
     return load_file
