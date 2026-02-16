@@ -136,6 +136,10 @@ class Saver:
             Saver._save_png_image(content, abs_path)
         elif FileExtension.PKL == data_type.file_extension:
             Saver._save_pickle(content, abs_path)
+        elif FileExtension.CSV == data_type.file_extension:
+            Saver._save_csv(content, abs_path)
+        elif FileExtension.NKBIN == data_type.file_extension:
+            Saver._save_networkit(content, abs_path)
         else:
             raise ValueError(f"Unsupported DataType for saving: {data_type}")
 
@@ -148,6 +152,21 @@ class Saver:
 
             # noinspection PyTypeChecker
             pickle.dump(obj, f)
+
+    @staticmethod
+    def _save_csv(content, filepath: str) -> None:
+        import csv
+
+        with open(filepath, "w", newline="") as f:
+            writer = csv.writer(f)
+            for row in content:
+                writer.writerow(row)
+
+    @staticmethod
+    def _save_networkit(graph, filepath: str) -> None:
+        import networkit as nk
+
+        nk.writeGraph(graph, filepath, nk.Format.NetworkitBinary)
 
     @staticmethod
     def _save_png_image(image, filepath: str) -> None:

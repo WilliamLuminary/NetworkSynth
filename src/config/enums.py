@@ -87,6 +87,8 @@ class DatasetId:
 class FileExtension(Enum):
     PNG = "png"
     PKL = "pkl"
+    CSV = "csv"
+    NKBIN = "nkbin"
 
     def __str__(self):
         return self.value
@@ -107,8 +109,7 @@ class FileTag(Enum):
 
 class DataType(Enum):
     DEFAULT_DATA = ("", {FileTag.DATA}, FileExtension.PKL)
-    ORIGINAL_IMAGE = ("Original Image", {
-                      FileTag.FIG, FileTag.ORI}, FileExtension.PNG)
+    ORIGINAL_IMAGE = ("Original Image", {FileTag.FIG, FileTag.ORI}, FileExtension.PNG)
     ORIGINAL_GRAPH = (
         "Original Graph",
         {FileTag.FIG, FileTag.PLOT, FileTag.ORI},
@@ -134,8 +135,22 @@ class DataType(Enum):
         {FileTag.DATA, FileTag.SYN},
         FileExtension.PKL,
     )
-    ANALYSIS_DATA = ("Analysis Data", {
-                     FileTag.DATA, FileTag.ANA}, FileExtension.PKL)
+    SYNTHETIC_EDGELIST = (
+        "Synthetic Edge List",
+        {FileTag.DATA, FileTag.SYN},
+        FileExtension.CSV,
+    )
+    SYNTHETIC_POSITIONS = (
+        "Synthetic Positions",
+        {FileTag.DATA, FileTag.SYN},
+        FileExtension.CSV,
+    )
+    SYNTHETIC_NETWORK_NKI = (
+        "Synthetic Network (NetworKit)",
+        {FileTag.DATA, FileTag.SYN},
+        FileExtension.NKBIN,
+    )
+    ANALYSIS_DATA = ("Analysis Data", {FileTag.DATA, FileTag.ANA}, FileExtension.PKL)
     ANALYSIS_FIGURE = (
         "Analysis Figure",
         {FileTag.FIG, FileTag.PLOT, FileTag.ANA},
