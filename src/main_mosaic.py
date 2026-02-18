@@ -25,7 +25,6 @@ import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Dict, Tuple
 
-import networkx as nx
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.collections import LineCollection
@@ -34,6 +33,7 @@ from config import BaseConfig, DataType
 from config.mosaic_mode import MosaicConfig
 from graph import GraphGenerator
 from graph.mosaic_stitcher import MosaicStitcher
+from graph.synth_graph import SynthGraph
 from handlers import AttributesCalculator, RunAgent, Saver
 from utils import finalize_plot, trim_graph
 
@@ -61,7 +61,7 @@ def generate_single_tile(args):
 
     Returns
     -------
-    ((row, col), nx.Graph | None)
+    ((row, col), SynthGraph | None)
     """
     row, col, exit_event, attributes, tile_gen_frame, offset_x, offset_y = args
 
@@ -73,10 +73,9 @@ def generate_single_tile(args):
         graph = generator.generate_network(frame_range=tile_gen_frame)
         graph = trim_graph(graph, attributes.average_degree)
 
-        # Shift every node to global coordinates
-        for node in graph.nodes():
-            pos = graph.nodes[node]["pos"]
-            graph.nodes[node]["pos"] = (pos[0] + offset_x, pos[1] + offset_y)
+        positions = graph.positions()
+        positions[:, 0] += offset_x
+        positions[:, 1] += offset_y
 
         return (row, col), graph
 
@@ -111,8 +110,6 @@ def compute_tile_layout():
     total_w = grid_cols * tile_w
     total_h = grid_rows * tile_h
 
-    # Overlap is a fraction of the *tile* size, keeping the
-    # generation frame reasonable regardless of grid dimensions.
     overlap_x = BaseConfig.OVERLAP_MARGIN_FRACTION * tile_w
     overlap_y = BaseConfig.OVERLAP_MARGIN_FRACTION * tile_h
 
@@ -132,7 +129,6 @@ def compute_tile_layout():
     tile_offsets: Dict[Tuple[int, int], Tuple[float, float]] = {}
     for r in range(grid_rows):
         for c in range(grid_cols):
-            # Centre of tile (r, c) in global coords
             offset_x = c * tile_w + tile_w / 2.0
             offset_y = r * tile_h + tile_h / 2.0
             tile_offsets[(r, c)] = (offset_x, offset_y)
@@ -147,13 +143,13 @@ def generate_all_tiles(
     attributes: AttributesCalculator,
     tile_gen_frame: Tuple[int, int],
     tile_offsets: Dict[Tuple[int, int], Tuple[float, float]],
-) -> Dict[Tuple[int, int], nx.Graph]:
+) -> Dict[Tuple[int, int], SynthGraph]:
     """
     Generate every tile in parallel via ``ProcessPoolExecutor``.
 
     Returns
     -------
-    dict[(row, col), nx.Graph]
+    dict[(row, col), SynthGraph]
         Successfully generated tiles with global-coordinate positions.
     """
     from multiprocessing import Manager
@@ -164,13 +160,12 @@ def generate_all_tiles(
 
     logger.info(f"Generating {num_tiles:,} tiles with {num_workers} workers …")
 
-    # Build argument list
     tile_args = [
         (r, c, exit_event, attributes, tile_gen_frame, off_x, off_y)
         for (r, c), (off_x, off_y) in tile_offsets.items()
     ]
 
-    tile_graphs: Dict[Tuple[int, int], nx.Graph] = {}
+    tile_graphs: Dict[Tuple[int, int], SynthGraph] = {}
     failed_tiles = []
 
     try:
@@ -243,15 +238,10 @@ def run_mosaic_for_dataset(dataset_id):
     # 5. Save network data + plot
     data_agent.add_synthetic_graph(mosaic_graph)
     prefix = f"mosaic_{BaseConfig.GRID_ROWS}x{BaseConfig.GRID_COLS}"
-    data_agent.save(
-        data_type=DataType.SYNTHETIC_NETWORK,
-        file_name_prefix=prefix,
-    )
     data_agent.save(DataType.SYNTHETIC_EDGELIST, f"{prefix}_", arg=mosaic_graph)
     data_agent.save(DataType.SYNTHETIC_POSITIONS, f"{prefix}_", arg=mosaic_graph)
     data_agent.save(DataType.SYNTHETIC_NETWORK_NKI, f"{prefix}_", arg=mosaic_graph)
 
-    # Plot the full stitched network
     mosaic_fig = plot_mosaic_network(mosaic_graph)
     data_agent.saver.save_file(
         mosaic_fig,
@@ -270,7 +260,7 @@ def run_mosaic_for_dataset(dataset_id):
 # Mosaic-aware plotting
 # ------------------------------------------------------------------ #
 def plot_mosaic_network(
-    graph: nx.Graph,
+    graph: SynthGraph,
     node_size: float = 0.05,
     line_width: float = 0.1,
     margin_frac: float = 0.02,
@@ -281,26 +271,12 @@ def plot_mosaic_network(
     matplotlib primitives (``LineCollection`` + ``scatter``)
     so even million-node graphs render without OOM.
 
-    Parameters
-    ----------
-    graph : nx.Graph
-        The stitched mosaic network.
-    node_size : float
-        Marker size for scatter (pts**2).
-    line_width : float
-        Line width for edges.
-    margin_frac : float
-        Extra margin around the bounding box (fraction).
-    dpi : int
-        Figure resolution.
-
     Returns
     -------
     np.ndarray
         RGBA image array of the figure.
     """
-    positions = nx.get_node_attributes(graph, "pos")
-    pos_arr = np.array(list(positions.values()))
+    pos_arr = graph.positions()
 
     x_min, y_min = pos_arr.min(axis=0)
     x_max, y_max = pos_arr.max(axis=0)
@@ -320,12 +296,10 @@ def plot_mosaic_network(
 
     fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=dpi)
 
-    # --- edges via LineCollection (single artist) ---
     segments = []
     for u, v in graph.edges():
-        pu, pv = positions.get(u), positions.get(v)
-        if pu is not None and pv is not None:
-            segments.append([pu, pv])
+        pu, pv = pos_arr[u], pos_arr[v]
+        segments.append([pu, pv])
     lc = LineCollection(
         segments,
         colors="red",
@@ -334,7 +308,6 @@ def plot_mosaic_network(
     )
     ax.add_collection(lc)
 
-    # --- nodes via scatter (single artist) ---
     ax.scatter(
         pos_arr[:, 0],
         pos_arr[:, 1],

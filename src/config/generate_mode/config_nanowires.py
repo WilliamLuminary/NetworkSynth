@@ -6,8 +6,6 @@ from typing import List, Tuple
 import cv2
 import numpy as np
 
-from utils import build_graph
-
 from .._utils import _transpose_network_pos
 from ..base_config import BaseConfig
 from ..enums import DatasetId
@@ -57,6 +55,8 @@ class ConfigNanowires(BaseConfig):
         """Load original network from position and edge list files."""
         positions = _load_positions(dataset_id)
         edge_list = _load_edge_list(dataset_id)
+        from utils import build_graph
+
         original_network = build_graph(positions, edge_list, arg_type="edge_list")
         _transpose_network_pos(original_network)
         return original_network

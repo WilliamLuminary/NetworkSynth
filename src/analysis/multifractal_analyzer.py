@@ -437,7 +437,8 @@ class MultifractalAnalyzer:
         else:
             lcc = self.graph.largest_connected_component()
             nk_graph = lcc.nk
-        diam = nk.distance.Diameter(nk_graph, algo=nk.distance.DiameterAlgo.exact)
+        algo = getattr(nk.distance.DiameterAlgo, "Exact", None) or nk.distance.DiameterAlgo.exact
+        diam = nk.distance.Diameter(nk_graph, algo=algo)
         diam.run()
         return diam.getDiameter()[0]
 

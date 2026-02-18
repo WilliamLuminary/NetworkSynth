@@ -7,8 +7,6 @@ from typing import List
 import cv2
 import numpy as np
 
-from utils import build_graph
-
 from .._utils import (
     _find_file_with_pattern,
     _resize_cv2_image,
@@ -61,6 +59,8 @@ class Config2(BaseConfig):
         """Load original network. dataset_id has single level: [set_name]"""
         positions = _load_positions(dataset_id)
         mat = _load_sparse_matrix(dataset_id)
+        from utils import build_graph
+
         original_network = build_graph(positions, mat)
         _transpose_network_pos(original_network)
         return original_network

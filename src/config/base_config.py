@@ -3,7 +3,7 @@ import logging
 import os
 from typing import List, Optional, Set, Tuple
 
-from config.enums import DatasetId
+from .enums import DatasetId
 
 logger = logging.getLogger(__name__)
 

@@ -9,7 +9,7 @@ from analysis import MultifractalAnalyzer
 
 # noinspection PyUnresolvedReferences
 from config import BaseConfig, DatasetId
-from config import GenConfig1 as GenConfig
+from config.generate_mode import GenConfig1 as GenConfig
 from handlers import RunAgent
 from main import compute_average_error, generate_synthetic_network
 

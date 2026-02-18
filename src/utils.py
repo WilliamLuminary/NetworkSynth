@@ -113,10 +113,13 @@ def finalize_plot(fig, show: bool = False) -> np.ndarray:
 
     if show:
         try:
-            import cv2
+            import os
 
-            cv2.imshow("Preview", image[..., :3])
-            cv2.waitKey(1)
+            if os.environ.get("DISPLAY"):
+                import cv2
+
+                cv2.imshow("Preview", image[..., :3])
+                cv2.waitKey(1)
         except Exception:
             logging.debug("Interactive preview unavailable.")
 
