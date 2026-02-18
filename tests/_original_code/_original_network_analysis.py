@@ -7,6 +7,7 @@ import networkit as nk
 import networkx as nx
 import numpy as np
 import scipy.stats as stats
+
 from GraphRicciCurvature.OllivierRicci import OllivierRicci
 from tqdm import tqdm
 

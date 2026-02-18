@@ -41,22 +41,16 @@ def compare_dicts_of_lists_of_floats(
         assert np.allclose(arr_a, arr_b, atol=atol)
 
 
-def test_attributes_calculators_equivalence(load_weighted_test_nx_graph):
-    graph = load_weighted_test_nx_graph
+def test_attributes_calculators_equivalence(load_weighted_test_synth_graph):
+    graph = load_weighted_test_synth_graph
     _ = AttributesCalculator().analyze(graph)
-    # assert old_calc.average_degree == pytest.approx(new_calc.average_degree, abs=1e-7)
-    # assert old_calc.average_length == pytest.approx(new_calc.average_length, abs=1e-7)
-    # compare_dicts_of_floats(old_calc.degree_distribution, new_calc.degree_distribution)
-    # compare_dicts_of_dicts_of_floats(old_calc.degree_transition_probs, new_calc.degree_transition_probs)
-    # compare_dicts_of_lists_of_floats(old_calc.degree_lengths, new_calc.degree_lengths)
-    # compare_dicts_of_lists_of_floats(old_calc.degree_angles, new_calc.degree_angles)
     print(
         "All calculator attributes matched (within numerical tolerance) between old and new implementations."
     )
 
 
-def test_pickle_io(load_unweighted_test_nx_graph):
-    sample_graph = load_unweighted_test_nx_graph
+def test_pickle_io(load_unweighted_test_synth_graph):
+    sample_graph = load_unweighted_test_synth_graph
     attr_cal = AttributesCalculator()
     attr_cal.analyze(sample_graph)
     pickle_file_path = os.path.join("data", "attr_dict.pkl")

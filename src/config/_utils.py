@@ -1,7 +1,6 @@
 from typing import Optional, Tuple
 
-from networkx import Graph
-from numpy import array, float64, ndarray
+from numpy import ndarray
 
 from config import BaseConfig
 
@@ -63,7 +62,7 @@ def _trim_cv2_image(
     return image[top : h - bottom if bottom else h, left : w - right if right else w]
 
 
-def _transpose_network_pos(network: Graph) -> None:
-    for node, d in network.nodes(data=True):
-        p = array(d.get("pos", [0, 0]), dtype=float64)
-        d["pos"] = array([p[1], p[0]])
+def _transpose_network_pos(network) -> None:
+    """Swap x and y coordinates in the network's positions array."""
+    pos = network.positions()
+    pos[:, [0, 1]] = pos[:, [1, 0]]

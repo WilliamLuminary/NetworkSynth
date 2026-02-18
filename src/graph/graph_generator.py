@@ -2,13 +2,13 @@
 
 from typing import Optional, Tuple, Union
 
-import networkx as nx
 from numpy import ndarray
 
 from config import BaseConfig
-from utils import build_graph, calculate_frame, largest_connected_component
+from utils import build_graph, calculate_frame
 
 from ._graph_node import GraphNode
+from .synth_graph import SynthGraph
 
 
 class GraphGenerator:
@@ -71,11 +71,12 @@ def _within_frame(
     return frame[0][0] <= x <= frame[0][1] and frame[1][0] <= y <= frame[1][1]
 
 
-def _filter_graph(graph: nx.Graph, frame: Union[list, tuple]) -> nx.Graph:
-    nodes_to_keep = {
-        node
-        for node, pos in nx.get_node_attributes(graph, "pos").items()
-        if _within_frame(pos, frame)
-    }
-    filtered_fraction = graph.subgraph(nodes_to_keep)
-    return largest_connected_component(filtered_fraction)
+def _filter_graph(graph: SynthGraph, frame: Union[list, tuple]) -> SynthGraph:
+    positions = graph.positions()
+    nodes_to_keep = set()
+    for node in graph.nodes():
+        pos = positions[node]
+        if _within_frame(pos, frame):
+            nodes_to_keep.add(node)
+    filtered = graph.subgraph(nodes_to_keep)
+    return filtered.largest_connected_component()

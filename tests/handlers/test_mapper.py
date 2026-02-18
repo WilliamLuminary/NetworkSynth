@@ -18,9 +18,7 @@ def profile_mapper_time(mapper, graph, iterations=10):
     times = []
     for _ in range(iterations):
         graph_copy = graph.copy()
-        # Remove weights for a fair test.
-        for _, _, data in graph_copy.edges(data=True):
-            data.pop("weight", None)
+        graph_copy.make_unweighted()
         start = time.perf_counter()
         mapper.assign_weights(graph_copy)
         times.append(time.perf_counter() - start)
@@ -34,8 +32,7 @@ def compute_quality(mapper, graph):
     # noinspection PyProtectedMember
     original_lengths, original_weights = Mapper._compute_edge_metrics(graph)
     graph_copy = graph.copy()
-    for _, _, data in graph_copy.edges(data=True):
-        data.pop("weight", None)
+    graph_copy.make_unweighted()
     mapper.assign_weights(graph_copy)
 
     # noinspection PyProtectedMember
@@ -48,10 +45,9 @@ def compute_quality(mapper, graph):
 def plot_map(mapper, sample_graph):
     # noinspection PyProtectedMember
     ori_lengths, ori_weights = Mapper._compute_edge_metrics(sample_graph)
-    new_graph = sample_graph.copy()
     for _ in range(10):
-        for u, v, data in new_graph.edges(data=True):
-            del data["weight"]
+        new_graph = sample_graph.copy()
+        new_graph.make_unweighted()
         mapper.assign_weights(new_graph)
         # noinspection PyProtectedMember
         new_lengths, new_weights = Mapper._compute_edge_metrics(new_graph)
@@ -73,15 +69,15 @@ def plot_map(mapper, sample_graph):
         sleep(0.1)
 
 
-def test_mapper(load_weighted_test_nx_graph):
-    sample_graph = load_weighted_test_nx_graph
+def test_mapper(load_weighted_test_synth_graph):
+    sample_graph = load_weighted_test_synth_graph
     mapper = Mapper(sample_graph)
     plot_map(mapper, sample_graph)
 
 
-def test_mapper_performance(load_weighted_test_nx_graph):
+def test_mapper_performance(load_weighted_test_synth_graph):
     """Measures runtime."""
-    sample_graph = load_weighted_test_nx_graph
+    sample_graph = load_weighted_test_synth_graph
     mapper1 = Mapper(sample_graph)
 
     time1, std1 = profile_mapper_time(mapper1, sample_graph)
@@ -90,9 +86,9 @@ def test_mapper_performance(load_weighted_test_nx_graph):
     print(f"Mapper: Avg Time = {time1:.4f}s ± {std1:.4f}s")
 
 
-def test_mapper_quality(load_weighted_test_nx_graph):
+def test_mapper_quality(load_weighted_test_synth_graph):
     """Measures Mean absolute error and Pearson correlation."""
-    sample_graph = load_weighted_test_nx_graph
+    sample_graph = load_weighted_test_synth_graph
     mapper1 = Mapper(sample_graph)
 
     mae1, corr1 = compute_quality(mapper1, sample_graph)

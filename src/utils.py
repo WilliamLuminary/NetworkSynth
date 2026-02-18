@@ -4,16 +4,15 @@ import logging
 import time
 from typing import Tuple, Union
 
-import networkx as nx
 import numpy as np
-from matplotlib import pyplot as plt
 from numpy import ndarray
 
 from config import BaseConfig
+from graph.synth_graph import SynthGraph
 
 
 def calculate_frame(
-    graph: nx.Graph = None,
+    graph: SynthGraph = None,
     center_position: Union[tuple, list, ndarray] = None,
     frame_range: Tuple[int, int] = None,
 ) -> tuple[tuple[float, float], tuple[float, float]]:
@@ -29,8 +28,11 @@ def calculate_frame(
             raise ValueError(
                 "Only synthetic_graph or center_position must be provided."
             )
-        _positions = np.array(list(nx.get_node_attributes(graph, "pos").values()))
-        _center_x, _center_y = _positions[:, 0].mean(), _positions[:, 1].mean()
+        _positions = graph.positions()
+        _center_x, _center_y = (
+            _positions[:, 0].mean(),
+            _positions[:, 1].mean(),
+        )
 
     _half_range = (frame_range[0] / 2, frame_range[1] / 2)
     _width, _height = _half_range
@@ -39,16 +41,16 @@ def calculate_frame(
         (
             round(_center_x - _width, 2),
             round(_center_x + _width, 2),
-        ),  # Horizontal range (width)
+        ),
         (
             round(_center_y - _height, 2),
             round(_center_y + _height, 2),
-        ),  # Vertical range (height)
+        ),
     )
     return frame
 
 
-def build_graph(*args, arg_type: str = "adjacency_matrix") -> nx.Graph:
+def build_graph(*args, arg_type: str = "adjacency_matrix") -> SynthGraph:
     if arg_type == "adjacency_matrix":
         return _from_adjacency_matrix(*args)
     elif arg_type == "graph_node":
@@ -57,76 +59,30 @@ def build_graph(*args, arg_type: str = "adjacency_matrix") -> nx.Graph:
         return _from_edge_list(*args)
     else:
         raise TypeError(
-            f"Unsupported Type: {arg_type} from function {build_graph.__name__}."
+            f"Unsupported Type: {arg_type} " f"from function {build_graph.__name__}."
         )
 
 
-def _from_adjacency_matrix(positions: np.ndarray, adjacency_matrix) -> nx.Graph:
-    # noinspection PyUnresolvedReferences
-    graph = nx.from_scipy_sparse_array(adjacency_matrix, edge_attribute="weight")
-    for i, pos in enumerate(positions):
-        graph.nodes[i]["pos"] = pos
-
-    graph = largest_connected_component(graph)
-    graph = nx.convert_node_labels_to_integers(graph, label_attribute="old_label")
-    return graph
+def _from_adjacency_matrix(positions: np.ndarray, adjacency_matrix) -> SynthGraph:
+    graph = SynthGraph.from_sparse_matrix(positions, adjacency_matrix)
+    return graph.largest_connected_component()
 
 
-def _from_graph_node(nodes: set, edges: set) -> nx.Graph:
-    graph = nx.Graph()
-    position_map = {node.position: node for node in nodes}
-
-    for node in nodes:
-        graph.add_node(position_map[node.position].id, pos=node.position)
-
-    for edge in edges:
-        u, v = position_map[edge[0]].id, position_map[edge[1]].id
-        graph.add_edge(u, v)
-
-    graph = largest_connected_component(graph)
-    return graph
+def _from_graph_node(nodes: set, edges: set) -> SynthGraph:
+    graph = SynthGraph.from_graph_nodes(nodes, edges)
+    return graph.largest_connected_component()
 
 
-def _from_edge_list(positions: np.ndarray, edge_list: np.ndarray) -> nx.Graph:
-    graph = nx.Graph()
-
-    for i, pos in enumerate(positions):
-        graph.add_node(i, pos=pos)
-
-    for edge in edge_list:
-        u, v = int(edge[0]), int(edge[1])
-        graph.add_edge(u, v)
-
-    graph = largest_connected_component(graph)
-    graph = nx.convert_node_labels_to_integers(graph, label_attribute="old_label")
-    return graph
+def _from_edge_list(positions: np.ndarray, edge_list: np.ndarray) -> SynthGraph:
+    graph = SynthGraph.from_edge_list(positions, edge_list)
+    return graph.largest_connected_component()
 
 
-def largest_connected_component(graph: nx.Graph, reindex: bool = True) -> nx.Graph:
+def largest_connected_component(graph: SynthGraph) -> SynthGraph:
     """
     Keep only the largest connected component of the graph.
-    :param graph: A networkx graph, possibly with multiple connected components.
-    :param reindex: If True, reindex node labels to 0..n-1 (storing old labels in 'old_label' attribute).
-    :return: A networkx graph with only the largest connected component.
-
-    Post condition:
-        - The original graph remains unchanged.
-        - The returned graph is nx.graph copy of the largest connected component.
-        - If reindex=True, node labels are converted to integers 0..n-1.
     """
-    if graph.number_of_nodes() <= 1:
-        result = graph.copy()
-    elif nx.is_connected(graph):
-        result = graph.copy()
-    else:
-        largest_cc = max(nx.connected_components(graph), key=len)
-        # noinspection PyTypeChecker
-        result = graph.subgraph(largest_cc).copy()
-
-    if reindex:
-        result = nx.convert_node_labels_to_integers(result, label_attribute="old_label")
-
-    return result
+    return graph.largest_connected_component()
 
 
 def timer(func):
@@ -136,44 +92,74 @@ def timer(func):
         result = func(*args, **kwargs)
         end = time.time()
         logging.info(
-            f'Time taken by func "{func.__name__}" : {round(end - start, 2)} seconds'
+            "Time taken by func %r: %.2f seconds",
+            func.__name__,
+            end - start,
         )
         return result
 
     return wrapper
 
 
-def finalize_plot(fig: plt.Figure, show: bool = False) -> np.ndarray:
-    plt.tight_layout(pad=0)
+def finalize_plot(fig, show: bool = False) -> np.ndarray:
+    """Render a Figure to an ndarray image. Thread-safe (no pyplot globals).
+
+    When *show* is True the rendered image is displayed in a non-blocking
+    OpenCV window (requires a GUI environment) instead of calling the
+    blocking ``plt.show()``.
+    """
+    fig.tight_layout(pad=0)
+    image = figure_to_ndarray(fig)
+
     if show:
-        plt.show()
-    fig = figure_to_ndarray(fig)
-    plt.close()
-    return fig
+        try:
+            import cv2
+
+            cv2.imshow("Preview", image[..., :3])
+            cv2.waitKey(1)
+        except Exception:
+            logging.debug("Interactive preview unavailable.")
+
+    # Explicitly close the figure to free memory.
+    # Import pyplot only for the close() call; safe because
+    # we reference our specific figure, not "current figure".
+    from matplotlib import pyplot as _plt
+
+    _plt.close(fig)
+    return image
 
 
-def figure_to_ndarray(fig: plt.Figure, swap_channels: bool = False) -> ndarray:
+def figure_to_ndarray(fig, swap_channels: bool = False) -> ndarray:
+    """Render a matplotlib Figure to an RGBA ndarray via the Agg canvas.
+
+    This is thread-safe: it attaches a fresh FigureCanvasAgg to the
+    figure and never touches pyplot global state.
+    """
     from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
     canvas = FigureCanvas(fig)
     canvas.draw()
     buf = canvas.buffer_rgba()
     image_array = np.asarray(buf)
-    image_array = image_array[..., [2, 1, 0, 3]] if swap_channels else image_array
+    if swap_channels:
+        image_array = image_array[..., [2, 1, 0, 3]]
     return image_array
 
 
-def trim_graph(graph: nx.Graph, tar_avg_deg: float) -> nx.Graph:
+def trim_graph(graph: SynthGraph, tar_avg_deg: float) -> SynthGraph:
     """
-    Trim the synthetic graph to have an average degree close to the original graph.
-    :param graph: A synthetic graph.
-    :param tar_avg_deg: The target average degree.
-    :return: A copy of the trimmed synthetic graph.
+    Trim the synthetic graph to have an average degree close
+    to the original graph.
     """
     while 2 * graph.number_of_edges() / graph.number_of_nodes() > 1.1 * tar_avg_deg:
-        highest_degree_node = max(graph.degree, key=lambda x: x[1])[0]
-        neighbors = list(graph.neighbors(highest_degree_node))
-        if neighbors:
-            graph.remove_edge(highest_degree_node, neighbors[0])
-        graph = largest_connected_component(graph)
+        max_node, max_deg = -1, -1
+        for u in graph.nodes():
+            d = graph.degree(u)
+            if d > max_deg:
+                max_deg = d
+                max_node = u
+        nbrs = graph.neighbors(max_node)
+        if nbrs:
+            graph.remove_edge(max_node, nbrs[0])
+        graph = graph.largest_connected_component()
     return graph

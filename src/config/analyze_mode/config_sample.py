@@ -4,7 +4,7 @@ import os
 import pickle
 from typing import List, Tuple
 
-import networkx as nx
+from graph.synth_graph import SynthGraph
 
 from ..base_config import BaseConfig
 
@@ -24,7 +24,7 @@ class SampleConfig(BaseConfig):
     @staticmethod
     def _load_networks_dict(
         _both_networks_path,
-    ) -> Tuple[List[nx.Graph], List[nx.Graph]]:
+    ) -> Tuple[List[SynthGraph], List[SynthGraph]]:
         original_network, synthetic_networks = None, None
         for entry in os.listdir(_both_networks_path):
             entry_path = os.path.join(_both_networks_path, entry)
@@ -35,10 +35,21 @@ class SampleConfig(BaseConfig):
         return original_network, synthetic_networks
 
 
-def _load_network_pkl(folder: str) -> List[nx.Graph]:
+def _load_network_pkl(folder: str) -> List[SynthGraph]:
+    """Load network pkl files with backward compatibility for nx.Graph."""
+    import networkx as nx
+
     for file in os.listdir(folder):
         if file.endswith(".pkl") and "network" in file:
             with open(os.path.join(folder, file), "rb") as f:
                 content = pickle.load(f)
-                return [content] if isinstance(content, nx.Graph) else content
+                if isinstance(content, nx.Graph):
+                    return [SynthGraph.from_networkx(content)]
+                elif isinstance(content, SynthGraph):
+                    return [content]
+                elif isinstance(content, list):
+                    return [
+                        SynthGraph.from_networkx(g) if isinstance(g, nx.Graph) else g
+                        for g in content
+                    ]
     return []

@@ -1,9 +1,9 @@
 from typing import Dict, List, Optional, Tuple, Union
 
-import networkx as nx
 import numpy as np
 
 from config import BaseConfig, DatasetId, Mode
+from graph.synth_graph import SynthGraph
 
 
 class DataLoader:
@@ -33,16 +33,16 @@ class DataLoader:
     def get_original_image(self) -> np.ndarray:
         return self.__original_image
 
-    def get_original_network(self) -> Union[nx.Graph, List[nx.Graph]]:
+    def get_original_network(self) -> Union[SynthGraph, List[SynthGraph]]:
         return self.__original_network
 
     def get_attr_dict(self) -> Dict:
         return self.__attr
 
-    def get_synthetic_networks(self) -> List[nx.Graph]:
+    def get_synthetic_networks(self) -> List[SynthGraph]:
         return self.__synthetic_networks
 
-    def add_synthetic_graph(self, graph: nx.Graph) -> None:
+    def add_synthetic_graph(self, graph: SynthGraph) -> None:
         self.__synthetic_networks.append(graph)
 
     def load(self) -> None:
@@ -64,7 +64,7 @@ class DataLoader:
     def _load_original_network(self):
         return BaseConfig.ORIGINAL_NETWORK_FUNC(self._dataset_id)
 
-    def _load_both_networks(self) -> Tuple[List[nx.Graph], List[nx.Graph]]:
+    def _load_both_networks(self) -> Tuple[List[SynthGraph], List[SynthGraph]]:
         return BaseConfig.NETWORKS_FUNC(self._both_networks_path)
 
     def _load_attr(self) -> Dict:

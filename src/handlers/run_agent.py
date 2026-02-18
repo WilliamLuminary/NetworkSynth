@@ -3,11 +3,17 @@ import inspect
 import logging
 from typing import Optional
 
-import networkx as nx
-from matplotlib import pyplot as plt
 from numpy import ndarray
 
-from config import FILE_CONFIGURATIONS, BaseConfig, DatasetId, DataType, FileTag, Mode
+from config import (
+    FILE_CONFIGURATIONS,
+    BaseConfig,
+    DatasetId,
+    DataType,
+    FileTag,
+    Mode,
+)
+from graph.synth_graph import SynthGraph
 
 from .data_loader import DataLoader
 from .saver import Saver
@@ -44,7 +50,7 @@ class RunAgent:
             self.batch_processor = None
         else:
             raise ValueError(
-                "Invalid arguments: provide dataset_id, networks_path, or attr_path"
+                "Invalid arguments: provide dataset_id, " "networks_path, or attr_path"
             )
 
     def prepare_data(self):
@@ -95,7 +101,7 @@ class RunAgent:
         assert self.batch_processor, "Batch processor is not initialized."
         self.batch_processor.process().plot()
 
-    def add_synthetic_graph(self, graph: nx.Graph):
+    def add_synthetic_graph(self, graph: SynthGraph):
         """
         Add a synthetic graph to the list of synthetic graphs.
         NOT THREAD-SAFE.
@@ -106,7 +112,8 @@ class RunAgent:
         return self.data_loader.get_original_network()
 
     def save_synthetic_outputs(self, prefix: str):
-        """Save synthetic networks in formats specified by BaseConfig.OUTPUT_FORMATS."""
+        """Save synthetic networks in formats specified by
+        BaseConfig.OUTPUT_FORMATS."""
         fmts = {f.lower() for f in BaseConfig.OUTPUT_FORMATS}
         if "pkl" in fmts:
             self.save(DataType.SYNTHETIC_NETWORK, prefix)
@@ -120,7 +127,10 @@ class RunAgent:
                 self.save(DataType.SYNTHETIC_NETWORK_NKI, g_prefix, arg=g)
 
     def save(
-        self, data_type: DataType, file_name_prefix: Optional[str] = None, arg=None
+        self,
+        data_type: DataType,
+        file_name_prefix: Optional[str] = None,
+        arg=None,
     ):
         if not self.saver and not data_type.has_tag(FileTag.PLOT):
             return
@@ -132,28 +142,24 @@ class RunAgent:
         )
 
         if data_type == DataType.ORIGINAL_IMAGE:
-            assert (
-                self.mode == Mode.GEN
-            ), "This data type is only available in Generate mode."
+            assert self.mode == Mode.GEN
             original_image = self.data_loader.get_original_image()
             self.saver.save_file(original_image, data_type, file_name_prefix)
 
         elif data_type == DataType.ORIGINAL_NETWORK:
-            assert (
-                self.mode == Mode.GEN
-            ), "This data type is only available in Generate mode."
+            assert self.mode == Mode.GEN
             original_network = self.data_loader.get_original_network()
             self.saver.save_file(original_network, data_type, file_name_prefix)
 
         elif data_type == DataType.ORIGINAL_PROPERTY:
-            assert (
-                self.mode == Mode.GEN
-            ), "This data type is only available in Generate mode."
-            assert self.attributes, "Attributes are not initialized."
+            assert self.mode == Mode.GEN
+            assert self.attributes, "Attributes not initialized."
             import dataclasses
 
             self.saver.save_file(
-                dataclasses.asdict(self.attributes), data_type, file_name_prefix
+                dataclasses.asdict(self.attributes),
+                data_type,
+                file_name_prefix,
             )  # type: ignore
 
         elif data_type == DataType.ORIGINAL_GRAPH:
@@ -170,18 +176,18 @@ class RunAgent:
                 self.saver.save_file(original_figure, data_type, file_name_prefix)
 
         elif data_type == DataType.SYNTHETIC_GRAPH:
-            assert isinstance(
-                arg, nx.Graph
-            ), "Must be a networkx.Graph synthetic network."
-            show_figure_if_not_saving: bool = not self.saver and arg
+            assert isinstance(arg, SynthGraph)
+            show_if_not_saving = bool(not self.saver and arg)
             synthetic_figure = plot_network(
                 data_type=DataType.SYNTHETIC_GRAPH,
                 graph=arg,
-                show=show_figure_if_not_saving,
+                show=show_if_not_saving,
             )
-            if not show_figure_if_not_saving:
+            if not show_if_not_saving:
                 self.saver.save_file(
-                    synthetic_figure, DataType.SYNTHETIC_GRAPH, file_name_prefix
+                    synthetic_figure,
+                    DataType.SYNTHETIC_GRAPH,
+                    file_name_prefix,
                 )
 
         elif data_type == DataType.SYNTHETIC_NETWORK:
@@ -189,58 +195,72 @@ class RunAgent:
             self.saver.save_file(synthetic_networks, data_type, file_name_prefix)
 
         elif data_type == DataType.SYNTHETIC_EDGELIST:
-            assert isinstance(arg, nx.Graph), "arg must be a networkx.Graph."
-            edgelist = _nx_to_edgelist_csv(arg)
+            assert isinstance(arg, SynthGraph)
+            edgelist = _synth_to_edgelist_csv(arg)
             self.saver.save_file(edgelist, data_type, file_name_prefix)
 
         elif data_type == DataType.SYNTHETIC_POSITIONS:
-            assert isinstance(arg, nx.Graph), "arg must be a networkx.Graph."
-            positions = _nx_to_positions_csv(arg)
+            assert isinstance(arg, SynthGraph)
+            positions = _synth_to_positions_csv(arg)
             self.saver.save_file(positions, data_type, file_name_prefix)
 
         elif data_type == DataType.SYNTHETIC_NETWORK_NKI:
-            assert isinstance(arg, nx.Graph), "arg must be a networkx.Graph."
-            nk_graph = _nx_to_networkit(arg)
-            self.saver.save_file(nk_graph, data_type, file_name_prefix)
+            assert isinstance(arg, SynthGraph)
+            self.saver.save_file(
+                (arg.nk, arg.positions()),
+                data_type,
+                file_name_prefix,
+            )
 
         elif data_type == DataType.ANALYSIS_DATA:
-            assert (
-                self.mode == Mode.ANA
-            ), "This data type is only available in Analyze mode."
+            assert self.mode == Mode.ANA
             self.saver.save_file(
                 {
-                    "original_multifractal_analysis_results": self.batch_processor.get_original_data(),
-                    "synthetic_multifractal_analysis_results": self.batch_processor.get_synthetic_data(),
+                    "original_multifractal_analysis_results": (
+                        self.batch_processor.get_original_data()
+                    ),
+                    "synthetic_multifractal_analysis_results": (
+                        self.batch_processor.get_synthetic_data()
+                    ),
                 },
                 data_type,
                 file_name_prefix,
             )
 
         elif data_type == DataType.ANALYSIS_FIGURE:
-            assert (
-                self.mode == Mode.ANA
-            ), "This data type is only available in Analyze mode."
+            assert self.mode == Mode.ANA
             for image_name, image in self.batch_processor.get_images().items():
                 self.saver.save_file(image, data_type, f"{image_name}_")
 
         else:
-            logger.error(f"Please configure save() for {data_type}.")
+            logger.error("Please configure save() for %s.", data_type)
 
 
-def plot_network(data_type: DataType, graph: nx.Graph, **kwargs) -> ndarray:
+# ---------------------------------------------------------------------------
+# Thread-safe plotting (no pyplot global state)
+# ---------------------------------------------------------------------------
+
+
+def plot_network(data_type: DataType, graph: SynthGraph, **kwargs) -> ndarray:
+    """Render a graph to an ndarray image.
+
+    Uses matplotlib's OO API exclusively -- no pyplot globals --
+    so it is safe to call from any thread or process.
     """
-    :param data_type:
-    :param graph: If provided, plot the graph directly.
-    :param kwargs: Title, frame, plot_in_frame, background, image, alpha, edge_width, node_size, output_path
-    """
-    assert data_type.has_tag(
-        FileTag.PLOT
-    ), f"{data_type} shouldn't call {inspect.currentframe().f_code.co_name}."
+    from matplotlib.figure import Figure
+    from matplotlib.patches import Rectangle
+
+    assert data_type.has_tag(FileTag.PLOT), (
+        f"{data_type} shouldn't call " f"{inspect.currentframe().f_code.co_name}."
+    )
 
     file_config = FILE_CONFIGURATIONS.get(data_type)
 
     if data_type is DataType.ORIGINAL_GRAPH:
-        frame = (0, BaseConfig.FRAME_SIZE[0]), (0, BaseConfig.FRAME_SIZE[1])
+        frame = (
+            (0, BaseConfig.FRAME_SIZE[0]),
+            (0, BaseConfig.FRAME_SIZE[1]),
+        )
     else:
         from utils import calculate_frame
 
@@ -251,23 +271,27 @@ def plot_network(data_type: DataType, graph: nx.Graph, **kwargs) -> ndarray:
     aspect_ratio = frame_width / frame_height
     fig_height = 10
     fig_width = fig_height * aspect_ratio
-    fig, ax = plt.subplots(figsize=(fig_width, fig_height), dpi=300)
 
-    position_dict = nx.get_node_attributes(graph, "pos")
+    fig = Figure(figsize=(fig_width, fig_height), dpi=300)
+    ax = fig.add_subplot(111)
+
+    positions = graph.positions()
     edge_width = file_config.line_width
     for u, v in graph.edges():
-        pos_u = position_dict.get(u)
-        pos_v = position_dict.get(v)
-        if pos_u is not None and pos_v is not None:
-            x_values = [pos_u[0], pos_v[0]]
-            y_values = [pos_u[1], pos_v[1]]
-            ax.plot(x_values, y_values, "r-", linewidth=edge_width, zorder=2)
+        pos_u = positions[u]
+        pos_v = positions[v]
+        ax.plot(
+            [pos_u[0], pos_v[0]],
+            [pos_u[1], pos_v[1]],
+            "r-",
+            linewidth=edge_width,
+            zorder=2,
+        )
 
     node_size = file_config.node_size
     for node in graph.nodes():
-        pos = position_dict.get(node)
-        if pos is not None:
-            ax.plot(pos[0], pos[1], "bo", markersize=node_size, zorder=2)
+        pos = positions[node]
+        ax.plot(pos[0], pos[1], "bo", markersize=node_size, zorder=2)
 
     ax.set_xlim(frame[0])
     ax.set_ylim(frame[1])
@@ -288,7 +312,7 @@ def plot_network(data_type: DataType, graph: nx.Graph, **kwargs) -> ndarray:
             logger.info("No background image provided.")
     else:
         ax.add_patch(
-            plt.Rectangle(
+            Rectangle(
                 (frame[0][0], frame[1][0]),
                 frame[0][1] - frame[0][0],
                 frame[1][1] - frame[1][0],
@@ -300,7 +324,7 @@ def plot_network(data_type: DataType, graph: nx.Graph, **kwargs) -> ndarray:
         )
 
     if "title" in kwargs:
-        plt.title(kwargs["title"])
+        ax.set_title(kwargs["title"])
 
     ax.set_xticks([])
     ax.set_yticks([])
@@ -316,31 +340,17 @@ def plot_network(data_type: DataType, graph: nx.Graph, **kwargs) -> ndarray:
     return finalize_plot(fig, show_on_the_fly)
 
 
-def _nx_to_edgelist_csv(graph: nx.Graph):
-    pos = nx.get_node_attributes(graph, "pos")
+def _synth_to_edgelist_csv(graph: SynthGraph):
+    positions = graph.positions()
     rows = [["source_x", "source_y", "target_x", "target_y", "weight"]]
-    for u, v, d in graph.edges(data=True):
-        rows.append([*pos[u], *pos[v], d.get("weight", 1.0)])
+    for u, v, w in graph.edges_with_weights():
+        rows.append([*positions[u], *positions[v], w])
     return rows
 
 
-def _nx_to_positions_csv(graph: nx.Graph):
-    pos = nx.get_node_attributes(graph, "pos")
+def _synth_to_positions_csv(graph: SynthGraph):
+    positions = graph.positions()
     rows = [["x", "y"]]
-    for p in pos.values():
-        rows.append([p[0], p[1]])
+    for pos in positions:
+        rows.append([pos[0], pos[1]])
     return rows
-
-
-def _nx_to_networkit(graph: nx.Graph):
-    import networkit as nk
-
-    n = graph.number_of_nodes()
-    weighted = any("weight" in d for _, _, d in graph.edges(data=True))
-    nk_graph = nk.Graph(n, weighted=weighted)
-    node_map = {node: idx for idx, node in enumerate(graph.nodes())}
-    for u, v, d in graph.edges(data=True):
-        nk_graph.addEdge(
-            node_map[u], node_map[v], d.get("weight", 1.0) if weighted else 1.0
-        )
-    return nk_graph

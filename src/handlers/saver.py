@@ -4,6 +4,8 @@ import logging
 import os
 from typing import Any, Optional
 
+import numpy as np
+
 from config import (
     FILE_CONFIGURATIONS,
     BaseConfig,
@@ -149,6 +151,14 @@ class Saver:
 
     @staticmethod
     def _save_pickle(obj: Any, filepath: str) -> None:
+        from graph.synth_graph import SynthGraph
+
+        # Convert SynthGraph to nx.Graph for backward-compatible pickling
+        if isinstance(obj, list) and obj and isinstance(obj[0], SynthGraph):
+            obj = [g.to_networkx() for g in obj]
+        elif isinstance(obj, SynthGraph):
+            obj = obj.to_networkx()
+
         with open(filepath, "wb") as f:
             import pickle
 
@@ -165,10 +175,18 @@ class Saver:
                 writer.writerow(row)
 
     @staticmethod
-    def _save_networkit(graph, filepath: str) -> None:
+    def _save_networkit(content, filepath: str) -> None:
+        """Save a networkit graph. If content is a (nk.Graph, positions) tuple,
+        also save positions as a companion .npy file."""
         import networkit as nk
 
-        nk.writeGraph(graph, filepath, nk.Format.NetworkitBinary)
+        if isinstance(content, tuple):
+            nk_graph, positions = content
+            nk.writeGraph(nk_graph, filepath, nk.Format.NetworkitBinary)
+            pos_path = filepath.rsplit(".", 1)[0] + "_positions.npy"
+            np.save(pos_path, positions)
+        else:
+            nk.writeGraph(content, filepath, nk.Format.NetworkitBinary)
 
     @staticmethod
     def _save_png_image(image, filepath: str) -> None:

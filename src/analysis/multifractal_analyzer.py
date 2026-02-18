@@ -1,4 +1,4 @@
-# src/handlers/multifractal_analyzer.py
+# src/analysis/multifractal_analyzer.py
 import logging
 from collections import Counter
 from contextlib import contextmanager
@@ -6,10 +6,10 @@ from dataclasses import astuple, dataclass
 from typing import Dict, List
 
 import networkit as nk
-import networkx as nx
 import numpy as np
 
 from config import BaseConfig
+from graph.synth_graph import SynthGraph
 
 logger = logging.getLogger(__name__)
 
@@ -28,21 +28,33 @@ class MultifractalAnalyzer:
     small_q = _generate_range(300)
     full_q = _generate_range(2000)
 
-    def __init__(self, graph: nx.Graph):
+    def __init__(self, graph: SynthGraph):
         self.graph = graph
         self.f_digit = 0
         self.q_ = None
-        valid_weighted_analysis = all(
-            "weight" in data for _, _, data in graph.edges(data=True)
-        )
-        self.weighted = (
-            BaseConfig.MEASURE_WEIGHTED if valid_weighted_analysis else False
-        )
+        self.weighted = BaseConfig.MEASURE_WEIGHTED if graph.is_weighted() else False
         if BaseConfig.MEASURE_WEIGHTED is not self.weighted:
             print("Unweighted graph! Can't perform weighted analysis.")
 
+    # ---- helpers ----
+
+    def _get_nk_graph(self) -> nk.Graph:
+        """Return the underlying nk.Graph for analysis."""
+        return self.graph.nk
+
+    def _make_inverted_weight_graph(self) -> nk.Graph:
+        """Create a nk.Graph copy with inverted weights (1/w) for distance-based algorithms."""
+        g = self.graph.nk
+        n = g.numberOfNodes()
+        inv = nk.Graph(n, weighted=True)
+        for u, v, w in g.iterEdgesWeights():
+            inv_w = 1.0 / w if w != 0 else float("inf")
+            inv.addEdge(u, v, inv_w)
+        return inv
+
+    # ---- public ----
+
     def analyze_error_features(self) -> MultifractalErrorFeatures:
-        # Use a small Q range for error analysis
         with self.set_q(self.small_q):
             tau_list, _ = self._compute_multifractal_taus()
             alpha_0, width, _, _ = self._compute_n_spectrum(tau_list)
@@ -55,20 +67,16 @@ class MultifractalAnalyzer:
 
         return euclidean(astuple(this), astuple(other))
 
-    def _compute_multifractal_taus(self):
-        graph = nx.convert_node_labels_to_integers(self.graph)
+    # ---- multifractal core ----
 
-        if self.weighted:
-            graph_nk = nk.nxadapter.nx2nk(graph, weightAttr="weight")
-        else:
-            graph_nk = nk.nxadapter.nx2nk(graph)
+    def _compute_multifractal_taus(self):
+        nk_graph = self._get_nk_graph()
 
         n_list = []
         r_g_all_set = set()
-        for node in graph.nodes():
-            # noinspection PyUnresolvedReferences
+        for node in self.graph.nodes():
             distances = (
-                nk.distance.Dijkstra(graph_nk, node, storePaths=False)
+                nk.distance.Dijkstra(nk_graph, node, storePaths=False)
                 .run()
                 .getDistances()
             )
@@ -144,20 +152,15 @@ class MultifractalAnalyzer:
         return dim_list, dim_max, dim_min, diff, valid_q
 
     def _compute_node_dimension(self) -> Dict[int, float]:
-        graph = nx.convert_node_labels_to_integers(self.graph)
         if self.weighted:
-            for _, _, d in graph.edges(data=True):
-                if d.get("weight", 0) != 0:
-                    d["weight"] = 1.0 / d["weight"]
-            graph_nk = nk.nxadapter.nx2nk(graph, weightAttr="weight")
+            nk_graph = self._make_inverted_weight_graph()
         else:
-            graph_nk = nk.nxadapter.nx2nk(graph)
+            nk_graph = self._get_nk_graph()
 
         node_dimensions = {}
-        for node in graph.nodes():
-            # noinspection PyUnresolvedReferences
+        for node in self.graph.nodes():
             distances = (
-                nk.distance.Dijkstra(graph_nk, int(node), storePaths=False)
+                nk.distance.Dijkstra(nk_graph, int(node), storePaths=False)
                 .run()
                 .getDistances()
             )
@@ -190,64 +193,68 @@ class MultifractalAnalyzer:
         return node_dimensions
 
     def _compute_centralities(self) -> Dict[str, List[float]]:
-        if self.weighted:
-
-            def closeness_distance(u, v, d):
-                return 1 / d["weight"]
-
-            degree_attr = "weight"
-            clustering_attr = "weight"
-        else:
-            closeness_distance = None
-            degree_attr = None
-            clustering_attr = None
+        nk_graph = self._get_nk_graph()
 
         nfd_centrality = self._compute_node_dimension()
-        closeness_centrality = nx.closeness_centrality(
-            self.graph, distance=closeness_distance
+
+        # Closeness centrality (use inverted weights as distance for weighted graphs)
+        if self.weighted:
+            inv_graph = self._make_inverted_weight_graph()
+            closeness_values = (
+                nk.centrality.Closeness(inv_graph, True, True).run().scores()
+            )
+        else:
+            closeness_values = (
+                nk.centrality.Closeness(nk_graph, True, True).run().scores()
+            )
+
+        # Degree centrality (weighted = sum of edge weights, unweighted = count)
+        if self.weighted:
+            degree_values = [self.graph.weighted_degree(u) for u in self.graph.nodes()]
+        else:
+            degree_values = [self.graph.degree(u) for u in self.graph.nodes()]
+
+        # Local clustering coefficient
+        cluster_values = (
+            nk.centrality.LocalClusteringCoefficient(nk_graph).run().scores()
         )
-        degree_centrality = dict(self.graph.degree(weight=degree_attr))
-        cluster_coef = nx.clustering(self.graph, weight=clustering_attr)
 
         return {
             "nfd": list(nfd_centrality.values()),
-            "closeness": list(closeness_centrality.values()),
-            "degree": list(degree_centrality.values()),
-            "clustering": list(cluster_coef.values()),
+            "closeness": list(closeness_values),
+            "degree": degree_values,
+            "clustering": list(cluster_values),
         }
 
     def _compute_betweenness(self) -> List[float]:
         if self.weighted:
-            graph_copy = self.graph.copy()
-            for _, _, d in graph_copy.edges(data=True):
-                d["weight"] = (
-                    1.0 / d["weight"] if d.get("weight", 0) != 0 else float("inf")
-                )
-            graph_nk = nk.nxadapter.nx2nk(graph_copy, weightAttr="weight")
+            inv_graph = self._make_inverted_weight_graph()
+            bt = nk.centrality.Betweenness(inv_graph, normalized=True).run().scores()
         else:
-            graph_nk = nk.nxadapter.nx2nk(self.graph, weightAttr=None)
-        # noinspection PyUnresolvedReferences
-        bt = nk.centrality.Betweenness(graph_nk, normalized=True).run().scores()
+            nk_graph = self._get_nk_graph()
+            bt = nk.centrality.Betweenness(nk_graph, normalized=True).run().scores()
         return bt
 
     def _compute_ollivier_ricci_curvature(self) -> List[float]:
-        graph_copy = self.graph.copy()
+        """Uses to_networkx() because GraphRicciCurvature requires nx.Graph."""
+        import networkx as nx
         from GraphRicciCurvature.OllivierRicci import OllivierRicci
 
+        nx_graph = self.graph.to_networkx()
+
         if self.weighted:
-            for u, v, d in graph_copy.edges(data=True):
+            for u, v, d in nx_graph.edges(data=True):
                 if d.get("weight", 0) != 0:
                     d["weight"] = 1.0 / d["weight"]
             orc = OllivierRicci(
-                nx.convert_node_labels_to_integers(graph_copy),
+                nx.convert_node_labels_to_integers(nx_graph),
                 alpha=0.5,
                 verbose="ERROR",
                 weight="weight",
             )
         else:
-            # noinspection PyTypeChecker
             orc = OllivierRicci(
-                nx.convert_node_labels_to_integers(graph_copy),
+                nx.convert_node_labels_to_integers(nx_graph),
                 alpha=0.5,
                 verbose="ERROR",
                 weight=None,
@@ -256,42 +263,52 @@ class MultifractalAnalyzer:
         return [d["ricciCurvature"] for _, _, d in orc.G.edges(data=True)]
 
     def _compute_assortativity(self) -> float:
+        """Degree-degree Pearson correlation coefficient (manual computation)."""
+        from scipy.stats import pearsonr
+
+        x, y = [], []
         if self.weighted:
-            return nx.degree_pearson_correlation_coefficient(
-                self.graph, weight="weight"
-            )
+            for u, v in self.graph.edges():
+                x.append(self.graph.weighted_degree(u))
+                y.append(self.graph.weighted_degree(v))
         else:
-            return nx.degree_pearson_correlation_coefficient(self.graph)
+            for u, v in self.graph.edges():
+                x.append(self.graph.degree(u))
+                y.append(self.graph.degree(v))
+
+        # Symmetrize for undirected graphs
+        all_x = x + y
+        all_y = y + x
+        if len(set(all_x)) < 2 or len(set(all_y)) < 2:
+            return 0.0
+        r, _ = pearsonr(all_x, all_y)
+        return float(r)
 
     def _compute_eigenvector_centrality(self) -> List[float]:
-        if nx.is_connected(self.graph):
-            graph_lcc = self.graph
+        if self.graph.is_connected():
+            nk_graph = self._get_nk_graph()
         else:
-            from utils import largest_connected_component
-
-            graph_lcc = largest_connected_component(self.graph)
+            lcc = self.graph.largest_connected_component()
+            nk_graph = lcc.nk
 
         try:
-            if self.weighted:
-                ec_dict = nx.eigenvector_centrality(
-                    graph_lcc, max_iter=1000, weight="weight"
-                )
-            else:
-                ec_dict = nx.eigenvector_centrality(graph_lcc, max_iter=1000)
-            return list(ec_dict.values())
-        except nx.PowerIterationFailedConvergence:
-            return [float("nan")] * graph_lcc.number_of_nodes()
+            ec = nk.centrality.EigenvectorCentrality(nk_graph, tol=1e-6)
+            ec.run()
+            return ec.scores()
+        except Exception:
+            return [float("nan")] * nk_graph.numberOfNodes()
 
     def _compute_diameter(self) -> float:
-        if nx.is_connected(self.graph):
-            return nx.diameter(self.graph)
+        if self.graph.is_connected():
+            nk_graph = self._get_nk_graph()
         else:
-            from utils import largest_connected_component
-
-            return nx.diameter(largest_connected_component(self.graph))
+            lcc = self.graph.largest_connected_component()
+            nk_graph = lcc.nk
+        diam = nk.distance.Diameter(nk_graph, algo=nk.distance.DiameterAlgo.exact)
+        diam.run()
+        return diam.getDiameter()[0]
 
     def analyze_graph(self) -> Dict[str, List]:
-        # Use the full Q range for error analysis
         with self.set_q(self.full_q):
             with self.set_f_digit(1):
                 tau_list, zq_list = self._compute_multifractal_taus()
@@ -311,7 +328,6 @@ class MultifractalAnalyzer:
             diam = self._compute_diameter()
 
         return {
-            # Graph-level multifractal
             "tau_list": tau_list,
             "alpha_0": alpha_0,
             "width": width,
@@ -322,7 +338,6 @@ class MultifractalAnalyzer:
             "valid_q": valid_q,
             "diameter": diam,
             "assortativity": assort,
-            # Node-level distributions
             "nfd_dist": centralities["nfd"],
             "closeness_dist": centralities["closeness"],
             "degree_dist": centralities["degree"],
