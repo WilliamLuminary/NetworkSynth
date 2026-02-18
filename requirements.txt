@@ -12,7 +12,3 @@ wandb~=0.25.0
 # Dev / testing
 pytest~=9.0.2
 pre-commit~=4.5.1
-
-# Optional – needed for ORC_BACKEND="grc" or loading legacy nx.Graph pickles
-# networkx~=3.4.2
-# GraphRicciCurvature~=0.5.3.2

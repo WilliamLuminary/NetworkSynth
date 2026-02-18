@@ -1,12 +1,13 @@
 import os
 import pickle
 
-import networkx as nx
 import pytest
 
 from graph.synth_graph import SynthGraph
 
 BASE_DIR = os.path.dirname(__file__)
+
+nx = pytest.importorskip("networkx", reason="Legacy pkl fixtures require networkx")
 
 
 @pytest.fixture

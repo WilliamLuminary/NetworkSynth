@@ -57,9 +57,7 @@ def _wasserstein_lp(p: np.ndarray, q: np.ndarray, cost: np.ndarray) -> float:
     n, m = len(p), len(q)
     A_eq = _get_transport_constraints(n, m)
     b_eq = np.concatenate([p, q])
-    res = linprog(
-        cost.ravel(), A_eq=A_eq, b_eq=b_eq, bounds=(0, None), method="highs"
-    )
+    res = linprog(cost.ravel(), A_eq=A_eq, b_eq=b_eq, bounds=(0, None), method="highs")
     return res.fun if res.success else float("nan")
 
 
@@ -86,8 +84,8 @@ def _ollivier_ricci_curvature(
     uniformly otherwise), W₁ is the 1-Wasserstein distance under the
     shortest-path metric, and d(u,v) is the direct edge distance.
 
-    This matches the GraphRicciCurvature library's ``OllivierRicci`` with the
-    same ``base`` / ``exp_power`` defaults.
+    The default ``base`` / ``exp_power`` values match the convention used by
+    the GraphRicciCurvature library.
     """
     nk_graph = graph.nk
 
@@ -113,10 +111,12 @@ def _ollivier_ricci_curvature(
         if nbrs_u:
             mu_u[0] = alpha
             if weighted:
-                w_u = np.array([
-                    base ** (-(dist_graph.weight(u, nb) ** exp_power))
-                    for nb in nbrs_u
-                ])
+                w_u = np.array(
+                    [
+                        base ** (-(dist_graph.weight(u, nb) ** exp_power))
+                        for nb in nbrs_u
+                    ]
+                )
                 mu_u[1:] = (1.0 - alpha) * w_u / w_u.sum()
             else:
                 mu_u[1:] = (1.0 - alpha) / len(nbrs_u)
@@ -129,10 +129,12 @@ def _ollivier_ricci_curvature(
         if nbrs_v:
             mu_v[0] = alpha
             if weighted:
-                w_v = np.array([
-                    base ** (-(dist_graph.weight(v, nb) ** exp_power))
-                    for nb in nbrs_v
-                ])
+                w_v = np.array(
+                    [
+                        base ** (-(dist_graph.weight(v, nb) ** exp_power))
+                        for nb in nbrs_v
+                    ]
+                )
                 mu_v[1:] = (1.0 - alpha) * w_v / w_v.sum()
             else:
                 mu_v[1:] = (1.0 - alpha) / len(nbrs_v)
@@ -283,21 +285,19 @@ class MultifractalAnalyzer:
             ntw_mat[i] += np.where(idx > 0, cum[idx - 1], 0)
 
         # --- vectorised partition function Z(q) ---
-        norm_mat = ntw_mat / ntw_mat[:, -1:]            # (V, R)
-        log_norm = np.log(norm_mat)                      # (V, R)
-        q_arr = np.asarray(self.q_)                      # (Q,)
+        norm_mat = ntw_mat / ntw_mat[:, -1:]  # (V, R)
+        log_norm = np.log(norm_mat)  # (V, R)
+        q_arr = np.asarray(self.q_)  # (Q,)
         # (Q,1,1) * (1,V,R) -> (Q,V,R)  then sum over V -> (Q,R)
-        zq_arr = np.exp(
-            q_arr[:, None, None] * log_norm[None, :, :]
-        ).sum(axis=1)
+        zq_arr = np.exp(q_arr[:, None, None] * log_norm[None, :, :]).sum(axis=1)
 
         # --- batch OLS (same formula as scipy.stats.linregress) ---
-        log_r = np.log(r_g_all / diameter)               # (R,)
-        log_zq = np.log(zq_arr)                          # (Q, R)
+        log_r = np.log(r_g_all / diameter)  # (R,)
+        log_zq = np.log(zq_arr)  # (Q, R)
         x_c = log_r - log_r.mean()
         y_c = log_zq - log_zq.mean(axis=1, keepdims=True)
         ss_xx = (x_c * x_c).sum()
-        tau_arr = (y_c * x_c).sum(axis=1) / ss_xx        # (Q,)
+        tau_arr = (y_c * x_c).sum(axis=1) / ss_xx  # (Q,)
 
         return tau_arr.tolist(), zq_arr.tolist()
 
@@ -407,47 +407,7 @@ class MultifractalAnalyzer:
         return bt
 
     def _compute_ollivier_ricci_curvature(self) -> List[float]:
-        """Dispatch to the configured ORC backend.
-
-        Controlled by ``BaseConfig.ORC_BACKEND``:
-        * ``"native"`` – pure NetworKit + scipy  (default, no extra deps)
-        * ``"grc"``    – GraphRicciCurvature lib  (requires networkx + GRC)
-        """
-        backend = BaseConfig.ORC_BACKEND.lower()
-        if backend == "native":
-            return _ollivier_ricci_curvature(
-                self.graph, alpha=0.5, weighted=self.weighted
-            )
-        if backend == "grc":
-            return self._compute_orc_grc()
-        raise ValueError(f"Unknown ORC_BACKEND={backend!r}. " "Use 'native' or 'grc'.")
-
-    def _compute_orc_grc(self) -> List[float]:
-        """Ollivier-Ricci curvature via the GraphRicciCurvature library."""
-        import networkx as nx
-        from GraphRicciCurvature.OllivierRicci import OllivierRicci
-
-        nx_graph = self.graph.to_networkx()
-
-        if self.weighted:
-            for u, v, d in nx_graph.edges(data=True):
-                if d.get("weight", 0) != 0:
-                    d["weight"] = 1.0 / d["weight"]
-            orc = OllivierRicci(
-                nx.convert_node_labels_to_integers(nx_graph),
-                alpha=0.5,
-                verbose="ERROR",
-                weight="weight",
-            )
-        else:
-            orc = OllivierRicci(
-                nx.convert_node_labels_to_integers(nx_graph),
-                alpha=0.5,
-                verbose="ERROR",
-                weight=None,
-            )
-        orc.compute_ricci_curvature()
-        return [d["ricciCurvature"] for _, _, d in orc.G.edges(data=True)]
+        return _ollivier_ricci_curvature(self.graph, alpha=0.5, weighted=self.weighted)
 
     def _compute_assortativity(self) -> float:
         """Degree-degree Pearson correlation coefficient (manual computation)."""
@@ -498,7 +458,10 @@ class MultifractalAnalyzer:
                 uw.addEdge(u, v)
             nk_graph = uw
 
-        algo = getattr(nk.distance.DiameterAlgo, "Exact", None) or nk.distance.DiameterAlgo.exact
+        algo = (
+            getattr(nk.distance.DiameterAlgo, "Exact", None)
+            or nk.distance.DiameterAlgo.exact
+        )
         diam = nk.distance.Diameter(nk_graph, algo=algo)
         diam.run()
         return diam.getDiameter()[0]

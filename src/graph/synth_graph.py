@@ -2,9 +2,8 @@
 """
 SynthGraph: lightweight wrapper around a networkit graph with numpy positions.
 
-Replaces nx.Graph as the primary graph representation. NetworkX is fully
-optional -- it is imported lazily only by ``from_networkx()`` and
-``to_networkx()`` for backward-compatible pickle loading.
+Replaces nx.Graph as the primary graph representation. NetworkX is only
+needed by ``from_networkx()`` for deserializing legacy pickle files.
 """
 from __future__ import annotations
 
@@ -156,14 +155,7 @@ class SynthGraph:
             new_graph.addEdge(u, v)
         self._graph = new_graph
 
-    # ---- conversion: to/from networkx ----
-
-    def to_networkx(self):
-        """Convert to nx.Graph (requires networkx to be installed)."""
-        G = nk.nxadapter.nk2nx(self._graph)
-        for i in range(self.number_of_nodes()):
-            G.nodes[i]["pos"] = tuple(self._positions[i])
-        return G
+    # ---- conversion: from networkx (legacy pickle loading) ----
 
     @classmethod
     def from_networkx(cls, G) -> SynthGraph:

@@ -151,18 +151,9 @@ class Saver:
 
     @staticmethod
     def _save_pickle(obj: Any, filepath: str) -> None:
-        from graph.synth_graph import SynthGraph
-
-        # Convert SynthGraph to nx.Graph for backward-compatible pickling
-        if isinstance(obj, list) and obj and isinstance(obj[0], SynthGraph):
-            obj = [g.to_networkx() for g in obj]
-        elif isinstance(obj, SynthGraph):
-            obj = obj.to_networkx()
-
         with open(filepath, "wb") as f:
             import pickle
 
-            # noinspection PyTypeChecker
             pickle.dump(obj, f)
 
     @staticmethod
