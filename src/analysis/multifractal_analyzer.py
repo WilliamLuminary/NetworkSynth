@@ -191,6 +191,38 @@ class MultifractalAnalyzer:
             self._inv_graph = inv
         return self._inv_graph
 
+    @staticmethod
+    def _weighted_clustering(nk_graph: nk.Graph) -> List[float]:
+        """Weighted clustering matching ``nx.clustering(G, weight=...)``."""
+        n = nk_graph.numberOfNodes()
+        max_w = 0.0
+        for u, v, w in nk_graph.iterEdgesWeights():
+            if w > max_w:
+                max_w = w
+        if max_w == 0:
+            max_w = 1.0
+
+        nbrs = [set(nk_graph.iterNeighbors(u)) for u in range(n)]
+        result = [0.0] * n
+        for i in range(n):
+            inbrs = nbrs[i]
+            deg = len(inbrs)
+            if deg < 2:
+                continue
+            wt_tri = 0.0
+            seen = set()
+            for j in inbrs:
+                seen.add(j)
+                wij = nk_graph.weight(i, j) / max_w
+                jnbrs = nbrs[j] - seen
+                common = inbrs & jnbrs
+                for k in common:
+                    wjk = nk_graph.weight(j, k) / max_w
+                    wki = nk_graph.weight(k, i) / max_w
+                    wt_tri += (wij * wjk * wki) ** (1.0 / 3.0)
+            result[i] = (2.0 * wt_tri) / (deg * (deg - 1))
+        return result
+
     # ---- public ----
 
     def analyze_error_features(self) -> MultifractalErrorFeatures:
@@ -351,9 +383,12 @@ class MultifractalAnalyzer:
         else:
             degree_values = [self.graph.degree(u) for u in self.graph.nodes()]
 
-        cluster_values = (
-            nk.centrality.LocalClusteringCoefficient(nk_graph).run().scores()
-        )
+        if self.weighted:
+            cluster_values = self._weighted_clustering(nk_graph)
+        else:
+            cluster_values = list(
+                nk.centrality.LocalClusteringCoefficient(nk_graph).run().scores()
+            )
 
         return {
             "nfd": list(nfd_centrality.values()),
@@ -450,11 +485,19 @@ class MultifractalAnalyzer:
             return [float("nan")] * nk_graph.numberOfNodes()
 
     def _compute_diameter(self) -> float:
+        """Unweighted hop diameter (matches nx.diameter behaviour)."""
         if self.graph.is_connected():
             nk_graph = self._get_nk_graph()
         else:
             lcc = self.graph.largest_connected_component()
             nk_graph = lcc.nk
+
+        if nk_graph.isWeighted():
+            uw = nk.Graph(nk_graph.numberOfNodes(), weighted=False)
+            for u, v in nk_graph.iterEdges():
+                uw.addEdge(u, v)
+            nk_graph = uw
+
         algo = getattr(nk.distance.DiameterAlgo, "Exact", None) or nk.distance.DiameterAlgo.exact
         diam = nk.distance.Diameter(nk_graph, algo=algo)
         diam.run()
