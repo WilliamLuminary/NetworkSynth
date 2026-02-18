@@ -1,28 +1,26 @@
 # src/config/mosaic_mode/config_sample.py
 """
-Mosaic mode sample configuration.
+Mosaic mode sample configuration — simple flat-file data layout.
 
-Generates a GRID_ROWS x GRID_COLS grid of small tile networks,
-then stitches them into one large network by merging close nodes
-in the overlap regions between adjacent tiles.
+Uses data from ``sample_input/mosaic_mode/`` with single-level
+DatasetId (like the generate_mode sample config).  The grid is
+kept small (2×2) for quick smoke-testing.
 
-Uses the *old_input* dataset format (A 20kX by default):
-  - positions  : .npy  from  old_input/position/
-  - adjacency  : .npz  from  old_input/sparse_matrices/
-  - images     : .tif  from  old_input/Original Graphs/<set>/
+Data layout
+-----------
+sample_input/mosaic_mode/
+├── sample_1_pos.npy     (N×2 positions)
+├── sample_1_mat.npy     (scipy sparse adjacency)
+└── sample_1_image.tif   (grayscale background)
 """
 import logging
 import os
-import re
 from typing import Tuple
 
 import cv2
 import numpy as np
 
-from utils import build_graph
-
 from .._utils import (
-    _find_file_with_pattern,
     _resize_cv2_image,
     _transpose_network_pos,
     _trim_cv2_image,
@@ -34,32 +32,18 @@ logger = logging.getLogger(__name__)
 
 
 class SampleConfig(BaseConfig):
-    """
-    Mosaic mode: generate a grid of tile networks and stitch them together.
+    """Small mosaic for testing — 2×2 grid, sample_input data."""
 
-    Mosaic-specific parameters:
-        GRID_ROWS / GRID_COLS: Number of tiles in each dimension.
-        TILE_FRAME_SIZE: Frame size (X, Y) of each tile.
-        OVERLAP_MARGIN_FRACTION: Fraction of tile frame used
-            as overlap per tile side.
-        NUM_WORKERS: Number of parallel processes for tile generation.
-    """
+    # --- Dataset (single-level id) ---
+    DATASETS = [DatasetId("sample_1")]
 
-    # --- Dataset ---
-    DATASETS = [DatasetId("A", "20kX")]
-
-    # --- Mosaic Grid Parameters ---
-    GRID_ROWS: int = 100
-    GRID_COLS: int = 100
+    # --- Mosaic grid parameters ---
+    GRID_ROWS: int = 2
+    GRID_COLS: int = 2
     TILE_FRAME_SIZE: Tuple[int, int] = (510, 510)
-
-    # Overlap margin as a fraction of the tile frame size.
-    # Per-side overlap (px) =
-    #   OVERLAP_MARGIN_FRACTION * TILE_FRAME_SIZE[dim]
-    # 0.15 × 510 ≈ 76 px per side (~6 avg edge lengths for A 20kX).
     OVERLAP_MARGIN_FRACTION: float = 0.15
 
-    # --- Network Generation Parameters (identical for all tiles) ---
+    # --- Network generation parameters (per tile) ---
     IMAGE_SIZE: Tuple[int, int] = (510, 510)
     FRAME_SIZE: Tuple[int, int] = (510, 510)
     SYNTHETIC_FRAME_SIZE: Tuple[int, int] = TILE_FRAME_SIZE
@@ -67,7 +51,6 @@ class SampleConfig(BaseConfig):
     CLOSED_NODES_FACTOR = 1.0
     CLOSED_EDGES_FACTOR = 1.5
 
-    # Not used in mosaic mode (tiles, not individual synths)
     SYNTHETIC_GRAPH_NUMBER = 0
     SYNTHETIC_NETWORK_NUMBER = 0
 
@@ -76,11 +59,12 @@ class SampleConfig(BaseConfig):
     MEASURE_WEIGHTED = True
     FULL_ANALYSIS = False
 
-    # --- Input paths (old_input format) ---
-    BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, "old_input")
-    POSITION_DATA_DIR = os.path.join(BASE_INPUT_PATH, "position")
-    ADJ_MATRIX_DATA_DIR = os.path.join(BASE_INPUT_PATH, "sparse_matrices")
-    IMAGES_DIR = os.path.join(BASE_INPUT_PATH, "Original Graphs")
+    # --- Input paths (flat sample layout) ---
+    BASE_INPUT_PATH = os.path.join(
+        BaseConfig.BASE_INPUT_PATH,
+        "sample_input",
+        "mosaic_mode",
+    )
 
     @classmethod
     def initialize(cls):
@@ -91,17 +75,19 @@ class SampleConfig(BaseConfig):
 
     @staticmethod
     def load_original_network(dataset_id: DatasetId):
-        """Load original network from .npy positions + .npz sparse matrix."""
-        positions = _load_positions(dataset_id)
-        mat = _load_sparse_matrix(dataset_id)
+        set_name = dataset_id[0]
+        positions = _load_positions(set_name)
+        mat = _load_sparse_matrix(set_name)
+
+        from utils import build_graph
+
         original_network = build_graph(positions, mat)
         _transpose_network_pos(original_network)
         return original_network
 
     @staticmethod
     def load_original_image(dataset_id: DatasetId):
-        """Load and process the original TIF image."""
-        image = _load_raw_image(dataset_id)
+        image = _load_raw_image(dataset_id[0])
         if image is None:
             return None
         image = _trim_cv2_image(image)
@@ -110,81 +96,43 @@ class SampleConfig(BaseConfig):
 
 
 # ------------------------------------------------------------------ #
-# Data loaders  (mirrors generate_mode/config_1.py for old_input)
+# Data loaders (flat file layout, single-level DatasetId)
 # ------------------------------------------------------------------ #
-def _load_positions(dataset_id: DatasetId) -> np.ndarray:
-    """Load node positions from .npy file.
 
-    dataset_id[0] = set_name (A), dataset_id[1] = resolution (20kX).
-    """
-    set_name, resolution = dataset_id[0], dataset_id[1]
-    file_path = _find_file_with_pattern(
-        SampleConfig.POSITION_DATA_DIR,
-        rf"{re.escape(set_name)}_{re.escape(resolution)}.*\.npy",
-        f"positions for {set_name} {resolution}",
+
+def _load_positions(set_name: str) -> np.ndarray:
+    path = os.path.join(
+        SampleConfig.BASE_INPUT_PATH,
+        f"{set_name}_pos.npy",
     )
-    logger.info("Loading positions from %s", file_path)
-    return np.load(file_path, allow_pickle=True)
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Positions file not found: {path}")
+    logger.info("Loading positions from %s", path)
+    return np.load(path, allow_pickle=True)
 
 
-def _load_sparse_matrix(dataset_id: DatasetId):
-    """Load adjacency sparse matrix from .npz file.
-
-    dataset_id[0] = set_name (A), dataset_id[1] = resolution (20kX).
-    """
-    set_name, resolution = dataset_id[0], dataset_id[1]
-    file_path = _find_file_with_pattern(
-        SampleConfig.ADJ_MATRIX_DATA_DIR,
-        rf"sparse_matrices_{re.escape(resolution)}.*\.npz",
-        "sparse matrix",
+def _load_sparse_matrix(set_name: str):
+    path = os.path.join(
+        SampleConfig.BASE_INPUT_PATH,
+        f"{set_name}_mat.npy",
     )
-    matrix_data = np.load(file_path, allow_pickle=True)
-
-    matrix_key = set_name
-    if set_name == "C":
-        if "C1" in matrix_data:
-            matrix_key = "C1"
-        elif "C" in matrix_data:
-            matrix_key = "C"
-        else:
-            available = list(matrix_data.keys())
-            raise KeyError(
-                f"Neither 'C' nor 'C1' found in sparse matrix. "
-                f"Available: {available}"
-            )
-
-    if matrix_key not in matrix_data:
-        available = list(matrix_data.keys())
-        raise KeyError(
-            f"Set '{matrix_key}' not found in sparse matrix. " f"Available: {available}"
-        )
-
-    return matrix_data[matrix_key].item()
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Adjacency matrix file not found: {path}")
+    logger.info("Loading adjacency matrix from %s", path)
+    return np.load(path, allow_pickle=True).item()
 
 
-def _load_raw_image(dataset_id: DatasetId):
-    """Load raw TIF image for the dataset.
-
-    dataset_id[0] = set_name (A), dataset_id[1] = resolution (20kX).
-    """
-    set_name, resolution = dataset_id[0], dataset_id[1]
-    directory_path = os.path.join(SampleConfig.IMAGES_DIR, set_name)
-
-    if set_name == "B":
-        directory_path = os.path.join(directory_path, "1811")
-        logger.warning("For set B, using the 1811 subdirectory for images.")
-
-    file_path = _find_file_with_pattern(
-        directory_path,
-        rf"\b{re.escape(resolution)}\b.*\.(tif|png|jpg)",
-        f"image for {set_name} {resolution}",
+def _load_raw_image(set_name: str):
+    path = os.path.join(
+        SampleConfig.BASE_INPUT_PATH,
+        f"{set_name}_image.tif",
     )
-    if file_path is None:
-        logger.warning("Background image is None.")
+    if not os.path.exists(path):
+        logger.warning("No image at %s. Returning None.", path)
         return None
 
-    logger.info("Loading image from %s", file_path)
-    image = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
+    logger.info("Loading image from %s", path)
+    image = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
     if image is None:
-        logger.warning("Failed to load image from %s", file_path)
+        logger.warning("Failed to load image: %s", path)
     return image
