@@ -8,7 +8,10 @@ import networkx as nx
 import numpy as np
 import scipy.stats as stats
 
-from GraphRicciCurvature.OllivierRicci import OllivierRicci
+try:
+    from GraphRicciCurvature.OllivierRicci import OllivierRicci
+except ImportError:
+    OllivierRicci = None
 from tqdm import tqdm
 
 max_dim = []
@@ -237,6 +240,8 @@ def calculate_betweenness(G_nx, weight_flag):
 
 
 def calculate_orc(G, weight_flag):
+    if OllivierRicci is None:
+        raise ImportError("GraphRicciCurvature is not installed")
     G = deepcopy(G)
     avg_orc = []
     if weight_flag == "True":

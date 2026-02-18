@@ -7,11 +7,128 @@ from typing import Dict, List
 
 import networkit as nk
 import numpy as np
+from scipy.optimize import linprog
 
 from config import BaseConfig
 from graph.synth_graph import SynthGraph
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Native Ollivier-Ricci curvature (NetworKit + scipy, no networkx needed)
+# ---------------------------------------------------------------------------
+
+
+def _wasserstein_lp(p: np.ndarray, q: np.ndarray, cost: np.ndarray) -> float:
+    """Exact 1-Wasserstein distance between discrete measures via LP (HiGHS).
+
+    Parameters
+    ----------
+    p, q : 1-D arrays summing to 1
+        Source / target probability masses.
+    cost : 2-D array of shape (len(p), len(q))
+        Pairwise transport costs.
+
+    Returns
+    -------
+    float
+        The earth-mover distance, or NaN on solver failure.
+    """
+    n, m = len(p), len(q)
+    c = cost.ravel()
+
+    # Row-sum constraints: sum_j f[i,j] = p[i]
+    # Col-sum constraints: sum_i f[i,j] = q[j]
+    A_eq = np.zeros((n + m, n * m))
+    for i in range(n):
+        A_eq[i, i * m : (i + 1) * m] = 1.0
+    for j in range(m):
+        A_eq[n + j, j::m] = 1.0
+    b_eq = np.concatenate([p, q])
+
+    res = linprog(c, A_eq=A_eq, b_eq=b_eq, bounds=(0, None), method="highs")
+    return res.fun if res.success else float("nan")
+
+
+def _ollivier_ricci_curvature(
+    graph: SynthGraph,
+    alpha: float = 0.5,
+    weighted: bool = False,
+) -> List[float]:
+    """Compute Ollivier-Ricci curvature for every edge.
+
+    For each edge (u, v) the curvature is
+
+        κ(u, v) = 1 − W₁(μ_u, μ_v) / d(u, v)
+
+    where μ_x places mass *alpha* on x and spreads (1 − alpha) uniformly
+    over x's neighbours, and W₁ is the 1-Wasserstein (earth-mover) distance
+    under the shortest-path metric d.
+
+    Parameters
+    ----------
+    graph : SynthGraph
+    alpha : float, default 0.5
+        Laziness parameter for the random walk measure.
+    weighted : bool
+        If True, use inverted edge weights (1/w) as distances.
+
+    Returns
+    -------
+    list[float]
+        One curvature value per edge, in ``graph.edges()`` order.
+    """
+    nk_graph = graph.nk
+
+    # Build the distance graph (inverted weights when weighted)
+    if weighted:
+        n = nk_graph.numberOfNodes()
+        dist_graph = nk.Graph(n, weighted=True)
+        for u, v, w in nk_graph.iterEdgesWeights():
+            dist_graph.addEdge(u, v, 1.0 / w if w != 0 else float("inf"))
+    else:
+        dist_graph = nk_graph
+
+    # Pre-compute all-pairs shortest paths (very fast in NetworKit)
+    apsp = nk.distance.APSP(dist_graph)
+    apsp.run()
+
+    curvatures: List[float] = []
+    for u, v in graph.edges():
+        # Probability measure at u: alpha·δ_u + (1−alpha)·Uniform(N(u))
+        nbrs_u = list(nk_graph.iterNeighbors(u))
+        support_u = [u] + nbrs_u
+        mu_u = np.empty(len(support_u))
+        if nbrs_u:
+            mu_u[0] = alpha
+            mu_u[1:] = (1.0 - alpha) / len(nbrs_u)
+        else:
+            mu_u[0] = 1.0
+
+        # Probability measure at v
+        nbrs_v = list(nk_graph.iterNeighbors(v))
+        support_v = [v] + nbrs_v
+        mu_v = np.empty(len(support_v))
+        if nbrs_v:
+            mu_v[0] = alpha
+            mu_v[1:] = (1.0 - alpha) / len(nbrs_v)
+        else:
+            mu_v[0] = 1.0
+
+        # Cost matrix: shortest-path distances between the two supports
+        cost = np.empty((len(support_u), len(support_v)))
+        for i, s in enumerate(support_u):
+            for j, t in enumerate(support_v):
+                cost[i, j] = apsp.getDistance(s, t)
+
+        w1 = _wasserstein_lp(mu_u, mu_v, cost)
+
+        d_uv = apsp.getDistance(u, v)
+        kappa = 1.0 - w1 / d_uv if d_uv > 0 else 0.0
+        curvatures.append(kappa)
+
+    return curvatures
 
 
 @dataclass
@@ -236,7 +353,23 @@ class MultifractalAnalyzer:
         return bt
 
     def _compute_ollivier_ricci_curvature(self) -> List[float]:
-        """Uses to_networkx() because GraphRicciCurvature requires nx.Graph."""
+        """Dispatch to the configured ORC backend.
+
+        Controlled by ``BaseConfig.ORC_BACKEND``:
+        * ``"native"`` – pure NetworKit + scipy  (default, no extra deps)
+        * ``"grc"``    – GraphRicciCurvature lib  (requires networkx + GRC)
+        """
+        backend = BaseConfig.ORC_BACKEND.lower()
+        if backend == "native":
+            return _ollivier_ricci_curvature(
+                self.graph, alpha=0.5, weighted=self.weighted
+            )
+        if backend == "grc":
+            return self._compute_orc_grc()
+        raise ValueError(f"Unknown ORC_BACKEND={backend!r}. " "Use 'native' or 'grc'.")
+
+    def _compute_orc_grc(self) -> List[float]:
+        """Ollivier-Ricci curvature via the GraphRicciCurvature library."""
         import networkx as nx
         from GraphRicciCurvature.OllivierRicci import OllivierRicci
 

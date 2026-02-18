@@ -2,8 +2,9 @@
 """
 SynthGraph: lightweight wrapper around a networkit graph with numpy positions.
 
-Replaces nx.Graph as the primary graph representation. NetworkX is only
-used for backward-compatible pickle loading and GraphRicciCurvature interop.
+Replaces nx.Graph as the primary graph representation. NetworkX is fully
+optional -- it is imported lazily only by ``from_networkx()`` and
+``to_networkx()`` for backward-compatible pickle loading.
 """
 from __future__ import annotations
 
@@ -158,7 +159,7 @@ class SynthGraph:
     # ---- conversion: to/from networkx ----
 
     def to_networkx(self):
-        """Convert to nx.Graph (for GraphRicciCurvature or legacy code)."""
+        """Convert to nx.Graph (requires networkx to be installed)."""
         G = nk.nxadapter.nk2nx(self._graph)
         for i in range(self.number_of_nodes()):
             G.nodes[i]["pos"] = tuple(self._positions[i])

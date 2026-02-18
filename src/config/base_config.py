@@ -41,6 +41,9 @@ class BaseConfig:
     MEASURE_WEIGHTED: bool
     FULL_ANALYSIS: bool = False
 
+    # Ollivier-Ricci curvature backend: "native" (NetworKit+scipy) or "grc" (GraphRicciCurvature)
+    ORC_BACKEND: str = "native"
+
     SYNTHETIC_GRAPH_NUMBER: int = 0
     SYNTHETIC_NETWORK_NUMBER: int = 0
 

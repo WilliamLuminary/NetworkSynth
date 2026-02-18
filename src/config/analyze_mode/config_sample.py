@@ -36,20 +36,43 @@ class SampleConfig(BaseConfig):
 
 
 def _load_network_pkl(folder: str) -> List[SynthGraph]:
-    """Load network pkl files with backward compatibility for nx.Graph."""
-    import networkx as nx
+    """Load network pkl files with backward compatibility for nx.Graph.
+
+    If the pickle contains legacy ``nx.Graph`` objects, *networkx*
+    must be installed so ``pickle.load`` can deserialize them.
+    """
+    try:
+        import networkx as nx
+
+        _has_nx = True
+    except ImportError:
+        nx = None  # type: ignore[assignment]
+        _has_nx = False
 
     for file in os.listdir(folder):
         if file.endswith(".pkl") and "network" in file:
-            with open(os.path.join(folder, file), "rb") as f:
-                content = pickle.load(f)
-                if isinstance(content, nx.Graph):
-                    return [SynthGraph.from_networkx(content)]
-                elif isinstance(content, SynthGraph):
-                    return [content]
-                elif isinstance(content, list):
-                    return [
-                        SynthGraph.from_networkx(g) if isinstance(g, nx.Graph) else g
-                        for g in content
-                    ]
+            try:
+                with open(os.path.join(folder, file), "rb") as f:
+                    content = pickle.load(f)
+            except ModuleNotFoundError as exc:
+                if "networkx" in str(exc):
+                    logger.error(
+                        "Legacy nx.Graph pickle but "
+                        "networkx not installed. "
+                        "pip install networkx"
+                    )
+                raise
+
+            if isinstance(content, SynthGraph):
+                return [content]
+            if _has_nx and isinstance(content, nx.Graph):
+                return [SynthGraph.from_networkx(content)]
+            if isinstance(content, list):
+                result: List[SynthGraph] = []
+                for g in content:
+                    if isinstance(g, SynthGraph):
+                        result.append(g)
+                    elif _has_nx and isinstance(g, nx.Graph):
+                        result.append(SynthGraph.from_networkx(g))
+                return result
     return []
