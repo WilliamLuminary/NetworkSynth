@@ -1,4 +1,8 @@
-# src/main_multifractal_analysis.py
+# src/pipelines/analyze.py
+import os
+
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+
 import logging
 import os
 from collections import deque
@@ -46,7 +50,7 @@ def find_pkl_containers(base_dir: str, max_depth: int = 3) -> Dict[str, str]:
     return containers
 
 
-if __name__ == "__main__":
+def main():
     data_dict = find_pkl_containers(BaseConfig.NETWORKS_DATA_PATH)
     for name, path in data_dict.items():
         data_agent = RunAgent(networks_path=path)
@@ -54,3 +58,7 @@ if __name__ == "__main__":
         data_agent.multifractal_analysis()
         data_agent.save(DataType.ANALYSIS_DATA)
         data_agent.save(DataType.ANALYSIS_FIGURE)
+
+
+if __name__ == "__main__":
+    main()

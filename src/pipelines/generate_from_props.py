@@ -1,4 +1,8 @@
-# src/main_from_properties.py
+# src/pipelines/generate_from_props.py
+import os
+
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+
 import logging
 
 from config import AttrConfig, BaseConfig, DataType

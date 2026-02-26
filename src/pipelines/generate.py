@@ -1,4 +1,8 @@
-# src/main.py
+# src/pipelines/generate.py
+import os
+
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+
 import logging
 from typing import List
 

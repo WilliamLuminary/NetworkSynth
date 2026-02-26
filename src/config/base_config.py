@@ -40,6 +40,7 @@ class BaseConfig:
 
     MEASURE_WEIGHTED: bool
     FULL_ANALYSIS: bool = False
+    FULL_Q_BAND: bool = False
 
     SYNTHETIC_GRAPH_NUMBER: int = 0
     SYNTHETIC_NETWORK_NUMBER: int = 0
@@ -66,11 +67,13 @@ class BaseConfig:
     NETWORKS_FUNC = load_idle
     ATTRIBUTES_DICT_FUNC = load_idle
 
+    MAX_WORKERS: int = 30
+
     @classmethod
     def get_max_workers(cls, num_tasks: int = None) -> int:
-        """Return number of worker processes, leaving 1 CPU for the OS."""
+        """Return number of worker processes, capped by MAX_WORKERS."""
         cpu_count = os.cpu_count() or 1
-        max_workers = max(1, cpu_count - 1)
+        max_workers = min(max(1, cpu_count - 1), cls.MAX_WORKERS)
         if num_tasks is not None:
             max_workers = min(max_workers, num_tasks)
         return max_workers

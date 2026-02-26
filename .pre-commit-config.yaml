@@ -34,5 +34,5 @@ repos:
       - id: flake8
         args:
           - "--max-line-length=120"
-          - "--extend-ignore=E203,W503"
+          - "--extend-ignore=E203,W503,E402"
           - "--per-file-ignores=*/__init__.py:F401"

@@ -1,4 +1,11 @@
-from . import analyze_mode, attr_generate_mode, generate_mode, mosaic_mode
+from . import (
+    analyze_mode,
+    attr_generate_mode,
+    generate_mode,
+    hybrid_mode,
+    mosaic_mode,
+    scaling_mode,
+)
 from .base_config import BaseConfig  # noqa: F401
 from .enums import (  # noqa: F401
     AnalysisMode,
@@ -15,6 +22,13 @@ from .file_definitions import (  # noqa: F401
     PlotConfig,
 )
 
-for _module in (analyze_mode, attr_generate_mode, generate_mode, mosaic_mode):
+for _module in (
+    analyze_mode,
+    attr_generate_mode,
+    generate_mode,
+    hybrid_mode,
+    mosaic_mode,
+    scaling_mode,
+):
     for _name in getattr(_module, "__all__", []):
         globals()[_name] = getattr(_module, _name)

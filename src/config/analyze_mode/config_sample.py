@@ -1,12 +1,15 @@
 # src/config/analyze_mode/config_sample.py
+from __future__ import annotations
+
 import logging
 import os
 import pickle
-from typing import List, Tuple
-
-from graph.synth_graph import SynthGraph
+from typing import TYPE_CHECKING, List, Tuple
 
 from ..base_config import BaseConfig
+
+if TYPE_CHECKING:
+    from graph.synth_graph import SynthGraph
 
 logger = logging.getLogger(__name__)
 
@@ -35,12 +38,14 @@ class SampleConfig(BaseConfig):
         return original_network, synthetic_networks
 
 
-def _load_network_pkl(folder: str) -> List[SynthGraph]:
+def _load_network_pkl(folder: str) -> list:
     """Load network pkl files with backward compatibility for nx.Graph.
 
     If the pickle contains legacy ``nx.Graph`` objects, *networkx*
     must be installed so ``pickle.load`` can deserialize them.
     """
+    from graph.synth_graph import SynthGraph
+
     try:
         import networkx as nx
 

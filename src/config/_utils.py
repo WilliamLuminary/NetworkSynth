@@ -2,7 +2,7 @@ from typing import Optional, Tuple
 
 from numpy import ndarray
 
-from config import BaseConfig
+from .base_config import BaseConfig
 
 
 def _find_file_with_pattern(

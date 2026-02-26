@@ -1,25 +1,12 @@
-# src/main_mosaic.py
+# src/pipelines/mosaic.py
 """
 Mosaic pipeline — generates a grid of small tile networks and stitches
 them into one large network.
-
-Pipeline
---------
-1. Load an original network and compute its structural attributes
-   (degree distribution, edge lengths, angle differences, …).
-2. Lay out a GRID_ROWS × GRID_COLS tile grid with overlap margins so
-   adjacent tiles share a band of generated network.
-3. Generate every tile independently via ``ProcessPoolExecutor``
-   (naturally parallel — no shared state between tiles).
-4. Stitch tiles by merging close nodes in the overlap regions, using the
-   same proximity threshold (``avg_length × CLOSED_NODES_FACTOR``) that
-   ``GraphNode`` uses during generation.
-5. Save the final stitched network.
-
-Usage
------
-    python main_mosaic.py
 """
+
+import os
+
+os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed

@@ -34,6 +34,8 @@ class GraphNode:
     _closed_nodes_factor: float
     _closed_edges_factor: float
 
+    _merge_priority: bool = False
+
     @classmethod
     def initialize(cls, attrs):
         cls._degree_dist = attrs.degree_distribution
@@ -60,6 +62,56 @@ class GraphNode:
         cls.edge_grid.clear()
         cls._aborted_edge = 0
         cls._merged_edge = 0
+
+    @classmethod
+    def create_frozen(cls, position, register_in_grid: bool = False):
+        """Create a node that exists for graph construction but won't expand.
+
+        When *register_in_grid* is ``False`` (the default for Phase 2),
+        the node is **not** added to ``node_grid``.  Tile edges in
+        ``edge_grid`` are sufficient to prevent new growth from crossing
+        tile interiors; keeping frozen nodes out of ``node_grid`` avoids
+        wasteful back-merges from frontier branches into their own tile.
+        """
+        node = object.__new__(cls)
+        node.id = next(cls.id_counter)
+        node.position = position
+        node.degree = 2
+        node.children = [None, None]
+        node.parent = None
+        node.clockwise = False
+        node.base_angle = 0.0
+        if register_in_grid:
+            key = cls._spatial_hash(position)
+            cls.node_grid[key].add(node)
+        return node
+
+    @classmethod
+    def create_frontier_node(cls, position, degree, base_angle, clockwise, parent_node):
+        """Create a frontier node ready for ``generate_children()``.
+
+        Mimics a normal non-root node whose BFS expansion was paused:
+        ``children = [parent_node]`` so ``generate_children()`` will treat
+        it as unexpanded (``len(children) == 1``).
+        """
+        node = object.__new__(cls)
+        node.id = next(cls.id_counter)
+        node.position = position
+        node.degree = degree
+        node.base_angle = base_angle
+        node.clockwise = clockwise
+        node.parent = parent_node
+        node.children = [parent_node]
+        key = cls._spatial_hash(position)
+        cls.node_grid[key].add(node)
+        return node
+
+    @classmethod
+    def add_frozen_edge(cls, edge):
+        """Add an edge to the edge grid without a node context."""
+        keys = cls._edge_spatial_hash(*edge)
+        for key in keys:
+            cls.edge_grid[key].add(edge)
 
     def __init__(self, position, parent=None, parent_angle=None):
         """
@@ -140,31 +192,60 @@ class GraphNode:
         assert len(children_positions) == self.degree - 1
 
         for child_position, angle in zip(children_positions, angles):
-            if self._any_close_edge(child_position):  # Avoid closed edges
-                GraphNode._aborted_edge += 1
-                continue
-            close_node = self._get_closest_valid_node(child_position)
-            new_edge = (self.position, child_position)
-            if close_node is not None:  # Merge closed nodes
-                # NB:
-                new_edge = (self.position, close_node.position)
-                if not self._check_intersection(new_edge):
-                    self._add_child(close_node)
-                    self._add_edge_to_grid(new_edge)
-                    GraphNode._merged_edge += 1
-                else:
-                    GraphNode._aborted_edge += 1
+            if GraphNode._merge_priority:
+                self._place_child_merge_priority(child_position, angle)
             else:
-                if not self._check_intersection(new_edge):
-                    child_node = GraphNode(
-                        child_position, parent=self, parent_angle=angle
-                    )
-                    self._add_child(child_node)
-                    self._add_edge_to_grid(new_edge)
-                    self._add_to_grid(child_node.position)
-                else:
-                    GraphNode._aborted_edge += 1
+                self._place_child_default(child_position, angle)
         return True
+
+    def _place_child_default(self, child_position, angle) -> None:
+        """Original logic: close-edge check first, then merge-node check."""
+        if self._any_close_edge(child_position):
+            GraphNode._aborted_edge += 1
+            return
+        close_node = self._get_closest_valid_node(child_position)
+        new_edge = (self.position, child_position)
+        if close_node is not None:
+            new_edge = (self.position, close_node.position)
+            if not self._check_intersection(new_edge):
+                self._add_child(close_node)
+                self._add_edge_to_grid(new_edge)
+                GraphNode._merged_edge += 1
+            else:
+                GraphNode._aborted_edge += 1
+        else:
+            if not self._check_intersection(new_edge):
+                child_node = GraphNode(child_position, parent=self, parent_angle=angle)
+                self._add_child(child_node)
+                self._add_edge_to_grid(new_edge)
+                self._add_to_grid(child_node.position)
+            else:
+                GraphNode._aborted_edge += 1
+
+    def _place_child_merge_priority(self, child_position, angle) -> None:
+        """Scaling mode: check for mergeable nodes first so cross-root
+        connections are not blocked by close-edge avoidance."""
+        close_node = self._get_closest_valid_node(child_position)
+        if close_node is not None:
+            new_edge = (self.position, close_node.position)
+            if not self._check_intersection(new_edge):
+                self._add_child(close_node)
+                self._add_edge_to_grid(new_edge)
+                GraphNode._merged_edge += 1
+            else:
+                GraphNode._aborted_edge += 1
+            return
+        if self._any_close_edge(child_position):
+            GraphNode._aborted_edge += 1
+            return
+        new_edge = (self.position, child_position)
+        if not self._check_intersection(new_edge):
+            child_node = GraphNode(child_position, parent=self, parent_angle=angle)
+            self._add_child(child_node)
+            self._add_edge_to_grid(new_edge)
+            self._add_to_grid(child_node.position)
+        else:
+            GraphNode._aborted_edge += 1
 
     def _get_closest_valid_node(self, position):
         close_nodes_with_distances = self._find_close_node(position)

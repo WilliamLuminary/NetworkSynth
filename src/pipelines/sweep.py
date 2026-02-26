@@ -1,21 +1,24 @@
-# src/main_sweeping.py
+# src/pipelines/sweep.py
+import os
+
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from itertools import product
 from typing import Tuple
 
 import wandb
-
 from analysis import MultifractalAnalyzer
 
 # noinspection PyUnresolvedReferences
 from config import BaseConfig, DatasetId
 from config.generate_mode import GenConfig1 as GenConfig
 from handlers import RunAgent
-from main import compute_average_error, generate_synthetic_network
+from pipelines.generate import compute_average_error, generate_synthetic_network
 
 GenConfig.initialize()
-BaseConfig.SYNTHETIC_NETWORK_NUMBER = 20
+BaseConfig.SYNTHETIC_NETWORK_NUMBER = 100
 BaseConfig.SYNTHETIC_GRAPH_NUMBER = 0
 BaseConfig.disable_saving("Sweeping Experiment")
 EXPERIMENT_PROJECT_NAME = "hyperparam-tuning"

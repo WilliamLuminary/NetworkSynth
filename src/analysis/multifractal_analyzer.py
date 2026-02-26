@@ -228,7 +228,8 @@ class MultifractalAnalyzer:
     # ---- public ----
 
     def analyze_error_features(self) -> MultifractalErrorFeatures:
-        with self.set_q(self.small_q):
+        q_band = self.full_q if BaseConfig.FULL_Q_BAND else self.small_q
+        with self.set_q(q_band):
             tau_list, _ = self._compute_multifractal_taus()
             alpha_0, width, _, _ = self._compute_n_spectrum(tau_list)
         return MultifractalErrorFeatures(alpha_0, width)

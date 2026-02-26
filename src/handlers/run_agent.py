@@ -341,10 +341,9 @@ def plot_network(data_type: DataType, graph: SynthGraph, **kwargs) -> ndarray:
 
 
 def _synth_to_edgelist_csv(graph: SynthGraph):
-    positions = graph.positions()
-    rows = [["source_x", "source_y", "target_x", "target_y", "weight"]]
+    rows = [["source_index", "target_index", "edge_weight"]]
     for u, v, w in graph.edges_with_weights():
-        rows.append([*positions[u], *positions[v], w])
+        rows.append([u, v, w])
     return rows
 
 
