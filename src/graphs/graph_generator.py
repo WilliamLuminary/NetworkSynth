@@ -1,4 +1,4 @@
-# src/graph/graph_generator.py
+# src/graphs/graph_generator.py
 
 import logging
 import random as rng
@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 from numpy import ndarray
 
-from config import BaseConfig
+from configs import BaseConfig
 from utils import build_graph, calculate_frame
 
 from ._graph_node import GraphNode

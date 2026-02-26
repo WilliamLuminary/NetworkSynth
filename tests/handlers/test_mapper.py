@@ -5,7 +5,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from scipy.stats import pearsonr
 
-from config import GenConfig1
+from configs import GenConfig1
 from handlers import Mapper
 
 GenConfig1.initialize()

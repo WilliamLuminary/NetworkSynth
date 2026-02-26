@@ -9,11 +9,12 @@ from itertools import product
 from typing import Tuple
 
 import wandb
+
 from analysis import MultifractalAnalyzer
 
 # noinspection PyUnresolvedReferences
-from config import BaseConfig, DatasetId
-from config.generate_mode import GenConfig1 as GenConfig
+from configs import BaseConfig, DatasetId
+from configs.generate_mode import GenConfig1 as GenConfig
 from handlers import RunAgent
 from pipelines.generate import compute_average_error, generate_synthetic_network
 

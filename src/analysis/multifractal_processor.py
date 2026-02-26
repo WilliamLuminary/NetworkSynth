@@ -3,7 +3,7 @@ from typing import Dict, List, Optional, Union
 
 import numpy as np
 
-from graph.synth_graph import SynthGraph
+from graphs.synth_graph import SynthGraph
 
 from .multifractal_analyzer import MultifractalAnalyzer
 

@@ -2,8 +2,8 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
-from config import BaseConfig, DatasetId, Mode
-from graph.synth_graph import SynthGraph
+from configs import BaseConfig, DatasetId, Mode
+from graphs.synth_graph import SynthGraph
 
 
 class DataLoader:

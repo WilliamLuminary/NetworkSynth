@@ -1,4 +1,4 @@
-# src/scripts/scaling_100x100.py
+# scripts/run_scaling_100x100.py
 """
 Production run: generate a 100x100 scaled network via multi-root BFS.
 
@@ -10,15 +10,17 @@ branches from different roots encounter each other.
 Logs are written to ``data/output/logs/scaling_100x100.log`` for
 real-time monitoring via ``tail -f``.
 
-Usage (from src/):
-    python scripts/scaling_100x100.py
+Usage (from project root):
+    python scripts/run_scaling_100x100.py
 """
 import logging
 import os
 import sys
 import time
 
-LOG_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "output", "logs")
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+
+LOG_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "output", "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 LOG_FILE = os.path.join(LOG_DIR, "scaling_100x100.log")
 
@@ -34,14 +36,14 @@ root_logger.addHandler(file_handler)
 root_logger.addHandler(stream_handler)
 logger = logging.getLogger(__name__)
 
-from config.scaling_mode import ScalingConfig
+from configs.scaling_mode import ScalingConfig
 
 ScalingConfig.initialize()
 
 import networkit as nk
 
-from config import BaseConfig, DataType
-from graph import GraphGenerator
+from configs import BaseConfig, DataType
+from graphs import GraphGenerator
 from handlers import RunAgent, Saver
 from utils import trim_graph
 

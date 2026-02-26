@@ -37,7 +37,7 @@ class SampleConfig(BaseConfig):
     MEASURE_WEIGHTED = False
 
     BASE_INPUT_PATH = os.path.join(
-        BaseConfig.BASE_INPUT_PATH, "sample_input", "generate_mode"
+        BaseConfig.BASE_INPUT_PATH, "samples", "generate_mode"
     )
     POSITION_DATA_DIR = os.path.join(BASE_INPUT_PATH, "")
     ADJ_MATRIX_DATA_DIR = os.path.join(BASE_INPUT_PATH, "")

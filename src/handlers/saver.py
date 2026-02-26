@@ -6,7 +6,7 @@ from typing import Any, Optional
 
 import numpy as np
 
-from config import (
+from configs import (
     FILE_CONFIGURATIONS,
     BaseConfig,
     DatasetId,

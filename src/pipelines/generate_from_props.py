@@ -5,8 +5,8 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 import logging
 
-from config import AttrConfig, BaseConfig, DataType
-from graph import GraphGenerator
+from configs import AttrConfig, BaseConfig, DataType
+from graphs import GraphGenerator
 from handlers import AttributesCalculator, RunAgent
 from utils import trim_graph
 

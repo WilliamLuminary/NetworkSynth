@@ -5,7 +5,7 @@ from typing import Optional
 
 from numpy import ndarray
 
-from config import (
+from configs import (
     FILE_CONFIGURATIONS,
     BaseConfig,
     DatasetId,
@@ -13,7 +13,7 @@ from config import (
     FileTag,
     Mode,
 )
-from graph.synth_graph import SynthGraph
+from graphs.synth_graph import SynthGraph
 
 from .data_loader import DataLoader
 from .saver import Saver

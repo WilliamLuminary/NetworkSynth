@@ -1,4 +1,4 @@
-# src/config/analyze_mode/config_sample.py
+# src/configs/analyze_mode/config_sample.py
 from __future__ import annotations
 
 import logging
@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, List, Tuple
 from ..base_config import BaseConfig
 
 if TYPE_CHECKING:
-    from graph.synth_graph import SynthGraph
+    from graphs.synth_graph import SynthGraph
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ def _load_network_pkl(folder: str) -> list:
     If the pickle contains legacy ``nx.Graph`` objects, *networkx*
     must be installed so ``pickle.load`` can deserialize them.
     """
-    from graph.synth_graph import SynthGraph
+    from graphs.synth_graph import SynthGraph
 
     try:
         import networkx as nx

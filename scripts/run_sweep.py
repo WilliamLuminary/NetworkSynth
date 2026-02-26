@@ -1,4 +1,4 @@
-# src/scripts/sweep_tmp.py
+# scripts/run_sweep.py
 """
 Hyperparameter sweep over (CLOSED_NODES_FACTOR, CLOSED_EDGES_FACTOR).
 
@@ -9,12 +9,15 @@ results to Weights & Biases (wandb) including a heatmap artifact.
 Grid searched: nf and ef each from 0.4 to 2.0 in steps of 0.1
                → 17 × 17 = 289 parameter pairs.
 
-Usage (from src/):
-    python scripts/sweep_tmp.py
+Usage (from project root):
+    python scripts/run_sweep.py
 """
 import os
+import sys
 
 os.environ.setdefault("OMP_NUM_THREADS", "1")
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -22,11 +25,12 @@ from itertools import product
 from typing import Tuple
 
 import wandb
+
 from analysis import MultifractalAnalyzer
 
 # noinspection PyUnresolvedReferences
-from config import BaseConfig, DatasetId
-from config.generate_mode import GenConfigTmp as GenConfig
+from configs import BaseConfig, DatasetId
+from configs.generate_mode import GenConfigTmp as GenConfig
 from handlers import RunAgent, Saver
 from pipelines.generate import compute_average_error, generate_synthetic_network
 

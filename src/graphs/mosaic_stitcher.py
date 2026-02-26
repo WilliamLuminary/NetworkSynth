@@ -1,4 +1,4 @@
-# src/graph/mosaic_stitcher.py
+# src/graphs/mosaic_stitcher.py
 """
 Mosaic stitcher: combines multiple tile networks into one large network
 by merging close nodes at tile boundaries.

@@ -6,7 +6,7 @@ from typing import DefaultDict, Final, Tuple
 import numpy as np
 from scipy.spatial.distance import euclidean
 
-from graph.synth_graph import SynthGraph
+from graphs.synth_graph import SynthGraph
 
 logger = logging.getLogger(__name__)
 

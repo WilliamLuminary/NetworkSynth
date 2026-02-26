@@ -1,4 +1,4 @@
-# src/graph/synth_graph.py
+# src/graphs/synth_graph.py
 """
 SynthGraph: lightweight wrapper around a networkit graph with numpy positions.
 

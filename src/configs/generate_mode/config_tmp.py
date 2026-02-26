@@ -32,9 +32,7 @@ class ConfigTmp(BaseConfig):
     FULL_ANALYSIS = False
     FULL_Q_BAND = False
 
-    BASE_INPUT_PATH = os.path.join(
-        BaseConfig.BASE_INPUT_PATH, "sample_input", "mosaic_mode"
-    )
+    BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, "samples", "mosaic_mode")
 
     @classmethod
     def initialize(cls):

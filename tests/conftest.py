@@ -3,7 +3,7 @@ import pickle
 
 import pytest
 
-from graph.synth_graph import SynthGraph
+from graphs.synth_graph import SynthGraph
 
 BASE_DIR = os.path.dirname(__file__)
 

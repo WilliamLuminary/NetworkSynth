@@ -8,7 +8,7 @@ import os
 from collections import deque
 from typing import Dict
 
-from config import AnaConfig, BaseConfig, DataType
+from configs import AnaConfig, BaseConfig, DataType
 from handlers import RunAgent
 
 AnaConfig.initialize()

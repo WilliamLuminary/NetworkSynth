@@ -18,7 +18,7 @@
 2. **Prepare Sample Data**
 
    ```
-   data/input/sample_input/generate_mode/
+   data/input/samples/generate_mode/
    ├── sample_1_pos.npy    # Node positions (N, 2)
    ├── sample_1_mat.npy    # Adjacency matrix
    └── sample_1_image.tif  # Background image (optional)
@@ -46,7 +46,7 @@
 The unified `DatasetId` class replaces the old `SetName`/`Resolution` enum system:
 
 ```python
-from config import DatasetId
+from configs import DatasetId
 
 # Single-level dataset (e.g., nanowires)
 dataset = DatasetId("1-0")
@@ -62,7 +62,7 @@ dataset[1]      # "10kX"
 
 ### Creating a New Config
 
-1. Create `src/config/generate_mode/config_mydata.py`:
+1. Create `src/configs/generate_mode/config_mydata.py`:
 
 ```python
 from typing import List
@@ -134,7 +134,7 @@ The config is automatically exported as `GenConfigMydata` based on the naming co
 
 ## Graph Architecture: SynthGraph
 
-The codebase uses `SynthGraph` (defined in `src/graph/synth_graph.py`) as its
+The codebase uses `SynthGraph` (defined in `src/graphs/synth_graph.py`) as its
 primary graph representation. It wraps a **NetworKit** `nk.Graph` (C++ engine)
 together with a NumPy positions array, replacing the previous `nx.Graph`.
 
@@ -156,8 +156,8 @@ in three specific places:
 
 | File | Purpose |
 |------|---------|
-| `src/graph/synth_graph.py` | `from_networkx()` — converts legacy `nx.Graph` pickle files to `SynthGraph` |
-| `src/config/analyze_mode/config_sample.py` | Detects old `.pkl` files containing `nx.Graph` and converts them via `SynthGraph.from_networkx()` |
+| `src/graphs/synth_graph.py` | `from_networkx()` — converts legacy `nx.Graph` pickle files to `SynthGraph` |
+| `src/configs/analyze_mode/config_sample.py` | Detects old `.pkl` files containing `nx.Graph` and converts them via `SynthGraph.from_networkx()` |
 | `src/analysis/multifractal_analyzer.py` | `to_networkx()` — converts back to `nx.Graph` only for `GraphRicciCurvature` (which requires `nx.Graph` input) |
 
 All graph algorithms (Dijkstra, betweenness, closeness, eigenvector

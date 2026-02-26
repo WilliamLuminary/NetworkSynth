@@ -12,8 +12,8 @@ from scipy import sparse as sp
 from scipy.optimize import linprog
 from scipy.stats import linregress
 
-from config import BaseConfig
-from graph.synth_graph import SynthGraph
+from configs import BaseConfig
+from graphs.synth_graph import SynthGraph
 
 logger = logging.getLogger(__name__)
 

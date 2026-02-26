@@ -1,4 +1,4 @@
-# src/scripts/hybrid_100x100.py
+# scripts/run_hybrid_100x100.py
 """
 Production run: generate a 100x100 network using the two-phase hybrid pipeline.
 
@@ -17,18 +17,20 @@ Phase 2 — Assembly & gap-filling (single-process, multi-threaded):
 Logs are written to ``data/output/logs/hybrid_100x100.log`` for
 real-time monitoring via ``tail -f``.
 
-Usage (from src/):
-    python scripts/hybrid_100x100.py
+Usage (from project root):
+    python scripts/run_hybrid_100x100.py
 """
 import os
+import sys
 
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+
 import logging
-import sys
 import time
 
-LOG_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "output", "logs")
+LOG_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "output", "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 LOG_FILE = os.path.join(LOG_DIR, "hybrid_100x100.log")
 
@@ -52,8 +54,8 @@ logger.info("=" * 60)
 logger.info("Hybrid 100×100 production run")
 logger.info("=" * 60)
 
-from config import BaseConfig
-from config.hybrid_mode import HybridConfig
+from configs import BaseConfig
+from configs.hybrid_mode import HybridConfig
 from handlers import Saver
 from pipelines.hybrid import run_hybrid_for_dataset
 

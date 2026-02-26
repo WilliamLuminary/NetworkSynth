@@ -1,20 +1,10 @@
-# src/config/hybrid_mode/config_sample.py
+# src/config/scaling_mode/config_sample.py
 """
-Hybrid mode sample configuration.
-
-Phase 1: Generate HYBRID_ROWS × HYBRID_COLS seed tiles independently
-          in parallel, each covering ~1×1 SYNTHETIC_FRAME_SIZE.  Quality-
-          checked via multifractal error against the original network.
-
-Phase 2: Assemble all seed tiles on a shared whiteboard (spacing = 2×
-          SYNTHETIC_FRAME_SIZE per center) and continue BFS from their
-          frontier nodes to fill the ~1×1 gaps and merge into a single
-          connected network.
-
-Result: a network roughly (2·HYBRID_ROWS) × (2·HYBRID_COLS) times
-        larger than the original (in frame area).
+Scaling mode sample configuration.
 
 Reuses the mosaic sample input data for convenience.
+A small 3×3 grid is used by default for quick smoke-testing;
+set SCALE_ROWS / SCALE_COLS to 100 for the full-size run.
 """
 import logging
 import os
@@ -35,14 +25,15 @@ logger = logging.getLogger(__name__)
 
 
 class SampleConfig(BaseConfig):
-    """Hybrid mode sample — parallel seed tiles + frontier continuation."""
+    """Scaling mode sample — multi-root synchronized BFS."""
 
     DATASETS = [DatasetId("sample_1")]
 
-    # --- Hybrid grid parameters ---
-    HYBRID_ROWS: int = 50
-    HYBRID_COLS: int = 50
-    PHASE2_MAX_ROUNDS: int = 500
+    # --- Scaling grid parameters ---
+    SCALE_ROWS: int = 3
+    SCALE_COLS: int = 3
+    MAX_GENERATION_ROUNDS: int = 500
+    ROOT_SPACING_FACTOR: float = 1.0
 
     # --- Network generation parameters ---
     IMAGE_SIZE: Tuple[int, int] = (510, 510)
@@ -63,7 +54,7 @@ class SampleConfig(BaseConfig):
     # --- Input paths (reuse mosaic sample data) ---
     BASE_INPUT_PATH = os.path.join(
         BaseConfig.BASE_INPUT_PATH,
-        "sample_input",
+        "samples",
         "mosaic_mode",
     )
 

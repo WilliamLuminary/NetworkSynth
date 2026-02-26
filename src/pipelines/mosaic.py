@@ -16,11 +16,11 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.collections import LineCollection
 
-from config import BaseConfig, DataType
-from config.mosaic_mode import MosaicConfig
-from graph import GraphGenerator
-from graph.mosaic_stitcher import MosaicStitcher
-from graph.synth_graph import SynthGraph
+from configs import BaseConfig, DataType
+from configs.mosaic_mode import MosaicConfig
+from graphs import GraphGenerator
+from graphs.mosaic_stitcher import MosaicStitcher
+from graphs.synth_graph import SynthGraph
 from handlers import AttributesCalculator, RunAgent, Saver
 from utils import finalize_plot, trim_graph
 

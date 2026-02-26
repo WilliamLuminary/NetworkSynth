@@ -1,4 +1,4 @@
-# src/graph/_graph_node.py
+# src/graphs/_graph_node.py
 import itertools
 import random
 from collections import defaultdict
@@ -7,7 +7,7 @@ from typing import Dict, List, Set, Tuple
 import numpy as np
 from scipy.spatial.distance import euclidean
 
-from config import BaseConfig
+from configs import BaseConfig
 
 
 class GraphNode:

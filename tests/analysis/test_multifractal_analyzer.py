@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from analysis.multifractal_analyzer import MultifractalAnalyzer
-from config import AnaConfig, BaseConfig
+from configs import AnaConfig, BaseConfig
 
 from .._original_code import (
     original_calculate_assortativity,

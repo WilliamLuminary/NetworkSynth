@@ -18,11 +18,11 @@ from matplotlib import pyplot as plt
 from matplotlib.collections import LineCollection
 
 from analysis import MultifractalAnalyzer
-from config import BaseConfig, DataType
-from config.hybrid_mode import HybridConfig
-from graph import GraphGenerator
-from graph.graph_generator import FrontierDescriptor
-from graph.synth_graph import SynthGraph
+from configs import BaseConfig, DataType
+from configs.hybrid_mode import HybridConfig
+from graphs import GraphGenerator
+from graphs.graph_generator import FrontierDescriptor
+from graphs.synth_graph import SynthGraph
 from handlers import AttributesCalculator, Mapper, RunAgent, Saver
 from utils import build_graph, finalize_plot, trim_graph
 

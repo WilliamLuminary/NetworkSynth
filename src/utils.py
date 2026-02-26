@@ -7,8 +7,8 @@ from typing import Tuple, Union
 import numpy as np
 from numpy import ndarray
 
-from config import BaseConfig
-from graph.synth_graph import SynthGraph
+from configs import BaseConfig
+from graphs.synth_graph import SynthGraph
 
 
 def calculate_frame(

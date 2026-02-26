@@ -9,9 +9,9 @@ from typing import List
 import numpy as np
 
 from analysis import MultifractalAnalyzer
-from config import BaseConfig, DatasetId, DataType
-from config.generate_mode import GenConfig1 as GenConfig
-from graph import GraphGenerator
+from configs import BaseConfig, DatasetId, DataType
+from configs.generate_mode import GenConfig1 as GenConfig
+from graphs import GraphGenerator
 from handlers import AttributesCalculator, Mapper, RunAgent, Saver
 from utils import trim_graph
 

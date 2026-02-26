@@ -1,14 +1,14 @@
-# src/config/mosaic_mode/config_sample.py
+# src/configs/mosaic_mode/config_sample.py
 """
 Mosaic mode sample configuration — simple flat-file data layout.
 
-Uses data from ``sample_input/mosaic_mode/`` with single-level
+Uses data from ``samples/mosaic_mode/`` with single-level
 DatasetId (like the generate_mode sample config).  The grid is
 kept small (2×2) for quick smoke-testing.
 
 Data layout
 -----------
-sample_input/mosaic_mode/
+samples/mosaic_mode/
 ├── sample_1_pos.npy     (N×2 positions)
 ├── sample_1_mat.npy     (scipy sparse adjacency)
 └── sample_1_image.tif   (grayscale background)
@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 class SampleConfig(BaseConfig):
-    """Small mosaic for testing — 2×2 grid, sample_input data."""
+    """Small mosaic for testing — 2×2 grid, sample data."""
 
     # --- Dataset (single-level id) ---
     DATASETS = [DatasetId("sample_1")]
@@ -62,7 +62,7 @@ class SampleConfig(BaseConfig):
     # --- Input paths (flat sample layout) ---
     BASE_INPUT_PATH = os.path.join(
         BaseConfig.BASE_INPUT_PATH,
-        "sample_input",
+        "samples",
         "mosaic_mode",
     )
 

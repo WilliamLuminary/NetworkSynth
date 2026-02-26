@@ -22,10 +22,10 @@ class SampleConfig(BaseConfig):
     MAX_ATTEMPTS = 10
 
     BASE_INPUT_PATH = os.path.join(
-        BaseConfig.BASE_INPUT_PATH, "sample_input", "generate_mode"
+        BaseConfig.BASE_INPUT_PATH, "samples", "generate_mode"
     )
     ATTRIBUTES_DICT_DATA_PATH = os.path.join(
-        BaseConfig.BASE_INPUT_PATH, "sample_input", "property_generate_mode"
+        BaseConfig.BASE_INPUT_PATH, "samples", "property_generate_mode"
     )
 
     @classmethod
