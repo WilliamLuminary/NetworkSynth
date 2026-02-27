@@ -76,6 +76,7 @@ logger.info(f"Connected components: {n_comp}")
 logger.info(f"Top 5 sizes: {sizes[:5]}")
 
 scaled_graph = trim_graph(scaled_graph, attributes.average_degree)
+data_agent.mapper.assign_weights(scaled_graph)
 data_agent.add_synthetic_graph(scaled_graph)
 prefix = "scaled_100x100_"
 data_agent.save(DataType.SYNTHETIC_EDGELIST, prefix, arg=scaled_graph)

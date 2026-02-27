@@ -21,6 +21,7 @@ from analysis import MultifractalAnalyzer
 from configs import BaseConfig, DataType
 from configs.hybrid_mode import HybridConfig
 from graphs import GraphGenerator
+from graphs._graph_node import GraphNode
 from graphs.graph_generator import FrontierDescriptor
 from graphs.synth_graph import SynthGraph
 from handlers import AttributesCalculator, Mapper, RunAgent, Saver
@@ -61,6 +62,8 @@ def _generate_tile_worker(args):
         return (row, col), None
 
     try:
+        GraphNode.initialize(attributes)
+
         best_error = float("inf")
         best_result = None
 
@@ -241,6 +244,7 @@ def run_phase2(
             }
         )
 
+    GraphNode.initialize(attributes)
     graph = GraphGenerator.assemble_and_continue(
         tile_data_list, global_frame, max_rounds
     )
@@ -369,6 +373,8 @@ def run_hybrid_for_dataset(dataset_id):
         f"After LCC: {hybrid_graph.number_of_nodes():,} nodes, "
         f"{hybrid_graph.number_of_edges():,} edges"
     )
+
+    mapper.assign_weights(hybrid_graph)
 
     # --- Save ---
     data_agent.add_synthetic_graph(hybrid_graph)

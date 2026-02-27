@@ -4,8 +4,6 @@ import logging
 import os
 from typing import Any, Optional
 
-import numpy as np
-
 from configs import (
     FILE_CONFIGURATIONS,
     BaseConfig,
@@ -167,17 +165,20 @@ class Saver:
 
     @staticmethod
     def _save_networkit(content, filepath: str) -> None:
-        """Save a networkit graph. If content is a (nk.Graph, positions) tuple,
-        also save positions as a companion .npy file."""
+        """Save a networkit graph in binary format.
+
+        Accepts either a bare ``nk.Graph`` or a ``(nk.Graph, positions)``
+        tuple; in the latter case only the graph is written (positions
+        are saved separately via SYNTHETIC_POSITIONS to keep all formats
+        consistent).
+        """
         import networkit as nk
 
         if isinstance(content, tuple):
-            nk_graph, positions = content
-            nk.writeGraph(nk_graph, filepath, nk.Format.NetworkitBinary)
-            pos_path = filepath.rsplit(".", 1)[0] + "_positions.npy"
-            np.save(pos_path, positions)
+            nk_graph, _positions = content
         else:
-            nk.writeGraph(content, filepath, nk.Format.NetworkitBinary)
+            nk_graph = content
+        nk.writeGraph(nk_graph, filepath, nk.Format.NetworkitBinary)
 
     @staticmethod
     def _save_png_image(image, filepath: str) -> None:
