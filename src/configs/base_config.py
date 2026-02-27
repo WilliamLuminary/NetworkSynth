@@ -81,7 +81,9 @@ class BaseConfig:
     @classmethod
     def initialize(cls):
         cls._setup_logger(details=cls.__name__)
-        cls.OUTPUT_DENOTE = cls.__name__
+        module_parts = cls.__module__.split(".")
+        mode = next((p for p in module_parts if p.endswith("_mode")), None)
+        cls.OUTPUT_DENOTE = f"{mode}_{cls.__name__}" if mode else cls.__name__
 
     @classmethod
     def _inject_dependencies(cls):

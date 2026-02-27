@@ -14,7 +14,12 @@ Phase 2: Assemble all seed tiles on a shared whiteboard (spacing = 2×
 Result: a network roughly (2·HYBRID_ROWS) × (2·HYBRID_COLS) times
         larger than the original (in frame area).
 
-Reuses the mosaic sample input data for convenience.
+Data layout
+-----------
+samples/hybrid_mode/
+├── sample_1_pos.npy     (N×2 positions)
+├── sample_1_mat.npy     (scipy sparse adjacency)
+└── sample_1_image.tif   (grayscale background)
 """
 import logging
 import os
@@ -60,11 +65,11 @@ class SampleConfig(BaseConfig):
     MEASURE_WEIGHTED = True
     FULL_ANALYSIS = False
 
-    # --- Input paths (reuse mosaic sample data) ---
+    # --- Input paths ---
     BASE_INPUT_PATH = os.path.join(
         BaseConfig.BASE_INPUT_PATH,
         "samples",
-        "mosaic_mode",
+        "hybrid_mode",
     )
 
     @classmethod
