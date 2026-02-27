@@ -1,11 +1,11 @@
 # src/graphs/_graph_node.py
 import itertools
+import math
 import random
 from collections import defaultdict
 from typing import Dict, List, Set, Tuple
 
 import numpy as np
-from scipy.spatial.distance import euclidean
 
 from configs import BaseConfig
 
@@ -46,7 +46,12 @@ class GraphNode:
 
         cls._closed_nodes_thr = cls._avg_length * BaseConfig.CLOSED_NODES_FACTOR
         cls._closed_edges_thr = cls._avg_length * BaseConfig.CLOSED_EDGES_FACTOR
+        cls._closed_nodes_thr_sq = cls._closed_nodes_thr**2
+        cls._closed_edges_thr_sq = cls._closed_edges_thr**2
         cls._grid_size = cls._avg_length
+
+        cls._node_search_radius = math.ceil(BaseConfig.CLOSED_NODES_FACTOR)
+        cls._edge_search_radius = math.ceil(BaseConfig.CLOSED_EDGES_FACTOR)
 
         cls._closed_nodes_factor = BaseConfig.CLOSED_NODES_FACTOR
         cls._closed_edges_factor = BaseConfig.CLOSED_EDGES_FACTOR
@@ -255,52 +260,55 @@ class GraphNode:
 
     def _find_close_node(self, position):
         key = self._spatial_hash(position)
-        neighboring_keys = [
-            (key[0] + dx, key[1] + dy) for dx in range(-1, 2) for dy in range(-1, 2)
-        ]
+        px, py = position
+        thr_sq = self._closed_nodes_thr_sq
+        r = self._node_search_radius
         close_nodes_with_distances = []
-        for neighbor_key in neighboring_keys:
-            for node in GraphNode.node_grid[neighbor_key]:
-                if node != self and node not in self.children:
-                    distance = np.linalg.norm(
-                        np.array(node.position) - np.array(position)
-                    )
-                    if distance < self._closed_nodes_thr:
-                        close_nodes_with_distances.append((node, distance))
+        for dx in range(-r, r + 1):
+            for dy in range(-r, r + 1):
+                for node in GraphNode.node_grid.get((key[0] + dx, key[1] + dy), ()):
+                    if node != self and node not in self.children:
+                        ddx = node.position[0] - px
+                        ddy = node.position[1] - py
+                        dist_sq = ddx * ddx + ddy * ddy
+                        if dist_sq < thr_sq:
+                            close_nodes_with_distances.append((node, dist_sq))
         return close_nodes_with_distances
 
     def _any_close_edge(self, position) -> bool:
         key = self._spatial_hash(position)
-        neighboring_keys = [
-            (key[0] + dx, key[1] + dy) for dx in range(-1, 2) for dy in range(-1, 2)
-        ]
-        for neighbor_key in neighboring_keys:
-            for edge in GraphNode.edge_grid[neighbor_key]:
-                if self._is_interfering_edge(edge, position):
-                    return True
+        r = self._edge_search_radius
+        for dx in range(-r, r + 1):
+            for dy in range(-r, r + 1):
+                for edge in GraphNode.edge_grid.get((key[0] + dx, key[1] + dy), ()):
+                    if self._is_interfering_edge(edge, position):
+                        return True
         return False
 
     def _is_interfering_edge(self, edge, position) -> bool:
         if self.parent and (self.parent.position in edge or self.position in edge):
-            return False  # Skip edges from the same parent
+            return False
         p1, p2 = edge
-        return (
-            euclidean(position, p1) < self._closed_edges_thr
-            or euclidean(position, p2) < self._closed_edges_thr
-        )
+        thr_sq = self._closed_edges_thr_sq
+        dx1 = position[0] - p1[0]
+        dy1 = position[1] - p1[1]
+        if dx1 * dx1 + dy1 * dy1 < thr_sq:
+            return True
+        dx2 = position[0] - p2[0]
+        dy2 = position[1] - p2[1]
+        return dx2 * dx2 + dy2 * dy2 < thr_sq
 
     def _generate_angles_and_lengths(self) -> Tuple[list[float], ...]:
         if self.degree == 1:
             return [], []
-        angles = random.choices(
-            GraphNode._degree_angles[self.degree], k=self.degree - 1
-        )
-        angles = (
-            np.cumsum(angles)
-            if self.clockwise
-            else np.cumsum([-angle for angle in angles])
-        )
-        angles = (angles + self.base_angle).tolist()
+        raw = random.choices(GraphNode._degree_angles[self.degree], k=self.degree - 1)
+        sign = 1 if self.clockwise else -1
+        base = self.base_angle
+        acc = 0.0
+        angles = []
+        for a in raw:
+            acc += sign * a
+            angles.append(acc + base)
         lengths = random.choices(
             GraphNode._degree_lengths[self.degree], k=self.degree - 1
         )
@@ -310,13 +318,16 @@ class GraphNode:
         self, lengths: List[float], angles: List[float]
     ) -> List[Tuple[float, float]]:
         x, y = self.position
-        _cartesian_coord = []
+        result = []
         for length, angle in zip(lengths, angles):
-            angle_rad = np.deg2rad(angle)
-            new_x = x + length * np.cos(angle_rad)
-            new_y = y + length * np.sin(angle_rad)
-            _cartesian_coord.append((new_x, new_y))
-        return _cartesian_coord
+            angle_rad = math.radians(angle)
+            result.append(
+                (
+                    x + length * math.cos(angle_rad),
+                    y + length * math.sin(angle_rad),
+                )
+            )
+        return result
 
     @staticmethod
     def _check_intersection(
@@ -324,7 +335,7 @@ class GraphNode:
     ) -> bool:
         edge_fractions = GraphNode._edge_spatial_hash(*new_edge)
         for edge_frac in edge_fractions:
-            for edge in GraphNode.edge_grid[edge_frac]:
+            for edge in GraphNode.edge_grid.get(edge_frac, ()):
                 if new_edge[0] in edge or new_edge[1] in edge:
                     continue  # Skip edges with the same endpoint
                 if _do_intersect(new_edge[0], new_edge[1], edge[0], edge[1]):
@@ -340,15 +351,16 @@ class GraphNode:
     def _edge_spatial_hash(
         p1: Tuple[float, float], p2: Tuple[float, float]
     ) -> Set[Tuple[int, int]]:
-        grid_size = GraphNode._grid_size
-        x_min, x_max = sorted([p1[0], p2[0]])
-        y_min, y_max = sorted([p1[1], p2[1]])
-        keys = {
-            (int(x // grid_size), int(y // grid_size))
-            for x in np.arange(x_min, x_max + grid_size, grid_size)
-            for y in np.arange(y_min, y_max + grid_size, grid_size)
-        }
-        return keys
+        gs = GraphNode._grid_size
+        gx1 = int(p1[0] // gs)
+        gx2 = int(p2[0] // gs)
+        gy1 = int(p1[1] // gs)
+        gy2 = int(p2[1] // gs)
+        if gx1 > gx2:
+            gx1, gx2 = gx2, gx1
+        if gy1 > gy2:
+            gy1, gy2 = gy2, gy1
+        return {(x, y) for x in range(gx1, gx2 + 1) for y in range(gy1, gy2 + 1)}
 
     def __repr__(self):
         return f"GraphNode(id_counter={self.id})"

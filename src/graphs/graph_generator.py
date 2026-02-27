@@ -240,6 +240,7 @@ class GraphGenerator:
         position_to_node: Dict[Tuple[float, float], GraphNode] = {}
         total_edges = 0
 
+        all_edges: set = set()
         for tile in tile_data_list:
             for pos in tile["positions"]:
                 if pos not in position_to_node and pos not in frontier_positions:
@@ -247,6 +248,7 @@ class GraphGenerator:
                     position_to_node[pos] = frozen
             for edge in tile["edges"]:
                 GraphNode.add_frozen_edge(edge)
+                all_edges.add(edge)
                 total_edges += 1
 
         logger.info(
@@ -255,10 +257,6 @@ class GraphGenerator:
         )
 
         all_nodes: set = set(position_to_node.values())
-        all_edges: set = set()
-        for tile in tile_data_list:
-            for edge in tile["edges"]:
-                all_edges.add(edge)
         seen_ids: set = {id(n) for n in all_nodes}
 
         frontier: list = []
