@@ -44,10 +44,11 @@ class SampleConfig(BaseConfig):
 
     DATASETS = [DatasetId("sample_1")]
 
-    # --- Hybrid grid parameters ---
+    # --- Hybrid layout parameters ---
     HYBRID_ROWS: int = 50
     HYBRID_COLS: int = 50
     PHASE2_MAX_ROUNDS: int = 500
+    MIN_CENTER_DISTANCE_FACTOR: float = 1.5
 
     # --- Network generation parameters ---
     IMAGE_SIZE: Tuple[int, int] = (510, 510)

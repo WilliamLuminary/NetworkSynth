@@ -69,14 +69,12 @@ class GraphNode:
         cls._merged_edge = 0
 
     @classmethod
-    def create_frozen(cls, position, register_in_grid: bool = False):
-        """Create a node that exists for graph construction but won't expand.
+    def create_interior_node(cls, position):
+        """Lightweight node for pre-existing tile interior positions.
 
-        When *register_in_grid* is ``False`` (the default for Phase 2),
-        the node is **not** added to ``node_grid``.  Tile edges in
-        ``edge_grid`` are sufficient to prevent new growth from crossing
-        tile interiors; keeping frozen nodes out of ``node_grid`` avoids
-        wasteful back-merges from frontier branches into their own tile.
+        Not added to ``node_grid`` and will not expand — exists only so
+        ``SynthGraph.from_graph_nodes`` can include it in the final graph.
+        Tile edges in ``edge_grid`` handle avoidance.
         """
         node = object.__new__(cls)
         node.id = next(cls.id_counter)
@@ -86,9 +84,6 @@ class GraphNode:
         node.parent = None
         node.clockwise = False
         node.base_angle = 0.0
-        if register_in_grid:
-            key = cls._spatial_hash(position)
-            cls.node_grid[key].add(node)
         return node
 
     @classmethod
@@ -112,8 +107,8 @@ class GraphNode:
         return node
 
     @classmethod
-    def add_frozen_edge(cls, edge):
-        """Add an edge to the edge grid without a node context."""
+    def register_edge(cls, edge):
+        """Add a pre-existing edge to ``edge_grid`` for avoidance checks."""
         keys = cls._edge_spatial_hash(*edge)
         for key in keys:
             cls.edge_grid[key].add(edge)

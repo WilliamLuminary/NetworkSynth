@@ -215,14 +215,15 @@ class GraphGenerator:
     ) -> SynthGraph:
         """Phase 2: populate grids from tiles, then BFS from frontier nodes.
 
-        Frozen tile nodes are kept OUT of ``node_grid`` so that frontier
-        branches cannot wastefully merge back into their own tile's
-        interior.  Tile edges ARE added to ``edge_grid``, which is
-        sufficient to prevent new growth from crossing existing tiles.
+        Tile edges are added to ``edge_grid`` so avoidance prevents new
+        growth from crossing existing tile interiors.  Interior nodes are
+        lightweight placeholders (not in ``node_grid``) kept only for
+        final graph assembly.
 
-        Only frontier nodes (and newly grown children) enter ``node_grid``,
-        so the close-node merge logic only fires between actively growing
-        branches — exactly the cross-tile connections we want.
+        Merge priority is enabled so that when two tile frontiers meet,
+        the close-node merge check runs *before* edge avoidance — without
+        this, the approaching tile's nearby edges would block the
+        connection before the merge check gets a chance.
 
         Each element of *tile_data_list* must have:
           - ``positions``: list of (x, y) in **global** coordinates
@@ -244,16 +245,16 @@ class GraphGenerator:
         for tile in tile_data_list:
             for pos in tile["positions"]:
                 if pos not in position_to_node and pos not in frontier_positions:
-                    frozen = GraphNode.create_frozen(pos, register_in_grid=False)
-                    position_to_node[pos] = frozen
+                    node = GraphNode.create_interior_node(pos)
+                    position_to_node[pos] = node
             for edge in tile["edges"]:
-                GraphNode.add_frozen_edge(edge)
+                GraphNode.register_edge(edge)
                 all_edges.add(edge)
                 total_edges += 1
 
         logger.info(
-            f"Phase 2: assembled {len(position_to_node):,} frozen nodes "
-            f"(not in node_grid), {total_edges:,} edges in edge_grid"
+            f"Phase 2: assembled {len(position_to_node):,} interior nodes, "
+            f"{total_edges:,} edges in edge_grid"
         )
 
         all_nodes: set = set(position_to_node.values())
@@ -264,9 +265,7 @@ class GraphGenerator:
             for desc in tile["frontier"]:
                 parent = position_to_node.get(desc.parent_position)
                 if parent is None:
-                    parent = GraphNode.create_frozen(
-                        desc.parent_position, register_in_grid=False
-                    )
+                    parent = GraphNode.create_interior_node(desc.parent_position)
                     position_to_node[desc.parent_position] = parent
                     all_nodes.add(parent)
                     seen_ids.add(id(parent))

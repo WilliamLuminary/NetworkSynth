@@ -222,7 +222,10 @@ def run_mosaic_for_dataset(dataset_id):
     stitcher = MosaicStitcher(merge_threshold=merge_threshold)
     mosaic_graph = stitcher.stitch(tile_graphs)
 
-    # 5. Save network data + plot
+    # 5. Assign edge weights from original network's length→weight distribution
+    data_agent.mapper.assign_weights(mosaic_graph)
+
+    # 6. Save network data + plot
     data_agent.add_synthetic_graph(mosaic_graph)
     prefix = f"mosaic_{BaseConfig.GRID_ROWS}x{BaseConfig.GRID_COLS}"
     data_agent.save(DataType.SYNTHETIC_EDGELIST, f"{prefix}_", arg=mosaic_graph)

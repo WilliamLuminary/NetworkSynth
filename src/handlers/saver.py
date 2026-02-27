@@ -168,17 +168,26 @@ class Saver:
         """Save a networkit graph in binary format.
 
         Accepts either a bare ``nk.Graph`` or a ``(nk.Graph, positions)``
-        tuple; in the latter case only the graph is written (positions
-        are saved separately via SYNTHETIC_POSITIONS to keep all formats
-        consistent).
+        tuple.  When positions are provided, a companion
+        ``<basename>_positions.npy`` is written alongside the ``.nkbin``
+        so that the nkbin output is self-contained (topology + weights
+        in the binary graph, positions in the compact numpy array).
         """
         import networkit as nk
+        import numpy as np
 
         if isinstance(content, tuple):
-            nk_graph, _positions = content
+            nk_graph, positions = content
         else:
             nk_graph = content
+            positions = None
+
         nk.writeGraph(nk_graph, filepath, nk.Format.NetworkitBinary)
+
+        if positions is not None:
+            pos_path = filepath.rsplit(".", 1)[0] + "_positions.npy"
+            np.save(pos_path, np.asarray(positions))
+            logger.info(f"Saved companion positions: {pos_path}")
 
     @staticmethod
     def _save_png_image(image, filepath: str) -> None:

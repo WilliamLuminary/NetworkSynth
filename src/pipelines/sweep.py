@@ -9,7 +9,6 @@ from itertools import product
 from typing import Tuple
 
 import wandb
-
 from analysis import MultifractalAnalyzer
 
 # noinspection PyUnresolvedReferences

@@ -46,7 +46,10 @@ def run_scaling_for_dataset(dataset_id):
     # 3. Trim to match average degree
     scaled_graph = trim_graph(scaled_graph, attributes.average_degree)
 
-    # 4. Save network data + plot
+    # 4. Assign edge weights from original network's length→weight distribution
+    data_agent.mapper.assign_weights(scaled_graph)
+
+    # 5. Save network data + plot
     data_agent.add_synthetic_graph(scaled_graph)
     prefix = f"scaled_{BaseConfig.SCALE_ROWS}x{BaseConfig.SCALE_COLS}"
 

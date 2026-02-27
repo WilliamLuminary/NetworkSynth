@@ -34,6 +34,54 @@ SIGINT_INFO = "SIGINT received. Terminating…"
 
 
 # ------------------------------------------------------------------ #
+# Center placement — Poisson-disk-like rejection sampling
+# ------------------------------------------------------------------ #
+
+
+def generate_random_centers(
+    whiteboard_w: float,
+    whiteboard_h: float,
+    min_distance: float,
+    max_centers: int = 0,
+    rng_seed: int = 42,
+    max_rejections: int = 50_000,
+) -> List[Tuple[float, float]]:
+    """Place centers randomly with a minimum pairwise distance.
+
+    Uses simple rejection sampling: draw a uniform point, accept if it
+    is at least *min_distance* from every existing centre, otherwise
+    discard.  Stops after *max_rejections* consecutive failures or
+    when *max_centers* is reached (0 = no limit).
+    """
+    gen = np.random.RandomState(rng_seed)
+    centers: List[Tuple[float, float]] = []
+    consecutive_rejects = 0
+
+    while consecutive_rejects < max_rejections:
+        if max_centers > 0 and len(centers) >= max_centers:
+            break
+        x = gen.uniform(0, whiteboard_w)
+        y = gen.uniform(0, whiteboard_h)
+        too_close = False
+        for cx, cy in centers:
+            if (x - cx) ** 2 + (y - cy) ** 2 < min_distance**2:
+                too_close = True
+                break
+        if too_close:
+            consecutive_rejects += 1
+            continue
+        centers.append((x, y))
+        consecutive_rejects = 0
+
+    logger.info(
+        f"Placed {len(centers):,} random centers "
+        f"(whiteboard {whiteboard_w:.0f}×{whiteboard_h:.0f}, "
+        f"min_dist={min_distance:.0f})"
+    )
+    return centers
+
+
+# ------------------------------------------------------------------ #
 # Phase 1 — parallel tile generation with quality control
 # ------------------------------------------------------------------ #
 
@@ -43,7 +91,7 @@ def _generate_tile_worker(args):
 
     Returns
     -------
-    (row, col), dict | None
+    tile_idx, dict | None
         On success the dict contains:
         - ``error``    : float
         - ``positions``: list of (x, y)          — local coordinates
@@ -52,14 +100,14 @@ def _generate_tile_worker(args):
     """
     import random
 
-    row, col, exit_event, attributes, std_err_fea, mapper = args
+    tile_idx, exit_event, attributes, std_err_fea, mapper = args
 
-    seed = os.getpid() ^ (row * 1000 + col)
+    seed = os.getpid() ^ tile_idx
     random.seed(seed)
     np.random.seed(seed % (2**31))
 
     if exit_event.is_set():
-        return (row, col), None
+        return tile_idx, None
 
     try:
         GraphNode.initialize(attributes)
@@ -91,7 +139,7 @@ def _generate_tile_worker(args):
             }
 
             if error < BaseConfig.ERROR_TOLERANCE:
-                return (row, col), tile_payload
+                return tile_idx, tile_payload
 
             if error < best_error:
                 best_error = error
@@ -99,69 +147,64 @@ def _generate_tile_worker(args):
 
         if best_result is not None:
             logger.warning(
-                f"Tile ({row},{col}): max attempts reached "
+                f"Tile {tile_idx}: max attempts reached "
                 f"(best error={best_error:.4f})"
             )
-            return (row, col), best_result
+            return tile_idx, best_result
 
-        logger.error(f"Tile ({row},{col}): all attempts produced <100 nodes")
-        return (row, col), None
+        logger.error(f"Tile {tile_idx}: all attempts produced <100 nodes")
+        return tile_idx, None
 
     except Exception as exc:
-        logger.error(f"Tile ({row},{col}) failed: {exc}", exc_info=True)
-        return (row, col), None
+        logger.error(f"Tile {tile_idx} failed: {exc}", exc_info=True)
+        return tile_idx, None
 
 
 def run_phase1(
     attributes: AttributesCalculator,
     mapper: Mapper,
     std_err_fea,
-    rows: int,
-    cols: int,
-) -> Dict[Tuple[int, int], dict]:
+    num_centers: int,
+) -> Dict[int, dict]:
     """Generate all seed tiles in parallel and return their raw data."""
     from multiprocessing import Manager
 
     exit_event = Manager().Event()
-    num_tiles = rows * cols
-    num_workers = BaseConfig.get_max_workers(num_tiles)
+    num_workers = BaseConfig.get_max_workers(num_centers)
 
     logger.info(
-        f"Phase 1: generating {num_tiles:,} seed tiles "
-        f"({rows}×{cols}) with {num_workers} workers"
+        f"Phase 1: generating {num_centers:,} seed tiles " f"with {num_workers} workers"
     )
 
     tile_args = [
-        (r, c, exit_event, attributes, std_err_fea, mapper)
-        for r in range(rows)
-        for c in range(cols)
+        (i, exit_event, attributes, std_err_fea, mapper) for i in range(num_centers)
     ]
 
-    tile_results: Dict[Tuple[int, int], dict] = {}
+    tile_results: Dict[int, dict] = {}
     failed = []
 
     try:
         with ProcessPoolExecutor(max_workers=num_workers) as executor:
             futures = {
-                executor.submit(_generate_tile_worker, a): a[:2] for a in tile_args
+                executor.submit(_generate_tile_worker, a): a[0] for a in tile_args
             }
             completed = 0
             next_log_pct = 10
             for future in as_completed(futures):
-                (r, c), data = future.result()
+                tile_idx, data = future.result()
                 completed += 1
-                progress = round(completed / num_tiles * 100, 1)
+                progress = round(completed / num_centers * 100, 1)
                 if progress >= next_log_pct:
                     err_str = f", error={data['error']:.4f}" if data else ""
                     logger.info(
                         f"Phase 1 progress: {progress}% "
-                        f"({completed:,}/{num_tiles:,}){err_str}"
+                        f"({completed:,}/{num_centers:,}){err_str}"
                     )
                     next_log_pct += 10
                 if data is not None:
-                    tile_results[(r, c)] = data
+                    tile_results[tile_idx] = data
                 else:
-                    failed.append((r, c))
+                    failed.append(tile_idx)
     except KeyboardInterrupt:
         logger.info(SIGINT_INFO)
         exit_event.set()
@@ -172,7 +215,7 @@ def run_phase1(
 
     errors = [d["error"] for d in tile_results.values()]
     logger.info(
-        f"Phase 1 complete: {len(tile_results):,}/{num_tiles:,} tiles OK, "
+        f"Phase 1 complete: {len(tile_results):,}/{num_centers:,} tiles OK, "
         f"avg error={np.mean(errors):.4f}"
     )
     return tile_results
@@ -184,52 +227,44 @@ def run_phase1(
 
 
 def run_phase2(
-    tile_results: Dict[Tuple[int, int], dict],
+    tile_results: Dict[int, dict],
     attributes: AttributesCalculator,
-    rows: int,
-    cols: int,
+    centers: List[Tuple[float, float]],
+    whiteboard_w: float,
+    whiteboard_h: float,
     max_rounds: int,
 ) -> SynthGraph:
-    """Offset tiles into global coordinates, then assemble and continue BFS."""
+    """Offset tiles to their global center positions, then continue BFS."""
     frame_w, frame_h = BaseConfig.SYNTHETIC_FRAME_SIZE
-    spacing_w = frame_w * 2.0
-    spacing_h = frame_h * 2.0
-
-    global_w = cols * spacing_w
-    global_h = rows * spacing_h
-    margin_x = spacing_w * 0.5
-    margin_y = spacing_h * 0.5
+    margin_x = frame_w
+    margin_y = frame_h
     global_frame = (
-        (-margin_x, global_w + margin_x),
-        (-margin_y, global_h + margin_y),
+        (-margin_x, whiteboard_w + margin_x),
+        (-margin_y, whiteboard_h + margin_y),
     )
 
     logger.info(
-        f"Phase 2: spacing=({spacing_w:.0f},{spacing_h:.0f}), "
+        f"Phase 2: whiteboard {whiteboard_w:.0f}×{whiteboard_h:.0f}, "
         f"global_frame={global_frame}"
     )
 
     tile_data_list: List[dict] = []
-    for (r, c), data in tile_results.items():
-        offset_x = c * spacing_w + spacing_w / 2.0
-        offset_y = r * spacing_h + spacing_h / 2.0
+    for tile_idx, data in tile_results.items():
+        cx, cy = centers[tile_idx]
 
-        offset_positions = [(x + offset_x, y + offset_y) for x, y in data["positions"]]
+        offset_positions = [(x + cx, y + cy) for x, y in data["positions"]]
         offset_edges = [
-            (
-                (x1 + offset_x, y1 + offset_y),
-                (x2 + offset_x, y2 + offset_y),
-            )
+            ((x1 + cx, y1 + cy), (x2 + cx, y2 + cy))
             for (x1, y1), (x2, y2) in data["edges"]
         ]
         offset_frontier = [
             FrontierDescriptor(
-                position=(d.position[0] + offset_x, d.position[1] + offset_y),
+                position=(d.position[0] + cx, d.position[1] + cy),
                 degree=d.degree,
                 base_angle=d.base_angle,
                 clockwise=d.clockwise,
                 parent_position=(
-                    (d.parent_position[0] + offset_x, d.parent_position[1] + offset_y)
+                    (d.parent_position[0] + cx, d.parent_position[1] + cy)
                     if d.parent_position
                     else None
                 ),
@@ -346,10 +381,23 @@ def run_hybrid_for_dataset(dataset_id):
     rows = BaseConfig.HYBRID_ROWS
     cols = BaseConfig.HYBRID_COLS
     max_rounds = BaseConfig.PHASE2_MAX_ROUNDS
+    min_dist_factor = getattr(BaseConfig, "MIN_CENTER_DISTANCE_FACTOR", 1.5)
+
+    frame_w, frame_h = BaseConfig.SYNTHETIC_FRAME_SIZE
+    whiteboard_w = cols * frame_w * 2.0
+    whiteboard_h = rows * frame_h * 2.0
+    min_distance = min_dist_factor * max(frame_w, frame_h)
+
+    max_centers = getattr(BaseConfig, "NUM_CENTERS", 0)
+
+    # --- Generate random centers ---
+    centers = generate_random_centers(
+        whiteboard_w, whiteboard_h, min_distance, max_centers=max_centers
+    )
 
     # --- Phase 1 ---
     t0 = time.time()
-    tile_results = run_phase1(attributes, mapper, std_err_fea, rows, cols)
+    tile_results = run_phase1(attributes, mapper, std_err_fea, len(centers))
     logger.info(f"Phase 1 elapsed: {time.time() - t0:.1f}s")
 
     if not tile_results:
@@ -362,7 +410,9 @@ def run_hybrid_for_dataset(dataset_id):
     logger.info(f"Phase 2: restored networkit threads to {max_threads}")
 
     t1 = time.time()
-    hybrid_graph = run_phase2(tile_results, attributes, rows, cols, max_rounds)
+    hybrid_graph = run_phase2(
+        tile_results, attributes, centers, whiteboard_w, whiteboard_h, max_rounds
+    )
     logger.info(f"Phase 2 elapsed: {time.time() - t1:.1f}s")
 
     hybrid_graph = trim_graph(hybrid_graph, attributes.average_degree)
@@ -378,7 +428,7 @@ def run_hybrid_for_dataset(dataset_id):
 
     # --- Save ---
     data_agent.add_synthetic_graph(hybrid_graph)
-    prefix = f"hybrid_{rows}x{cols}"
+    prefix = f"hybrid_{len(centers)}centers"
 
     data_agent.save(DataType.SYNTHETIC_EDGELIST, f"{prefix}_", arg=hybrid_graph)
     data_agent.save(DataType.SYNTHETIC_POSITIONS, f"{prefix}_", arg=hybrid_graph)
