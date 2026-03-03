@@ -18,7 +18,7 @@
 2. **Prepare Sample Data**
 
    ```
-   data/input/sample_input/generate_mode/
+   data/input/samples/generate_mode/
    ├── sample_1_pos.npy    # Node positions (N, 2)
    ├── sample_1_mat.npy    # Adjacency matrix
    └── sample_1_image.tif  # Background image (optional)
@@ -46,7 +46,7 @@
 The unified `DatasetId` class replaces the old `SetName`/`Resolution` enum system:
 
 ```python
-from config import DatasetId
+from configs import DatasetId
 
 # Single-level dataset (e.g., nanowires)
 dataset = DatasetId("1-0")
@@ -62,7 +62,7 @@ dataset[1]      # "10kX"
 
 ### Creating a New Config
 
-1. Create `src/config/generate_mode/config_mydata.py`:
+1. Create `src/configs/generate_mode/config_mydata.py`:
 
 ```python
 from typing import List
@@ -94,7 +94,8 @@ class ConfigMydata(BaseConfig):
 
     @staticmethod
     def load_original_network(dataset_id: DatasetId):
-        # Load and return networkx.Graph with 'pos' node attribute
+        # Load positions + adjacency, return SynthGraph
+        # via build_graph(positions, matrix)
         ...
 
     @staticmethod
@@ -131,11 +132,43 @@ The config is automatically exported as `GenConfigMydata` based on the naming co
 | `SYNTHETIC_GRAPH_NUMBER` | 0-10 | Graphs to visualize (≤ network count) |
 | `MAX_ATTEMPTS` | 5-20 | Retry attempts per network |
 
+## Graph Architecture: SynthGraph
+
+The codebase uses `SynthGraph` (defined in `src/graphs/synth_graph.py`) as its
+primary graph representation. It wraps a **NetworKit** `nk.Graph` (C++ engine)
+together with a NumPy positions array, replacing the previous `nx.Graph`.
+
+```
+SynthGraph
+  ├── nk.Graph          # graph structure + edge weights (C++ backed)
+  └── np.ndarray (N,2)  # node positions indexed by integer node ID
+```
+
+**Key methods**: `positions()`, `degree()`, `neighbors()`, `edges()`,
+`weight()`, `set_weight()`, `largest_connected_component()`, `subgraph()`,
+`copy()`, `to_networkx()`, `from_networkx()`, `from_sparse_matrix()`,
+`from_graph_nodes()`.
+
+### Where NetworkX is still used
+
+NetworkX (`networkx`) remains installed as a dependency but is only imported
+in three specific places:
+
+| File | Purpose |
+|------|---------|
+| `src/graphs/synth_graph.py` | `from_networkx()` — converts legacy `nx.Graph` pickle files to `SynthGraph` |
+| `src/configs/analyze_mode/config_sample.py` | Detects old `.pkl` files containing `nx.Graph` and converts them via `SynthGraph.from_networkx()` |
+| `src/analysis/multifractal_analyzer.py` | `to_networkx()` — converts back to `nx.Graph` only for `GraphRicciCurvature` (which requires `nx.Graph` input) |
+
+All graph algorithms (Dijkstra, betweenness, closeness, eigenvector
+centrality, diameter, connected components, clustering) now use **NetworKit**
+natively.
+
 ## Data Loader Requirements
 
 | Function | Return Type | Requirements |
 |----------|-------------|--------------|
-| `load_original_network(dataset_id)` | `nx.Graph` | Nodes must have `pos` attribute |
+| `load_original_network(dataset_id)` | `SynthGraph` | Built via `build_graph()` from positions + adjacency data |
 | `load_original_image(dataset_id)` | `np.ndarray` or `None` | CV2-compatible grayscale |
 
 ## Troubleshooting

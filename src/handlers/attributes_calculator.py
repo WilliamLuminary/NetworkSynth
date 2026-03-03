@@ -4,9 +4,10 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple
 
-import networkx as nx
 import numpy as np
 from scipy.spatial.distance import euclidean
+
+from graphs.synth_graph import SynthGraph
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ class OldAttributesCalculator:
     average_edge_length: float = 0.0
     average_degree: float = 0.0
 
-    def analyze(self, graph: nx.Graph) -> "OldAttributesCalculator":
+    def analyze(self, graph: SynthGraph) -> "OldAttributesCalculator":
         if graph.number_of_nodes() == 0:
             return self
 
@@ -37,8 +38,8 @@ class OldAttributesCalculator:
         return self
 
     @staticmethod
-    def _compute_degree_distribution(graph: nx.Graph) -> Dict[int, float]:
-        degrees = [deg for _, deg in graph.degree()]
+    def _compute_degree_distribution(graph: SynthGraph) -> Dict[int, float]:
+        degrees = [graph.degree(u) for u in graph.nodes()]
         total_nodes = graph.number_of_nodes()
         degree_counts = Counter(degrees)
         if total_nodes == 0:
@@ -49,13 +50,12 @@ class OldAttributesCalculator:
 
     @staticmethod
     def _compute_degree_transition_probs(
-        graph: nx.Graph,
+        graph: SynthGraph,
     ) -> Dict[int, Dict[int, float]]:
-        degrees = dict(graph.degree())
         degree_neighbors = defaultdict(list)
-        for node, adjacency_dict in graph.adjacency():
-            node_degree = degrees[node]
-            neighbor_degrees = [degrees[nbr] for nbr in adjacency_dict.keys()]
+        for node in graph.nodes():
+            node_degree = graph.degree(node)
+            neighbor_degrees = [graph.degree(nbr) for nbr in graph.neighbors(node)]
             degree_neighbors[node_degree].extend(neighbor_degrees)
 
         transition_probs = {}
@@ -73,30 +73,27 @@ class OldAttributesCalculator:
 
     @staticmethod
     def _compute_edge_lengths_and_angle_diffs(
-        graph: nx.Graph,
+        graph: SynthGraph,
     ) -> Tuple[Dict[int, List[float]], Dict[int, List[float]], float]:
-        node_positions = nx.get_node_attributes(graph, "pos")
+        positions = graph.positions()
         degree_to_lengths = defaultdict(list)
         degree_to_angle_diffs = defaultdict(list)
 
         total_length = 0.0
         total_edges_count = 0
         for node in graph.nodes():
-            neighbors = list(graph.neighbors(node))
-            if not neighbors:
+            nbrs = graph.neighbors(node)
+            if not nbrs:
                 continue
 
-            node_pos = np.array(node_positions[node], dtype=np.float64)
-
+            node_pos = positions[node]
             lengths = []
             angles = []
 
-            for neighbor in neighbors:
-                neighbor_pos = np.array(node_positions[neighbor], dtype=np.float64)
-
+            for neighbor in nbrs:
+                neighbor_pos = positions[neighbor]
                 length = euclidean(node_pos, neighbor_pos)
                 lengths.append(length)
-
                 angle = (
                     np.arctan2(
                         neighbor_pos[1] - node_pos[1], neighbor_pos[0] - node_pos[0]
@@ -106,9 +103,8 @@ class OldAttributesCalculator:
                 )
                 angles.append(angle)
 
-            node_degree = graph.degree[node]
+            node_degree = graph.degree(node)
             degree_to_lengths[node_degree].extend(lengths)
-
             total_length += sum(lengths)
             total_edges_count += len(lengths)
 
@@ -124,10 +120,10 @@ class OldAttributesCalculator:
         return degree_to_lengths, degree_to_angle_diffs, avg_length
 
     @staticmethod
-    def _compute_average_degree(graph: nx.Graph):
+    def _compute_average_degree(graph: SynthGraph):
         if graph.number_of_nodes() == 0:
             return 0.0
-        degrees = [deg for _, deg in graph.degree()]
+        degrees = [graph.degree(u) for u in graph.nodes()]
         return float(np.mean(degrees))
 
 
@@ -140,7 +136,7 @@ class AttributesCalculator:
     average_length: float = 0.0
     average_degree: float = 0.0
 
-    def analyze(self, graph: nx.Graph) -> "AttributesCalculator":
+    def analyze(self, graph: SynthGraph) -> "AttributesCalculator":
         """
         Analyze the graph to compute degree distribution, transition probabilities,
         edge lengths, angle differences, average edge length, and average degree.
@@ -170,32 +166,32 @@ class AttributesCalculator:
         return self
 
     @staticmethod
-    def _precompute_graph_data(graph: nx.Graph):
-        degrees: Dict[int, int] = dict(graph.degree())  # type: ignore
-        positions = nx.get_node_attributes(graph, "pos")
+    def _precompute_graph_data(graph: SynthGraph):
+        degrees: Dict[int, int] = {u: graph.degree(u) for u in graph.nodes()}
+        positions = graph.positions()
         degree_neighbors = defaultdict(list)
         degree_to_lengths = defaultdict(list)
         node_angles = defaultdict(list)
+
         for node_u, node_v in graph.edges():
             degree_u = degrees[node_u]
             degree_v = degrees[node_v]
             degree_neighbors[degree_u].append(degree_v)
             degree_neighbors[degree_v].append(degree_u)
 
-            if (node_u in positions) and (node_v in positions):
-                u_pos = np.array(positions[node_u], dtype=np.float64)
-                v_pos = np.array(positions[node_v], dtype=np.float64)
-                length = euclidean(u_pos, v_pos)
-                degree_to_lengths[degree_u].append(length)
-                degree_to_lengths[degree_v].append(length)
-                angle_u_to_v = (
-                    np.arctan2(v_pos[1] - u_pos[1], v_pos[0] - u_pos[0]) * 180 / np.pi
-                )
-                angle_v_to_u = (
-                    np.arctan2(u_pos[1] - v_pos[1], u_pos[0] - v_pos[0]) * 180 / np.pi
-                )
-                node_angles[node_u].append(angle_u_to_v)
-                node_angles[node_v].append(angle_v_to_u)
+            u_pos = positions[node_u]
+            v_pos = positions[node_v]
+            length = euclidean(u_pos, v_pos)
+            degree_to_lengths[degree_u].append(length)
+            degree_to_lengths[degree_v].append(length)
+            angle_u_to_v = (
+                np.arctan2(v_pos[1] - u_pos[1], v_pos[0] - u_pos[0]) * 180 / np.pi
+            )
+            angle_v_to_u = (
+                np.arctan2(u_pos[1] - v_pos[1], u_pos[0] - v_pos[0]) * 180 / np.pi
+            )
+            node_angles[node_u].append(angle_u_to_v)
+            node_angles[node_v].append(angle_v_to_u)
 
         return {
             "degrees": degrees,
@@ -256,7 +252,6 @@ class AttributesCalculator:
                 continue
             sorted_angles = np.sort(angle_list)
             diffs = np.diff(sorted_angles)
-            # wrap-around difference
             wrap_diff = 360.0 + sorted_angles[0] - sorted_angles[-1]
             diffs = np.append(diffs, wrap_diff)
             node_degree = degrees[node]
