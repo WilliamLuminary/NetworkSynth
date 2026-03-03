@@ -54,8 +54,8 @@ data/output/*
 !data/input/.keep
 !data/output/.keep
 
-# Keep some files in the data/input/sample_input directory
-!data/input/sample_input/
+# Keep some files in the data/input/samples directory
+!data/input/samples/
 
 wandb/
 

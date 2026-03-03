@@ -2,9 +2,10 @@
 
 import logging
 import os
+import sys
 from typing import Any, Optional
 
-from config import (
+from configs import (
     FILE_CONFIGURATIONS,
     BaseConfig,
     DatasetId,
@@ -152,7 +153,6 @@ class Saver:
         with open(filepath, "wb") as f:
             import pickle
 
-            # noinspection PyTypeChecker
             pickle.dump(obj, f)
 
     @staticmethod
@@ -165,10 +165,30 @@ class Saver:
                 writer.writerow(row)
 
     @staticmethod
-    def _save_networkit(graph, filepath: str) -> None:
-        import networkit as nk
+    def _save_networkit(content, filepath: str) -> None:
+        """Save a networkit graph in binary format.
 
-        nk.writeGraph(graph, filepath, nk.Format.NetworkitBinary)
+        Accepts either a bare ``nk.Graph`` or a ``(nk.Graph, positions)``
+        tuple.  When positions are provided, a companion
+        ``<basename>_positions.npy`` is written alongside the ``.nkbin``
+        so that the nkbin output is self-contained (topology + weights
+        in the binary graph, positions in the compact numpy array).
+        """
+        import networkit as nk
+        import numpy as np
+
+        if isinstance(content, tuple):
+            nk_graph, positions = content
+        else:
+            nk_graph = content
+            positions = None
+
+        nk.writeGraph(nk_graph, filepath, nk.Format.NetworkitBinary)
+
+        if positions is not None:
+            pos_path = filepath.rsplit(".", 1)[0] + "_positions.npy"
+            np.save(pos_path, np.asarray(positions))
+            logger.info(f"Saved companion positions: {pos_path}")
 
     @staticmethod
     def _save_png_image(image, filepath: str) -> None:
@@ -181,21 +201,72 @@ class Saver:
         cv2.imwrite(filepath, image)
 
 
+def _is_junction(path: str) -> bool:
+    """Check whether *path* is an NTFS directory junction (reparse point)."""
+    try:
+        import stat
+
+        return bool(
+            os.lstat(path).st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT
+        )
+    except (AttributeError, OSError):
+        return False
+
+
+_IS_WINDOWS = sys.platform == "win32"
+
+
+def _create_junction(link_path: str, target_path: str) -> None:
+    """Create an NTFS directory junction (no elevated privileges needed)."""
+    try:
+        import _winapi  # CPython C extension, available on all Windows builds
+
+        _winapi.CreateJunction(target_path, link_path)
+        return
+    except ImportError:
+        pass
+
+    import subprocess
+
+    subprocess.run(
+        ["cmd", "/c", "mklink", "/J", link_path, target_path],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+    )
+
+
 def _update_soft_link(link_path: str, target_path: str) -> None:
-    if os.path.exists(link_path) or os.path.islink(link_path):
+    """Point *link_path* at *target_path*.
+
+    Unix: symbolic link.  Windows: directory junction (avoids the need
+    for elevated privileges or Developer Mode).
+    """
+    if os.path.islink(link_path):
         try:
             os.unlink(link_path)
         except OSError as e:
+            logger.warning(f"Failed to remove existing link: {link_path}. Error: {e}")
+            return
+    elif _IS_WINDOWS and _is_junction(link_path):
+        try:
+            os.rmdir(link_path)
+        except OSError as e:
             logger.warning(
-                f"Failed to remove existing soft link: {link_path}. Error: {e}"
+                f"Failed to remove existing junction: {link_path}. Error: {e}"
             )
             return
+
     try:
-        os.symlink(target_path, link_path)
-    except OSError as e:
-        # On Windows, symlinks require admin privileges or Developer Mode
-        logger.warning(f"Failed to create soft link: {link_path}. Error: {e}")
-        return
+        if _IS_WINDOWS:
+            _create_junction(link_path, os.path.abspath(target_path))
+        else:
+            rel_target = os.path.relpath(target_path, os.path.dirname(link_path))
+            os.symlink(rel_target, link_path)
+    except Exception as e:
+        logger.warning(
+            f"Failed to create link: {link_path} -> {target_path}. Error: {e}"
+        )
 
 
 def _ensure_directory(path: str, exist_ok=False) -> None:

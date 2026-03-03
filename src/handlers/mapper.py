@@ -1,28 +1,21 @@
 import logging
 import random
 from collections import defaultdict
-from typing import DefaultDict, Final, Generator, Tuple
+from typing import DefaultDict, Final, Tuple
 
-import networkx as nx
 import numpy as np
+from scipy.spatial.distance import euclidean
+
+from graphs.synth_graph import SynthGraph
 
 logger = logging.getLogger(__name__)
 
 NUM_BINS: Final[int] = 100
 
 
-def _length_generator(graph) -> Generator[tuple, None, None]:
-    from scipy.spatial.distance import euclidean
-
-    for u, v, data in graph.edges(data=True):
-        if "length" not in data:
-            data["length"] = euclidean(graph.nodes[u]["pos"], graph.nodes[v]["pos"])
-        yield u, v, data
-
-
 class Mapper:
-    def __init__(self, graph: nx.Graph):
-        if all("weight" in data for _, _, data in graph.edges(data=True)):
+    def __init__(self, graph: SynthGraph):
+        if graph.is_weighted():
             lengths, weights = self._compute_edge_metrics(graph)
             self.avg_weights: Final = np.mean(weights)
             bins, dist = self._create_mapping_metrics(lengths, weights)
@@ -33,14 +26,16 @@ class Mapper:
             self.skipped = False
         else:
             self.skipped = True
-            logger.info("Input graph has no 'weight'.")
+            logger.info("Input graph has no weights.")
 
     @staticmethod
-    def _compute_edge_metrics(graph: nx.Graph):
+    def _compute_edge_metrics(graph: SynthGraph):
+        positions = graph.positions()
         lengths, weights = [], []
-        for _, _, data in _length_generator(graph):
-            lengths.append(data["length"])
-            weights.append(data.get("weight", 1.0))
+        for u, v, w in graph.edges_with_weights():
+            length = euclidean(positions[u], positions[v])
+            lengths.append(length)
+            weights.append(w)
         return lengths, weights
 
     @staticmethod
@@ -83,25 +78,22 @@ class Mapper:
         )
         return length_bins
 
-    def assign_weights(self, graph) -> None:
+    def assign_weights(self, graph: SynthGraph) -> None:
         """
-        Assigns edge weights to the graph based on the length of the edges.
-        :param graph: A networkx graph.
-        :return: None.
-        # Postcondition:
-        The graph is modified in place.
+        Assigns edge weights to the graph based on edge lengths.
+        Converts the graph to weighted in-place if needed.
         """
         if self.skipped:
             return
 
-        if nx.get_edge_attributes(graph, "weight"):
+        if graph.is_weighted():
             raise ValueError("Graph already has edge weights assigned")
 
-        weights = {
-            (u, v): self._length_to_weight(data["length"])
-            for u, v, data in _length_generator(graph)
-        }
-        nx.set_edge_attributes(graph, weights, "weight")
+        graph.make_weighted()
+        positions = graph.positions()
+        for u, v in graph.edges():
+            length = euclidean(positions[u], positions[v])
+            graph.set_weight(u, v, self._length_to_weight(length))
 
     def _length_to_weight(self, length: float) -> float:
         bin_idx = np.clip(
@@ -112,7 +104,7 @@ class Mapper:
 
 
 class EnhancedMapper(Mapper):
-    def __init__(self, graph: nx.Graph, *, mix_intensity: float = 0.3):
+    def __init__(self, graph: SynthGraph, *, mix_intensity: float = 0.3):
         """
         :param mix_intensity: 0.0 (original) to 1.0 (full mixing)
         """
@@ -147,19 +139,16 @@ class EnhancedMapper(Mapper):
             self.original_weights[indices.squeeze()], p=mixing_probs
         )
 
-    def assign_weights(self, graph: nx.Graph) -> None:
-        if nx.get_edge_attributes(graph, "weight"):
+    def assign_weights(self, graph: SynthGraph) -> None:
+        if graph.is_weighted():
             raise ValueError("Graph already has edge weights assigned")
 
-        weights = {}
-        for u, v, data in _length_generator(graph):
-            length = data["length"]
-
+        graph.make_weighted()
+        positions = graph.positions()
+        for u, v in graph.edges():
+            length = euclidean(positions[u], positions[v])
             if np.random.random() < self.mix_intensity:
                 weight = self._get_mixed_weight(length)
             else:
                 weight = self._length_to_weight(length)
-
-            weights[(u, v)] = weight
-
-        nx.set_edge_attributes(graph, weights, "weight")
+            graph.set_weight(u, v, weight)
