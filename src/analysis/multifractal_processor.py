@@ -1,8 +1,9 @@
 import logging
 from typing import Dict, List, Optional, Union
 
-import networkx as nx
 import numpy as np
+
+from graphs.synth_graph import SynthGraph
 
 from .multifractal_analyzer import MultifractalAnalyzer
 
@@ -10,14 +11,14 @@ logger = logging.getLogger(__name__)
 
 
 class MultifractalProcessor:
-    def __init__(self, arg: Union[Dict, nx.Graph, List[Dict], List[nx.Graph]]):
-        self._graphs: Optional[List[nx.Graph]] = None
+    def __init__(self, arg: Union[Dict, SynthGraph, List[Dict], List[SynthGraph]]):
+        self._graphs: Optional[List[SynthGraph]] = None
         self._analysis_results: Optional[List[Dict]] = None
-        if isinstance(arg, nx.Graph):
+        if isinstance(arg, SynthGraph):
             self._graphs = [arg]
         elif isinstance(arg, Dict):
             self._analysis_results: List[Dict] = [arg]
-        elif isinstance(arg[0], nx.Graph):
+        elif isinstance(arg[0], SynthGraph):
             self._graphs = arg
         elif isinstance(arg[0], Dict):
             self._analysis_results: List[Dict] = arg
@@ -36,7 +37,7 @@ class MultifractalProcessor:
     def _perform_full_analysis(self) -> List[Dict]:
         return [self._analyze_single_graph(i, G) for i, G in enumerate(self._graphs)]
 
-    def _analyze_single_graph(self, idx: int, graph: nx.Graph) -> Dict:
+    def _analyze_single_graph(self, idx: int, graph: SynthGraph) -> Dict:
         analyzer = MultifractalAnalyzer(graph)
         result = analyzer.analyze_graph()
 

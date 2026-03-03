@@ -1,4 +1,4 @@
-exclude: ^(archieved/|tests/_original_code/)
+exclude: ^(archived/|tests/_original_code/)
 
 repos:
   # General file fixes
@@ -9,6 +9,10 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
       - id: check-added-large-files
+        exclude: ^data/input/samples/
+      - id: check-added-large-files
+        files: ^data/input/samples/
+        args: ['--maxkb=102400']
 
   # Black - code formatter
   - repo: https://github.com/psf/black
@@ -30,5 +34,5 @@ repos:
       - id: flake8
         args:
           - "--max-line-length=120"
-          - "--extend-ignore=E203,W503"
+          - "--extend-ignore=E203,W503,E402"
           - "--per-file-ignores=*/__init__.py:F401"

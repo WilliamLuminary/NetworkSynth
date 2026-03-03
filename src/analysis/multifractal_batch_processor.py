@@ -1,15 +1,18 @@
 import logging
 from typing import Dict, List
 
+import matplotlib
 import numpy as np
-from matplotlib import pyplot as plt
+from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
 
 from utils import finalize_plot
 
 from .multifractal_processor import MultifractalProcessor
 
 logger = logging.getLogger(__name__)
-# noinspection SpellCheckingInspection
+
+# Plot style applied per-figure via rc_context (never mutates globals).
 _PLOT_CONFIG = {
     "font.size": 24,
     "axes.linewidth": 2,
@@ -47,7 +50,10 @@ class MultifractalBatchProcessor:
 
     @classmethod
     def from_dict(cls, data_: Dict):
-        return cls(original=data_["original"], synthetic=data_["synthetic"])
+        return cls(
+            original=data_["original"],
+            synthetic=data_["synthetic"],
+        )
 
     def process(self):
         if not self._original_processed:
@@ -109,26 +115,33 @@ class MultifractalBatchProcessor:
         )
 
     def _create_plot(self, x_key, y_key, x_label, y_label):
-        plt.rcParams.update(_PLOT_CONFIG)
-        fig, ax = plt.subplots(figsize=(10, 8), dpi=150)
-        legend = []
+        # Use rc_context so _PLOT_CONFIG is local to this figure
+        # and never mutates global rcParams.
+        with matplotlib.rc_context(_PLOT_CONFIG):
+            fig = Figure(figsize=(10, 8), dpi=150)
+            ax = fig.add_subplot(111)
+            legend = []
 
-        for data_type in ["synthetic", "original"]:
-            results = getattr(self, f"_{data_type}_data", [])
-            assert results, f"No {data_type} data available."
+            for data_type in ["synthetic", "original"]:
+                results = getattr(self, f"_{data_type}_data", [])
+                assert results, f"No {data_type} data available."
 
-            self._plot_dataset(
-                ax=ax,
-                entries=results,
-                data_type=data_type,
-                x_key=x_key,
-                y_key=y_key,
-                legend=legend,
+                self._plot_dataset(
+                    ax=ax,
+                    entries=results,
+                    data_type=data_type,
+                    x_key=x_key,
+                    y_key=y_key,
+                    legend=legend,
+                )
+
+            ax.set_xlabel(x_label, fontweight="bold")
+            ax.set_ylabel(y_label, fontweight="bold")
+            ax.legend(
+                handles=legend,
+                loc="upper right",
+                frameon=False,
             )
-
-        ax.set_xlabel(x_label, fontweight="bold")
-        ax.set_ylabel(y_label, fontweight="bold")
-        ax.legend(handles=legend, loc="upper right", frameon=False)
 
         return finalize_plot(fig)
 
@@ -136,10 +149,12 @@ class MultifractalBatchProcessor:
     def _plot_dataset(ax, entries, data_type, x_key, y_key, legend):
         cmap_config = _CMAP_RANGES[data_type]
         style = _PLOT_STYLE[data_type]
-        cmap = plt.get_cmap(cmap_config["name"])
+        cmap = matplotlib.colormaps[cmap_config["name"]]
 
         color_values = np.linspace(
-            cmap_config["start"], cmap_config["end"], len(entries)
+            cmap_config["start"],
+            cmap_config["end"],
+            len(entries),
         )
 
         for idx, entry in enumerate(entries):
@@ -151,14 +166,12 @@ class MultifractalBatchProcessor:
                 lw=style["lw"],
             )
 
-        from matplotlib.lines import Line2D
-
         legend.append(
             Line2D(
                 [0],
                 [0],
                 color=cmap(np.mean(color_values)),
                 lw=4,
-                label=f"{data_type.capitalize()} (n={len(entries)})",
+                label=(f"{data_type.capitalize()} " f"(n={len(entries)})"),
             )
         )
