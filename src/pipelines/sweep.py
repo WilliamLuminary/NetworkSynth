@@ -12,11 +12,14 @@ from analysis import MultifractalAnalyzer
 
 # noinspection PyUnresolvedReferences
 from configs import BaseConfig, DatasetId
-from configs.generate_mode import GenConfig1 as GenConfig
+
+# All datasets (default):  SweepConfig
+# Per-machine single-dataset: SweepConfigA / SweepConfigB / SweepConfigC / SweepConfigD
+from configs.sweep_mode import SweepConfig as ActiveSweepConfig
 from handlers import RunAgent
 from pipelines.generate import compute_average_error, generate_synthetic_network
 
-GenConfig.initialize()
+ActiveSweepConfig.initialize()
 BaseConfig.SYNTHETIC_NETWORK_NUMBER = 100
 BaseConfig.SYNTHETIC_GRAPH_NUMBER = 0
 BaseConfig.disable_saving("Sweeping Experiment")

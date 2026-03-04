@@ -121,6 +121,19 @@ The config is automatically exported as `GenConfigMydata` based on the naming co
 | `config_nanowires.py` | `ConfigNanowires` | `GenConfigNanowires` |
 | `config_mydata.py` | `ConfigMydata` | `GenConfigMydata` |
 
+## Sweep Best Parameters
+
+Best `(CLOSED_NODES_FACTOR, CLOSED_EDGES_FACTOR)` per dataset from hyperparameter sweeps.
+
+| Dataset | Node Factor | Edge Factor | Error | Success Rate | Note |
+|---------|-------------|-------------|-------|--------------|------|
+| A       | 0.6         | 1.8         | 0.101 | 41%          | Highest success rate |
+| A       | 1.4         | 2.0         | 0.094 | 37%          | Best error-success balance |
+| A       | 0.4         | 1.9         | 0.086 | 30%          | Lowest error at ≥30% success |
+| B       |             |             |       |              |      |
+| C       |             |             |       |              |      |
+| D       |             |             |       |              |      |
+
 ## Key Parameters
 
 | Parameter | Typical Values | Description |

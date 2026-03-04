@@ -1,25 +1,18 @@
-# src/config/hybrid_mode/config_sample.py
+# src/config/sweep_mode/config_sample.py
 """
-Hybrid mode sample configuration.
+Sweep mode default configuration (all A/B/C/D datasets).
 
-Phase 1: Generate HYBRID_ROWS × HYBRID_COLS seed tiles independently
-          in parallel, each covering ~1×1 SYNTHETIC_FRAME_SIZE.  Quality-
-          checked via multifractal error against the original network.
+Uses the same input data as hybrid mode:
+    data/input/samples/hybrid_mode/
+    ├── sample_{A,B,C,D}_pos.npy
+    ├── sample_{A,B,C,D}_mat.npy
+    └── sample_{A,B,C,D}_image.tif
 
-Phase 2: Assemble all seed tiles on a shared whiteboard (spacing = 2×
-          SYNTHETIC_FRAME_SIZE per center) and continue BFS from their
-          frontier nodes to fill the ~1×1 gaps and merge into a single
-          connected network.
-
-Result: a network roughly (2·HYBRID_ROWS) × (2·HYBRID_COLS) times
-        larger than the original (in frame area).
-
-Data layout
------------
-samples/hybrid_mode/
-├── sample_{A,B,C,D}_pos.npy     (N×2 positions)
-├── sample_{A,B,C,D}_mat.npy     (scipy sparse adjacency)
-└── sample_{A,B,C,D}_image.tif   (grayscale background)
+For per-dataset sweeps on separate machines, use the individual configs:
+    config_a.py -> SweepConfigA   (sample_A only)
+    config_b.py -> SweepConfigB   (sample_B only)
+    config_c.py -> SweepConfigC   (sample_C only)
+    config_d.py -> SweepConfigD   (sample_D only)
 """
 import logging
 import os
@@ -28,11 +21,7 @@ from typing import Tuple
 import cv2
 import numpy as np
 
-from .._utils import (
-    _resize_cv2_image,
-    _transpose_network_pos,
-    _trim_cv2_image,
-)
+from .._utils import _resize_cv2_image, _transpose_network_pos, _trim_cv2_image
 from ..base_config import BaseConfig
 from ..enums import DatasetId
 
@@ -40,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 class SampleConfig(BaseConfig):
-    """Hybrid mode sample — parallel seed tiles + frontier continuation."""
+    """Sweep on all four hybrid-mode datasets."""
 
     DATASETS = [
         DatasetId("sample_A"),
@@ -49,13 +38,6 @@ class SampleConfig(BaseConfig):
         DatasetId("sample_D"),
     ]
 
-    # --- Hybrid layout parameters ---
-    HYBRID_ROWS: int = 50
-    HYBRID_COLS: int = 50
-    PHASE2_MAX_ROUNDS: int = 500
-    MIN_CENTER_DISTANCE_FACTOR: float = 1.5
-
-    # --- Network generation parameters ---
     IMAGE_SIZE: Tuple[int, int] = (510, 510)
     FRAME_SIZE: Tuple[int, int] = (510, 510)
     SYNTHETIC_FRAME_SIZE: Tuple[int, int] = (510, 510)
@@ -71,7 +53,6 @@ class SampleConfig(BaseConfig):
     MEASURE_WEIGHTED = True
     FULL_ANALYSIS = False
 
-    # --- Input paths ---
     BASE_INPUT_PATH = os.path.join(
         BaseConfig.BASE_INPUT_PATH,
         "samples",

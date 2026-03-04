@@ -5,6 +5,7 @@ from . import (
     hybrid_mode,
     mosaic_mode,
     scaling_mode,
+    sweep_mode,
 )
 from .base_config import BaseConfig  # noqa: F401
 from .enums import (  # noqa: F401
@@ -29,6 +30,7 @@ for _module in (
     hybrid_mode,
     mosaic_mode,
     scaling_mode,
+    sweep_mode,
 ):
     for _name in getattr(_module, "__all__", []):
         globals()[_name] = getattr(_module, _name)
