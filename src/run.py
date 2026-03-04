@@ -45,10 +45,10 @@ def cmd_hybrid(_args):
     main()
 
 
-def cmd_sweep(_args):
+def cmd_sweep(args):
     from pipelines.sweep import main
 
-    main()
+    main(config=args.config)
 
 
 def cmd_analyze(_args):
@@ -78,6 +78,14 @@ def main():
     for name, (help_text, func) in COMMANDS.items():
         p = sub.add_parser(name, help=help_text)
         p.set_defaults(func=func)
+
+        if name == "sweep":
+            p.add_argument(
+                "--config",
+                choices=["A", "B", "C", "D"],
+                default=None,
+                help="Run sweep for a single dataset (A/B/C/D). Omit to sweep all.",
+            )
 
     args = parser.parse_args()
     args.func(args)

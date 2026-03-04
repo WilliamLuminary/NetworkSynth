@@ -12,17 +12,28 @@ from analysis import MultifractalAnalyzer
 
 # noinspection PyUnresolvedReferences
 from configs import BaseConfig, DatasetId
-
-# All datasets (default):  SweepConfig
-# Per-machine single-dataset: SweepConfigA / SweepConfigB / SweepConfigC / SweepConfigD
-from configs.sweep_mode import SweepConfig as ActiveSweepConfig
 from handlers import RunAgent
 from pipelines.generate import compute_average_error, generate_synthetic_network
 
-ActiveSweepConfig.initialize()
-BaseConfig.SYNTHETIC_NETWORK_NUMBER = 100
-BaseConfig.SYNTHETIC_GRAPH_NUMBER = 0
-BaseConfig.disable_saving("Sweeping Experiment")
+_CONFIG_MAP = {
+    "A": "SweepConfigA",
+    "B": "SweepConfigB",
+    "C": "SweepConfigC",
+    "D": "SweepConfigD",
+}
+
+
+def _init_config(config_key=None):
+    """Resolve and initialize the sweep config. Call once before sweeping."""
+    import configs.sweep_mode as sweep_mod
+
+    name = _CONFIG_MAP.get(config_key, "SweepConfig")
+    cfg = getattr(sweep_mod, name)
+    cfg.initialize()
+    BaseConfig.SYNTHETIC_NETWORK_NUMBER = 100
+    BaseConfig.SYNTHETIC_GRAPH_NUMBER = 0
+    BaseConfig.disable_saving("Sweeping Experiment")
+
 
 EXPERIMENT_PROJECT_NAME = "hyperparam-tuning"
 NODE_FACTORS = [round(0.3 + 0.1 * i, 1) for i in range(18)]
@@ -120,7 +131,9 @@ def run_for_dataset(dataset_id: DatasetId) -> None:
     wandb.agent(sweep_id, function=trial)
 
 
-def main():
+def main(config=None):
+    _init_config(config)
+
     assert (
         BaseConfig.SYNTHETIC_NETWORK_NUMBER != 0
     ), "Sweeping experiments require synthetic networks."
