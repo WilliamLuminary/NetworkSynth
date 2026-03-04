@@ -1,4 +1,4 @@
-# src/config/base_config.py
+# src/configs/base_config.py
 import logging
 import os
 from typing import List, Optional, Set, Tuple

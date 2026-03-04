@@ -1,4 +1,4 @@
-# src/config/hybrid_mode/config_sample.py
+# src/configs/hybrid_mode/config_sample.py
 """
 Hybrid mode sample configuration.
 

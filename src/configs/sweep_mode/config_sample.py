@@ -1,4 +1,4 @@
-# src/config/sweep_mode/config_sample.py
+# src/configs/sweep_mode/config_sample.py
 """
 Sweep mode default configuration (all A/B/C/D datasets).
 

@@ -1,4 +1,4 @@
-# src/config/file_definitions.py
+# src/configs/file_definitions.py
 from dataclasses import dataclass
 from typing import Optional
 

@@ -1,4 +1,4 @@
-# src/config/enums.py
+# src/configs/enums.py
 import os
 from enum import Enum, auto
 from typing import Set, Tuple, Union

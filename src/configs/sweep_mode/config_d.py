@@ -1,4 +1,4 @@
-# src/config/sweep_mode/config_d.py
+# src/configs/sweep_mode/config_d.py
 """Sweep config for dataset D only (one machine)."""
 from ..enums import DatasetId
 from .config_sample import SampleConfig
