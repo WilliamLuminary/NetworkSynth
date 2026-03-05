@@ -130,7 +130,9 @@ Best `(CLOSED_NODES_FACTOR, CLOSED_EDGES_FACTOR)` per dataset from hyperparamete
 | A       | 0.6         | 1.8         | 0.101 | 41%          | Highest success rate |
 | A       | 1.4         | 2.0         | 0.094 | 37%          | Best error-success balance |
 | A       | 0.4         | 1.9         | 0.086 | 30%          | Lowest error at ≥30% success |
-| B       |             |             |       |              | Sweep still running (192/324) |
+| B       | 1.4         | 2.0         | 0.089 | 49%          | Lowest error at ≥49% success |
+| B       | 1.8         | 2.0         | 0.092 | 63%          | Best balance |
+| B       | 2.0         | 2.0         | 0.093 | 66%          | Highest success rate |
 | C       | 1.3         | 1.6         | 0.091 | 71%          | Lowest error at ≥70% success |
 | C       | 1.6         | 1.6         | 0.095 | 76%          | Best balance |
 | C       | 0.6         | 1.7         | 0.102 | 80%          | Highest success rate |
