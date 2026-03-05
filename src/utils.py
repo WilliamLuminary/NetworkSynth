@@ -172,7 +172,7 @@ def trim_graph(graph: SynthGraph, tar_avg_deg: float) -> SynthGraph:
             break
 
         target_edges = int(target * n / 2)
-        logger.info(
+        logger.debug(
             f"trim_graph round {round_num}: avg_deg={current_avg:.2f} → "
             f"target≤{target:.2f}, keeping {target_edges:,} of "
             f"{m:,} edges ({n:,} nodes)"
@@ -204,7 +204,7 @@ def trim_graph(graph: SynthGraph, tar_avg_deg: float) -> SynthGraph:
                 new_nk.addEdge(int(kept_src[i]), int(kept_dst[i]))
 
         graph = SynthGraph(new_nk, graph.positions())
-        logger.info(
+        logger.debug(
             f"trim_graph round {round_num}: rebuilt with "
             f"{graph.number_of_edges():,} edges, extracting LCC"
         )

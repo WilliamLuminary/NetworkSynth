@@ -8,7 +8,6 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from multiprocessing import Manager
 
 import wandb
-
 from analysis import MultifractalAnalyzer
 
 # noinspection PyUnresolvedReferences
@@ -37,8 +36,14 @@ def _init_config(config_key=None):
 
 
 EXPERIMENT_PROJECT_NAME = "hyperparam-tuning"
-NODE_FACTORS = [round(0.3 + 0.1 * i, 1) for i in range(18)]
-EDGE_FACTORS = [round(0.3 + 0.1 * i, 1) for i in range(18)]
+DEFAULT_NF_RANGE = (0.3, 2.0)
+DEFAULT_EF_RANGE = (0.3, 2.0)
+
+
+def _build_factors(lo, hi, step=0.1):
+    n = round((hi - lo) / step) + 1
+    return [round(lo + step * i, 1) for i in range(n)]
+
 
 logger = logging.getLogger(__name__)
 
@@ -97,9 +102,17 @@ def generate_networks(data_agent, std_err_fea, nf, ef):
     return avg_error, success_rate
 
 
-def run_for_dataset(dataset_id: DatasetId) -> None:
+def run_for_dataset(dataset_id: DatasetId, node_factors, edge_factors) -> None:
     """Create a wandb sweep for a single dataset and run all trials."""
     logger.info(f"Processing dataset: {dataset_id}")
+    logger.info(
+        f"  nf: {node_factors[0]}-{node_factors[-1]} ({len(node_factors)} values)"
+    )
+    logger.info(
+        f"  ef: {edge_factors[0]}-{edge_factors[-1]} ({len(edge_factors)} values)"
+    )
+    logger.info(f"  total trials: {len(node_factors) * len(edge_factors)}")
+
     data_agent = RunAgent(dataset_id=dataset_id)
     data_agent.prepare_data()
     std_err_fea = MultifractalAnalyzer(
@@ -111,8 +124,8 @@ def run_for_dataset(dataset_id: DatasetId) -> None:
         "method": "grid",
         "metric": {"name": "error", "goal": "minimize"},
         "parameters": {
-            "node_factor": {"values": NODE_FACTORS},
-            "edge_factor": {"values": EDGE_FACTORS},
+            "node_factor": {"values": node_factors},
+            "edge_factor": {"values": edge_factors},
         },
     }
 
@@ -132,8 +145,13 @@ def run_for_dataset(dataset_id: DatasetId) -> None:
     wandb.agent(sweep_id, function=trial)
 
 
-def main(config=None):
+def main(config=None, nf_range=None, ef_range=None):
     _init_config(config)
+
+    nf_lo, nf_hi = nf_range or DEFAULT_NF_RANGE
+    ef_lo, ef_hi = ef_range or DEFAULT_EF_RANGE
+    node_factors = _build_factors(nf_lo, nf_hi)
+    edge_factors = _build_factors(ef_lo, ef_hi)
 
     assert (
         BaseConfig.SYNTHETIC_NETWORK_NUMBER != 0
@@ -142,7 +160,7 @@ def main(config=None):
     wandb.login()
     try:
         for dataset_id in BaseConfig.get_datasets():
-            run_for_dataset(dataset_id)
+            run_for_dataset(dataset_id, node_factors, edge_factors)
     except KeyboardInterrupt:
         logger.critical("MAIN PROCESS: Forcing immediate shutdown!")
 
