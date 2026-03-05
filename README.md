@@ -124,7 +124,7 @@ Best `(CLOSED_NODES_FACTOR, CLOSED_EDGES_FACTOR)` per dataset from hyperparamete
 
 | Dataset | Node Factor | Edge Factor | Error | Success Rate | Note                         |
 | ------- | ----------- | ----------- | ----- | ------------ | ---------------------------- |
-| A       | 1.0         | 1.5         |       |              | (local sweep)                |
+| A       | 1.0         | 1.5         |       |              | (local test: yaxing_li/hyperparam-tuning/runs/n1tl0yfr)         |
 | B       | 1.4         | 2.0         | 0.089 | 49%          | Lowest error at ≥49% success |
 | B       | 1.8         | 2.0         | 0.092 | 63%          | Best balance |
 | B       | 2.0         | 2.0         | 0.093 | 66%          | Highest success rate |
