@@ -1,32 +1,27 @@
 # Graph Network Analysis and Synthesis Toolkit
 
-![Network Analysis](https://img.shields.io/badge/network-analysis-blue)
-![Synthetic Generation](https://img.shields.io/badge/synthetic-generation-green)
+Network Analysis
+Synthetic Generation
 
 ## Quick Start
 
 1. **Install and Run**
-
-   ```bash
+  ```bash
    git clone https://github.com/WilliamLuminary/NetworkSynth.git
    cd NetworkSynth
    pip install -r requirements.txt  # Python 3.10+
 
    python src/main.py
-   ```
-
+  ```
 2. **Prepare Sample Data**
-
-   ```
+  ```
    data/input/samples/generate_mode/
    ├── sample_1_pos.npy    # Node positions (N, 2)
    ├── sample_1_mat.npy    # Adjacency matrix
    └── sample_1_image.tif  # Background image (optional)
-   ```
-
+  ```
 3. **Expected Output**
-
-   ```
+  ```
    data/output/ConfigName_results_YYYYMMDD_HHMMSS/
    └── sample_1/
        ├── original/
@@ -37,7 +32,7 @@
        └── synthetic/
            ├── len_10_err_0.123_synthetic_network_*.pkl
            └── synthetic_graph_*.png
-   ```
+  ```
 
 ## Configuration System
 
@@ -104,7 +99,7 @@ class ConfigMydata(BaseConfig):
         ...
 ```
 
-2. Update `src/main.py`:
+1. Update `src/main.py`:
 
 ```python
 from config.generate_mode import GenConfigMydata as GenConfig
@@ -115,41 +110,44 @@ The config is automatically exported as `GenConfigMydata` based on the naming co
 
 ### Config Naming Convention
 
-| File Name | Class Name | Exported As |
-|-----------|------------|-------------|
-| `config_sample.py` | `SampleConfig` | `GenConfig` |
+
+| File Name             | Class Name        | Exported As          |
+| --------------------- | ----------------- | -------------------- |
+| `config_sample.py`    | `SampleConfig`    | `GenConfig`          |
 | `config_nanowires.py` | `ConfigNanowires` | `GenConfigNanowires` |
-| `config_mydata.py` | `ConfigMydata` | `GenConfigMydata` |
+| `config_mydata.py`    | `ConfigMydata`    | `GenConfigMydata`    |
+
 
 ## Sweep Best Parameters
 
 Best `(CLOSED_NODES_FACTOR, CLOSED_EDGES_FACTOR)` per dataset from hyperparameter sweeps.
 
-| Dataset | Node Factor | Edge Factor | Error | Success Rate | Note |
-|---------|-------------|-------------|-------|--------------|------|
-| A       | 0.6         | 1.8         | 0.101 | 41%          | Highest success rate |
-| A       | 1.4         | 2.0         | 0.094 | 37%          | Best error-success balance |
-| A       | 0.4         | 1.9         | 0.086 | 30%          | Lowest error at ≥30% success |
+| Dataset | Node Factor | Edge Factor | Error | Success Rate | Note                         |
+| ------- | ----------- | ----------- | ----- | ------------ | ---------------------------- |
+| A       | 1.0         | 1.5         |       |              | (local sweep)                |
 | B       | 1.4         | 2.0         | 0.089 | 49%          | Lowest error at ≥49% success |
 | B       | 1.8         | 2.0         | 0.092 | 63%          | Best balance |
 | B       | 2.0         | 2.0         | 0.093 | 66%          | Highest success rate |
 | C       | 1.3         | 1.6         | 0.091 | 71%          | Lowest error at ≥70% success |
-| C       | 1.6         | 1.6         | 0.095 | 76%          | Best balance |
-| C       | 0.6         | 1.7         | 0.102 | 80%          | Highest success rate |
+| C       | 1.6         | 1.6         | 0.095 | 76%          | Best balance                 |
+| C       | 0.6         | 1.7         | 0.102 | 80%          | Highest success rate         |
 | D       | 1.8         | 1.7         | 0.086 | 32%          | Lowest error at ≥30% success |
-| D       | 1.5         | 1.3         | 0.101 | 69%          | Best balance |
-| D       | 1.0         | 0.7         | 0.102 | 82%          | Highest success rate |
+| D       | 1.5         | 1.3         | 0.101 | 69%          | Best balance                 |
+| D       | 1.0         | 0.7         | 0.102 | 82%          | Highest success rate         |
+
 
 ## Key Parameters
 
-| Parameter | Typical Values | Description |
-|-----------|----------------|-------------|
-| `CLOSED_NODES_FACTOR` | 0.5-2.0 | Node merging likelihood |
-| `CLOSED_EDGES_FACTOR` | 0.5-2.0 | Edge proximity tolerance |
-| `ERROR_TOLERANCE` | 0.1-0.5 | Multifractal similarity threshold |
-| `SYNTHETIC_NETWORK_NUMBER` | 1-100 | Networks to generate per dataset |
-| `SYNTHETIC_GRAPH_NUMBER` | 0-10 | Graphs to visualize (≤ network count) |
-| `MAX_ATTEMPTS` | 5-20 | Retry attempts per network |
+
+| Parameter                  | Typical Values | Description                           |
+| -------------------------- | -------------- | ------------------------------------- |
+| `CLOSED_NODES_FACTOR`      | 0.5-2.0        | Node merging likelihood               |
+| `CLOSED_EDGES_FACTOR`      | 0.5-2.0        | Edge proximity tolerance              |
+| `ERROR_TOLERANCE`          | 0.1-0.5        | Multifractal similarity threshold     |
+| `SYNTHETIC_NETWORK_NUMBER` | 1-100          | Networks to generate per dataset      |
+| `SYNTHETIC_GRAPH_NUMBER`   | 0-10           | Graphs to visualize (≤ network count) |
+| `MAX_ATTEMPTS`             | 5-20           | Retry attempts per network            |
+
 
 ## Graph Architecture: SynthGraph
 
@@ -173,11 +171,13 @@ SynthGraph
 NetworkX (`networkx`) remains installed as a dependency but is only imported
 in three specific places:
 
-| File | Purpose |
-|------|---------|
-| `src/graphs/synth_graph.py` | `from_networkx()` — converts legacy `nx.Graph` pickle files to `SynthGraph` |
-| `src/configs/analyze_mode/config_sample.py` | Detects old `.pkl` files containing `nx.Graph` and converts them via `SynthGraph.from_networkx()` |
-| `src/analysis/multifractal_analyzer.py` | `to_networkx()` — converts back to `nx.Graph` only for `GraphRicciCurvature` (which requires `nx.Graph` input) |
+
+| File                                        | Purpose                                                                                                        |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `src/graphs/synth_graph.py`                 | `from_networkx()` — converts legacy `nx.Graph` pickle files to `SynthGraph`                                    |
+| `src/configs/analyze_mode/config_sample.py` | Detects old `.pkl` files containing `nx.Graph` and converts them via `SynthGraph.from_networkx()`              |
+| `src/analysis/multifractal_analyzer.py`     | `to_networkx()` — converts back to `nx.Graph` only for `GraphRicciCurvature` (which requires `nx.Graph` input) |
+
 
 All graph algorithms (Dijkstra, betweenness, closeness, eigenvector
 centrality, diameter, connected components, clustering) now use **NetworKit**
@@ -185,20 +185,25 @@ natively.
 
 ## Data Loader Requirements
 
-| Function | Return Type | Requirements |
-|----------|-------------|--------------|
-| `load_original_network(dataset_id)` | `SynthGraph` | Built via `build_graph()` from positions + adjacency data |
-| `load_original_image(dataset_id)` | `np.ndarray` or `None` | CV2-compatible grayscale |
+
+| Function                            | Return Type            | Requirements                                              |
+| ----------------------------------- | ---------------------- | --------------------------------------------------------- |
+| `load_original_network(dataset_id)` | `SynthGraph`           | Built via `build_graph()` from positions + adjacency data |
+| `load_original_image(dataset_id)`   | `np.ndarray` or `None` | CV2-compatible grayscale                                  |
+
 
 ## Troubleshooting
 
 **Missing Input Files**
+
 - Check file paths match your `BASE_INPUT_PATH` and dataset IDs
 
 **Dimension Mismatch**
+
 - Node positions shape `(N, 2)` must match adjacency matrix `(N, N)`
 
 **Generation Failures**
+
 ```python
 CLOSED_NODES_FACTOR *= 1.2  # Allow more node merging
 ERROR_TOLERANCE *= 1.5      # Accept less similar networks
@@ -206,4 +211,5 @@ MAX_ATTEMPTS = 20           # More retry attempts
 ```
 
 **Import Errors**
+
 - Ensure config class follows naming convention: `ConfigXxx` in `config_xxx.py`

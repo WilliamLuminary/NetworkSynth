@@ -63,20 +63,20 @@ class SampleConfig(BaseConfig):
     FRAME_SIZE: Tuple[int, int] = (510, 510)
     SYNTHETIC_FRAME_SIZE: Tuple[int, int] = (510, 510)
 
-    CLOSED_NODES_FACTOR = 1.0
-    CLOSED_EDGES_FACTOR = 1.5
+    CLOSED_NODES_FACTOR = 1.4
+    CLOSED_EDGES_FACTOR = 2.0
 
     # Per-dataset overrides for (CLOSED_NODES_FACTOR, CLOSED_EDGES_FACTOR).
     # Datasets not listed here use the defaults above.
     DATASET_FACTORS: Dict[str, Tuple[float, float]] = {
-        "sample_A": (0.4, 1.9),
+        "sample_A": (1.0, 1.5),
         "sample_C": (1.6, 1.6),
     }
 
     SYNTHETIC_GRAPH_NUMBER = 0
     SYNTHETIC_NETWORK_NUMBER = 0
 
-    MAX_ATTEMPTS = 10
+    MAX_ATTEMPTS = 20
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = True
     FULL_ANALYSIS = False
