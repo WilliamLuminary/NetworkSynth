@@ -152,10 +152,12 @@ def figure_to_ndarray(fig, swap_channels: bool = False) -> ndarray:
 def trim_graph(graph: SynthGraph, tar_avg_deg: float) -> SynthGraph:
     """Trim edges from high-degree nodes until average degree <= 1.1 * target.
 
-    Removes edges in bulk (highest-degree nodes first), then extracts
-    the largest connected component.  Repeats if LCC extraction changes
-    the node count enough to push the average degree back above target.
+    Uses vectorised NumPy to score all edges and ``argpartition`` to
+    select which to keep in O(E), then rebuilds the graph and extracts
+    the LCC.  Repeats if LCC shifts the average degree above target.
     """
+    import networkit as nk
+
     logger = logging.getLogger(__name__)
     target = 1.1 * tar_avg_deg
 
@@ -164,37 +166,47 @@ def trim_graph(graph: SynthGraph, tar_avg_deg: float) -> SynthGraph:
         n = graph.number_of_nodes()
         if n == 0:
             return graph
-        current_avg = 2 * graph.number_of_edges() / n
+        m = graph.number_of_edges()
+        current_avg = 2 * m / n
         if current_avg <= target:
             break
 
         target_edges = int(target * n / 2)
-        edges_to_remove = graph.number_of_edges() - target_edges
-
         logger.info(
             f"trim_graph round {round_num}: avg_deg={current_avg:.2f} → "
-            f"target≤{target:.2f}, removing ~{edges_to_remove:,} of "
-            f"{graph.number_of_edges():,} edges ({n:,} nodes)"
+            f"target≤{target:.2f}, keeping {target_edges:,} of "
+            f"{m:,} edges ({n:,} nodes)"
         )
 
-        node_degrees = [(graph.degree(u), u) for u in graph.nodes()]
-        node_degrees.sort(reverse=True)
+        src = np.empty(m, dtype=np.int64)
+        dst = np.empty(m, dtype=np.int64)
+        for i, (u, v) in enumerate(graph.edges()):
+            src[i] = u
+            dst[i] = v
 
-        removed = 0
-        for _, u in node_degrees:
-            if removed >= edges_to_remove:
-                break
-            cur_deg = graph.degree(u)
-            if cur_deg <= 1:
-                continue
-            can_remove = min(cur_deg - 1, edges_to_remove - removed)
-            nbrs = graph.neighbors(u)[:can_remove]
-            for v in nbrs:
-                graph.remove_edge(u, v)
-                removed += 1
+        degrees = np.array([graph.degree(u) for u in range(n)], dtype=np.int32)
+        edge_scores = np.maximum(degrees[src], degrees[dst])
+        keep_idx = np.argpartition(edge_scores, target_edges)[:target_edges]
 
+        kept_src = src[keep_idx]
+        kept_dst = dst[keep_idx]
+        weighted = graph.is_weighted()
+        new_nk = nk.Graph(n, weighted=weighted)
+        if weighted:
+            for i in range(len(kept_src)):
+                new_nk.addEdge(
+                    int(kept_src[i]),
+                    int(kept_dst[i]),
+                    graph.weight(int(kept_src[i]), int(kept_dst[i])),
+                )
+        else:
+            for i in range(len(kept_src)):
+                new_nk.addEdge(int(kept_src[i]), int(kept_dst[i]))
+
+        graph = SynthGraph(new_nk, graph.positions())
         logger.info(
-            f"trim_graph round {round_num}: removed {removed:,} edges, extracting LCC"
+            f"trim_graph round {round_num}: rebuilt with "
+            f"{graph.number_of_edges():,} edges, extracting LCC"
         )
         graph = graph.largest_connected_component()
         round_num += 1
