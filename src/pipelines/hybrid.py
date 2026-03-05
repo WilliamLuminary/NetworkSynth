@@ -378,14 +378,13 @@ def run_hybrid_for_dataset(dataset_id):
         data_agent.get_original_network()
     ).analyze_error_features()
 
-    rows = BaseConfig.HYBRID_ROWS
-    cols = BaseConfig.HYBRID_COLS
+    scale_rows, scale_cols = BaseConfig.TARGET_SCALE
     max_rounds = BaseConfig.PHASE2_MAX_ROUNDS
     min_dist_factor = getattr(BaseConfig, "MIN_CENTER_DISTANCE_FACTOR", 1.5)
 
     frame_w, frame_h = BaseConfig.SYNTHETIC_FRAME_SIZE
-    whiteboard_w = cols * frame_w * 2.0
-    whiteboard_h = rows * frame_h * 2.0
+    whiteboard_w = scale_cols * frame_w
+    whiteboard_h = scale_rows * frame_h
     min_distance = min_dist_factor * max(frame_w, frame_h)
 
     max_centers = getattr(BaseConfig, "NUM_CENTERS", 0)

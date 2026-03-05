@@ -2,17 +2,16 @@
 """
 Hybrid mode sample configuration.
 
-Phase 1: Generate HYBRID_ROWS × HYBRID_COLS seed tiles independently
-          in parallel, each covering ~1×1 SYNTHETIC_FRAME_SIZE.  Quality-
-          checked via multifractal error against the original network.
+Phase 1: Generate seed tiles independently in parallel, each covering
+          ~1×1 SYNTHETIC_FRAME_SIZE.  Quality-checked via multifractal
+          error against the original network.
 
-Phase 2: Assemble all seed tiles on a shared whiteboard (spacing = 2×
-          SYNTHETIC_FRAME_SIZE per center) and continue BFS from their
-          frontier nodes to fill the ~1×1 gaps and merge into a single
+Phase 2: Assemble all seed tiles on a shared whiteboard and continue
+          BFS from frontier nodes to fill gaps and merge into a single
           connected network.
 
-Result: a network roughly (2·HYBRID_ROWS) × (2·HYBRID_COLS) times
-        larger than the original (in frame area).
+Result: a network whose whiteboard spans TARGET_SCALE times the
+        original frame in each dimension.
 
 Data layout
 -----------
@@ -50,8 +49,12 @@ class SampleConfig(BaseConfig):
     ]
 
     # --- Hybrid layout parameters ---
-    HYBRID_ROWS: int = 50
-    HYBRID_COLS: int = 50
+
+    # Desired output scale relative to the original frame, per axis.
+    # E.g. (100, 100) means the whiteboard is 100× the original frame
+    # width and 100× the original frame height.
+    TARGET_SCALE: Tuple[int, int] = (100, 100)
+
     PHASE2_MAX_ROUNDS: int = 500
     MIN_CENTER_DISTANCE_FACTOR: float = 1.5
 
