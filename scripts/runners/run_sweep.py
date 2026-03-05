@@ -17,7 +17,7 @@ import sys
 
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed

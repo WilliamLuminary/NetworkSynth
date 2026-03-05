@@ -24,12 +24,12 @@ import sys
 
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
 import logging
 import time
 
-LOG_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "output", "logs")
+LOG_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "output", "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 LOG_FILE = os.path.join(LOG_DIR, "hybrid_100x100.log")
 
