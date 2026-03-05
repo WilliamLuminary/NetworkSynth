@@ -365,8 +365,19 @@ def plot_hybrid_network(
 # ------------------------------------------------------------------ #
 
 
+def _apply_dataset_factors(dataset_id):
+    """Apply per-dataset (nf, ef) overrides if configured."""
+    overrides = getattr(BaseConfig, "DATASET_FACTORS", {})
+    key = dataset_id[0]
+    if key in overrides:
+        nf, ef = overrides[key]
+        BaseConfig.set_node_factor(nf)
+        BaseConfig.set_edge_factor(ef)
+
+
 def run_hybrid_for_dataset(dataset_id):
     logger.info(f"=== Hybrid pipeline for dataset: {dataset_id} ===")
+    _apply_dataset_factors(dataset_id)
     logger.info(BaseConfig())
 
     data_agent = RunAgent(dataset_id=dataset_id)

@@ -22,7 +22,7 @@ samples/hybrid_mode/
 """
 import logging
 import os
-from typing import Tuple
+from typing import Dict, Tuple
 
 import cv2
 import numpy as np
@@ -65,6 +65,13 @@ class SampleConfig(BaseConfig):
 
     CLOSED_NODES_FACTOR = 1.0
     CLOSED_EDGES_FACTOR = 1.5
+
+    # Per-dataset overrides for (CLOSED_NODES_FACTOR, CLOSED_EDGES_FACTOR).
+    # Datasets not listed here use the defaults above.
+    DATASET_FACTORS: Dict[str, Tuple[float, float]] = {
+        "sample_A": (0.4, 1.9),
+        "sample_C": (1.6, 1.6),
+    }
 
     SYNTHETIC_GRAPH_NUMBER = 0
     SYNTHETIC_NETWORK_NUMBER = 0
