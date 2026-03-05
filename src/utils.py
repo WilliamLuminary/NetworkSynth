@@ -150,19 +150,53 @@ def figure_to_ndarray(fig, swap_channels: bool = False) -> ndarray:
 
 
 def trim_graph(graph: SynthGraph, tar_avg_deg: float) -> SynthGraph:
+    """Trim edges from high-degree nodes until average degree <= 1.1 * target.
+
+    Removes edges in bulk (highest-degree nodes first), then extracts
+    the largest connected component.  Repeats if LCC extraction changes
+    the node count enough to push the average degree back above target.
     """
-    Trim the synthetic graph to have an average degree close
-    to the original graph.
-    """
-    while 2 * graph.number_of_edges() / graph.number_of_nodes() > 1.1 * tar_avg_deg:
-        max_node, max_deg = -1, -1
-        for u in graph.nodes():
-            d = graph.degree(u)
-            if d > max_deg:
-                max_deg = d
-                max_node = u
-        nbrs = graph.neighbors(max_node)
-        if nbrs:
-            graph.remove_edge(max_node, nbrs[0])
+    logger = logging.getLogger(__name__)
+    target = 1.1 * tar_avg_deg
+
+    round_num = 0
+    while True:
+        n = graph.number_of_nodes()
+        if n == 0:
+            return graph
+        current_avg = 2 * graph.number_of_edges() / n
+        if current_avg <= target:
+            break
+
+        target_edges = int(target * n / 2)
+        edges_to_remove = graph.number_of_edges() - target_edges
+
+        logger.info(
+            f"trim_graph round {round_num}: avg_deg={current_avg:.2f} → "
+            f"target≤{target:.2f}, removing ~{edges_to_remove:,} of "
+            f"{graph.number_of_edges():,} edges ({n:,} nodes)"
+        )
+
+        node_degrees = [(graph.degree(u), u) for u in graph.nodes()]
+        node_degrees.sort(reverse=True)
+
+        removed = 0
+        for _, u in node_degrees:
+            if removed >= edges_to_remove:
+                break
+            cur_deg = graph.degree(u)
+            if cur_deg <= 1:
+                continue
+            can_remove = min(cur_deg - 1, edges_to_remove - removed)
+            nbrs = graph.neighbors(u)[:can_remove]
+            for v in nbrs:
+                graph.remove_edge(u, v)
+                removed += 1
+
+        logger.info(
+            f"trim_graph round {round_num}: removed {removed:,} edges, extracting LCC"
+        )
         graph = graph.largest_connected_component()
+        round_num += 1
+
     return graph
