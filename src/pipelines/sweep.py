@@ -8,6 +8,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from multiprocessing import Manager
 
 import wandb
+
 from analysis import MultifractalAnalyzer
 
 # noinspection PyUnresolvedReferences
