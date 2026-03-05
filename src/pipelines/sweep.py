@@ -7,13 +7,18 @@ import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from multiprocessing import Manager
 
+import numpy as np
+
 import wandb
 from analysis import MultifractalAnalyzer
 
 # noinspection PyUnresolvedReferences
 from configs import BaseConfig, DatasetId
+from graphs import GraphGenerator
+from graphs._graph_node import GraphNode
 from handlers import RunAgent
-from pipelines.generate import compute_average_error, generate_synthetic_network
+from pipelines.generate import compute_average_error
+from utils import build_graph, trim_graph
 
 _CONFIG_MAP = {
     "A": "SweepConfigA",
@@ -49,10 +54,46 @@ logger = logging.getLogger(__name__)
 
 
 def _generate_with_factors(exit_event, std_err_fea, attributes, mapper, nf, ef):
-    """Spawn-safe wrapper: explicitly set factors before generation."""
+    """Spawn-safe: uses the same BFS path as the hybrid tile generator."""
+    import random
+
     BaseConfig.CLOSED_NODES_FACTOR = nf
     BaseConfig.CLOSED_EDGES_FACTOR = ef
-    return generate_synthetic_network(exit_event, std_err_fea, attributes, mapper)
+
+    if exit_event.is_set():
+        return None, float("inf")
+
+    GraphNode.initialize(attributes)
+
+    for attempt in range(BaseConfig.MAX_ATTEMPTS):
+        seed = os.getpid() ^ attempt
+        random.seed(seed)
+        np.random.seed(seed % (2**31))
+
+        try:
+            result = GraphGenerator._bfs_network_with_frontier()
+            inner_nodes, inner_edges, *_ = result
+
+            if not inner_nodes or len(inner_nodes) < 100:
+                continue
+
+            graph = build_graph(inner_nodes, inner_edges, arg_type="graph_node")
+            graph = trim_graph(graph, attributes.average_degree)
+            mapper.assign_weights(graph)
+
+            if exit_event.is_set():
+                return None, float("inf")
+
+            err_fea = MultifractalAnalyzer(graph).analyze_error_features()
+            error = MultifractalAnalyzer.analyze_error(err_fea, std_err_fea)
+            if error < BaseConfig.ERROR_TOLERANCE:
+                return graph, error
+        except KeyboardInterrupt:
+            raise
+        except Exception:
+            continue
+
+    return None, float("inf")
 
 
 def generate_networks(data_agent, std_err_fea, nf, ef):
