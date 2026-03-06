@@ -70,7 +70,7 @@ class SampleConfig(BaseConfig):
     # Datasets not listed here use the defaults above.
     DATASET_FACTORS: Dict[str, Tuple[float, float]] = {
         "sample_A": (1.0, 1.5),
-        "sample_B": (2.0, 2.0),
+        "sample_B": (1.8, 1.5),
         "sample_C": (1.6, 1.6),
         "sample_D": (1.0, 0.7),
     }
