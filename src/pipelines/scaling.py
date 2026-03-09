@@ -63,6 +63,11 @@ def run_scaling_for_dataset(dataset_id):
         DataType.SYNTHETIC_GRAPH,
         f"{prefix}_",
     )
+    data_agent.saver.save_file(
+        scaled_fig,
+        DataType.SYNTHETIC_GRAPH_PNG,
+        f"{prefix}_",
+    )
     Saver.end_batch()
 
     logger.info(

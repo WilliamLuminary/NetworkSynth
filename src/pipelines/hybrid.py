@@ -214,8 +214,12 @@ def run_phase1(
         logger.warning(f"{len(failed)} tiles failed: {failed[:20]}")
 
     errors = [d["error"] for d in tile_results.values()]
+    successful = sum(1 for e in errors if e < BaseConfig.ERROR_TOLERANCE)
+    over_tol = len(tile_results) - successful
     logger.info(
-        f"Phase 1 complete: {len(tile_results):,}/{num_centers:,} tiles OK, "
+        f"Phase 1 complete: {successful:,}/{num_centers:,} centers successful "
+        f"(tol={BaseConfig.ERROR_TOLERANCE}), "
+        f"{over_tol:,} over tolerance, {len(failed):,} failed, "
         f"avg error={np.mean(errors):.4f}"
     )
     return tile_results
@@ -452,6 +456,7 @@ def run_hybrid_for_dataset(dataset_id):
 
     fig = plot_hybrid_network(hybrid_graph)
     data_agent.saver.save_file(fig, DataType.SYNTHETIC_GRAPH, f"{prefix}_")
+    data_agent.saver.save_file(fig, DataType.SYNTHETIC_GRAPH_PNG, f"{prefix}_")
     Saver.end_batch()
 
     logger.info(

@@ -245,13 +245,17 @@ class Saver:
 
     @staticmethod
     def _save_png_image(image, filepath: str) -> None:
+        from matplotlib.figure import Figure
         from numpy import ndarray
 
-        assert isinstance(image, ndarray), "Unsupported image format. Expected ndarray."
+        if isinstance(image, Figure):
+            image.savefig(filepath, format="png", bbox_inches="tight")
+        elif isinstance(image, ndarray):
+            import cv2
 
-        import cv2
-
-        cv2.imwrite(filepath, image)
+            cv2.imwrite(filepath, image)
+        else:
+            raise TypeError(f"Unsupported image type: {type(image)}")
 
 
 def _is_junction(path: str) -> bool:

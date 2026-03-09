@@ -132,6 +132,11 @@ class DataType(Enum):
         {FileTag.FIG, FileTag.PLOT, FileTag.SYN},
         FileExtension.WEBP,
     )
+    SYNTHETIC_GRAPH_PNG = (
+        "Synthetic Graph (PNG)",
+        {FileTag.FIG, FileTag.PLOT, FileTag.SYN},
+        FileExtension.PNG,
+    )
     SYNTHETIC_NETWORK = (
         "Synthetic Network",
         {FileTag.DATA, FileTag.SYN},

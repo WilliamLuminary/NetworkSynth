@@ -15,8 +15,8 @@ Phase 2 — Assembly & gap-filling (single-process, multi-threaded):
     adjacent components.
 
 Usage (from project root):
-    python scripts/run_hybrid_100x100.py            # run all datasets (A–D)
-    python scripts/run_hybrid_100x100.py --config A  # run sample A only
+    python scripts/runners/run_hybrid_100x100.py
+    python scripts/runners/run_hybrid_100x100.py --config B # run sample A only
 """
 import argparse
 import os
