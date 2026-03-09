@@ -1,11 +1,10 @@
-"""
-Convert a NetworkX pickle file to CSV (edge list + positions) and NetworKit binary.
+"""Convert a NetworkX pickle file to CSV (edge list + positions) and NetworKit binary.
 
 Usage:
-    python scripts/convert_pkl_network.py <pkl_path> [--output-dir <dir>]
+    python scripts/helpers/convert_pkl_network.py network.pkl
+    python scripts/helpers/convert_pkl_network.py network.pkl --output_dir out/
 """
 
-import argparse
 import csv
 import os
 import pickle
@@ -61,7 +60,13 @@ def save_networkit(graph: nx.Graph, filepath: str) -> None:
     )
 
 
-def convert(pkl_path: str, output_dir: str = None) -> None:
+def main(pkl_path: str, output_dir: str = None):
+    """Convert NetworkX pkl to CSV + NetworKit binary.
+
+    Args:
+        pkl_path: Path to the NetworkX pickle file.
+        output_dir: Output directory (default: same as pkl).
+    """
     if not os.path.isfile(pkl_path):
         print(f"Error: File not found: {pkl_path}")
         sys.exit(1)
@@ -89,17 +94,7 @@ def convert(pkl_path: str, output_dir: str = None) -> None:
     print(f"\nDone. Output: {output_dir}")
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Convert NetworkX pkl to CSV + NetworKit binary."
-    )
-    parser.add_argument("pkl_path", help="Path to the NetworkX pickle file")
-    parser.add_argument(
-        "--output-dir", default=None, help="Output directory (default: same as pkl)"
-    )
-    args = parser.parse_args()
-    convert(args.pkl_path, args.output_dir)
-
-
 if __name__ == "__main__":
-    main()
+    import fire
+
+    fire.Fire(main)

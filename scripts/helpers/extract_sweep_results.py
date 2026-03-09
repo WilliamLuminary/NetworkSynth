@@ -1,13 +1,11 @@
-"""
-Fetch sweep results from remote wandb and analyze error vs success rate.
+"""Fetch sweep results from remote wandb and analyze error vs success rate.
 
 Usage:
-    python scripts/helpers/extract_sweep_results.py <sweep_id>
     python scripts/helpers/extract_sweep_results.py ta7fgh0c
-    python scripts/helpers/extract_sweep_results.py --entity my_team ta7fgh0c
+    python scripts/helpers/extract_sweep_results.py ta7fgh0c --entity my_team
+    python scripts/helpers/extract_sweep_results.py ta7fgh0c --save results.json
 """
 
-import argparse
 import json
 
 
@@ -99,22 +97,30 @@ def _print_table(rows):
         print(f"{nf:5.1f} {ef:5.1f} {err:8.3f} {sr*100:9.1f}%")
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Analyze wandb sweep results.")
-    parser.add_argument("sweep_id", help="Wandb sweep ID (e.g. ta7fgh0c)")
-    parser.add_argument("--entity", default="yaxing_li", help="Wandb entity")
-    parser.add_argument("--project", default="hyperparam-tuning", help="Wandb project")
-    parser.add_argument("--save", metavar="PATH", help="Save raw data as JSON")
-    args = parser.parse_args()
+def main(
+    sweep_id: str,
+    entity: str = "yaxing_li",
+    project: str = "hyperparam-tuning",
+    save: str = None,
+):
+    """Analyze wandb sweep results.
 
-    data = fetch_data(args.entity, args.project, args.sweep_id)
+    Args:
+        sweep_id: Wandb sweep ID (e.g. ta7fgh0c).
+        entity: Wandb entity.
+        project: Wandb project name.
+        save: Optional path to save raw data as JSON.
+    """
+    data = fetch_data(entity, project, sweep_id)
     analyze(data)
 
-    if args.save:
-        with open(args.save, "w") as f:
+    if save:
+        with open(save, "w") as f:
             json.dump(data, f)
-        print(f"\nRaw data saved to {args.save}")
+        print(f"\nRaw data saved to {save}")
 
 
 if __name__ == "__main__":
-    main()
+    import fire
+
+    fire.Fire(main)

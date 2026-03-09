@@ -53,6 +53,7 @@ def run_scaling_for_dataset(dataset_id):
     data_agent.add_synthetic_graph(scaled_graph)
     prefix = f"scaled_{BaseConfig.SCALE_ROWS}x{BaseConfig.SCALE_COLS}"
 
+    Saver.begin_batch()
     data_agent.save(DataType.SYNTHETIC_EDGELIST, f"{prefix}_", arg=scaled_graph)
     data_agent.save(DataType.SYNTHETIC_POSITIONS, f"{prefix}_", arg=scaled_graph)
     data_agent.save(DataType.SYNTHETIC_NETWORK_NKI, f"{prefix}_", arg=scaled_graph)
@@ -63,6 +64,7 @@ def run_scaling_for_dataset(dataset_id):
         DataType.SYNTHETIC_GRAPH,
         f"{prefix}_",
     )
+    Saver.end_batch()
 
     logger.info(
         f"Scaling complete — "
@@ -76,16 +78,21 @@ def run_scaling_for_dataset(dataset_id):
 # ------------------------------------------------------------------ #
 def plot_scaled_network(
     graph: SynthGraph,
-    node_size: float = 0.05,
+    node_size: float = 0.01,
     line_width: float = 0.1,
     margin_frac: float = 0.02,
-    dpi: int = 200,
-) -> np.ndarray:
+    dpi: int = None,
+):
     """Plot the full scaled network using batched matplotlib primitives
     (``LineCollection`` + ``scatter``) so large graphs render efficiently.
 
     Returns an RGBA image array.
     """
+    from utils import recommend_dpi
+
+    if dpi is None:
+        dpi = recommend_dpi(graph.number_of_nodes())
+
     pos_arr = graph.positions()
 
     x_min, y_min = pos_arr.min(axis=0)

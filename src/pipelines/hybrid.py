@@ -312,11 +312,16 @@ def log_connectivity(graph: SynthGraph, label: str = ""):
 
 def plot_hybrid_network(
     graph: SynthGraph,
-    node_size: float = 0.05,
+    node_size: float = 0.01,
     line_width: float = 0.1,
     margin_frac: float = 0.02,
-    dpi: int = 200,
-) -> np.ndarray:
+    dpi: int = None,
+):
+    from utils import recommend_dpi
+
+    if dpi is None:
+        dpi = recommend_dpi(graph.number_of_nodes())
+
     pos_arr = graph.positions()
     x_min, y_min = pos_arr.min(axis=0)
     x_max, y_max = pos_arr.max(axis=0)
@@ -440,12 +445,14 @@ def run_hybrid_for_dataset(dataset_id):
     data_agent.add_synthetic_graph(hybrid_graph)
     prefix = f"hybrid_{len(centers)}centers"
 
+    Saver.begin_batch()
     data_agent.save(DataType.SYNTHETIC_EDGELIST, f"{prefix}_", arg=hybrid_graph)
     data_agent.save(DataType.SYNTHETIC_POSITIONS, f"{prefix}_", arg=hybrid_graph)
     data_agent.save(DataType.SYNTHETIC_NETWORK_NKI, f"{prefix}_", arg=hybrid_graph)
 
     fig = plot_hybrid_network(hybrid_graph)
     data_agent.saver.save_file(fig, DataType.SYNTHETIC_GRAPH, f"{prefix}_")
+    Saver.end_batch()
 
     logger.info(
         f"Hybrid complete — "

@@ -101,15 +101,14 @@ def timer(func):
     return wrapper
 
 
-def finalize_plot(fig, show: bool = False) -> np.ndarray:
-    """Render a Figure to an ndarray image. Thread-safe (no pyplot globals).
+def finalize_plot(fig, show: bool = False):
+    """Finalise a matplotlib Figure for saving.
 
-    When *show* is True the rendered image is displayed in a non-blocking
-    OpenCV window (requires a GUI environment) instead of calling the
-    blocking ``plt.show()``.
+    Returns the *Figure* itself so callers can persist it as SVG (or any
+    other vector format) without rasterisation.  When *show* is True the
+    figure is temporarily rasterised for an interactive OpenCV preview.
     """
     fig.tight_layout(pad=0)
-    image = figure_to_ndarray(fig)
 
     if show:
         try:
@@ -118,18 +117,59 @@ def finalize_plot(fig, show: bool = False) -> np.ndarray:
             if os.environ.get("DISPLAY"):
                 import cv2
 
-                cv2.imshow("Preview", image[..., :3])
+                preview = figure_to_ndarray(fig)
+                cv2.imshow("Preview", preview[..., :3])
                 cv2.waitKey(1)
         except Exception:
             logging.debug("Interactive preview unavailable.")
 
-    # Explicitly close the figure to free memory.
-    # Import pyplot only for the close() call; safe because
-    # we reference our specific figure, not "current figure".
-    from matplotlib import pyplot as _plt
+    return fig
 
-    _plt.close(fig)
-    return image
+
+_DPI_TIERS = [
+    (10_000, 150),
+    (100_000, 300),
+    (1_000_000, 600),
+    (5_000_000, 900),
+    (20_000_000, 1200),
+]
+
+
+def recommend_dpi(num_nodes: int) -> int:
+    """Pick a standard DPI based on network size.
+
+    Returns one of 150, 300, 600, 900, 1200, or 1800.
+    """
+    for threshold, dpi in _DPI_TIERS:
+        if num_nodes < threshold:
+            return dpi
+    return 1800
+
+
+def save_figure_as_webp(fig, filepath: str, *, dpi: int = None, lossless: bool = True):
+    """Rasterise a matplotlib Figure and save as WebP via Pillow.
+
+    Parameters
+    ----------
+    fig : matplotlib.figure.Figure
+    filepath : str
+    dpi : int, optional
+        Override the figure's native DPI for rasterisation.
+    lossless : bool
+        True for lossless WebP (default), False for lossy (smaller).
+    """
+    from io import BytesIO
+
+    from PIL import Image
+
+    buf = BytesIO()
+    save_kw = {"format": "png", "bbox_inches": "tight"}
+    if dpi is not None:
+        save_kw["dpi"] = dpi
+    fig.savefig(buf, **save_kw)
+    buf.seek(0)
+    img = Image.open(buf)
+    img.save(filepath, "webp", lossless=lossless)
 
 
 def figure_to_ndarray(fig, swap_channels: bool = False) -> ndarray:

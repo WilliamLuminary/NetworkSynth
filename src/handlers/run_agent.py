@@ -120,11 +120,13 @@ class RunAgent:
         graphs = self.data_loader.get_synthetic_networks()
         for i, g in enumerate(graphs):
             g_prefix = f"{prefix}_n{i}_"
+            Saver.begin_batch()
             if "csv" in fmts:
                 self.save(DataType.SYNTHETIC_EDGELIST, g_prefix, arg=g)
                 self.save(DataType.SYNTHETIC_POSITIONS, g_prefix, arg=g)
             if "nkbin" in fmts:
                 self.save(DataType.SYNTHETIC_NETWORK_NKI, g_prefix, arg=g)
+            Saver.end_batch()
 
     def save(
         self,
@@ -241,7 +243,7 @@ class RunAgent:
 # ---------------------------------------------------------------------------
 
 
-def plot_network(data_type: DataType, graph: SynthGraph, **kwargs) -> ndarray:
+def plot_network(data_type: DataType, graph: SynthGraph, **kwargs):
     """Render a graph to an ndarray image.
 
     Uses matplotlib's OO API exclusively -- no pyplot globals --

@@ -228,6 +228,7 @@ def run_mosaic_for_dataset(dataset_id):
     # 6. Save network data + plot
     data_agent.add_synthetic_graph(mosaic_graph)
     prefix = f"mosaic_{BaseConfig.GRID_ROWS}x{BaseConfig.GRID_COLS}"
+    Saver.begin_batch()
     data_agent.save(DataType.SYNTHETIC_EDGELIST, f"{prefix}_", arg=mosaic_graph)
     data_agent.save(DataType.SYNTHETIC_POSITIONS, f"{prefix}_", arg=mosaic_graph)
     data_agent.save(DataType.SYNTHETIC_NETWORK_NKI, f"{prefix}_", arg=mosaic_graph)
@@ -238,6 +239,7 @@ def run_mosaic_for_dataset(dataset_id):
         DataType.SYNTHETIC_GRAPH,
         f"{prefix}_",
     )
+    Saver.end_batch()
 
     logger.info(
         f"Mosaic complete — "
@@ -251,11 +253,11 @@ def run_mosaic_for_dataset(dataset_id):
 # ------------------------------------------------------------------ #
 def plot_mosaic_network(
     graph: SynthGraph,
-    node_size: float = 0.05,
+    node_size: float = 0.01,
     line_width: float = 0.1,
     margin_frac: float = 0.02,
-    dpi: int = 200,
-) -> np.ndarray:
+    dpi: int = None,
+):
     """
     Plot the full stitched mosaic network using batched
     matplotlib primitives (``LineCollection`` + ``scatter``)
@@ -266,6 +268,11 @@ def plot_mosaic_network(
     np.ndarray
         RGBA image array of the figure.
     """
+    from utils import recommend_dpi
+
+    if dpi is None:
+        dpi = recommend_dpi(graph.number_of_nodes())
+
     pos_arr = graph.positions()
 
     x_min, y_min = pos_arr.min(axis=0)

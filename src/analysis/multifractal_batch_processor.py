@@ -95,7 +95,7 @@ class MultifractalBatchProcessor:
             }
         )
 
-    def get_images(self) -> Dict[str, np.ndarray]:
+    def get_images(self) -> Dict[str, Figure]:
         return self._images
 
     def _plot_spectra(self):

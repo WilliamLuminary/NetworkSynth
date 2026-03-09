@@ -86,6 +86,8 @@ class DatasetId:
 
 class FileExtension(Enum):
     PNG = "png"
+    SVG = "svg"
+    WEBP = "webp"
     PKL = "pkl"
     CSV = "csv"
     NKBIN = "nkbin"
@@ -113,7 +115,7 @@ class DataType(Enum):
     ORIGINAL_GRAPH = (
         "Original Graph",
         {FileTag.FIG, FileTag.PLOT, FileTag.ORI},
-        FileExtension.PNG,
+        FileExtension.SVG,
     )
     ORIGINAL_PROPERTY = (
         "Original Property",
@@ -128,7 +130,7 @@ class DataType(Enum):
     SYNTHETIC_GRAPH = (
         "Synthetic Graph",
         {FileTag.FIG, FileTag.PLOT, FileTag.SYN},
-        FileExtension.PNG,
+        FileExtension.WEBP,
     )
     SYNTHETIC_NETWORK = (
         "Synthetic Network",
@@ -154,7 +156,7 @@ class DataType(Enum):
     ANALYSIS_FIGURE = (
         "Analysis Figure",
         {FileTag.FIG, FileTag.PLOT, FileTag.ANA},
-        FileExtension.PNG,
+        FileExtension.SVG,
     )
 
     def __init__(
