@@ -219,9 +219,9 @@ class Saver:
     def _save_webp(fig, filepath: str) -> None:
         from matplotlib.figure import Figure
 
-        assert isinstance(fig, Figure), (
-            f"WebP saving expects a matplotlib Figure, got {type(fig).__name__}."
-        )
+        assert isinstance(
+            fig, Figure
+        ), f"WebP saving expects a matplotlib Figure, got {type(fig).__name__}."
         from utils import save_figure_as_webp
 
         save_figure_as_webp(fig, filepath)
@@ -234,9 +234,9 @@ class Saver:
     def _save_svg_figure(fig, filepath: str) -> None:
         from matplotlib.figure import Figure
 
-        assert isinstance(fig, Figure), (
-            f"SVG saving expects a matplotlib Figure, got {type(fig).__name__}."
-        )
+        assert isinstance(
+            fig, Figure
+        ), f"SVG saving expects a matplotlib Figure, got {type(fig).__name__}."
         fig.savefig(filepath, format="svg", bbox_inches="tight")
 
         from matplotlib import pyplot as _plt

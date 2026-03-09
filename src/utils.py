@@ -130,7 +130,7 @@ _DPI_TIERS = [
     (10_000, 150),
     (100_000, 300),
     (1_000_000, 600),
-    (5_000_000, 900),
+    (10_000_000, 900),
     (20_000_000, 1200),
 ]
 
@@ -161,6 +161,8 @@ def save_figure_as_webp(fig, filepath: str, *, dpi: int = None, lossless: bool =
     from io import BytesIO
 
     from PIL import Image
+
+    Image.MAX_IMAGE_PIXELS = None
 
     buf = BytesIO()
     save_kw = {"format": "png", "bbox_inches": "tight"}

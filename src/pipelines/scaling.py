@@ -5,7 +5,6 @@ Scaling pipeline — multi-root synchronized BFS for large networks.
 
 import logging
 
-import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.collections import LineCollection
 

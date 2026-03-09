@@ -32,9 +32,9 @@ def load_graph(nkbin_path):
 
     g = nk.readGraph(nkbin_path, nk.Format.NetworkitBinary)
     positions = np.load(pos_path)
-    assert positions.shape[0] == g.numberOfNodes(), (
-        f"Position count ({positions.shape[0]}) != node count ({g.numberOfNodes()})"
-    )
+    assert (
+        positions.shape[0] == g.numberOfNodes()
+    ), f"Position count ({positions.shape[0]}) != node count ({g.numberOfNodes()})"
 
     print(
         f"Loaded: {g.numberOfNodes():,} nodes, {g.numberOfEdges():,} edges, "

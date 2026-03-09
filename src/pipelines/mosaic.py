@@ -12,7 +12,6 @@ import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Dict, Tuple
 
-import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.collections import LineCollection
 

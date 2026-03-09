@@ -3,8 +3,6 @@ import inspect
 import logging
 from typing import Optional
 
-from numpy import ndarray
-
 from configs import (
     FILE_CONFIGURATIONS,
     BaseConfig,
