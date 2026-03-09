@@ -146,6 +146,9 @@ def recommend_dpi(num_nodes: int) -> int:
     return 1800
 
 
+_WEBP_MAX_PX = 16383
+
+
 def save_figure_as_webp(fig, filepath: str, *, dpi: int = None, lossless: bool = True):
     """Rasterise a matplotlib Figure and save as WebP via Pillow.
 
@@ -155,6 +158,8 @@ def save_figure_as_webp(fig, filepath: str, *, dpi: int = None, lossless: bool =
     filepath : str
     dpi : int, optional
         Override the figure's native DPI for rasterisation.
+        Automatically capped so neither dimension exceeds the
+        WebP 16 383-pixel limit.
     lossless : bool
         True for lossless WebP (default), False for lossy (smaller).
     """
@@ -163,6 +168,16 @@ def save_figure_as_webp(fig, filepath: str, *, dpi: int = None, lossless: bool =
     from PIL import Image
 
     Image.MAX_IMAGE_PIXELS = None
+
+    w_in, h_in = fig.get_size_inches()
+    max_dpi = int(min(_WEBP_MAX_PX / w_in, _WEBP_MAX_PX / h_in))
+    if dpi is not None and dpi > max_dpi:
+        import logging
+
+        logging.getLogger(__name__).info(
+            f"DPI capped {dpi} -> {max_dpi} to stay within WebP {_WEBP_MAX_PX}px limit"
+        )
+        dpi = max_dpi
 
     buf = BytesIO()
     save_kw = {"format": "png", "bbox_inches": "tight"}
