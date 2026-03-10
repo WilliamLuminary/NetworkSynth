@@ -70,15 +70,15 @@ class SampleConfig(BaseConfig):
     # Datasets not listed here use the defaults above.
     DATASET_FACTORS: Dict[str, Tuple[float, float]] = {
         "sample_A": (1.0, 1.5),
-        "sample_B": (1.8, 1.5),
-        "sample_C": (1.6, 1.6),
-        "sample_D": (1.0, 0.7),
+        "sample_B": (1.5, 1.2),
+        "sample_C": (1.5, 1.5),
+        "sample_D": (1.3, 1.0),
     }
 
     SYNTHETIC_GRAPH_NUMBER = 0
     SYNTHETIC_NETWORK_NUMBER = 0
 
-    MAX_ATTEMPTS = 20
+    MAX_ATTEMPTS = 100
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = True
     FULL_ANALYSIS = False
