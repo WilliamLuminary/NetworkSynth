@@ -63,6 +63,11 @@ FILE_CONFIGURATIONS = {
         show_on_the_fly=False,
         detail="synthetic_graph",
     ),
+    DataType.SYNTHETIC_GRAPH_PNG: FileConfig(
+        relative_dir=SYNTHETIC_DIR,
+        data_type=DataType.SYNTHETIC_GRAPH_PNG,
+        detail="synthetic_graph_png",
+    ),
     DataType.SYNTHETIC_NETWORK: FileConfig(
         relative_dir=SYNTHETIC_DIR,
         data_type=DataType.SYNTHETIC_NETWORK,

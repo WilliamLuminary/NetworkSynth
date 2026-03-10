@@ -215,15 +215,13 @@ class GraphGenerator:
     ) -> SynthGraph:
         """Phase 2: populate grids from tiles, then BFS from frontier nodes.
 
-        Tile edges are added to ``edge_grid`` so avoidance prevents new
-        growth from crossing existing tile interiors.  Interior nodes are
-        lightweight placeholders (not in ``node_grid``) kept only for
-        final graph assembly.
+        Tile edges are added to ``edge_grid`` and interior nodes to
+        ``node_grid`` so the same close-node merge and close-edge
+        avoidance logic used in Phase 1 applies identically here.
 
-        Merge priority is enabled so that when two tile frontiers meet,
-        the close-node merge check runs *before* edge avoidance — without
-        this, the approaching tile's nearby edges would block the
-        connection before the merge check gets a chance.
+        Uses the same ``_place_child`` logic as Phase 1 to ensure
+        gap-fill regions have the same distributional properties as
+        tile interiors.
 
         Each element of *tile_data_list* must have:
           - ``positions``: list of (x, y) in **global** coordinates
@@ -231,7 +229,6 @@ class GraphGenerator:
           - ``frontier``:  list of :class:`FrontierDescriptor` in global coords
         """
         GraphNode.reset()
-        GraphNode._merge_priority = True
 
         frontier_positions: set = set()
         for tile in tile_data_list:
@@ -293,11 +290,12 @@ class GraphGenerator:
                     continue
                 if node.generate_children():
                     for child in node.children:
-                        all_nodes.add(child)
-                        all_edges.add((node.position, child.position))
-                        if id(child) not in seen_ids:
-                            seen_ids.add(id(child))
-                            next_frontier.append(child)
+                        if child != node:
+                            all_nodes.add(child)
+                            all_edges.add((node.position, child.position))
+                            if id(child) not in seen_ids:
+                                seen_ids.add(id(child))
+                                next_frontier.append(child)
 
             if not next_frontier:
                 logger.info(
@@ -316,7 +314,6 @@ class GraphGenerator:
 
             frontier = next_frontier
 
-        GraphNode._merge_priority = False
         logger.info(
             f"Phase 2 complete: {len(all_nodes):,} nodes, "
             f"{len(all_edges):,} edges, "
@@ -342,7 +339,6 @@ class GraphGenerator:
         before expanding, ensuring no systematic bias.
         """
         GraphNode.reset()
-        GraphNode._merge_priority = True
 
         all_nodes: set = set()
         all_edges: set = set()
@@ -406,7 +402,6 @@ class GraphGenerator:
 
             frontier = next_frontier
 
-        GraphNode._merge_priority = False
         logger.info(
             f"Multi-root BFS complete: {len(all_nodes):,} nodes, "
             f"{len(all_edges):,} edges, "

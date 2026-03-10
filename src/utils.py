@@ -152,32 +152,24 @@ _WEBP_MAX_PX = 16383
 def save_figure_as_webp(fig, filepath: str, *, dpi: int = None, lossless: bool = True):
     """Rasterise a matplotlib Figure and save as WebP via Pillow.
 
+    If the rasterised image exceeds the WebP 16 383-pixel limit in
+    either dimension it is downscaled proportionally before encoding.
+
     Parameters
     ----------
     fig : matplotlib.figure.Figure
     filepath : str
     dpi : int, optional
         Override the figure's native DPI for rasterisation.
-        Automatically capped so neither dimension exceeds the
-        WebP 16 383-pixel limit.
     lossless : bool
         True for lossless WebP (default), False for lossy (smaller).
     """
+    import logging
     from io import BytesIO
 
     from PIL import Image
 
     Image.MAX_IMAGE_PIXELS = None
-
-    w_in, h_in = fig.get_size_inches()
-    max_dpi = int(min(_WEBP_MAX_PX / w_in, _WEBP_MAX_PX / h_in))
-    if dpi is not None and dpi > max_dpi:
-        import logging
-
-        logging.getLogger(__name__).info(
-            f"DPI capped {dpi} -> {max_dpi} to stay within WebP {_WEBP_MAX_PX}px limit"
-        )
-        dpi = max_dpi
 
     buf = BytesIO()
     save_kw = {"format": "png", "bbox_inches": "tight"}
@@ -186,6 +178,16 @@ def save_figure_as_webp(fig, filepath: str, *, dpi: int = None, lossless: bool =
     fig.savefig(buf, **save_kw)
     buf.seek(0)
     img = Image.open(buf)
+
+    w, h = img.size
+    if w > _WEBP_MAX_PX or h > _WEBP_MAX_PX:
+        scale = min(_WEBP_MAX_PX / w, _WEBP_MAX_PX / h)
+        new_w, new_h = int(w * scale), int(h * scale)
+        logging.getLogger(__name__).info(
+            f"WebP resize: {w}x{h} -> {new_w}x{new_h} " f"(limit {_WEBP_MAX_PX}px)"
+        )
+        img = img.resize((new_w, new_h), Image.LANCZOS)
+
     img.save(filepath, "webp", lossless=lossless)
 
 

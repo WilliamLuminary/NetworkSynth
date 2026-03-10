@@ -46,7 +46,7 @@ def load_graph(nkbin_path):
     return SynthGraph(g, positions)
 
 
-def main(
+def plot_single(
     nkbin: str,
     output: str = None,
     fmt: str = "webp",
@@ -94,18 +94,70 @@ def main(
     if fmt == "webp":
         from utils import save_figure_as_webp
 
-        save_figure_as_webp(fig, output, dpi=dpi)
+        try:
+            save_figure_as_webp(fig, output, dpi=dpi)
+            print(f"Saved: {output}")
+        except Exception as e:
+            print(f"WebP failed: {e}")
+            output = nkbin.rsplit(".", 1)[0] + ".png"
+            save_kwargs = {"format": "png", "bbox_inches": "tight", "dpi": dpi}
+            fig.savefig(output, **save_kwargs)
+            print(f"Saved as PNG instead: {output}")
     else:
         save_kwargs = {"format": fmt, "bbox_inches": "tight"}
         if fmt in ("png",):
             save_kwargs["dpi"] = dpi
         fig.savefig(output, **save_kwargs)
-
-    print(f"Saved: {output}")
+        print(f"Saved: {output}")
 
     from matplotlib import pyplot as plt
 
     plt.close(fig)
+
+
+def main(
+    nkbin: str = None,
+    batch_dir: str = None,
+    **kwargs,
+):
+    """Plot one or many .nkbin networks.
+
+    Args:
+        nkbin: Path to a single .nkbin file.
+        batch_dir: Directory to scan recursively for .nkbin files.
+                   Each file is plotted; errors are reported and skipped.
+
+    All other flags (fmt, dpi, node_size, line_width, margin) are
+    forwarded to the per-file plot function.
+    """
+    if nkbin:
+        plot_single(nkbin, **kwargs)
+    elif batch_dir:
+        import glob
+
+        files = sorted(
+            glob.glob(os.path.join(batch_dir, "**", "*.nkbin"), recursive=True)
+        )
+        if not files:
+            print(f"No .nkbin files found under {batch_dir}")
+            return
+        print(f"Found {len(files)} .nkbin files under {batch_dir}")
+        failed = []
+        for i, f in enumerate(files, 1):
+            print(f"\n[{i}/{len(files)}] {f}")
+            try:
+                plot_single(f, **kwargs)
+            except Exception as exc:
+                print(f"  FAILED: {exc}")
+                failed.append(f)
+        if failed:
+            print(f"\n{len(failed)}/{len(files)} failed:")
+            for f in failed:
+                print(f"  {f}")
+        else:
+            print(f"\nAll {len(files)} files plotted successfully.")
+    else:
+        sys.exit("Provide --nkbin <file> or --batch_dir <directory>.")
 
 
 if __name__ == "__main__":
