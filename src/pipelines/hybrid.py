@@ -374,6 +374,15 @@ def plot_hybrid_network(
 # ------------------------------------------------------------------ #
 
 
+def _write_report(path: str, title: str, num_nodes: int, num_edges: int):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        f.write(f"{title}\n")
+        f.write(f"Nodes: {num_nodes:,}\n")
+        f.write(f"Edges: {num_edges:,}\n")
+    logger.info(f"Report saved: {path}")
+
+
 def _apply_dataset_factors(dataset_id):
     """Apply per-dataset (nf, ef) overrides if configured."""
     overrides = getattr(BaseConfig, "DATASET_FACTORS", {})
@@ -458,6 +467,21 @@ def run_hybrid_for_dataset(dataset_id):
     data_agent.saver.save_file(fig, DataType.SYNTHETIC_GRAPH, f"{prefix}_")
     data_agent.saver.save_file(fig, DataType.SYNTHETIC_GRAPH_PNG, f"{prefix}_")
     Saver.end_batch()
+
+    # --- Write reports ---
+    original_network = data_agent.get_original_network()
+    _write_report(
+        os.path.join(data_agent.saver.output_dir, "original", "report.txt"),
+        "Original Network",
+        original_network.number_of_nodes(),
+        original_network.number_of_edges(),
+    )
+    _write_report(
+        os.path.join(data_agent.saver.output_dir, "synthetic", "report.txt"),
+        "Synthetic Network",
+        hybrid_graph.number_of_nodes(),
+        hybrid_graph.number_of_edges(),
+    )
 
     logger.info(
         f"Hybrid complete — "
