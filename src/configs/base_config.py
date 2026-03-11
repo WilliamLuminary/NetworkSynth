@@ -1,4 +1,4 @@
-# src/config/base_config.py
+# src/configs/base_config.py
 import logging
 import os
 from typing import List, Optional, Set, Tuple
@@ -67,7 +67,7 @@ class BaseConfig:
     NETWORKS_FUNC = load_idle
     ATTRIBUTES_DICT_FUNC = load_idle
 
-    MAX_WORKERS: int = 30
+    MAX_WORKERS: int = 50
 
     @classmethod
     def get_max_workers(cls, num_tasks: int = None) -> int:

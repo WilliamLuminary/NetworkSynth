@@ -1,37 +1,27 @@
-# src/configs/hybrid_mode/config_sample.py
+# src/configs/sweep_mode/config_sample.py
 """
-Hybrid mode sample configuration.
+Sweep mode default configuration (all A/B/C/D datasets).
 
-Phase 1: Generate seed tiles independently in parallel, each covering
-          ~1×1 SYNTHETIC_FRAME_SIZE.  Quality-checked via multifractal
-          error against the original network.
+Uses the same input data as hybrid mode:
+    data/input/samples/hybrid_mode/
+    ├── sample_{A,B,C,D}_pos.npy
+    ├── sample_{A,B,C,D}_mat.npy
+    └── sample_{A,B,C,D}_image.tif
 
-Phase 2: Assemble all seed tiles on a shared whiteboard and continue
-          BFS from frontier nodes to fill gaps and merge into a single
-          connected network.
-
-Result: a network whose whiteboard spans TARGET_SCALE times the
-        original frame in each dimension.
-
-Data layout
------------
-samples/hybrid_mode/
-├── sample_{A,B,C,D}_pos.npy     (N×2 positions)
-├── sample_{A,B,C,D}_mat.npy     (scipy sparse adjacency)
-└── sample_{A,B,C,D}_image.tif   (grayscale background)
+For per-dataset sweeps on separate machines, use the individual configs:
+    config_a.py -> SweepConfigA   (sample_A only)
+    config_b.py -> SweepConfigB   (sample_B only)
+    config_c.py -> SweepConfigC   (sample_C only)
+    config_d.py -> SweepConfigD   (sample_D only)
 """
 import logging
 import os
-from typing import Dict, Tuple
+from typing import Tuple
 
 import cv2
 import numpy as np
 
-from .._utils import (
-    _resize_cv2_image,
-    _transpose_network_pos,
-    _trim_cv2_image,
-)
+from .._utils import _resize_cv2_image, _transpose_network_pos, _trim_cv2_image
 from ..base_config import BaseConfig
 from ..enums import DatasetId
 
@@ -39,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 class SampleConfig(BaseConfig):
-    """Hybrid mode sample — parallel seed tiles + frontier continuation."""
+    """Sweep on all four hybrid-mode datasets."""
 
     DATASETS = [
         DatasetId("sample_A"),
@@ -48,42 +38,21 @@ class SampleConfig(BaseConfig):
         DatasetId("sample_D"),
     ]
 
-    # --- Hybrid layout parameters ---
-
-    # Desired output scale relative to the original frame, per axis.
-    # E.g. (100, 100) means the whiteboard is 100× the original frame
-    # width and 100× the original frame height.
-    TARGET_SCALE: Tuple[int, int] = (100, 100)
-
-    PHASE2_MAX_ROUNDS: int = 500
-    MIN_CENTER_DISTANCE_FACTOR: float = 1.5
-
-    # --- Network generation parameters ---
     IMAGE_SIZE: Tuple[int, int] = (510, 510)
     FRAME_SIZE: Tuple[int, int] = (510, 510)
     SYNTHETIC_FRAME_SIZE: Tuple[int, int] = (510, 510)
 
-    CLOSED_NODES_FACTOR = 1.4
-    CLOSED_EDGES_FACTOR = 2.0
-
-    # Per-dataset overrides for (CLOSED_NODES_FACTOR, CLOSED_EDGES_FACTOR).
-    # Datasets not listed here use the defaults above.
-    DATASET_FACTORS: Dict[str, Tuple[float, float]] = {
-        "sample_A": (1.0, 1.5),
-        "sample_B": (1.5, 1.2),
-        "sample_C": (1.5, 1.5),
-        "sample_D": (1.3, 1.0),
-    }
+    CLOSED_NODES_FACTOR = 1.0
+    CLOSED_EDGES_FACTOR = 1.5
 
     SYNTHETIC_GRAPH_NUMBER = 0
     SYNTHETIC_NETWORK_NUMBER = 0
 
-    MAX_ATTEMPTS = 50
+    MAX_ATTEMPTS = 10
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = True
     FULL_ANALYSIS = False
 
-    # --- Input paths ---
     BASE_INPUT_PATH = os.path.join(
         BaseConfig.BASE_INPUT_PATH,
         "samples",

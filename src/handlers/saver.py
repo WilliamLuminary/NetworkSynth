@@ -95,6 +95,23 @@ class Saver:
             )
             _update_soft_link(latest_link_path, cls.base_output_dir)
 
+    _batch_timestamp: Optional[str] = None
+
+    @classmethod
+    def begin_batch(cls) -> str:
+        """Set a shared timestamp for a group of related saves.
+
+        All ``save_file`` calls until ``end_batch`` will use this timestamp.
+        Returns the generated timestamp so callers can log it.
+        """
+        cls._batch_timestamp = _time_id()
+        return cls._batch_timestamp
+
+    @classmethod
+    def end_batch(cls) -> None:
+        """Clear the batch timestamp."""
+        cls._batch_timestamp = None
+
     def save_file(
         self, content: Any, data_type: DataType, file_name_prefix: Optional[str] = None
     ) -> None:
@@ -119,8 +136,12 @@ class Saver:
         )
         file_detail = file_config.detail
 
-        if self.mode == Mode.GEN or data_type.file_extension == FileExtension.PNG:
-            file_name_identifier = _time_id()
+        if self.mode == Mode.GEN or data_type.file_extension in (
+            FileExtension.PNG,
+            FileExtension.SVG,
+            FileExtension.WEBP,
+        ):
+            file_name_identifier = self._batch_timestamp or _time_id()
             rel_path = file_config.relative_dir
             file_detail = (
                 (file_detail + "_")
@@ -135,7 +156,11 @@ class Saver:
         abs_path = os.path.join(self.output_dir, rel_path, file_name)
         _ensure_directory(os.path.dirname(abs_path), exist_ok=True)
 
-        if FileExtension.PNG == data_type.file_extension:
+        if FileExtension.WEBP == data_type.file_extension:
+            Saver._save_webp(content, abs_path)
+        elif FileExtension.SVG == data_type.file_extension:
+            Saver._save_svg_figure(content, abs_path)
+        elif FileExtension.PNG == data_type.file_extension:
             Saver._save_png_image(content, abs_path)
         elif FileExtension.PKL == data_type.file_extension:
             Saver._save_pickle(content, abs_path)
@@ -191,14 +216,46 @@ class Saver:
             logger.info(f"Saved companion positions: {pos_path}")
 
     @staticmethod
+    def _save_webp(fig, filepath: str) -> None:
+        from matplotlib.figure import Figure
+
+        assert isinstance(
+            fig, Figure
+        ), f"WebP saving expects a matplotlib Figure, got {type(fig).__name__}."
+        from utils import save_figure_as_webp
+
+        save_figure_as_webp(fig, filepath)
+
+        from matplotlib import pyplot as _plt
+
+        _plt.close(fig)
+
+    @staticmethod
+    def _save_svg_figure(fig, filepath: str) -> None:
+        from matplotlib.figure import Figure
+
+        assert isinstance(
+            fig, Figure
+        ), f"SVG saving expects a matplotlib Figure, got {type(fig).__name__}."
+        fig.savefig(filepath, format="svg", bbox_inches="tight")
+
+        from matplotlib import pyplot as _plt
+
+        _plt.close(fig)
+
+    @staticmethod
     def _save_png_image(image, filepath: str) -> None:
+        from matplotlib.figure import Figure
         from numpy import ndarray
 
-        assert isinstance(image, ndarray), "Unsupported image format. Expected ndarray."
+        if isinstance(image, Figure):
+            image.savefig(filepath, format="png", bbox_inches="tight")
+        elif isinstance(image, ndarray):
+            import cv2
 
-        import cv2
-
-        cv2.imwrite(filepath, image)
+            cv2.imwrite(filepath, image)
+        else:
+            raise TypeError(f"Unsupported image type: {type(image)}")
 
 
 def _is_junction(path: str) -> bool:

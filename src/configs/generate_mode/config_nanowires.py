@@ -1,4 +1,4 @@
-# src/config/generate_mode/config_nanowires.py
+# src/configs/generate_mode/config_nanowires.py
 import logging
 import os
 from typing import List, Tuple

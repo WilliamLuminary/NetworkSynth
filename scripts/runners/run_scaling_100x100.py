@@ -18,9 +18,9 @@ import os
 import sys
 import time
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
-LOG_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "output", "logs")
+LOG_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "output", "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 LOG_FILE = os.path.join(LOG_DIR, "scaling_100x100.log")
 
