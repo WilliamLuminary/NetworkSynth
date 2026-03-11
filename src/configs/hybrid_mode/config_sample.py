@@ -70,9 +70,9 @@ class SampleConfig(BaseConfig):
     # Datasets not listed here use the defaults above.
     DATASET_FACTORS: Dict[str, Tuple[float, float]] = {
         "sample_A": (1.0, 1.5),
-        "sample_B": (1.5, 1.2),
-        "sample_C": (1.5, 1.5),
-        "sample_D": (1.3, 1.0),
+        "sample_B": (1.8, 1.5),
+        "sample_C": (1.3, 1.6),
+        "sample_D": (1.5, 1.3),
     }
 
     SYNTHETIC_GRAPH_NUMBER = 0
