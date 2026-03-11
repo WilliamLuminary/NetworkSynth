@@ -167,6 +167,8 @@ def run_phase1(
     num_centers: int,
 ) -> Dict[int, dict]:
     """Generate all seed tiles in parallel and return their raw data."""
+    nk.setNumberOfThreads(1)
+
     from multiprocessing import Manager
 
     exit_event = Manager().Event()
