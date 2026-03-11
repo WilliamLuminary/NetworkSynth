@@ -1,4 +1,4 @@
-# src/config/scaling_mode/config_sample.py
+# src/configs/scaling_mode/config_sample.py
 """
 Scaling mode sample configuration.
 

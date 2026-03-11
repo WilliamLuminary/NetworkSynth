@@ -101,15 +101,14 @@ def timer(func):
     return wrapper
 
 
-def finalize_plot(fig, show: bool = False) -> np.ndarray:
-    """Render a Figure to an ndarray image. Thread-safe (no pyplot globals).
+def finalize_plot(fig, show: bool = False):
+    """Finalise a matplotlib Figure for saving.
 
-    When *show* is True the rendered image is displayed in a non-blocking
-    OpenCV window (requires a GUI environment) instead of calling the
-    blocking ``plt.show()``.
+    Returns the *Figure* itself so callers can persist it as SVG (or any
+    other vector format) without rasterisation.  When *show* is True the
+    figure is temporarily rasterised for an interactive OpenCV preview.
     """
     fig.tight_layout(pad=0)
-    image = figure_to_ndarray(fig)
 
     if show:
         try:
@@ -118,18 +117,78 @@ def finalize_plot(fig, show: bool = False) -> np.ndarray:
             if os.environ.get("DISPLAY"):
                 import cv2
 
-                cv2.imshow("Preview", image[..., :3])
+                preview = figure_to_ndarray(fig)
+                cv2.imshow("Preview", preview[..., :3])
                 cv2.waitKey(1)
         except Exception:
             logging.debug("Interactive preview unavailable.")
 
-    # Explicitly close the figure to free memory.
-    # Import pyplot only for the close() call; safe because
-    # we reference our specific figure, not "current figure".
-    from matplotlib import pyplot as _plt
+    return fig
 
-    _plt.close(fig)
-    return image
+
+_DPI_TIERS = [
+    (10_000, 150),
+    (100_000, 300),
+    (1_000_000, 600),
+    (10_000_000, 900),
+    (20_000_000, 1200),
+]
+
+
+def recommend_dpi(num_nodes: int) -> int:
+    """Pick a standard DPI based on network size.
+
+    Returns one of 150, 300, 600, 900, 1200, or 1800.
+    """
+    for threshold, dpi in _DPI_TIERS:
+        if num_nodes < threshold:
+            return dpi
+    return 1800
+
+
+_WEBP_MAX_PX = 16383
+
+
+def save_figure_as_webp(fig, filepath: str, *, dpi: int = None, lossless: bool = True):
+    """Rasterise a matplotlib Figure and save as WebP via Pillow.
+
+    If the rasterised image exceeds the WebP 16 383-pixel limit in
+    either dimension it is downscaled proportionally before encoding.
+
+    Parameters
+    ----------
+    fig : matplotlib.figure.Figure
+    filepath : str
+    dpi : int, optional
+        Override the figure's native DPI for rasterisation.
+    lossless : bool
+        True for lossless WebP (default), False for lossy (smaller).
+    """
+    import logging
+    from io import BytesIO
+
+    from PIL import Image
+
+    Image.MAX_IMAGE_PIXELS = None
+
+    buf = BytesIO()
+    save_kw = {"format": "png", "bbox_inches": "tight"}
+    if dpi is not None:
+        save_kw["dpi"] = dpi
+    fig.savefig(buf, **save_kw)
+    buf.seek(0)
+    img = Image.open(buf)
+
+    w, h = img.size
+    if w > _WEBP_MAX_PX or h > _WEBP_MAX_PX:
+        scale = min(_WEBP_MAX_PX / w, _WEBP_MAX_PX / h)
+        new_w, new_h = int(w * scale), int(h * scale)
+        logging.getLogger(__name__).info(
+            f"WebP resize: {w}x{h} -> {new_w}x{new_h} " f"(limit {_WEBP_MAX_PX}px)"
+        )
+        img = img.resize((new_w, new_h), Image.LANCZOS)
+
+    img.save(filepath, "webp", lossless=lossless)
 
 
 def figure_to_ndarray(fig, swap_channels: bool = False) -> ndarray:
@@ -150,19 +209,65 @@ def figure_to_ndarray(fig, swap_channels: bool = False) -> ndarray:
 
 
 def trim_graph(graph: SynthGraph, tar_avg_deg: float) -> SynthGraph:
+    """Trim edges from high-degree nodes until average degree <= 1.1 * target.
+
+    Uses vectorised NumPy to score all edges and ``argpartition`` to
+    select which to keep in O(E), then rebuilds the graph and extracts
+    the LCC.  Repeats if LCC shifts the average degree above target.
     """
-    Trim the synthetic graph to have an average degree close
-    to the original graph.
-    """
-    while 2 * graph.number_of_edges() / graph.number_of_nodes() > 1.1 * tar_avg_deg:
-        max_node, max_deg = -1, -1
-        for u in graph.nodes():
-            d = graph.degree(u)
-            if d > max_deg:
-                max_deg = d
-                max_node = u
-        nbrs = graph.neighbors(max_node)
-        if nbrs:
-            graph.remove_edge(max_node, nbrs[0])
+    import networkit as nk
+
+    logger = logging.getLogger(__name__)
+    target = 1.1 * tar_avg_deg
+
+    round_num = 0
+    while True:
+        n = graph.number_of_nodes()
+        if n == 0:
+            return graph
+        m = graph.number_of_edges()
+        current_avg = 2 * m / n
+        if current_avg <= target:
+            break
+
+        target_edges = int(target * n / 2)
+        logger.debug(
+            f"trim_graph round {round_num}: avg_deg={current_avg:.2f} → "
+            f"target≤{target:.2f}, keeping {target_edges:,} of "
+            f"{m:,} edges ({n:,} nodes)"
+        )
+
+        src = np.empty(m, dtype=np.int64)
+        dst = np.empty(m, dtype=np.int64)
+        for i, (u, v) in enumerate(graph.edges()):
+            src[i] = u
+            dst[i] = v
+
+        degrees = np.array([graph.degree(u) for u in range(n)], dtype=np.int32)
+        edge_scores = np.maximum(degrees[src], degrees[dst])
+        keep_idx = np.argpartition(edge_scores, target_edges)[:target_edges]
+
+        kept_src = src[keep_idx]
+        kept_dst = dst[keep_idx]
+        weighted = graph.is_weighted()
+        new_nk = nk.Graph(n, weighted=weighted)
+        if weighted:
+            for i in range(len(kept_src)):
+                new_nk.addEdge(
+                    int(kept_src[i]),
+                    int(kept_dst[i]),
+                    graph.weight(int(kept_src[i]), int(kept_dst[i])),
+                )
+        else:
+            for i in range(len(kept_src)):
+                new_nk.addEdge(int(kept_src[i]), int(kept_dst[i]))
+
+        graph = SynthGraph(new_nk, graph.positions())
+        logger.debug(
+            f"trim_graph round {round_num}: rebuilt with "
+            f"{graph.number_of_edges():,} edges, extracting LCC"
+        )
         graph = graph.largest_connected_component()
+        round_num += 1
+
     return graph

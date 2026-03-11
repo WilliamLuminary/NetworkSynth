@@ -1,4 +1,4 @@
-# src/config/mosaic_mode/config_1.py
+# src/configs/mosaic_mode/config_1.py
 """
 Mosaic mode configuration 1 — old_input dataset format (A 20kX).
 

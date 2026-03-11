@@ -1,4 +1,4 @@
-# src/config/generate_mode/config_sample.py
+# src/configs/generate_mode/config_sample.py
 import logging
 import os
 from typing import List

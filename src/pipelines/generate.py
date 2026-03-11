@@ -94,16 +94,16 @@ def generate_with_multiprocessing(data_agent: RunAgent):
                 )
                 for _ in range(num_network)
             ]
-            next_log = 0
+            next_log = 10
             for idx, future in enumerate(as_completed(futures), start=1):
                 synthetic_graph, error = future.result()
                 if not synthetic_graph:
                     break
 
-                if (progress := round(idx / num_network * 100, 2)) >= (
-                    next_log := next_log + 10
-                ):
+                progress = round(idx / num_network * 100, 2)
+                if progress >= next_log:
                     logger.info(f"({progress}%) Synthetic graph generated.")
+                    next_log += 10
 
                 if (num_figures := num_figures - 1) >= 0:
                     data_agent.save(
@@ -121,7 +121,6 @@ def generate_with_multiprocessing(data_agent: RunAgent):
         exit_event.set()
         for future in futures:
             future.cancel()
-        executor.shutdown(wait=True, cancel_futures=True)
 
     avg_err = compute_average_error(errors)
     prefix = f"len_{len(errors)}_err_{avg_err:.3f}"

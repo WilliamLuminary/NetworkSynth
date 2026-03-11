@@ -34,8 +34,6 @@ class GraphNode:
     _closed_nodes_factor: float
     _closed_edges_factor: float
 
-    _merge_priority: bool = False
-
     @classmethod
     def initialize(cls, attrs):
         cls._degree_dist = attrs.degree_distribution
@@ -70,11 +68,14 @@ class GraphNode:
 
     @classmethod
     def create_interior_node(cls, position):
-        """Lightweight node for pre-existing tile interior positions.
+        """Node for pre-existing tile interior positions.
 
-        Not added to ``node_grid`` and will not expand — exists only so
-        ``SynthGraph.from_graph_nodes`` can include it in the final graph.
-        Tile edges in ``edge_grid`` handle avoidance.
+        Added to ``node_grid`` so Phase 2 frontier expansion can
+        discover and merge with existing tile nodes — matching the
+        same close-node interaction that Phase 1 BFS has internally.
+
+        Will not expand (``len(children) == 2`` causes
+        ``generate_children()`` to return immediately).
         """
         node = object.__new__(cls)
         node.id = next(cls.id_counter)
@@ -84,6 +85,8 @@ class GraphNode:
         node.parent = None
         node.clockwise = False
         node.base_angle = 0.0
+        key = cls._spatial_hash(position)
+        cls.node_grid[key].add(node)
         return node
 
     @classmethod
@@ -192,39 +195,20 @@ class GraphNode:
         assert len(children_positions) == self.degree - 1
 
         for child_position, angle in zip(children_positions, angles):
-            if GraphNode._merge_priority:
-                self._place_child_merge_priority(child_position, angle)
-            else:
-                self._place_child_default(child_position, angle)
+            self._place_child(child_position, angle)
         return True
 
-    def _place_child_default(self, child_position, angle) -> None:
-        """Original logic: close-edge check first, then merge-node check."""
-        if self._any_close_edge(child_position):
-            GraphNode._aborted_edge += 1
-            return
-        close_node = self._get_closest_valid_node(child_position)
-        new_edge = (self.position, child_position)
-        if close_node is not None:
-            new_edge = (self.position, close_node.position)
-            if not self._check_intersection(new_edge):
-                self._add_child(close_node)
-                self._add_edge_to_grid(new_edge)
-                GraphNode._merged_edge += 1
-            else:
-                GraphNode._aborted_edge += 1
-        else:
-            if not self._check_intersection(new_edge):
-                child_node = GraphNode(child_position, parent=self, parent_angle=angle)
-                self._add_child(child_node)
-                self._add_edge_to_grid(new_edge)
-                self._add_to_grid(child_node.position)
-            else:
-                GraphNode._aborted_edge += 1
+    def _place_child(self, child_position, angle) -> None:
+        """Place a candidate child node.
 
-    def _place_child_merge_priority(self, child_position, angle) -> None:
-        """Scaling mode: check for mergeable nodes first so cross-root
-        connections are not blocked by close-edge avoidance."""
+        Order of checks (same in Phase 1 and Phase 2):
+          1. Close-node merge — if there is an existing node within the
+             merge threshold, add an edge to it (counts as a child but
+             the merged node is NOT re-queued for expansion).
+          2. Close-edge avoidance — if the candidate position is too
+             close to an existing edge, abort.
+          3. Otherwise create a new child node at the candidate position.
+        """
         close_node = self._get_closest_valid_node(child_position)
         if close_node is not None:
             new_edge = (self.position, close_node.position)
