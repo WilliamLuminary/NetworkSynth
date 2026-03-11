@@ -96,7 +96,9 @@ try:
         try:
             run_hybrid_for_dataset(dataset_id)
         except Exception:
-            logger.exception(f"Dataset {dataset_id} failed — continuing with remaining datasets")
+            logger.exception(
+                f"Dataset {dataset_id} failed — continuing with remaining datasets"
+            )
             failed_datasets.append(str(dataset_id))
     if failed_datasets:
         logger.warning(f"Failed datasets: {failed_datasets}")
