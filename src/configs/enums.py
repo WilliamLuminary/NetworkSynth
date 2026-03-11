@@ -1,4 +1,4 @@
-# src/config/enums.py
+# src/configs/enums.py
 import os
 from enum import Enum, auto
 from typing import Set, Tuple, Union
@@ -86,6 +86,8 @@ class DatasetId:
 
 class FileExtension(Enum):
     PNG = "png"
+    SVG = "svg"
+    WEBP = "webp"
     PKL = "pkl"
     CSV = "csv"
     NKBIN = "nkbin"
@@ -113,7 +115,7 @@ class DataType(Enum):
     ORIGINAL_GRAPH = (
         "Original Graph",
         {FileTag.FIG, FileTag.PLOT, FileTag.ORI},
-        FileExtension.PNG,
+        FileExtension.SVG,
     )
     ORIGINAL_PROPERTY = (
         "Original Property",
@@ -127,6 +129,11 @@ class DataType(Enum):
     )
     SYNTHETIC_GRAPH = (
         "Synthetic Graph",
+        {FileTag.FIG, FileTag.PLOT, FileTag.SYN},
+        FileExtension.WEBP,
+    )
+    SYNTHETIC_GRAPH_PNG = (
+        "Synthetic Graph (PNG)",
         {FileTag.FIG, FileTag.PLOT, FileTag.SYN},
         FileExtension.PNG,
     )
@@ -154,7 +161,7 @@ class DataType(Enum):
     ANALYSIS_FIGURE = (
         "Analysis Figure",
         {FileTag.FIG, FileTag.PLOT, FileTag.ANA},
-        FileExtension.PNG,
+        FileExtension.SVG,
     )
 
     def __init__(

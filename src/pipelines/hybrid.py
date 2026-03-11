@@ -102,6 +102,8 @@ def _generate_tile_worker(args):
 
     tile_idx, exit_event, attributes, std_err_fea, mapper = args
 
+    nk.setNumberOfThreads(1)
+
     seed = os.getpid() ^ tile_idx
     random.seed(seed)
     np.random.seed(seed % (2**31))
@@ -167,6 +169,8 @@ def run_phase1(
     num_centers: int,
 ) -> Dict[int, dict]:
     """Generate all seed tiles in parallel and return their raw data."""
+    nk.setNumberOfThreads(1)
+
     from multiprocessing import Manager
 
     exit_event = Manager().Event()
@@ -214,8 +218,12 @@ def run_phase1(
         logger.warning(f"{len(failed)} tiles failed: {failed[:20]}")
 
     errors = [d["error"] for d in tile_results.values()]
+    successful = sum(1 for e in errors if e < BaseConfig.ERROR_TOLERANCE)
+    over_tol = len(tile_results) - successful
     logger.info(
-        f"Phase 1 complete: {len(tile_results):,}/{num_centers:,} tiles OK, "
+        f"Phase 1 complete: {successful:,}/{num_centers:,} centers successful "
+        f"(tol={BaseConfig.ERROR_TOLERANCE}), "
+        f"{over_tol:,} over tolerance, {len(failed):,} failed, "
         f"avg error={np.mean(errors):.4f}"
     )
     return tile_results
@@ -312,11 +320,16 @@ def log_connectivity(graph: SynthGraph, label: str = ""):
 
 def plot_hybrid_network(
     graph: SynthGraph,
-    node_size: float = 0.05,
+    node_size: float = 0.01,
     line_width: float = 0.1,
     margin_frac: float = 0.02,
-    dpi: int = 200,
-) -> np.ndarray:
+    dpi: int = None,
+):
+    from utils import recommend_dpi
+
+    if dpi is None:
+        dpi = recommend_dpi(graph.number_of_nodes())
+
     pos_arr = graph.positions()
     x_min, y_min = pos_arr.min(axis=0)
     x_max, y_max = pos_arr.max(axis=0)
@@ -365,8 +378,28 @@ def plot_hybrid_network(
 # ------------------------------------------------------------------ #
 
 
+def _write_report(path: str, title: str, num_nodes: int, num_edges: int):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        f.write(f"{title}\n")
+        f.write(f"Nodes: {num_nodes:,}\n")
+        f.write(f"Edges: {num_edges:,}\n")
+    logger.info(f"Report saved: {path}")
+
+
+def _apply_dataset_factors(dataset_id):
+    """Apply per-dataset (nf, ef) overrides if configured."""
+    overrides = getattr(BaseConfig, "DATASET_FACTORS", {})
+    key = dataset_id[0]
+    if key in overrides:
+        nf, ef = overrides[key]
+        BaseConfig.set_node_factor(nf)
+        BaseConfig.set_edge_factor(ef)
+
+
 def run_hybrid_for_dataset(dataset_id):
     logger.info(f"=== Hybrid pipeline for dataset: {dataset_id} ===")
+    _apply_dataset_factors(dataset_id)
     logger.info(BaseConfig())
 
     data_agent = RunAgent(dataset_id=dataset_id)
@@ -378,14 +411,13 @@ def run_hybrid_for_dataset(dataset_id):
         data_agent.get_original_network()
     ).analyze_error_features()
 
-    rows = BaseConfig.HYBRID_ROWS
-    cols = BaseConfig.HYBRID_COLS
+    scale_rows, scale_cols = BaseConfig.TARGET_SCALE
     max_rounds = BaseConfig.PHASE2_MAX_ROUNDS
     min_dist_factor = getattr(BaseConfig, "MIN_CENTER_DISTANCE_FACTOR", 1.5)
 
     frame_w, frame_h = BaseConfig.SYNTHETIC_FRAME_SIZE
-    whiteboard_w = cols * frame_w * 2.0
-    whiteboard_h = rows * frame_h * 2.0
+    whiteboard_w = scale_cols * frame_w
+    whiteboard_h = scale_rows * frame_h
     min_distance = min_dist_factor * max(frame_w, frame_h)
 
     max_centers = getattr(BaseConfig, "NUM_CENTERS", 0)
@@ -430,12 +462,30 @@ def run_hybrid_for_dataset(dataset_id):
     data_agent.add_synthetic_graph(hybrid_graph)
     prefix = f"hybrid_{len(centers)}centers"
 
+    Saver.begin_batch()
     data_agent.save(DataType.SYNTHETIC_EDGELIST, f"{prefix}_", arg=hybrid_graph)
     data_agent.save(DataType.SYNTHETIC_POSITIONS, f"{prefix}_", arg=hybrid_graph)
     data_agent.save(DataType.SYNTHETIC_NETWORK_NKI, f"{prefix}_", arg=hybrid_graph)
 
     fig = plot_hybrid_network(hybrid_graph)
     data_agent.saver.save_file(fig, DataType.SYNTHETIC_GRAPH, f"{prefix}_")
+    data_agent.saver.save_file(fig, DataType.SYNTHETIC_GRAPH_PNG, f"{prefix}_")
+    Saver.end_batch()
+
+    # --- Write reports ---
+    original_network = data_agent.get_original_network()
+    _write_report(
+        os.path.join(data_agent.saver.output_dir, "original", "report.txt"),
+        "Original Network",
+        original_network.number_of_nodes(),
+        original_network.number_of_edges(),
+    )
+    _write_report(
+        os.path.join(data_agent.saver.output_dir, "synthetic", "report.txt"),
+        "Synthetic Network",
+        hybrid_graph.number_of_nodes(),
+        hybrid_graph.number_of_edges(),
+    )
 
     logger.info(
         f"Hybrid complete — "

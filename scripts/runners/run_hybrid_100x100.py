@@ -15,19 +15,21 @@ Phase 2 — Assembly & gap-filling (single-process, multi-threaded):
     adjacent components.
 
 Usage (from project root):
-    python scripts/run_hybrid_100x100.py
+    python scripts/runners/run_hybrid_100x100.py
+    python scripts/runners/run_hybrid_100x100.py --config B # run sample A only
 """
+import argparse
 import os
 import sys
 
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
 import logging
 import time
 
-LOG_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "output", "logs")
+LOG_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "output", "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 LOG_FILE = os.path.join(LOG_DIR, "hybrid_100x100.log")
 
@@ -51,7 +53,17 @@ logger.info("=" * 60)
 logger.info("Hybrid 100×100 production run")
 logger.info("=" * 60)
 
+parser = argparse.ArgumentParser(description="Hybrid 100×100 production run")
+parser.add_argument(
+    "--config",
+    choices=["A", "B", "C", "D"],
+    default=None,
+    help="Run for a single dataset (A/B/C/D). Omit to run all.",
+)
+args = parser.parse_args()
+
 from configs import BaseConfig
+from configs.enums import DatasetId
 from configs.hybrid_mode import HybridConfig
 from handlers import Saver
 from pipelines.hybrid import run_hybrid_for_dataset
@@ -59,7 +71,7 @@ from pipelines.hybrid import run_hybrid_for_dataset
 HybridConfig.NUM_CENTERS = 2000
 HybridConfig.initialize()
 
-logger.info(f"Whiteboard scale: {BaseConfig.HYBRID_ROWS}×{BaseConfig.HYBRID_COLS}")
+logger.info(f"Target scale: {BaseConfig.TARGET_SCALE}")
 logger.info(f"Num centers: {BaseConfig.NUM_CENTERS}")
 logger.info(f"Frame: {BaseConfig.SYNTHETIC_FRAME_SIZE}")
 min_dist_factor = getattr(BaseConfig, "MIN_CENTER_DISTANCE_FACTOR", 1.5)
@@ -68,16 +80,28 @@ logger.info(f"Phase 2 max rounds: {BaseConfig.PHASE2_MAX_ROUNDS}")
 logger.info(f"CPU count: {os.cpu_count()}")
 logger.info(f"Max workers: {BaseConfig.get_max_workers()}")
 
+if args.config:
+    datasets = [DatasetId(f"sample_{args.config}")]
+    logger.info(f"Running single dataset: sample_{args.config}")
+else:
+    datasets = BaseConfig.get_datasets()
+    logger.info(f"Running all datasets: {[str(d) for d in datasets]}")
+
 t_start = time.time()
 
 try:
     Saver.initialize()
-    for dataset_id in BaseConfig.get_datasets():
-        run_hybrid_for_dataset(dataset_id)
+    failed_datasets = []
+    for dataset_id in datasets:
+        try:
+            run_hybrid_for_dataset(dataset_id)
+        except Exception:
+            logger.exception(f"Dataset {dataset_id} failed — continuing with remaining datasets")
+            failed_datasets.append(str(dataset_id))
+    if failed_datasets:
+        logger.warning(f"Failed datasets: {failed_datasets}")
 except KeyboardInterrupt:
     logger.critical("Interrupted by user")
-except Exception:
-    logger.exception("Fatal error")
 finally:
     elapsed = time.time() - t_start
     hours, remainder = divmod(elapsed, 3600)

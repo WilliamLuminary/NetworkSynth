@@ -1,4 +1,4 @@
-# src/config/generate_mode/config_1.py
+# src/configs/generate_mode/config_1.py
 import logging
 import os
 import re

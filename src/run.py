@@ -45,10 +45,14 @@ def cmd_hybrid(_args):
     main()
 
 
-def cmd_sweep(_args):
+def cmd_sweep(args):
     from pipelines.sweep import main
 
-    main()
+    main(
+        config=args.config,
+        nf_range=args.nf_range,
+        ef_range=args.ef_range,
+    )
 
 
 def cmd_analyze(_args):
@@ -78,6 +82,28 @@ def main():
     for name, (help_text, func) in COMMANDS.items():
         p = sub.add_parser(name, help=help_text)
         p.set_defaults(func=func)
+
+        if name == "sweep":
+            p.add_argument(
+                "--config",
+                choices=["A", "B", "C", "D"],
+                default=None,
+                help="Run sweep for a single dataset (A/B/C/D). Omit to sweep all.",
+            )
+            p.add_argument(
+                "--nf-range",
+                nargs=2,
+                type=float,
+                metavar=("MIN", "MAX"),
+                help="Override node factor range (e.g. --nf-range 2.1 3.0)",
+            )
+            p.add_argument(
+                "--ef-range",
+                nargs=2,
+                type=float,
+                metavar=("MIN", "MAX"),
+                help="Override edge factor range (e.g. --ef-range 2.1 3.0)",
+            )
 
     args = parser.parse_args()
     args.func(args)
