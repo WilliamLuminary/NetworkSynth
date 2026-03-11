@@ -3,6 +3,28 @@
 Network Analysis
 Synthetic Generation
 
+## CI / Code Quality
+
+Every push and pull request to `main` is checked by a **GitHub Actions** workflow (`.github/workflows/pre-commit.yml`) that runs the project's [pre-commit](https://pre-commit.com/) hooks:
+
+| Hook | What it does |
+| --- | --- |
+| `trailing-whitespace` | Strips trailing whitespace |
+| `end-of-file-fixer` | Ensures files end with a newline |
+| `check-yaml` | Validates YAML syntax |
+| `check-added-large-files` | Blocks files > 100 MB in `data/input/samples/`, default limit elsewhere |
+| **Black** | Auto-formats Python code |
+| **isort** | Sorts imports (Black-compatible profile) |
+| **Flake8** | PEP 8 linting (`max-line-length=120`) |
+
+To run the same checks locally before pushing:
+
+```bash
+pip install pre-commit
+pre-commit install          # one-time setup – hooks run on every git commit
+pre-commit run --all-files  # manual full check
+```
+
 ## Quick Start
 
 1. **Install and Run**
