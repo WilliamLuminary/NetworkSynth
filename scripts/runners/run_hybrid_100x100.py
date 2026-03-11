@@ -91,12 +91,17 @@ t_start = time.time()
 
 try:
     Saver.initialize()
+    failed_datasets = []
     for dataset_id in datasets:
-        run_hybrid_for_dataset(dataset_id)
+        try:
+            run_hybrid_for_dataset(dataset_id)
+        except Exception:
+            logger.exception(f"Dataset {dataset_id} failed — continuing with remaining datasets")
+            failed_datasets.append(str(dataset_id))
+    if failed_datasets:
+        logger.warning(f"Failed datasets: {failed_datasets}")
 except KeyboardInterrupt:
     logger.critical("Interrupted by user")
-except Exception:
-    logger.exception("Fatal error")
 finally:
     elapsed = time.time() - t_start
     hours, remainder = divmod(elapsed, 3600)

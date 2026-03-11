@@ -102,6 +102,8 @@ def _generate_tile_worker(args):
 
     tile_idx, exit_event, attributes, std_err_fea, mapper = args
 
+    nk.setNumberOfThreads(1)
+
     seed = os.getpid() ^ tile_idx
     random.seed(seed)
     np.random.seed(seed % (2**31))
