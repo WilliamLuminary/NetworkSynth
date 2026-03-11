@@ -70,9 +70,10 @@ class GraphNode:
     def create_interior_node(cls, position):
         """Node for pre-existing tile interior positions.
 
-        Added to ``node_grid`` so that Phase 2 frontier expansion can
+        Added to ``node_grid`` so Phase 2 frontier expansion can
         discover and merge with existing tile nodes — matching the
         same close-node interaction that Phase 1 BFS has internally.
+
         Will not expand (``len(children) == 2`` causes
         ``generate_children()`` to return immediately).
         """

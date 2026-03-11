@@ -254,18 +254,14 @@ class GraphGenerator:
             f"{total_edges:,} edges in edge_grid"
         )
 
-        all_nodes: set = set(position_to_node.values())
-        seen_ids: set = {id(n) for n in all_nodes}
-
         frontier: list = []
+        seen_frontier_ids: set = set()
         for tile in tile_data_list:
             for desc in tile["frontier"]:
                 parent = position_to_node.get(desc.parent_position)
                 if parent is None:
                     parent = GraphNode.create_interior_node(desc.parent_position)
                     position_to_node[desc.parent_position] = parent
-                    all_nodes.add(parent)
-                    seen_ids.add(id(parent))
 
                 fnode = GraphNode.create_frontier_node(
                     desc.position,
@@ -276,10 +272,11 @@ class GraphGenerator:
                 )
                 position_to_node[desc.position] = fnode
                 frontier.append(fnode)
-                all_nodes.add(fnode)
-                seen_ids.add(id(fnode))
+                seen_frontier_ids.add(id(fnode))
 
         logger.info(f"Phase 2: {len(frontier):,} frontier nodes ready for expansion")
+
+        del position_to_node, frontier_positions
 
         for round_num in range(max_rounds):
             rng.shuffle(frontier)
@@ -290,29 +287,36 @@ class GraphGenerator:
                     continue
                 if node.generate_children():
                     for child in node.children:
-                        if child != node:
-                            all_nodes.add(child)
-                            all_edges.add((node.position, child.position))
-                            if id(child) not in seen_ids:
-                                seen_ids.add(id(child))
-                                next_frontier.append(child)
+                        if child != node and id(child) not in seen_frontier_ids:
+                            seen_frontier_ids.add(id(child))
+                            next_frontier.append(child)
 
             if not next_frontier:
                 logger.info(
                     f"Phase 2 round {round_num}: converged. "
-                    f"Total: {len(all_nodes):,} nodes, {len(all_edges):,} edges"
+                    f"merged={GraphNode._merged_edge:,}, "
+                    f"aborted={GraphNode._aborted_edge:,}"
                 )
                 break
 
             if (round_num + 1) % 10 == 0 or round_num == 0:
                 logger.info(
                     f"Phase 2 round {round_num}: frontier={len(next_frontier):,}, "
-                    f"nodes={len(all_nodes):,}, edges={len(all_edges):,}, "
                     f"merged={GraphNode._merged_edge:,}, "
                     f"aborted={GraphNode._aborted_edge:,}"
                 )
 
             frontier = next_frontier
+
+        del seen_frontier_ids
+
+        all_nodes: set = set()
+        for cell_nodes in GraphNode.node_grid.values():
+            all_nodes.update(cell_nodes)
+
+        all_edges: set = set()
+        for cell_edges in GraphNode.edge_grid.values():
+            all_edges.update(cell_edges)
 
         logger.info(
             f"Phase 2 complete: {len(all_nodes):,} nodes, "
