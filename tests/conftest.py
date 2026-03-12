@@ -3,9 +3,12 @@ import pickle
 
 import pytest
 
-from graphs.synth_graph import SynthGraph
-
 BASE_DIR = os.path.dirname(__file__)
+
+try:
+    from graphs.synth_graph import SynthGraph
+except ImportError:
+    SynthGraph = None
 
 nx = pytest.importorskip("networkx", reason="Legacy pkl fixtures require networkx")
 
@@ -25,6 +28,8 @@ def load_weighted_test_nx_graph():
 @pytest.fixture
 def load_weighted_test_synth_graph(load_weighted_test_nx_graph):
     """Weighted SynthGraph converted from the test pkl."""
+    if SynthGraph is None:
+        pytest.skip("SynthGraph requires networkit")
     return SynthGraph.from_networkx(load_weighted_test_nx_graph)
 
 
@@ -43,4 +48,6 @@ def load_unweighted_test_nx_graph():
 @pytest.fixture
 def load_unweighted_test_synth_graph(load_unweighted_test_nx_graph):
     """Unweighted SynthGraph converted from the test pkl."""
+    if SynthGraph is None:
+        pytest.skip("SynthGraph requires networkit")
     return SynthGraph.from_networkx(load_unweighted_test_nx_graph)

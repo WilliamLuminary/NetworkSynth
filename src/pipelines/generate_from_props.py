@@ -5,7 +5,7 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 import logging
 
-from configs import AttrConfig, BaseConfig, DataType
+from configs import AttrConfig, BaseConfig
 from graphs import GraphGenerator
 from handlers import AttributesCalculator, RunAgent
 from utils import trim_graph
@@ -81,9 +81,7 @@ def generate_with_multiprocessing(data_agent: RunAgent):
                     logger.info(f"({progress}%) Synthetic graph generated.")
 
                 if (num_figures := num_figures - 1) >= 0:
-                    data_agent.save(
-                        data_type=DataType.SYNTHETIC_GRAPH, arg=synthetic_graph
-                    )
+                    data_agent.save("synthetic_graph", content=synthetic_graph)
                 data_agent.add_synthetic_graph(synthetic_graph)
 
     except KeyboardInterrupt:

@@ -47,13 +47,20 @@ pre-commit run --all-files  # manual full check
    data/output/ConfigName_results_YYYYMMDD_HHMMSS/
    └── sample_1/
        ├── original/
-       │   ├── original_graph_*.png
+       │   ├── original_graph_*.svg
        │   ├── original_image_*.png
-       │   ├── original_network_*.pkl
+       │   ├── original_network_*_edgelist.csv
+       │   ├── original_network_*_positions.csv
+       │   ├── original_network_*.nkbin
+       │   ├── original_network_*_positions.npy
        │   └── original_property_*.pkl
        └── synthetic/
-           ├── len_10_err_0.123_synthetic_network_*.pkl
-           └── synthetic_graph_*.png
+           ├── synthetic_graph_*.webp
+           ├── synthetic_network_*.pkl
+           ├── synthetic_network_*_edgelist.csv
+           ├── synthetic_network_*_positions.csv
+           ├── synthetic_network_*.nkbin
+           └── synthetic_network_*_positions.npy
   ```
 
 ## Configuration System
@@ -121,7 +128,7 @@ class ConfigMydata(BaseConfig):
         ...
 ```
 
-1. Update `src/main.py`:
+2. Update `src/main.py`:
 
 ```python
 from config.generate_mode import GenConfigMydata as GenConfig
@@ -129,6 +136,108 @@ GenConfig.initialize()
 ```
 
 The config is automatically exported as `GenConfigMydata` based on the naming convention.
+
+### Save System
+
+Saving is config-driven: each config declares **what** formats to save, and the `Saver` handles **how** (path construction, timestamps, directory creation).
+
+#### Three layers
+
+```
+Pipeline  →  Saver.save(content, identifier, prefix)
+                 ↓
+              Config.save(identifier)  →  returns list of specs
+                 ↓
+              Serializer(content, filepath)  →  writes to disk
+```
+
+**Layer 1 — Serializers** (`src/configs/file_definitions.py`): Pure `(content, filepath)` functions.
+
+| Serializer | Output |
+| --- | --- |
+| `save_pickle` | `.pkl` |
+| `save_csv` | `.csv` |
+| `save_png` | `.png` (matplotlib Figure or numpy array) |
+| `save_svg` | `.svg` (matplotlib Figure) |
+| `save_webp` | `.webp` (matplotlib Figure) |
+| `save_networkit` | `.nkbin` + companion `_positions.npy` |
+| `save_network_csv` | `_edgelist.csv` + `_positions.csv` (from a SynthGraph) |
+| `save_network_nkbin` | `.nkbin` + `_positions.npy` (from a SynthGraph) |
+
+**Layer 2 — Config save methods** (`BaseConfig` + mode overrides): Each `save_*` classmethod returns a list of spec tuples — no dependency on the Saver.
+
+**Layer 3 — Saver** (`src/handlers/saver.py`): Single public method `save()`. Gets specs from the config, builds file paths, creates directories, and calls the serializer with `(content, filepath)`.
+
+#### How specs work
+
+Each `save_*` method returns a list of tuples:
+
+```python
+(relative_dir, detail, extension, save_fn)
+# Optional 5th element: False to disable timestamp
+```
+
+The Saver constructs the path as: `{output_dir}/{relative_dir}/{prefix}{detail}_{timestamp}.{extension}`
+
+#### Default save methods
+
+`BaseConfig` defines defaults for all standard identifiers. These are inherited by every mode config automatically:
+
+| Identifier | Directory | Formats | Serializer |
+| --- | --- | --- | --- |
+| `original_image` | `original/` | `.png` | `save_png` |
+| `original_network` | `original/` | `.csv`, `.nkbin` | `save_network_csv`, `save_network_nkbin` |
+| `original_property` | `original/` | `.pkl` | `save_pickle` |
+| `original_graph` | `original/` | `.svg` | `save_svg` |
+| `synthetic_graph` | `synthetic/` | `.webp` | `save_webp` |
+| `synthetic_network` | `synthetic/` | `.pkl` | `save_pickle` |
+| `synthetic_export` | `synthetic/` | `.csv`, `.nkbin` | `save_network_csv`, `save_network_nkbin` |
+| `analysis_data` | root | `.pkl` (no timestamp) | `save_pickle` |
+| `analysis_figure` | root | `.svg` | `save_svg` |
+
+#### Overriding save behavior
+
+A mode config can override any `save_*` method to change output formats. For example, mosaic mode saves synthetic graphs in both webp and png:
+
+```python
+class SampleConfig(BaseConfig):
+    @classmethod
+    def save_synthetic_graph(cls):
+        from ..file_definitions import save_png, save_webp
+
+        return [
+            ("synthetic", "synthetic_graph", "webp", save_webp),
+            ("synthetic", "synthetic_graph", "png", save_png),
+        ]
+```
+
+Only override what differs — everything else is inherited from `BaseConfig`.
+
+#### Adding a new save format
+
+To save a new type of data:
+
+1. Add a constant to `DataType` in `src/configs/enums.py`:
+
+```python
+class DataType:
+    MY_CUSTOM_DATA = "my_custom_data"
+```
+
+2. Add a `save_my_custom_data` method to `BaseConfig` (or your mode config):
+
+```python
+@classmethod
+def save_my_custom_data(cls):
+    from .file_definitions import save_pickle
+    return [("custom_dir", "my_data", "pkl", save_pickle)]
+```
+
+3. Call it from the pipeline:
+
+```python
+data_agent.save(DataType.MY_CUSTOM_DATA, content=my_data)
+```
 
 ### Config Naming Convention
 

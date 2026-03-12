@@ -1,18 +1,9 @@
-# src/configs/sweep_mode/config_sample.py
+# src/configs/generate_mode/config_snapshot.py
 """
-Sweep mode default configuration (all A/B/C/D datasets).
+Generate-mode config for snapshot generation.
 
-Uses the same input data as hybrid mode:
-    data/input/samples/hybrid_mode/
-    ├── sample_{A,B,C,D}_pos.npy
-    ├── sample_{A,B,C,D}_mat.npy
-    └── sample_{A,B,C,D}_image.tif
-
-For per-dataset sweeps on separate machines, use the individual configs:
-    config_a.py -> SweepConfigA   (sample_A only)
-    config_b.py -> SweepConfigB   (sample_B only)
-    config_c.py -> SweepConfigC   (sample_C only)
-    config_d.py -> SweepConfigD   (sample_D only)
+Uses the hybrid-mode sample_A data with its tuned node/edge factors,
+and enables BFS snapshots every SNAPSHOT_INTERVAL nodes.
 """
 import logging
 import os
@@ -28,15 +19,8 @@ from ..enums import DatasetId
 logger = logging.getLogger(__name__)
 
 
-class SampleConfig(BaseConfig):
-    """Sweep on all four hybrid-mode datasets."""
-
-    DATASETS = [
-        DatasetId("sample_A"),
-        DatasetId("sample_B"),
-        DatasetId("sample_C"),
-        DatasetId("sample_D"),
-    ]
+class SnapshotConfig(BaseConfig):
+    DATASETS = [DatasetId("sample_A")]
 
     IMAGE_SIZE: Tuple[int, int] = (510, 510)
     FRAME_SIZE: Tuple[int, int] = (510, 510)
@@ -45,26 +29,23 @@ class SampleConfig(BaseConfig):
     CLOSED_NODES_FACTOR = 1.0
     CLOSED_EDGES_FACTOR = 1.5
 
-    SYNTHETIC_GRAPH_NUMBER = 0
+    SNAPSHOT_INTERVAL = 10
+
+    SYNTHETIC_GRAPH_NUMBER = 1
     SYNTHETIC_NETWORK_NUMBER = 0
 
-    MAX_ATTEMPTS = 10
+    MAX_ATTEMPTS = 50
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = True
     FULL_ANALYSIS = False
 
-    BASE_INPUT_PATH = os.path.join(
-        BaseConfig.BASE_INPUT_PATH,
-        "samples",
-        "hybrid_mode",
-    )
+    BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, "samples", "hybrid_mode")
 
     @classmethod
     def initialize(cls):
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
-        # Sweep mode disables saving — no save methods needed.
         cls._inject_dependencies()
 
     @staticmethod
@@ -90,7 +71,7 @@ class SampleConfig(BaseConfig):
 
 
 def _load_positions(set_name: str) -> np.ndarray:
-    path = os.path.join(SampleConfig.BASE_INPUT_PATH, f"{set_name}_pos.npy")
+    path = os.path.join(SnapshotConfig.BASE_INPUT_PATH, f"{set_name}_pos.npy")
     if not os.path.exists(path):
         raise FileNotFoundError(f"Positions file not found: {path}")
     logger.info("Loading positions from %s", path)
@@ -98,7 +79,7 @@ def _load_positions(set_name: str) -> np.ndarray:
 
 
 def _load_sparse_matrix(set_name: str):
-    path = os.path.join(SampleConfig.BASE_INPUT_PATH, f"{set_name}_mat.npy")
+    path = os.path.join(SnapshotConfig.BASE_INPUT_PATH, f"{set_name}_mat.npy")
     if not os.path.exists(path):
         raise FileNotFoundError(f"Adjacency matrix file not found: {path}")
     logger.info("Loading adjacency matrix from %s", path)
@@ -106,7 +87,7 @@ def _load_sparse_matrix(set_name: str):
 
 
 def _load_raw_image(set_name: str):
-    path = os.path.join(SampleConfig.BASE_INPUT_PATH, f"{set_name}_image.tif")
+    path = os.path.join(SnapshotConfig.BASE_INPUT_PATH, f"{set_name}_image.tif")
     if not os.path.exists(path):
         logger.warning("No image at %s. Returning None.", path)
         return None

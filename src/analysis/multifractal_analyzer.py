@@ -94,6 +94,11 @@ def _ollivier_ricci_curvature(
         dist_graph = nk.Graph(n, weighted=True)
         for u, v, w in nk_graph.iterEdgesWeights():
             dist_graph.addEdge(u, v, 1.0 / w if w != 0 else float("inf"))
+    elif nk_graph.isWeighted():
+        n = nk_graph.numberOfNodes()
+        dist_graph = nk.Graph(n, weighted=False)
+        for u, v in nk_graph.iterEdges():
+            dist_graph.addEdge(u, v)
     else:
         dist_graph = nk_graph
 
@@ -174,12 +179,31 @@ class MultifractalAnalyzer:
         if BaseConfig.MEASURE_WEIGHTED is not self.weighted:
             print("Unweighted graph! Can't perform weighted analysis.")
         self._inv_graph: nk.Graph | None = None
+        self._uw_graph: nk.Graph | None = None
 
     # ---- helpers ----
 
     def _get_nk_graph(self) -> nk.Graph:
         """Return the underlying networkit graph."""
         return self.graph.nk
+
+    def _get_analysis_graph(self) -> nk.Graph:
+        """Return a graph matching the current analysis mode.
+
+        When ``self.weighted`` is False but the underlying graph carries
+        edge weights, returns a cached unweighted copy so that algorithms
+        like APSP and betweenness ignore the stored weights.
+        """
+        g = self.graph.nk
+        if not self.weighted and g.isWeighted():
+            if self._uw_graph is None:
+                n = g.numberOfNodes()
+                uw = nk.Graph(n, weighted=False)
+                for u, v in g.iterEdges():
+                    uw.addEdge(u, v)
+                self._uw_graph = uw
+            return self._uw_graph
+        return g
 
     def _get_inverted_weight_graph(self) -> nk.Graph:
         """Lazily build and cache a graph with inverted edge weights (1/w)."""
@@ -244,7 +268,7 @@ class MultifractalAnalyzer:
     # ---- multifractal core ----
 
     def _compute_multifractal_taus(self):
-        nk_graph = self._get_nk_graph()
+        nk_graph = self._get_analysis_graph()
 
         apsp = nk.distance.APSP(nk_graph)
         apsp.run()
@@ -330,7 +354,7 @@ class MultifractalAnalyzer:
         if self.weighted:
             nk_graph = self._get_inverted_weight_graph()
         else:
-            nk_graph = self._get_nk_graph()
+            nk_graph = self._get_analysis_graph()
 
         apsp = nk.distance.APSP(nk_graph)
         apsp.run()
@@ -365,7 +389,7 @@ class MultifractalAnalyzer:
         return node_dimensions
 
     def _compute_centralities(self) -> Dict[str, List[float]]:
-        nk_graph = self._get_nk_graph()
+        nk_graph = self._get_analysis_graph()
 
         nfd_centrality = self._compute_node_dimension()
 
@@ -403,7 +427,7 @@ class MultifractalAnalyzer:
             inv_graph = self._get_inverted_weight_graph()
             bt = nk.centrality.Betweenness(inv_graph, normalized=True).run().scores()
         else:
-            nk_graph = self._get_nk_graph()
+            nk_graph = self._get_analysis_graph()
             bt = nk.centrality.Betweenness(nk_graph, normalized=True).run().scores()
         return bt
 
@@ -433,10 +457,16 @@ class MultifractalAnalyzer:
 
     def _compute_eigenvector_centrality(self) -> List[float]:
         if self.graph.is_connected():
-            nk_graph = self._get_nk_graph()
+            nk_graph = self._get_analysis_graph()
         else:
             lcc = self.graph.largest_connected_component()
             nk_graph = lcc.nk
+            if not self.weighted and nk_graph.isWeighted():
+                n = nk_graph.numberOfNodes()
+                uw = nk.Graph(n, weighted=False)
+                for u, v in nk_graph.iterEdges():
+                    uw.addEdge(u, v)
+                nk_graph = uw
 
         try:
             ec = nk.centrality.EigenvectorCentrality(nk_graph, tol=1e-6)

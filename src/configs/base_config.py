@@ -1,7 +1,7 @@
 # src/configs/base_config.py
 import logging
 import os
-from typing import List, Optional, Set, Tuple
+from typing import List, Optional, Tuple
 
 from .enums import DatasetId
 
@@ -56,8 +56,7 @@ class BaseConfig:
     MAX_ATTEMPTS = 10
     ERROR_TOLERANCE = 0.15  # Generally should be 0.15
 
-    # Supported: "csv", "nkbin" (case-insensitive)
-    OUTPUT_FORMATS: Set[str] = {"csv", "nkbin"}
+    SNAPSHOT_INTERVAL: int = 0  # 0 = disabled; N = snapshot every N new nodes
 
     DISABLE_SAVING: bool = False
     DISABLE_SAVING_NOTE: str = ""
@@ -86,9 +85,33 @@ class BaseConfig:
         cls.OUTPUT_DENOTE = f"{mode}_{cls.__name__}" if mode else cls.__name__
 
     @classmethod
+    def save(cls, identifier: str):
+        """Return the save specs for *identifier*.
+
+        Checks for a ``save_<identifier>`` classmethod first (mode
+        overrides injected by ``_inject_dependencies``), then falls
+        back to ``DEFAULT_SAVE_SPECS`` in ``file_definitions``.
+
+        Each spec is a tuple::
+
+            (relative_dir, detail, extension, save_fn[, use_timestamp])
+        """
+        method = getattr(cls, f"save_{identifier}", None)
+        if method is not None:
+            return method()
+        from .file_definitions import DEFAULT_SAVE_SPECS
+
+        specs = DEFAULT_SAVE_SPECS.get(identifier)
+        if specs is None:
+            raise ValueError(f"No save spec for '{identifier}' in {cls.__name__}.")
+        return specs
+
+    @classmethod
     def _inject_dependencies(cls):
         for name in dir(cls):
-            if name.isupper() and not name.startswith("__"):
+            if name.startswith("__"):
+                continue
+            if name.isupper() or name.startswith("save_"):
                 value = getattr(cls, name)
                 setattr(BaseConfig, name, value)
 
