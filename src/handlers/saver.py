@@ -6,11 +6,9 @@ import sys
 from typing import Any, Optional
 
 from configs import (
-    FILE_CONFIGURATIONS,
     BaseConfig,
     DatasetId,
     DataType,
-    FileExtension,
     Mode,
 )
 
@@ -116,7 +114,11 @@ class Saver:
         self, content: Any, data_type: DataType, file_name_prefix: Optional[str] = None
     ) -> None:
         """
-        Saves the provided content to a file based on its configuration.
+        Saves the provided content to a file based on its SaveSpec.
+
+        The SaveSpec for *data_type* is looked up from
+        ``BaseConfig.SAVE_SPECS`` (populated by each mode config's
+        ``initialize()``).
 
         :param content: The data to be saved (e.g., image or pickled object).
         :param data_type: Specifies the data type and related save configurations.
@@ -131,131 +133,30 @@ class Saver:
             logger.warning(f"{BaseConfig.DISABLE_SAVING_NOTE} Saving is disabled. ")
             return
 
-        file_config = FILE_CONFIGURATIONS.get(
-            data_type, FILE_CONFIGURATIONS[DataType.DEFAULT_DATA]
-        )
-        file_detail = file_config.detail
-
-        if self.mode == Mode.GEN or data_type.file_extension in (
-            FileExtension.PNG,
-            FileExtension.SVG,
-            FileExtension.WEBP,
-        ):
-            file_name_identifier = self._batch_timestamp or _time_id()
-            rel_path = file_config.relative_dir
-            file_detail = (
-                (file_detail + "_")
-                if file_config.detail and file_config.detail[-1] != "_"
-                else (file_config.detail or "")
+        spec = BaseConfig.SAVE_SPECS.get(data_type)
+        if spec is None:
+            raise ValueError(
+                f"No SaveSpec registered for {data_type}. "
+                f"Check that your config's initialize() sets SAVE_SPECS."
             )
-        else:
-            file_name_identifier = ""
-            rel_path = ""
 
-        file_name = f"{file_name_prefix}{file_detail}{file_name_identifier}.{file_config.file_extension}"
-        abs_path = os.path.join(self.output_dir, rel_path, file_name)
+        file_name_prefix = file_name_prefix or ""
+        detail = spec.detail or ""
+
+        if spec.use_timestamp:
+            file_id = self._batch_timestamp or _time_id()
+            if detail and not detail.endswith("_"):
+                detail += "_"
+        else:
+            file_id = ""
+
+        extension = str(data_type.file_extension)
+        file_name = f"{file_name_prefix}{detail}{file_id}.{extension}"
+        abs_path = os.path.join(self.output_dir, spec.relative_dir, file_name)
         _ensure_directory(os.path.dirname(abs_path), exist_ok=True)
 
-        if FileExtension.WEBP == data_type.file_extension:
-            Saver._save_webp(content, abs_path)
-        elif FileExtension.SVG == data_type.file_extension:
-            Saver._save_svg_figure(content, abs_path)
-        elif FileExtension.PNG == data_type.file_extension:
-            Saver._save_png_image(content, abs_path)
-        elif FileExtension.PKL == data_type.file_extension:
-            Saver._save_pickle(content, abs_path)
-        elif FileExtension.CSV == data_type.file_extension:
-            Saver._save_csv(content, abs_path)
-        elif FileExtension.NKBIN == data_type.file_extension:
-            Saver._save_networkit(content, abs_path)
-        else:
-            raise ValueError(f"Unsupported DataType for saving: {data_type}")
-
+        spec.save_fn(content, abs_path)
         logger.info(f"Saved file: {abs_path}")
-
-    @staticmethod
-    def _save_pickle(obj: Any, filepath: str) -> None:
-        with open(filepath, "wb") as f:
-            import pickle
-
-            pickle.dump(obj, f)
-
-    @staticmethod
-    def _save_csv(content, filepath: str) -> None:
-        import csv
-
-        with open(filepath, "w", newline="") as f:
-            writer = csv.writer(f)
-            for row in content:
-                writer.writerow(row)
-
-    @staticmethod
-    def _save_networkit(content, filepath: str) -> None:
-        """Save a networkit graph in binary format.
-
-        Accepts either a bare ``nk.Graph`` or a ``(nk.Graph, positions)``
-        tuple.  When positions are provided, a companion
-        ``<basename>_positions.npy`` is written alongside the ``.nkbin``
-        so that the nkbin output is self-contained (topology + weights
-        in the binary graph, positions in the compact numpy array).
-        """
-        import networkit as nk
-        import numpy as np
-
-        if isinstance(content, tuple):
-            nk_graph, positions = content
-        else:
-            nk_graph = content
-            positions = None
-
-        nk.writeGraph(nk_graph, filepath, nk.Format.NetworkitBinary)
-
-        if positions is not None:
-            pos_path = filepath.rsplit(".", 1)[0] + "_positions.npy"
-            np.save(pos_path, np.asarray(positions))
-            logger.info(f"Saved companion positions: {pos_path}")
-
-    @staticmethod
-    def _save_webp(fig, filepath: str) -> None:
-        from matplotlib.figure import Figure
-
-        assert isinstance(
-            fig, Figure
-        ), f"WebP saving expects a matplotlib Figure, got {type(fig).__name__}."
-        from utils import save_figure_as_webp
-
-        save_figure_as_webp(fig, filepath)
-
-        from matplotlib import pyplot as _plt
-
-        _plt.close(fig)
-
-    @staticmethod
-    def _save_svg_figure(fig, filepath: str) -> None:
-        from matplotlib.figure import Figure
-
-        assert isinstance(
-            fig, Figure
-        ), f"SVG saving expects a matplotlib Figure, got {type(fig).__name__}."
-        fig.savefig(filepath, format="svg", bbox_inches="tight")
-
-        from matplotlib import pyplot as _plt
-
-        _plt.close(fig)
-
-    @staticmethod
-    def _save_png_image(image, filepath: str) -> None:
-        from matplotlib.figure import Figure
-        from numpy import ndarray
-
-        if isinstance(image, Figure):
-            image.savefig(filepath, format="png", bbox_inches="tight")
-        elif isinstance(image, ndarray):
-            import cv2
-
-            cv2.imwrite(filepath, image)
-        else:
-            raise TypeError(f"Unsupported image type: {type(image)}")
 
 
 def _is_junction(path: str) -> bool:

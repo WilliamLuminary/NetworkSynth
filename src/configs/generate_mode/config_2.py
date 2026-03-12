@@ -52,6 +52,9 @@ class Config2(BaseConfig):
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
+        from ..file_definitions import make_generate_save_specs
+
+        cls.SAVE_SPECS = make_generate_save_specs()
         cls._inject_dependencies()
 
     @staticmethod

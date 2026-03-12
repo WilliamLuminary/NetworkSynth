@@ -71,6 +71,15 @@ class SampleConfig(BaseConfig):
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
+        from ..enums import DataType
+        from ..file_definitions import SaveSpec, make_generate_save_specs, save_png
+
+        cls.SAVE_SPECS = {
+            **make_generate_save_specs(),
+            DataType.SYNTHETIC_GRAPH_PNG: SaveSpec(
+                "synthetic", "synthetic_graph_png", save_png
+            ),
+        }
         cls._inject_dependencies()
 
     @staticmethod

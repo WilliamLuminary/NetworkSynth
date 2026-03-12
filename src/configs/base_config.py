@@ -59,6 +59,8 @@ class BaseConfig:
     # Supported: "csv", "nkbin" (case-insensitive)
     OUTPUT_FORMATS: Set[str] = {"csv", "nkbin"}
 
+    SAVE_SPECS: dict = {}
+
     DISABLE_SAVING: bool = False
     DISABLE_SAVING_NOTE: str = ""
 
