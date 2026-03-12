@@ -15,7 +15,7 @@ from typing import Dict, Tuple
 from matplotlib import pyplot as plt
 from matplotlib.collections import LineCollection
 
-from configs import BaseConfig, DataType
+from configs import BaseConfig
 from configs.mosaic_mode import MosaicConfig
 from graphs import GraphGenerator
 from graphs.mosaic_stitcher import MosaicStitcher
@@ -228,21 +228,9 @@ def run_mosaic_for_dataset(dataset_id):
     data_agent.add_synthetic_graph(mosaic_graph)
     prefix = f"mosaic_{BaseConfig.GRID_ROWS}x{BaseConfig.GRID_COLS}"
     Saver.begin_batch()
-    data_agent.save(DataType.SYNTHETIC_EDGELIST, f"{prefix}_", arg=mosaic_graph)
-    data_agent.save(DataType.SYNTHETIC_POSITIONS, f"{prefix}_", arg=mosaic_graph)
-    data_agent.save(DataType.SYNTHETIC_NETWORK_NKI, f"{prefix}_", arg=mosaic_graph)
-
+    data_agent.saver.save(mosaic_graph, "synthetic_export", f"{prefix}_")
     mosaic_fig = plot_mosaic_network(mosaic_graph)
-    data_agent.saver.save_file(
-        mosaic_fig,
-        DataType.SYNTHETIC_GRAPH,
-        f"{prefix}_",
-    )
-    data_agent.saver.save_file(
-        mosaic_fig,
-        DataType.SYNTHETIC_GRAPH_PNG,
-        f"{prefix}_",
-    )
+    data_agent.saver.save(mosaic_fig, "synthetic_graph", f"{prefix}_")
     Saver.end_batch()
 
     logger.info(

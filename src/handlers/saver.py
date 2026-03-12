@@ -6,11 +6,8 @@ import sys
 from typing import Any, Optional
 
 from configs import (
-    FILE_CONFIGURATIONS,
     BaseConfig,
     DatasetId,
-    DataType,
-    FileExtension,
     Mode,
 )
 
@@ -68,6 +65,7 @@ class Saver:
             self.mode = Mode.GEN
 
         _ensure_directory(self.output_dir, exist_ok=True)
+        self._save_func = BaseConfig.save
 
     @classmethod
     def initialize(cls, result_dir: str = None) -> None:
@@ -101,8 +99,9 @@ class Saver:
     def begin_batch(cls) -> str:
         """Set a shared timestamp for a group of related saves.
 
-        All ``save_file`` calls until ``end_batch`` will use this timestamp.
-        Returns the generated timestamp so callers can log it.
+        All ``save`` calls until ``end_batch`` will share this
+        timestamp.  Returns the generated timestamp so callers can
+        log it.
         """
         cls._batch_timestamp = _time_id()
         return cls._batch_timestamp
@@ -112,150 +111,40 @@ class Saver:
         """Clear the batch timestamp."""
         cls._batch_timestamp = None
 
-    def save_file(
-        self, content: Any, data_type: DataType, file_name_prefix: Optional[str] = None
-    ) -> None:
-        """
-        Saves the provided content to a file based on its configuration.
+    def save(self, content: Any, identifier: str, prefix: str = "") -> None:
+        """Save *content* according to the specs returned by the config.
 
-        :param content: The data to be saved (e.g., image or pickled object).
-        :param data_type: Specifies the data type and related save configurations.
-        :param file_name_prefix: Optional prefix for the generated file name.
-        :return: None
+        :param content: The data to be saved.
+        :param identifier: String identifier (e.g. ``"original_network"``).
+            Maps to ``save_<identifier>`` on the active config.
+        :param prefix: Optional prefix for the generated file name.
         """
         if content is None:
             logger.warning("Content is None.")
             return
 
         if BaseConfig.DISABLE_SAVING:
-            logger.warning(f"{BaseConfig.DISABLE_SAVING_NOTE} Saving is disabled. ")
+            logger.warning(f"{BaseConfig.DISABLE_SAVING_NOTE} Saving is disabled.")
             return
 
-        file_config = FILE_CONFIGURATIONS.get(
-            data_type, FILE_CONFIGURATIONS[DataType.DEFAULT_DATA]
-        )
-        file_detail = file_config.detail
+        specs = self._save_func(identifier)
+        for spec in specs:
+            relative_dir, detail, extension, save_fn = spec[:4]
+            use_timestamp = spec[4] if len(spec) > 4 else True
 
-        if self.mode == Mode.GEN or data_type.file_extension in (
-            FileExtension.PNG,
-            FileExtension.SVG,
-            FileExtension.WEBP,
-        ):
-            file_name_identifier = self._batch_timestamp or _time_id()
-            rel_path = file_config.relative_dir
-            file_detail = (
-                (file_detail + "_")
-                if file_config.detail and file_config.detail[-1] != "_"
-                else (file_config.detail or "")
-            )
-        else:
-            file_name_identifier = ""
-            rel_path = ""
+            if use_timestamp:
+                file_id = self._batch_timestamp or _time_id()
+                detail_part = f"{prefix}{detail}_" if detail else prefix
+            else:
+                file_id = ""
+                detail_part = f"{prefix}{detail}" if detail else prefix
 
-        file_name = f"{file_name_prefix}{file_detail}{file_name_identifier}.{file_config.file_extension}"
-        abs_path = os.path.join(self.output_dir, rel_path, file_name)
-        _ensure_directory(os.path.dirname(abs_path), exist_ok=True)
+            file_name = f"{detail_part}{file_id}.{extension}"
+            abs_path = os.path.join(self.output_dir, relative_dir, file_name)
+            _ensure_directory(os.path.dirname(abs_path), exist_ok=True)
 
-        if FileExtension.WEBP == data_type.file_extension:
-            Saver._save_webp(content, abs_path)
-        elif FileExtension.SVG == data_type.file_extension:
-            Saver._save_svg_figure(content, abs_path)
-        elif FileExtension.PNG == data_type.file_extension:
-            Saver._save_png_image(content, abs_path)
-        elif FileExtension.PKL == data_type.file_extension:
-            Saver._save_pickle(content, abs_path)
-        elif FileExtension.CSV == data_type.file_extension:
-            Saver._save_csv(content, abs_path)
-        elif FileExtension.NKBIN == data_type.file_extension:
-            Saver._save_networkit(content, abs_path)
-        else:
-            raise ValueError(f"Unsupported DataType for saving: {data_type}")
-
-        logger.info(f"Saved file: {abs_path}")
-
-    @staticmethod
-    def _save_pickle(obj: Any, filepath: str) -> None:
-        with open(filepath, "wb") as f:
-            import pickle
-
-            pickle.dump(obj, f)
-
-    @staticmethod
-    def _save_csv(content, filepath: str) -> None:
-        import csv
-
-        with open(filepath, "w", newline="") as f:
-            writer = csv.writer(f)
-            for row in content:
-                writer.writerow(row)
-
-    @staticmethod
-    def _save_networkit(content, filepath: str) -> None:
-        """Save a networkit graph in binary format.
-
-        Accepts either a bare ``nk.Graph`` or a ``(nk.Graph, positions)``
-        tuple.  When positions are provided, a companion
-        ``<basename>_positions.npy`` is written alongside the ``.nkbin``
-        so that the nkbin output is self-contained (topology + weights
-        in the binary graph, positions in the compact numpy array).
-        """
-        import networkit as nk
-        import numpy as np
-
-        if isinstance(content, tuple):
-            nk_graph, positions = content
-        else:
-            nk_graph = content
-            positions = None
-
-        nk.writeGraph(nk_graph, filepath, nk.Format.NetworkitBinary)
-
-        if positions is not None:
-            pos_path = filepath.rsplit(".", 1)[0] + "_positions.npy"
-            np.save(pos_path, np.asarray(positions))
-            logger.info(f"Saved companion positions: {pos_path}")
-
-    @staticmethod
-    def _save_webp(fig, filepath: str) -> None:
-        from matplotlib.figure import Figure
-
-        assert isinstance(
-            fig, Figure
-        ), f"WebP saving expects a matplotlib Figure, got {type(fig).__name__}."
-        from utils import save_figure_as_webp
-
-        save_figure_as_webp(fig, filepath)
-
-        from matplotlib import pyplot as _plt
-
-        _plt.close(fig)
-
-    @staticmethod
-    def _save_svg_figure(fig, filepath: str) -> None:
-        from matplotlib.figure import Figure
-
-        assert isinstance(
-            fig, Figure
-        ), f"SVG saving expects a matplotlib Figure, got {type(fig).__name__}."
-        fig.savefig(filepath, format="svg", bbox_inches="tight")
-
-        from matplotlib import pyplot as _plt
-
-        _plt.close(fig)
-
-    @staticmethod
-    def _save_png_image(image, filepath: str) -> None:
-        from matplotlib.figure import Figure
-        from numpy import ndarray
-
-        if isinstance(image, Figure):
-            image.savefig(filepath, format="png", bbox_inches="tight")
-        elif isinstance(image, ndarray):
-            import cv2
-
-            cv2.imwrite(filepath, image)
-        else:
-            raise TypeError(f"Unsupported image type: {type(image)}")
+            save_fn(content, abs_path)
+            logger.info(f"Saved file: {abs_path}")
 
 
 def _is_junction(path: str) -> bool:

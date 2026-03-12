@@ -45,6 +45,45 @@ class GraphGenerator:
         synthetic_network = _filter_graph(_synthetic_network, frame)
         return synthetic_network
 
+    def generate_network_with_snapshots(
+        self,
+        snapshot_callback,
+        snapshot_interval: int = 50,
+        frame_range: Optional[Tuple[int, int]] = None,
+        regenerate_times: int = 100,
+    ):
+        """Generate a network while taking periodic BFS snapshots.
+
+        Parameters
+        ----------
+        snapshot_callback : callable
+            ``callback(positions, edges, frame, step_index)`` where
+            *positions* is a list of ``(x, y)`` tuples and *edges* is a
+            set of ``((x1, y1), (x2, y2))`` tuples.
+        snapshot_interval : int
+            Take a snapshot every time the network grows by this many
+            nodes.
+        """
+        frame_range = frame_range or BaseConfig.SYNTHETIC_FRAME_SIZE
+
+        for _ in range(regenerate_times):
+            nodes, edges = self._bfs_network(
+                frame_range,
+                snapshot_callback=snapshot_callback,
+                snapshot_interval=snapshot_interval,
+            )
+            if nodes and len(nodes) > 100:
+                break
+        else:
+            raise Exception(
+                "Failed to generate a network within the specified attempts."
+            )
+
+        _synthetic_network = build_graph(nodes, edges, arg_type="graph_node")
+        frame = calculate_frame(graph=_synthetic_network, frame_range=frame_range)
+        synthetic_network = _filter_graph(_synthetic_network, frame)
+        return synthetic_network
+
     def generate_scaled_network(
         self,
         scale_rows: int,
@@ -102,7 +141,12 @@ class GraphGenerator:
         return filtered
 
     @staticmethod
-    def _bfs_network(frame_range: Optional[Tuple[int, int]] = None) -> Tuple[set, set]:
+    def _bfs_network(
+        frame_range: Optional[Tuple[int, int]] = None,
+        *,
+        snapshot_callback=None,
+        snapshot_interval: int = 0,
+    ) -> Tuple[set, set]:
         frame_range = frame_range or BaseConfig.SYNTHETIC_FRAME_SIZE
 
         GraphNode.reset()
@@ -115,6 +159,10 @@ class GraphGenerator:
 
         from collections import deque
 
+        take_snapshots = snapshot_callback is not None and snapshot_interval > 0
+        snapshot_idx = 0
+        next_snapshot_at = snapshot_interval if take_snapshots else float("inf")
+
         node_queue = deque([root_node])
         while node_queue:
             current_node = node_queue.popleft()
@@ -126,6 +174,19 @@ class GraphGenerator:
                         node_set.add(child)
                         edge_set.add((current_node.position, child.position))
                         node_queue.append(child)
+
+            if take_snapshots and len(node_set) >= next_snapshot_at:
+                snapshot_callback(
+                    [n.position for n in node_set], edge_set, frame, snapshot_idx
+                )
+                snapshot_idx += 1
+                next_snapshot_at += snapshot_interval
+
+        if take_snapshots:
+            snapshot_callback(
+                [n.position for n in node_set], edge_set, frame, snapshot_idx
+            )
+
         return node_set, edge_set
 
     @staticmethod

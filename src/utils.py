@@ -208,6 +208,68 @@ def figure_to_ndarray(fig, swap_channels: bool = False) -> ndarray:
     return image_array
 
 
+def save_bfs_snapshot(
+    node_positions,
+    edges,
+    frame,
+    index: int,
+    output_dir: str,
+    *,
+    dpi: int = 150,
+) -> None:
+    """Render a lightweight BFS snapshot and save as PNG.
+
+    Parameters
+    ----------
+    node_positions : list of (x, y)
+    edges : set of ((x1, y1), (x2, y2))
+    frame : ((xmin, xmax), (ymin, ymax))
+    index : int
+        Snapshot sequence number (used in filename).
+    output_dir : str
+    dpi : int
+    """
+    import os
+
+    from matplotlib.collections import LineCollection
+    from matplotlib.figure import Figure
+
+    frame_w = frame[0][1] - frame[0][0]
+    frame_h = frame[1][1] - frame[1][0]
+    aspect = frame_w / frame_h if frame_h > 0 else 1.0
+    fig_h = 8
+    fig = Figure(figsize=(fig_h * aspect, fig_h), dpi=dpi)
+    ax = fig.add_subplot(111)
+
+    if edges:
+        segments = [[(e[0][0], e[0][1]), (e[1][0], e[1][1])] for e in edges]
+        lc = LineCollection(segments, colors="red", linewidths=0.5)
+        ax.add_collection(lc)
+
+    if node_positions:
+        xs = [p[0] for p in node_positions]
+        ys = [p[1] for p in node_positions]
+        ax.scatter(xs, ys, s=1, c="blue", zorder=2)
+
+    ax.set_xlim(frame[0])
+    ax.set_ylim(frame[1])
+    ax.set_title(
+        f"Step {index} \u2014 {len(node_positions)} nodes, {len(edges)} edges",
+        fontsize=10,
+    )
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_aspect("equal")
+    ax.axis("off")
+    fig.tight_layout(pad=0.5)
+
+    path = os.path.join(output_dir, f"snapshot_{index:05d}.png")
+    fig.savefig(path, dpi=dpi, bbox_inches="tight")
+    ax.clear()
+    fig.clear()
+    del ax, fig
+
+
 def trim_graph(graph: SynthGraph, tar_avg_deg: float) -> SynthGraph:
     """Trim edges from high-degree nodes until average degree <= 1.1 * target.
 

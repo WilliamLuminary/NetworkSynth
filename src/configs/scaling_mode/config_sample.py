@@ -65,6 +65,15 @@ class SampleConfig(BaseConfig):
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
         cls._inject_dependencies()
 
+    @classmethod
+    def save_synthetic_graph(cls):
+        from ..file_definitions import save_png, save_webp
+
+        return [
+            ("synthetic", "synthetic_graph", "webp", save_webp),
+            ("synthetic", "synthetic_graph", "png", save_png),
+        ]
+
     @staticmethod
     def load_original_network(dataset_id: DatasetId):
         set_name = dataset_id[0]

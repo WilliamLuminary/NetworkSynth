@@ -8,7 +8,7 @@ import os
 from collections import deque
 from typing import Dict
 
-from configs import AnaConfig, BaseConfig, DataType
+from configs import AnaConfig, BaseConfig
 from handlers import RunAgent
 
 AnaConfig.initialize()
@@ -56,8 +56,8 @@ def main():
         data_agent = RunAgent(networks_path=path)
         data_agent.prepare_data()
         data_agent.multifractal_analysis()
-        data_agent.save(DataType.ANALYSIS_DATA)
-        data_agent.save(DataType.ANALYSIS_FIGURE)
+        data_agent.save("analysis_data")
+        data_agent.save("analysis_figure")
 
 
 if __name__ == "__main__":
