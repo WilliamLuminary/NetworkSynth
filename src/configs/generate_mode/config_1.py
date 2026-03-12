@@ -46,8 +46,6 @@ class Config1(BaseConfig):
     MEASURE_WEIGHTED = True
     FULL_ANALYSIS = False
 
-    OUTPUT_FORMATS = {"csv", "nkbin"}
-
     BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, "old_input")
     POSITION_DATA_DIR = os.path.join(BASE_INPUT_PATH, "position")
     ADJ_MATRIX_DATA_DIR = os.path.join(BASE_INPUT_PATH, "sparse_matrices")

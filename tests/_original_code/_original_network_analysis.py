@@ -8,11 +8,7 @@ import networkx as nx
 import numpy as np
 import scipy.stats as stats
 
-try:
-    from GraphRicciCurvature.OllivierRicci import OllivierRicci
-except ImportError:
-    OllivierRicci = None
-from tqdm import tqdm
+from scipy.optimize import linprog
 
 max_dim = []
 min_dim = []
@@ -38,7 +34,7 @@ def wnfd_nk(G, Q, weight=True, draw=False, fdigi=0):
         G_nk = nk.nxadapter.nx2nk(G, weightAttr="weight")
     else:
         G_nk = nk.nxadapter.nx2nk(G)
-    for node in tqdm(G.nodes(), total=num_nodes_all):
+    for node in G.nodes():
         grow = []
         grow_ori = (
             nk.distance.Dijkstra(G_nk, node, storePaths=False).run().getDistances()
@@ -240,31 +236,73 @@ def calculate_betweenness(G_nx, weight_flag):
 
 
 def calculate_orc(G, weight_flag):
-    if OllivierRicci is None:
-        raise ImportError("GraphRicciCurvature is not installed")
+    """Ollivier-Ricci curvature via networkx + scipy LP (no external library)."""
     G = deepcopy(G)
-    avg_orc = []
+    G = nx.convert_node_labels_to_integers(G)
+    alpha = 0.5
+
     if weight_flag == "True":
         for u, v, d in G.edges(data=True):
-            d["weight"] = 1.0 / d["weight"]
-        orc = OllivierRicci(
-            nx.convert_node_labels_to_integers(G),
-            alpha=0.5,
-            verbose="ERROR",
-            weight="weight",
-        )
+            d["weight"] = 1.0 / d["weight"] if d["weight"] != 0 else float("inf")
+        dist = dict(nx.all_pairs_dijkstra_path_length(G, weight="weight"))
     else:
-        orc = OllivierRicci(
-            nx.convert_node_labels_to_integers(G),
-            alpha=0.5,
-            verbose="ERROR",
-            weight=None,
+        dist = dict(nx.all_pairs_shortest_path_length(G))
+
+    curvatures = []
+    for u, v in G.edges():
+        nbrs_u = list(G.neighbors(u))
+        nbrs_v = list(G.neighbors(v))
+        sup_u = [u] + nbrs_u
+        sup_v = [v] + nbrs_v
+
+        mu_u = np.empty(len(sup_u))
+        if nbrs_u:
+            mu_u[0] = alpha
+            mu_u[1:] = (1.0 - alpha) / len(nbrs_u)
+        else:
+            mu_u[0] = 1.0
+
+        mu_v = np.empty(len(sup_v))
+        if nbrs_v:
+            mu_v[0] = alpha
+            mu_v[1:] = (1.0 - alpha) / len(nbrs_v)
+        else:
+            mu_v[0] = 1.0
+
+        n_u, n_v = len(sup_u), len(sup_v)
+        cost = np.array(
+            [[dist[si].get(sj, float("inf")) for sj in sup_v] for si in sup_u]
         )
-    orc.compute_ricci_curvature()
-    G_orc = orc.G.copy()
-    for u, v, d in G_orc.edges(data=True):
-        avg_orc.append(d["ricciCurvature"])
-    return avg_orc
+
+        nm = n_u * n_v
+        row_idx, col_idx, data = [], [], []
+        for i in range(n_u):
+            for j in range(n_v):
+                row_idx.append(i)
+                col_idx.append(i * n_v + j)
+                data.append(1.0)
+        for j in range(n_v):
+            for i in range(n_u):
+                row_idx.append(n_u + j)
+                col_idx.append(i * n_v + j)
+                data.append(1.0)
+
+        from scipy import sparse as sp
+
+        A_eq = sp.csc_matrix(
+            (data, (row_idx, col_idx)), shape=(n_u + n_v, nm)
+        )
+        b_eq = np.concatenate([mu_u, mu_v])
+        res = linprog(
+            cost.ravel(), A_eq=A_eq, b_eq=b_eq, bounds=(0, None), method="highs"
+        )
+        w1 = res.fun if res.success else float("nan")
+
+        d_uv = dist[u][v]
+        kappa = 1.0 - w1 / d_uv if d_uv > 0 else 0.0
+        curvatures.append(kappa)
+
+    return curvatures
 
 
 def calculate_eigenvector_centrality(G, weight_flag):

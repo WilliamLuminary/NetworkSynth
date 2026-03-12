@@ -18,7 +18,7 @@ from matplotlib import pyplot as plt
 from matplotlib.collections import LineCollection
 
 from analysis import MultifractalAnalyzer
-from configs import BaseConfig, DataType
+from configs import BaseConfig
 from configs.hybrid_mode import HybridConfig
 from graphs import GraphGenerator
 from graphs._graph_node import GraphNode
@@ -463,13 +463,9 @@ def run_hybrid_for_dataset(dataset_id):
     prefix = f"hybrid_{len(centers)}centers"
 
     Saver.begin_batch()
-    data_agent.save(DataType.SYNTHETIC_EDGELIST, f"{prefix}_", arg=hybrid_graph)
-    data_agent.save(DataType.SYNTHETIC_POSITIONS, f"{prefix}_", arg=hybrid_graph)
-    data_agent.save(DataType.SYNTHETIC_NETWORK_NKI, f"{prefix}_", arg=hybrid_graph)
-
+    data_agent.saver.save(hybrid_graph, "synthetic_export", f"{prefix}_")
     fig = plot_hybrid_network(hybrid_graph)
-    data_agent.saver.save_file(fig, DataType.SYNTHETIC_GRAPH, f"{prefix}_")
-    data_agent.saver.save_file(fig, DataType.SYNTHETIC_GRAPH_PNG, f"{prefix}_")
+    data_agent.saver.save(fig, "synthetic_graph", f"{prefix}_")
     Saver.end_batch()
 
     # --- Write reports ---
