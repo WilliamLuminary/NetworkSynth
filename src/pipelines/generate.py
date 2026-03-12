@@ -106,9 +106,7 @@ def generate_with_multiprocessing(data_agent: RunAgent):
                     next_log += 10
 
                 if (num_figures := num_figures - 1) >= 0:
-                    data_agent.save(
-                        data_type=DataType.SYNTHETIC_GRAPH, arg=synthetic_graph
-                    )
+                    data_agent.save(DataType.SYNTHETIC_GRAPH, content=synthetic_graph)
                 data_agent.add_synthetic_graph(synthetic_graph)
                 errors.append(error)
     except KeyboardInterrupt:
@@ -128,8 +126,8 @@ def generate_with_multiprocessing(data_agent: RunAgent):
 
     if BaseConfig.FULL_ANALYSIS:
         data_agent.multifractal_analysis_in_generate_mode()
-        data_agent.save(data_type=DataType.ANALYSIS_DATA)
-        data_agent.save(data_type=DataType.ANALYSIS_FIGURE)
+        data_agent.save(DataType.ANALYSIS_DATA)
+        data_agent.save(DataType.ANALYSIS_FIGURE)
 
 
 def compute_average_error(errors: List) -> float:

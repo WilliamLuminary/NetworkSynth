@@ -8,8 +8,8 @@ from configs import (
     BaseConfig,
     DatasetId,
     DataType,
-    FileTag,
     Mode,
+    PlotConfig,
 )
 from graphs.synth_graph import SynthGraph
 
@@ -110,130 +110,91 @@ class RunAgent:
         return self.data_loader.get_original_network()
 
     def save_synthetic_outputs(self, prefix: str):
-        """Save synthetic networks in formats specified by
-        BaseConfig.OUTPUT_FORMATS."""
-        fmts = {f.lower() for f in BaseConfig.OUTPUT_FORMATS}
-        if "pkl" in fmts:
-            self.save(DataType.SYNTHETIC_NETWORK, prefix)
+        """Save synthetic networks (collection pkl + per-graph exports)."""
+        self.save(DataType.SYNTHETIC_NETWORK, prefix)
         graphs = self.data_loader.get_synthetic_networks()
         for i, g in enumerate(graphs):
-            g_prefix = f"{prefix}_n{i}_"
             Saver.begin_batch()
-            if "csv" in fmts:
-                self.save(DataType.SYNTHETIC_EDGELIST, g_prefix, arg=g)
-                self.save(DataType.SYNTHETIC_POSITIONS, g_prefix, arg=g)
-            if "nkbin" in fmts:
-                self.save(DataType.SYNTHETIC_NETWORK_NKI, g_prefix, arg=g)
+            self.saver.save(g, DataType.SYNTHETIC_EXPORT, f"{prefix}_n{i}_")
             Saver.end_batch()
 
     def save(
         self,
-        data_type: DataType,
-        file_name_prefix: Optional[str] = None,
-        arg=None,
+        identifier: str,
+        prefix: Optional[str] = None,
+        *,
+        content=None,
     ):
-        if not self.saver and not data_type.has_tag(FileTag.PLOT):
+        """Save content identified by *identifier* (a DataType constant).
+
+        If *content* is not provided, loads it from internal state.
+        """
+        is_plot = isinstance(FILE_CONFIGURATIONS.get(identifier), PlotConfig)
+        if not self.saver and not is_plot:
             return
 
-        file_name_prefix = (
-            f"{file_name_prefix}_"
-            if file_name_prefix and file_name_prefix[-1] != "_"
-            else (file_name_prefix or "")
-        )
+        prefix = f"{prefix}_" if prefix and not prefix.endswith("_") else (prefix or "")
 
-        if data_type == DataType.ORIGINAL_IMAGE:
-            assert self.mode == Mode.GEN
-            original_image = self.data_loader.get_original_image()
-            self.saver.save_file(original_image, data_type, file_name_prefix)
+        if content is not None:
+            if identifier == DataType.SYNTHETIC_GRAPH:
+                content = plot_network(
+                    data_type=identifier,
+                    graph=content,
+                    show=not self.saver,
+                )
+                if not self.saver:
+                    return
+            self.saver.save(content, identifier, prefix)
+            return
 
-        elif data_type == DataType.ORIGINAL_NETWORK:
-            assert self.mode == Mode.GEN
-            original_network = self.data_loader.get_original_network()
-            self.saver.save_file(original_network, data_type, file_name_prefix)
+        if identifier == DataType.ORIGINAL_IMAGE:
+            content = self.data_loader.get_original_image()
 
-        elif data_type == DataType.ORIGINAL_PROPERTY:
-            assert self.mode == Mode.GEN
-            assert self.attributes, "Attributes not initialized."
+        elif identifier == DataType.ORIGINAL_NETWORK:
+            content = self.data_loader.get_original_network()
+
+        elif identifier == DataType.ORIGINAL_PROPERTY:
             import dataclasses
 
-            self.saver.save_file(
-                dataclasses.asdict(self.attributes),
-                data_type,
-                file_name_prefix,
-            )  # type: ignore
+            assert self.attributes, "Attributes not initialized."
+            content = dataclasses.asdict(self.attributes)
 
-        elif data_type == DataType.ORIGINAL_GRAPH:
+        elif identifier == DataType.ORIGINAL_GRAPH:
             original_network = self.data_loader.get_original_network()
             original_image = self.data_loader.get_original_image()
-
-            original_figure = plot_network(
+            content = plot_network(
                 data_type=DataType.ORIGINAL_GRAPH,
                 graph=original_network,
                 background=original_image,
                 show=True,
             )
-            if self.saver:
-                self.saver.save_file(original_figure, data_type, file_name_prefix)
+            if not self.saver:
+                return
 
-        elif data_type == DataType.SYNTHETIC_GRAPH:
-            assert isinstance(arg, SynthGraph)
-            show_if_not_saving = bool(not self.saver and arg)
-            synthetic_figure = plot_network(
-                data_type=DataType.SYNTHETIC_GRAPH,
-                graph=arg,
-                show=show_if_not_saving,
-            )
-            if not show_if_not_saving:
-                self.saver.save_file(
-                    synthetic_figure,
-                    DataType.SYNTHETIC_GRAPH,
-                    file_name_prefix,
-                )
+        elif identifier == DataType.SYNTHETIC_NETWORK:
+            content = self.data_loader.get_synthetic_networks()
 
-        elif data_type == DataType.SYNTHETIC_NETWORK:
-            synthetic_networks = self.data_loader.get_synthetic_networks()
-            self.saver.save_file(synthetic_networks, data_type, file_name_prefix)
+        elif identifier == DataType.ANALYSIS_DATA:
+            content = {
+                "original_multifractal_analysis_results": (
+                    self.batch_processor.get_original_data()
+                ),
+                "synthetic_multifractal_analysis_results": (
+                    self.batch_processor.get_synthetic_data()
+                ),
+            }
 
-        elif data_type == DataType.SYNTHETIC_EDGELIST:
-            assert isinstance(arg, SynthGraph)
-            edgelist = _synth_to_edgelist_csv(arg)
-            self.saver.save_file(edgelist, data_type, file_name_prefix)
-
-        elif data_type == DataType.SYNTHETIC_POSITIONS:
-            assert isinstance(arg, SynthGraph)
-            positions = _synth_to_positions_csv(arg)
-            self.saver.save_file(positions, data_type, file_name_prefix)
-
-        elif data_type == DataType.SYNTHETIC_NETWORK_NKI:
-            assert isinstance(arg, SynthGraph)
-            self.saver.save_file(
-                (arg.nk, arg.positions()),
-                data_type,
-                file_name_prefix,
-            )
-
-        elif data_type == DataType.ANALYSIS_DATA:
-            assert self.mode == Mode.ANA
-            self.saver.save_file(
-                {
-                    "original_multifractal_analysis_results": (
-                        self.batch_processor.get_original_data()
-                    ),
-                    "synthetic_multifractal_analysis_results": (
-                        self.batch_processor.get_synthetic_data()
-                    ),
-                },
-                data_type,
-                file_name_prefix,
-            )
-
-        elif data_type == DataType.ANALYSIS_FIGURE:
-            assert self.mode == Mode.ANA
+        elif identifier == DataType.ANALYSIS_FIGURE:
             for image_name, image in self.batch_processor.get_images().items():
-                self.saver.save_file(image, data_type, f"{image_name}_")
+                self.saver.save(image, identifier, f"{image_name}_")
+            return
 
         else:
-            logger.error("Please configure save() for %s.", data_type)
+            logger.error("No content loader for identifier: %s", identifier)
+            return
+
+        if content is not None:
+            self.saver.save(content, identifier, prefix)
 
 
 # ---------------------------------------------------------------------------
@@ -241,7 +202,7 @@ class RunAgent:
 # ---------------------------------------------------------------------------
 
 
-def plot_network(data_type: DataType, graph: SynthGraph, **kwargs):
+def plot_network(data_type: str, graph: SynthGraph, **kwargs):
     """Render a graph to an ndarray image.
 
     Uses matplotlib's OO API exclusively -- no pyplot globals --
@@ -250,13 +211,12 @@ def plot_network(data_type: DataType, graph: SynthGraph, **kwargs):
     from matplotlib.figure import Figure
     from matplotlib.patches import Rectangle
 
-    assert data_type.has_tag(FileTag.PLOT), (
+    file_config = FILE_CONFIGURATIONS.get(data_type)
+    assert isinstance(file_config, PlotConfig), (
         f"{data_type} shouldn't call " f"{inspect.currentframe().f_code.co_name}."
     )
 
-    file_config = FILE_CONFIGURATIONS.get(data_type)
-
-    if data_type is DataType.ORIGINAL_GRAPH:
+    if data_type == DataType.ORIGINAL_GRAPH:
         frame = (
             (0, BaseConfig.FRAME_SIZE[0]),
             (0, BaseConfig.FRAME_SIZE[1]),
@@ -296,7 +256,7 @@ def plot_network(data_type: DataType, graph: SynthGraph, **kwargs):
     ax.set_xlim(frame[0])
     ax.set_ylim(frame[1])
 
-    if data_type is DataType.ORIGINAL_GRAPH:
+    if data_type == DataType.ORIGINAL_GRAPH:
         image = kwargs.get("background", None)
         if image is not None:
             alpha = getattr(file_config, "alpha", 1.0)
@@ -338,18 +298,3 @@ def plot_network(data_type: DataType, graph: SynthGraph, **kwargs):
     from utils import finalize_plot
 
     return finalize_plot(fig, show_on_the_fly)
-
-
-def _synth_to_edgelist_csv(graph: SynthGraph):
-    rows = [["source_index", "target_index", "edge_weight"]]
-    for u, v, w in graph.edges_with_weights():
-        rows.append([u, v, w])
-    return rows
-
-
-def _synth_to_positions_csv(graph: SynthGraph):
-    positions = graph.positions()
-    rows = [["x", "y"]]
-    for pos in positions:
-        rows.append([pos[0], pos[1]])
-    return rows

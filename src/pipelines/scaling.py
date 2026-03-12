@@ -53,21 +53,9 @@ def run_scaling_for_dataset(dataset_id):
     prefix = f"scaled_{BaseConfig.SCALE_ROWS}x{BaseConfig.SCALE_COLS}"
 
     Saver.begin_batch()
-    data_agent.save(DataType.SYNTHETIC_EDGELIST, f"{prefix}_", arg=scaled_graph)
-    data_agent.save(DataType.SYNTHETIC_POSITIONS, f"{prefix}_", arg=scaled_graph)
-    data_agent.save(DataType.SYNTHETIC_NETWORK_NKI, f"{prefix}_", arg=scaled_graph)
-
+    data_agent.saver.save(scaled_graph, DataType.SYNTHETIC_EXPORT, f"{prefix}_")
     scaled_fig = plot_scaled_network(scaled_graph)
-    data_agent.saver.save_file(
-        scaled_fig,
-        DataType.SYNTHETIC_GRAPH,
-        f"{prefix}_",
-    )
-    data_agent.saver.save_file(
-        scaled_fig,
-        DataType.SYNTHETIC_GRAPH_PNG,
-        f"{prefix}_",
-    )
+    data_agent.saver.save(scaled_fig, DataType.SYNTHETIC_GRAPH, f"{prefix}_")
     Saver.end_batch()
 
     logger.info(

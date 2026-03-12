@@ -12,8 +12,6 @@ from .enums import (  # noqa: F401
     AnalysisMode,
     DatasetId,
     DataType,
-    FileExtension,
-    FileTag,
     Mode,
 )
 from .file_definitions import (  # noqa: F401
@@ -21,8 +19,14 @@ from .file_definitions import (  # noqa: F401
     FileConfig,
     ImageConfig,
     PlotConfig,
-    SaveSpec,
-    make_generate_save_specs,
+    save_csv,
+    save_network_csv,
+    save_network_nkbin,
+    save_networkit,
+    save_pickle,
+    save_png,
+    save_svg,
+    save_webp,
 )
 
 for _module in (

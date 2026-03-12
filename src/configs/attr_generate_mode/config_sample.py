@@ -32,9 +32,6 @@ class SampleConfig(BaseConfig):
     def initialize(cls):
         super().initialize()
         cls.ATTRIBUTES_DICT_FUNC = cls._load_attr_dict
-        from ..file_definitions import make_generate_save_specs
-
-        cls.SAVE_SPECS = make_generate_save_specs()
         cls._inject_dependencies()
 
     @staticmethod

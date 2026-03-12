@@ -1,7 +1,7 @@
 # src/configs/enums.py
 import os
 from enum import Enum, auto
-from typing import Set, Tuple, Union
+from typing import Tuple
 
 
 class DatasetId:
@@ -84,100 +84,23 @@ class DatasetId:
         raise AttributeError("DatasetId is immutable")
 
 
-class FileExtension(Enum):
-    PNG = "png"
-    SVG = "svg"
-    WEBP = "webp"
-    PKL = "pkl"
-    CSV = "csv"
-    NKBIN = "nkbin"
+class DataType:
+    """String-constant identifiers for save dispatch.
 
-    def __str__(self):
-        return self.value
+    Each constant maps to a ``save_<identifier>`` classmethod on the
+    mode config (e.g. ``save_original_network``).  Used as the
+    *identifier* argument to ``Saver.save()``.
+    """
 
-
-class FileTag(Enum):
-    FIG = "figure"
-    PLOT = "plot"
-    DATA = "data"
-
-    ORI = "original"
-    SYN = "synthetic"
-    ANA = "analysis"
-
-    def __str__(self):
-        return self.value
-
-
-class DataType(Enum):
-    DEFAULT_DATA = ("", {FileTag.DATA}, FileExtension.PKL)
-    ORIGINAL_IMAGE = ("Original Image", {FileTag.FIG, FileTag.ORI}, FileExtension.PNG)
-    ORIGINAL_GRAPH = (
-        "Original Graph",
-        {FileTag.FIG, FileTag.PLOT, FileTag.ORI},
-        FileExtension.SVG,
-    )
-    ORIGINAL_PROPERTY = (
-        "Original Property",
-        {FileTag.ORI, FileTag.DATA},
-        FileExtension.PKL,
-    )
-    ORIGINAL_NETWORK = (
-        "Original Network",
-        {FileTag.DATA, FileTag.ORI},
-        FileExtension.PKL,
-    )
-    SYNTHETIC_GRAPH = (
-        "Synthetic Graph",
-        {FileTag.FIG, FileTag.PLOT, FileTag.SYN},
-        FileExtension.WEBP,
-    )
-    SYNTHETIC_GRAPH_PNG = (
-        "Synthetic Graph (PNG)",
-        {FileTag.FIG, FileTag.PLOT, FileTag.SYN},
-        FileExtension.PNG,
-    )
-    SYNTHETIC_NETWORK = (
-        "Synthetic Network",
-        {FileTag.DATA, FileTag.SYN},
-        FileExtension.PKL,
-    )
-    SYNTHETIC_EDGELIST = (
-        "Synthetic Edge List",
-        {FileTag.DATA, FileTag.SYN},
-        FileExtension.CSV,
-    )
-    SYNTHETIC_POSITIONS = (
-        "Synthetic Positions",
-        {FileTag.DATA, FileTag.SYN},
-        FileExtension.CSV,
-    )
-    SYNTHETIC_NETWORK_NKI = (
-        "Synthetic Network (NetworKit)",
-        {FileTag.DATA, FileTag.SYN},
-        FileExtension.NKBIN,
-    )
-    ANALYSIS_DATA = ("Analysis Data", {FileTag.DATA, FileTag.ANA}, FileExtension.PKL)
-    ANALYSIS_FIGURE = (
-        "Analysis Figure",
-        {FileTag.FIG, FileTag.PLOT, FileTag.ANA},
-        FileExtension.SVG,
-    )
-
-    def __init__(
-        self, description: str, tags: Set[FileTag], file_extension: FileExtension
-    ):
-        self.description = description
-        self.tags = tags
-        self.file_extension = file_extension
-
-    def __str__(self):
-        return self.description
-
-    def has_tag(self, tags: Union[FileTag, tuple[FileTag], list[FileTag]]) -> bool:
-        if isinstance(tags, FileTag):
-            return tags in self.tags
-        return set(tags).issubset(self.tags)
+    ORIGINAL_IMAGE = "original_image"
+    ORIGINAL_GRAPH = "original_graph"
+    ORIGINAL_PROPERTY = "original_property"
+    ORIGINAL_NETWORK = "original_network"
+    SYNTHETIC_GRAPH = "synthetic_graph"
+    SYNTHETIC_NETWORK = "synthetic_network"
+    SYNTHETIC_EXPORT = "synthetic_export"
+    ANALYSIS_DATA = "analysis_data"
+    ANALYSIS_FIGURE = "analysis_figure"
 
 
 class AnalysisMode(Enum):

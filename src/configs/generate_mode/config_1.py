@@ -46,8 +46,6 @@ class Config1(BaseConfig):
     MEASURE_WEIGHTED = True
     FULL_ANALYSIS = False
 
-    OUTPUT_FORMATS = {"csv", "nkbin"}
-
     BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, "old_input")
     POSITION_DATA_DIR = os.path.join(BASE_INPUT_PATH, "position")
     ADJ_MATRIX_DATA_DIR = os.path.join(BASE_INPUT_PATH, "sparse_matrices")
@@ -58,9 +56,6 @@ class Config1(BaseConfig):
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
-        from ..file_definitions import make_generate_save_specs
-
-        cls.SAVE_SPECS = make_generate_save_specs()
         cls._inject_dependencies()
 
     @staticmethod

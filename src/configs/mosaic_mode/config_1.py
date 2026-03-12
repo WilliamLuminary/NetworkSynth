@@ -73,16 +73,16 @@ class Config1(BaseConfig):
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
-        from ..enums import DataType
-        from ..file_definitions import SaveSpec, make_generate_save_specs, save_png
-
-        cls.SAVE_SPECS = {
-            **make_generate_save_specs(),
-            DataType.SYNTHETIC_GRAPH_PNG: SaveSpec(
-                "synthetic", "synthetic_graph_png", save_png
-            ),
-        }
         cls._inject_dependencies()
+
+    @classmethod
+    def save_synthetic_graph(cls):
+        from ..file_definitions import save_png, save_webp
+
+        return [
+            ("synthetic", "synthetic_graph", "webp", save_webp),
+            ("synthetic", "synthetic_graph", "png", save_png),
+        ]
 
     @staticmethod
     def load_original_network(dataset_id: DatasetId):

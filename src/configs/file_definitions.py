@@ -1,7 +1,8 @@
 # src/configs/file_definitions.py
 import logging
+import os
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 from .enums import DataType
 
@@ -9,30 +10,8 @@ _logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# SaveSpec + serialisation functions
+# Serialisation functions (Layer 1)
 # ---------------------------------------------------------------------------
-
-
-@dataclass
-class SaveSpec:
-    """Describes how a DataType should be persisted.
-
-    Attributes
-    ----------
-    relative_dir : str
-        Sub-directory under the dataset output dir (e.g. "original", "synthetic", "").
-    detail : str
-        Descriptive tag embedded in the file name (e.g. "synthetic_edgelist").
-    save_fn : Callable[[Any, str], None]
-        ``(content, filepath) -> None`` — the actual serialisation function.
-    use_timestamp : bool
-        Whether to append a timestamp to the file name (default ``True``).
-    """
-
-    relative_dir: str
-    detail: str
-    save_fn: Callable[[Any, str], None]
-    use_timestamp: bool = True
 
 
 def save_pickle(obj: Any, filepath: str) -> None:
@@ -119,37 +98,30 @@ def save_png(image, filepath: str) -> None:
         raise TypeError(f"Unsupported image type: {type(image)}")
 
 
-def make_generate_save_specs():
-    """Factory that returns the standard SaveSpecs for generate mode.
+def save_network_csv(graph, filepath: str) -> None:
+    """Save a SynthGraph as two CSVs: edgelist and positions.
 
-    Modes that extend generate (mosaic, scaling, hybrid, attr-generate)
-    can call this and merge additional specs via ``{**make_generate_save_specs(), ...}``.
+    Given ``filepath`` (e.g. ``…/synthetic_network.csv``), writes:
+    - ``…/synthetic_network_edgelist.csv``
+    - ``…/synthetic_network_positions.csv``
     """
-    return {
-        DataType.ORIGINAL_IMAGE: SaveSpec("original", "original_image", save_png),
-        DataType.ORIGINAL_GRAPH: SaveSpec("original", "original_graph", save_svg),
-        DataType.ORIGINAL_NETWORK: SaveSpec(
-            "original", "original_network", save_pickle
-        ),
-        DataType.ORIGINAL_PROPERTY: SaveSpec(
-            "original", "original_property", save_pickle
-        ),
-        DataType.SYNTHETIC_GRAPH: SaveSpec("synthetic", "synthetic_graph", save_webp),
-        DataType.SYNTHETIC_NETWORK: SaveSpec(
-            "synthetic", "synthetic_network", save_pickle
-        ),
-        DataType.SYNTHETIC_EDGELIST: SaveSpec(
-            "synthetic", "synthetic_edgelist", save_csv
-        ),
-        DataType.SYNTHETIC_POSITIONS: SaveSpec(
-            "synthetic", "synthetic_positions", save_csv
-        ),
-        DataType.SYNTHETIC_NETWORK_NKI: SaveSpec(
-            "synthetic", "synthetic_network_nki", save_networkit
-        ),
-        DataType.ANALYSIS_DATA: SaveSpec("", "analysis_data", save_pickle),
-        DataType.ANALYSIS_FIGURE: SaveSpec("", "analysis_figure", save_svg),
-    }
+    base, ext = os.path.splitext(filepath)
+
+    edgelist_rows = [["source_index", "target_index", "edge_weight"]]
+    for u, v, w in graph.edges_with_weights():
+        edgelist_rows.append([u, v, w])
+    save_csv(edgelist_rows, f"{base}_edgelist{ext}")
+
+    positions = graph.positions()
+    position_rows = [["x", "y"]]
+    for pos in positions:
+        position_rows.append([pos[0], pos[1]])
+    save_csv(position_rows, f"{base}_positions{ext}")
+
+
+def save_network_nkbin(graph, filepath: str) -> None:
+    """Extract networkit graph + positions and save in binary format."""
+    save_networkit((graph.nk, graph.positions()), filepath)
 
 
 # ---------------------------------------------------------------------------
@@ -161,12 +133,7 @@ def make_generate_save_specs():
 @dataclass
 class FileConfig:
     relative_dir: str
-    data_type: DataType
     detail: Optional[str] = None
-
-    def __post_init__(self):
-        self.file_tags = self.data_type.tags
-        self.file_extension = self.data_type.file_extension
 
 
 @dataclass
@@ -184,10 +151,10 @@ class PlotConfig(FileConfig):
 ORIGINAL_DIR = "original"
 SYNTHETIC_DIR = "synthetic"
 INPLACE_DIR = ""
+
 FILE_CONFIGURATIONS = {
     DataType.ORIGINAL_IMAGE: ImageConfig(
         relative_dir=ORIGINAL_DIR,
-        data_type=DataType.ORIGINAL_IMAGE,
         alpha=0.6,
         detail="original_image",
     ),
@@ -195,64 +162,25 @@ FILE_CONFIGURATIONS = {
         relative_dir=ORIGINAL_DIR,
         node_size=6.0,
         line_width=3.0,
-        data_type=DataType.ORIGINAL_GRAPH,
         detail="original_graph",
     ),
     DataType.ORIGINAL_NETWORK: FileConfig(
         relative_dir=ORIGINAL_DIR,
-        data_type=DataType.ORIGINAL_NETWORK,
         detail="original_network",
     ),
     DataType.ORIGINAL_PROPERTY: FileConfig(
         relative_dir=ORIGINAL_DIR,
-        data_type=DataType.ORIGINAL_PROPERTY,
         detail="original_property",
     ),
     DataType.SYNTHETIC_GRAPH: PlotConfig(
         relative_dir=SYNTHETIC_DIR,
         node_size=6.0,
         line_width=3.0,
-        data_type=DataType.SYNTHETIC_GRAPH,
         show_on_the_fly=False,
         detail="synthetic_graph",
     ),
-    DataType.SYNTHETIC_GRAPH_PNG: FileConfig(
-        relative_dir=SYNTHETIC_DIR,
-        data_type=DataType.SYNTHETIC_GRAPH_PNG,
-        detail="synthetic_graph_png",
-    ),
-    DataType.SYNTHETIC_NETWORK: FileConfig(
-        relative_dir=SYNTHETIC_DIR,
-        data_type=DataType.SYNTHETIC_NETWORK,
-        detail="synthetic_network",
-    ),
-    DataType.SYNTHETIC_EDGELIST: FileConfig(
-        relative_dir=SYNTHETIC_DIR,
-        data_type=DataType.SYNTHETIC_EDGELIST,
-        detail="synthetic_edgelist",
-    ),
-    DataType.SYNTHETIC_POSITIONS: FileConfig(
-        relative_dir=SYNTHETIC_DIR,
-        data_type=DataType.SYNTHETIC_POSITIONS,
-        detail="synthetic_positions",
-    ),
-    DataType.SYNTHETIC_NETWORK_NKI: FileConfig(
-        relative_dir=SYNTHETIC_DIR,
-        data_type=DataType.SYNTHETIC_NETWORK_NKI,
-        detail="synthetic_network_nki",
-    ),
-    DataType.ANALYSIS_DATA: FileConfig(
-        relative_dir=INPLACE_DIR,
-        data_type=DataType.ANALYSIS_DATA,
-        detail="analysis_data",
-    ),
     DataType.ANALYSIS_FIGURE: PlotConfig(
         relative_dir=INPLACE_DIR,
-        data_type=DataType.ANALYSIS_FIGURE,
         detail="analysis_figure",
-    ),
-    DataType.DEFAULT_DATA: FileConfig(
-        relative_dir="",
-        data_type=DataType.DEFAULT_DATA,
     ),
 }

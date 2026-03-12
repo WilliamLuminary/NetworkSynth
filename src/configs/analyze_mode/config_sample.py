@@ -22,16 +22,19 @@ class SampleConfig(BaseConfig):
     def initialize(cls):
         super().initialize()
         cls.NETWORKS_FUNC = cls._load_networks_dict
-        from ..enums import DataType
-        from ..file_definitions import SaveSpec, save_pickle, save_svg
-
-        cls.SAVE_SPECS = {
-            DataType.ANALYSIS_DATA: SaveSpec(
-                "", "analysis_data", save_pickle, use_timestamp=False
-            ),
-            DataType.ANALYSIS_FIGURE: SaveSpec("", "analysis_figure", save_svg),
-        }
         cls._inject_dependencies()
+
+    @classmethod
+    def save_analysis_data(cls):
+        from ..file_definitions import save_pickle
+
+        return [("", "analysis_data", "pkl", save_pickle, False)]
+
+    @classmethod
+    def save_analysis_figure(cls):
+        from ..file_definitions import save_svg
+
+        return [("", "analysis_figure", "svg", save_svg)]
 
     @staticmethod
     def _load_networks_dict(

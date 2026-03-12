@@ -1,7 +1,7 @@
 # src/configs/base_config.py
 import logging
 import os
-from typing import List, Optional, Set, Tuple
+from typing import List, Optional, Tuple
 
 from .enums import DatasetId
 
@@ -56,11 +56,6 @@ class BaseConfig:
     MAX_ATTEMPTS = 10
     ERROR_TOLERANCE = 0.15  # Generally should be 0.15
 
-    # Supported: "csv", "nkbin" (case-insensitive)
-    OUTPUT_FORMATS: Set[str] = {"csv", "nkbin"}
-
-    SAVE_SPECS: dict = {}
-
     DISABLE_SAVING: bool = False
     DISABLE_SAVING_NOTE: str = ""
 
@@ -88,9 +83,95 @@ class BaseConfig:
         cls.OUTPUT_DENOTE = f"{mode}_{cls.__name__}" if mode else cls.__name__
 
     @classmethod
+    def save(cls, identifier: str):
+        """Return the save specs for *identifier*.
+
+        Looks up ``save_<identifier>`` on the active config and calls it.
+        Each ``save_*`` classmethod returns a list of tuples::
+
+            (relative_dir, detail, extension, save_fn)
+
+        An optional 5th element ``False`` disables the timestamp.
+        """
+        method = getattr(cls, f"save_{identifier}", None)
+        if method is None:
+            raise ValueError(
+                f"No save method 'save_{identifier}' defined in {cls.__name__}."
+            )
+        return method()
+
+    # ------------------------------------------------------------------
+    # Default save methods (generate-mode baseline).
+    # Mode configs override only what they need to change.
+    # Each returns a list of (relative_dir, detail, ext, save_fn[, use_ts]).
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def save_original_image(cls):
+        from .file_definitions import save_png
+
+        return [("original", "original_image", "png", save_png)]
+
+    @classmethod
+    def save_original_network(cls):
+        from .file_definitions import save_network_csv, save_network_nkbin
+
+        return [
+            ("original", "original_network", "csv", save_network_csv),
+            ("original", "original_network", "nkbin", save_network_nkbin),
+        ]
+
+    @classmethod
+    def save_original_property(cls):
+        from .file_definitions import save_pickle
+
+        return [("original", "original_property", "pkl", save_pickle)]
+
+    @classmethod
+    def save_original_graph(cls):
+        from .file_definitions import save_svg
+
+        return [("original", "original_graph", "svg", save_svg)]
+
+    @classmethod
+    def save_synthetic_graph(cls):
+        from .file_definitions import save_webp
+
+        return [("synthetic", "synthetic_graph", "webp", save_webp)]
+
+    @classmethod
+    def save_synthetic_network(cls):
+        from .file_definitions import save_pickle
+
+        return [("synthetic", "synthetic_network", "pkl", save_pickle)]
+
+    @classmethod
+    def save_synthetic_export(cls):
+        from .file_definitions import save_network_csv, save_network_nkbin
+
+        return [
+            ("synthetic", "synthetic_network", "csv", save_network_csv),
+            ("synthetic", "synthetic_network", "nkbin", save_network_nkbin),
+        ]
+
+    @classmethod
+    def save_analysis_data(cls):
+        from .file_definitions import save_pickle
+
+        return [("", "analysis_data", "pkl", save_pickle, False)]
+
+    @classmethod
+    def save_analysis_figure(cls):
+        from .file_definitions import save_svg
+
+        return [("", "analysis_figure", "svg", save_svg)]
+
+    @classmethod
     def _inject_dependencies(cls):
         for name in dir(cls):
-            if name.isupper() and not name.startswith("__"):
+            if name.startswith("__"):
+                continue
+            if name.isupper() or name.startswith("save"):
                 value = getattr(cls, name)
                 setattr(BaseConfig, name, value)
 

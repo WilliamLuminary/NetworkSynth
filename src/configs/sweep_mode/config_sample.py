@@ -64,7 +64,7 @@ class SampleConfig(BaseConfig):
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
-        # Sweep mode disables saving — no SAVE_SPECS needed.
+        # Sweep mode disables saving — no save methods needed.
         cls._inject_dependencies()
 
     @staticmethod

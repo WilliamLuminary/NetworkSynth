@@ -8,7 +8,6 @@ from typing import Any, Optional
 from configs import (
     BaseConfig,
     DatasetId,
-    DataType,
     Mode,
 )
 
@@ -66,6 +65,7 @@ class Saver:
             self.mode = Mode.GEN
 
         _ensure_directory(self.output_dir, exist_ok=True)
+        self._save_func = BaseConfig.save
 
     @classmethod
     def initialize(cls, result_dir: str = None) -> None:
@@ -99,8 +99,9 @@ class Saver:
     def begin_batch(cls) -> str:
         """Set a shared timestamp for a group of related saves.
 
-        All ``save_file`` calls until ``end_batch`` will use this timestamp.
-        Returns the generated timestamp so callers can log it.
+        All ``save`` calls until ``end_batch`` will share this
+        timestamp.  Returns the generated timestamp so callers can
+        log it.
         """
         cls._batch_timestamp = _time_id()
         return cls._batch_timestamp
@@ -110,53 +111,40 @@ class Saver:
         """Clear the batch timestamp."""
         cls._batch_timestamp = None
 
-    def save_file(
-        self, content: Any, data_type: DataType, file_name_prefix: Optional[str] = None
-    ) -> None:
-        """
-        Saves the provided content to a file based on its SaveSpec.
+    def save(self, content: Any, identifier: str, prefix: str = "") -> None:
+        """Save *content* according to the specs returned by the config.
 
-        The SaveSpec for *data_type* is looked up from
-        ``BaseConfig.SAVE_SPECS`` (populated by each mode config's
-        ``initialize()``).
-
-        :param content: The data to be saved (e.g., image or pickled object).
-        :param data_type: Specifies the data type and related save configurations.
-        :param file_name_prefix: Optional prefix for the generated file name.
-        :return: None
+        :param content: The data to be saved.
+        :param identifier: String identifier (e.g. ``"original_network"``).
+            Maps to ``save_<identifier>`` on the active config.
+        :param prefix: Optional prefix for the generated file name.
         """
         if content is None:
             logger.warning("Content is None.")
             return
 
         if BaseConfig.DISABLE_SAVING:
-            logger.warning(f"{BaseConfig.DISABLE_SAVING_NOTE} Saving is disabled. ")
+            logger.warning(f"{BaseConfig.DISABLE_SAVING_NOTE} Saving is disabled.")
             return
 
-        spec = BaseConfig.SAVE_SPECS.get(data_type)
-        if spec is None:
-            raise ValueError(
-                f"No SaveSpec registered for {data_type}. "
-                f"Check that your config's initialize() sets SAVE_SPECS."
-            )
+        specs = self._save_func(identifier)
+        for spec in specs:
+            relative_dir, detail, extension, save_fn = spec[:4]
+            use_timestamp = spec[4] if len(spec) > 4 else True
 
-        file_name_prefix = file_name_prefix or ""
-        detail = spec.detail or ""
+            if use_timestamp:
+                file_id = self._batch_timestamp or _time_id()
+                detail_part = f"{prefix}{detail}_" if detail else prefix
+            else:
+                file_id = ""
+                detail_part = f"{prefix}{detail}" if detail else prefix
 
-        if spec.use_timestamp:
-            file_id = self._batch_timestamp or _time_id()
-            if detail and not detail.endswith("_"):
-                detail += "_"
-        else:
-            file_id = ""
+            file_name = f"{detail_part}{file_id}.{extension}"
+            abs_path = os.path.join(self.output_dir, relative_dir, file_name)
+            _ensure_directory(os.path.dirname(abs_path), exist_ok=True)
 
-        extension = str(data_type.file_extension)
-        file_name = f"{file_name_prefix}{detail}{file_id}.{extension}"
-        abs_path = os.path.join(self.output_dir, spec.relative_dir, file_name)
-        _ensure_directory(os.path.dirname(abs_path), exist_ok=True)
-
-        spec.save_fn(content, abs_path)
-        logger.info(f"Saved file: {abs_path}")
+            save_fn(content, abs_path)
+            logger.info(f"Saved file: {abs_path}")
 
 
 def _is_junction(path: str) -> bool:
