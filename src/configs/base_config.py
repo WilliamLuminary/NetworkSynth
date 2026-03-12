@@ -56,6 +56,8 @@ class BaseConfig:
     MAX_ATTEMPTS = 10
     ERROR_TOLERANCE = 0.15  # Generally should be 0.15
 
+    SNAPSHOT_INTERVAL: int = 0  # 0 = disabled; N = snapshot every N new nodes
+
     DISABLE_SAVING: bool = False
     DISABLE_SAVING_NOTE: str = ""
 

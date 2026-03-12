@@ -10,10 +10,10 @@ import numpy as np
 
 from analysis import MultifractalAnalyzer
 from configs import BaseConfig, DatasetId
-from configs.generate_mode import GenConfig1 as GenConfig
+from configs.generate_mode import GenConfigSnapshot as GenConfig
 from graphs import GraphGenerator
 from handlers import AttributesCalculator, Mapper, RunAgent, Saver
-from utils import trim_graph
+from utils import save_bfs_snapshot, trim_graph
 
 GenConfig.initialize()
 # BaseConfig.disable_saving("debug")
@@ -140,6 +140,31 @@ def compute_average_error(errors: List) -> float:
     return round(np.mean(non_outliers), 3) if non_outliers else float("inf")
 
 
+def generate_with_snapshots(data_agent: RunAgent):
+    """Generate a single network while saving intermediate BFS snapshots."""
+    snapshot_dir = os.path.join(data_agent.saver.output_dir, "snapshots")
+    os.makedirs(snapshot_dir, exist_ok=True)
+
+    interval = BaseConfig.SNAPSHOT_INTERVAL
+
+    def on_snapshot(positions, edges, frame, step_idx):
+        save_bfs_snapshot(positions, edges, frame, step_idx, snapshot_dir)
+
+    generator = GraphGenerator(data_agent.attributes)
+    synthetic_graph = generator.generate_network_with_snapshots(
+        snapshot_callback=on_snapshot,
+        snapshot_interval=interval,
+    )
+    synthetic_graph = trim_graph(synthetic_graph, data_agent.attributes.average_degree)
+    data_agent.mapper.assign_weights(synthetic_graph)
+
+    data_agent.save("synthetic_graph", content=synthetic_graph)
+    data_agent.add_synthetic_graph(synthetic_graph)
+    data_agent.save_synthetic_outputs(prefix="snapshot_run")
+
+    logger.info(f"Snapshot generation complete. Snapshots saved to {snapshot_dir}")
+
+
 def run_for_dataset(dataset_id: DatasetId):
     """Process a single dataset identified by DatasetId."""
     logger.info(f"Processing dataset: {dataset_id}")
@@ -151,7 +176,10 @@ def run_for_dataset(dataset_id: DatasetId):
     data_agent.save("original_property")
     data_agent.save("original_graph")
 
-    generate_with_multiprocessing(data_agent)
+    if BaseConfig.SNAPSHOT_INTERVAL > 0:
+        generate_with_snapshots(data_agent)
+    else:
+        generate_with_multiprocessing(data_agent)
 
 
 def main():
