@@ -208,6 +208,71 @@ def figure_to_ndarray(fig, swap_channels: bool = False) -> ndarray:
     return image_array
 
 
+def compute_network_metrics(graph: SynthGraph) -> dict:
+    """Compute 5 key network metrics for quality comparison.
+
+    Returns a dict with: node_count, avg_degree, avg_clustering,
+    avg_length, avg_angle.
+    """
+    import networkit as nk
+    from scipy.spatial.distance import euclidean
+
+    n = graph.number_of_nodes()
+    e = graph.number_of_edges()
+
+    node_count = n
+    avg_degree = 2.0 * e / n if n > 0 else 0.0
+
+    lcc = nk.centrality.LocalClusteringCoefficient(graph.nk)
+    lcc.run()
+    avg_clustering = sum(lcc.scores()) / n if n > 0 else 0.0
+
+    positions = graph.positions()
+    total_length = 0.0
+    for u, v in graph.edges():
+        total_length += euclidean(positions[u], positions[v])
+    avg_length = total_length / e if e > 0 else 0.0
+
+    all_angle_diffs = []
+    for node in graph.nodes():
+        nbrs = graph.neighbors(node)
+        if len(nbrs) < 2:
+            continue
+        node_pos = positions[node]
+        angles = [
+            np.arctan2(
+                positions[nbr][1] - node_pos[1],
+                positions[nbr][0] - node_pos[0],
+            )
+            * 180.0
+            / np.pi
+            for nbr in nbrs
+        ]
+        sorted_angles = np.sort(angles)
+        diffs = np.diff(sorted_angles)
+        diffs = np.append(diffs, 360.0 + sorted_angles[0] - sorted_angles[-1])
+        all_angle_diffs.extend(diffs)
+    avg_angle = float(np.mean(all_angle_diffs)) if all_angle_diffs else 0.0
+
+    return {
+        "node_count": node_count,
+        "avg_degree": avg_degree,
+        "avg_clustering": avg_clustering,
+        "avg_length": avg_length,
+        "avg_angle": avg_angle,
+    }
+
+
+def metric_distance(metrics: dict, ref_metrics: dict) -> float:
+    """Normalised mean relative error across all metrics."""
+    total = 0.0
+    for key in ref_metrics:
+        ref = ref_metrics[key]
+        syn = metrics[key]
+        total += abs(syn - ref) / abs(ref) if ref != 0 else abs(syn)
+    return total / len(ref_metrics)
+
+
 def save_bfs_snapshot(
     node_positions,
     edges,
@@ -255,6 +320,64 @@ def save_bfs_snapshot(
     ax.set_ylim(frame[1])
     ax.set_title(
         f"Step {index} \u2014 {len(node_positions)} nodes, {len(edges)} edges",
+        fontsize=10,
+    )
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_aspect("equal")
+    ax.axis("off")
+    fig.tight_layout(pad=0.5)
+
+    path = os.path.join(output_dir, f"snapshot_{index:05d}.png")
+    fig.savefig(path, dpi=dpi, bbox_inches="tight")
+    ax.clear()
+    fig.clear()
+    del ax, fig
+
+
+def save_hybrid_snapshot(
+    node_positions,
+    edges,
+    frame,
+    index: int,
+    output_dir: str,
+    *,
+    dpi: int = 100,
+    node_size: float = 0.1,
+    line_width: float = 0.1,
+) -> None:
+    """Render a snapshot of a large hybrid network and save as PNG.
+
+    Tuned for networks with 100K+ nodes: tiny markers, thin lines,
+    low DPI.  Uses fixed *frame* limits so all snapshots are aligned.
+    """
+    import os
+
+    from matplotlib.collections import LineCollection
+    from matplotlib.figure import Figure
+
+    frame_w = frame[0][1] - frame[0][0]
+    frame_h = frame[1][1] - frame[1][0]
+    aspect = frame_w / frame_h if frame_h > 0 else 1.0
+    fig_h = 10
+    fig = Figure(figsize=(fig_h * aspect, fig_h), dpi=dpi)
+    ax = fig.add_subplot(111)
+
+    if edges:
+        segments = [[(e[0][0], e[0][1]), (e[1][0], e[1][1])] for e in edges]
+        lc = LineCollection(segments, colors="red", linewidths=line_width)
+        ax.add_collection(lc)
+
+    if node_positions:
+        xs = [p[0] for p in node_positions]
+        ys = [p[1] for p in node_positions]
+        ax.scatter(xs, ys, s=node_size, c="blue", zorder=2, edgecolors="none")
+
+    ax.set_xlim(frame[0])
+    ax.set_ylim(frame[1])
+    ax.set_title(
+        f"Phase 2 — step {index} \u2014 "
+        f"{len(node_positions):,} nodes, {len(edges):,} edges",
         fontsize=10,
     )
     ax.set_xticks([])
