@@ -128,6 +128,19 @@ class TestSpecs:
 
 
 class TestModeOverrides:
+    @pytest.fixture(autouse=True)
+    def _restore_base_config(self):
+        """Snapshot BaseConfig before each test, restore after."""
+        snapshot = {}
+        for name in dir(BaseConfig):
+            if name.startswith("__"):
+                continue
+            if name.isupper() or name.startswith("save_"):
+                snapshot[name] = getattr(BaseConfig, name)
+        yield
+        for name, value in snapshot.items():
+            setattr(BaseConfig, name, value)
+
     def test_mosaic_synthetic_graph_has_png(self):
         from configs.mosaic_mode.config_sample import SampleConfig as MosaicConfig
 

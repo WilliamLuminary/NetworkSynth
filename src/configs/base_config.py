@@ -171,7 +171,7 @@ class BaseConfig:
         for name in dir(cls):
             if name.startswith("__"):
                 continue
-            if name.isupper() or name.startswith("save"):
+            if name.isupper() or name.startswith("save_"):
                 value = getattr(cls, name)
                 setattr(BaseConfig, name, value)
 
