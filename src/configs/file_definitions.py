@@ -4,8 +4,6 @@ import os
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from .enums import DataType
-
 _logger = logging.getLogger(__name__)
 
 
@@ -152,34 +150,79 @@ ORIGINAL_DIR = "original"
 SYNTHETIC_DIR = "synthetic"
 INPLACE_DIR = ""
 
+# Default save specifications, keyed by identifier string.
+#
+# Usage:
+#   Pipeline code calls  saver.save(content, "<identifier>", prefix)
+#   which resolves to    BaseConfig.save("<identifier>")
+#   which returns the spec list defined here (unless a mode config
+#   overrides it — see below).
+#
+# Each spec is a tuple of 4 or 5 elements:
+#   (relative_dir, detail, extension, save_fn[, use_timestamp])
+#
+#   relative_dir   – subdirectory under the output root (e.g. "original")
+#   detail         – descriptive stem used in the filename
+#   extension      – file extension without the dot (e.g. "csv", "pkl")
+#   save_fn        – serialiser function with signature (content, filepath)
+#   use_timestamp  – optional; defaults to True.  Set to False for files
+#                    that should never carry a timestamp (e.g. analysis_data).
+#
+# To override from a mode config, define a classmethod on the config:
+#
+#   class MyConfig(BaseConfig):
+#       @classmethod
+#       def save_original_network(cls):
+#           return [("original", "original_network", "csv", save_network_csv)]
+#
+# The dispatcher checks for a save_<identifier> method first; if none
+# exists, it falls back to this dict.
+DEFAULT_SAVE_SPECS = {
+    "original_image": [("original", "original_image", "png", save_png)],
+    "original_network": [
+        ("original", "original_network", "csv", save_network_csv),
+        ("original", "original_network", "nkbin", save_network_nkbin),
+    ],
+    "original_property": [("original", "original_property", "pkl", save_pickle)],
+    "original_graph": [("original", "original_graph", "svg", save_svg)],
+    "synthetic_graph": [("synthetic", "synthetic_graph", "webp", save_webp)],
+    "synthetic_network": [("synthetic", "synthetic_network", "pkl", save_pickle)],
+    "synthetic_export": [
+        ("synthetic", "synthetic_network", "csv", save_network_csv),
+        ("synthetic", "synthetic_network", "nkbin", save_network_nkbin),
+    ],
+    "analysis_data": [("", "analysis_data", "pkl", save_pickle, False)],
+    "analysis_figure": [("", "analysis_figure", "svg", save_svg)],
+}
+
 FILE_CONFIGURATIONS = {
-    DataType.ORIGINAL_IMAGE: ImageConfig(
+    "original_image": ImageConfig(
         relative_dir=ORIGINAL_DIR,
         alpha=0.6,
         detail="original_image",
     ),
-    DataType.ORIGINAL_GRAPH: PlotConfig(
+    "original_graph": PlotConfig(
         relative_dir=ORIGINAL_DIR,
         node_size=6.0,
         line_width=3.0,
         detail="original_graph",
     ),
-    DataType.ORIGINAL_NETWORK: FileConfig(
+    "original_network": FileConfig(
         relative_dir=ORIGINAL_DIR,
         detail="original_network",
     ),
-    DataType.ORIGINAL_PROPERTY: FileConfig(
+    "original_property": FileConfig(
         relative_dir=ORIGINAL_DIR,
         detail="original_property",
     ),
-    DataType.SYNTHETIC_GRAPH: PlotConfig(
+    "synthetic_graph": PlotConfig(
         relative_dir=SYNTHETIC_DIR,
         node_size=6.0,
         line_width=3.0,
         show_on_the_fly=False,
         detail="synthetic_graph",
     ),
-    DataType.ANALYSIS_FIGURE: PlotConfig(
+    "analysis_figure": PlotConfig(
         relative_dir=INPLACE_DIR,
         detail="analysis_figure",
     ),

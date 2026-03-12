@@ -4,7 +4,6 @@ import numpy as np
 import pytest
 
 from analysis.multifractal_analyzer import MultifractalAnalyzer
-from configs import BaseConfig
 from configs.analyze_mode.config_sample import SampleConfig as AnaConfig
 
 AnaConfig.initialize()
@@ -162,9 +161,6 @@ def test_eigenvector_centrality(load_unweighted_test_synth_graph):
 
 
 def test_diameter(load_unweighted_test_synth_graph):
-    if not BaseConfig.MEASURE_WEIGHTED:
-        return pytest.skip("Test only for weighted graphs")
-
     analyzer = MultifractalAnalyzer(load_unweighted_test_synth_graph)
     diameter = analyzer._compute_diameter()
 

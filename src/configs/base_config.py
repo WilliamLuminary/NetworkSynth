@@ -86,85 +86,23 @@ class BaseConfig:
     def save(cls, identifier: str):
         """Return the save specs for *identifier*.
 
-        Looks up ``save_<identifier>`` on the active config and calls it.
-        Each ``save_*`` classmethod returns a list of tuples::
+        Checks for a ``save_<identifier>`` classmethod first (mode
+        overrides injected by ``_inject_dependencies``), then falls
+        back to ``DEFAULT_SAVE_SPECS`` in ``file_definitions``.
 
-            (relative_dir, detail, extension, save_fn)
+        Each spec is a tuple::
 
-        An optional 5th element ``False`` disables the timestamp.
+            (relative_dir, detail, extension, save_fn[, use_timestamp])
         """
         method = getattr(cls, f"save_{identifier}", None)
-        if method is None:
-            raise ValueError(
-                f"No save method 'save_{identifier}' defined in {cls.__name__}."
-            )
-        return method()
+        if method is not None:
+            return method()
+        from .file_definitions import DEFAULT_SAVE_SPECS
 
-    # ------------------------------------------------------------------
-    # Default save methods (generate-mode baseline).
-    # Mode configs override only what they need to change.
-    # Each returns a list of (relative_dir, detail, ext, save_fn[, use_ts]).
-    # ------------------------------------------------------------------
-
-    @classmethod
-    def save_original_image(cls):
-        from .file_definitions import save_png
-
-        return [("original", "original_image", "png", save_png)]
-
-    @classmethod
-    def save_original_network(cls):
-        from .file_definitions import save_network_csv, save_network_nkbin
-
-        return [
-            ("original", "original_network", "csv", save_network_csv),
-            ("original", "original_network", "nkbin", save_network_nkbin),
-        ]
-
-    @classmethod
-    def save_original_property(cls):
-        from .file_definitions import save_pickle
-
-        return [("original", "original_property", "pkl", save_pickle)]
-
-    @classmethod
-    def save_original_graph(cls):
-        from .file_definitions import save_svg
-
-        return [("original", "original_graph", "svg", save_svg)]
-
-    @classmethod
-    def save_synthetic_graph(cls):
-        from .file_definitions import save_webp
-
-        return [("synthetic", "synthetic_graph", "webp", save_webp)]
-
-    @classmethod
-    def save_synthetic_network(cls):
-        from .file_definitions import save_pickle
-
-        return [("synthetic", "synthetic_network", "pkl", save_pickle)]
-
-    @classmethod
-    def save_synthetic_export(cls):
-        from .file_definitions import save_network_csv, save_network_nkbin
-
-        return [
-            ("synthetic", "synthetic_network", "csv", save_network_csv),
-            ("synthetic", "synthetic_network", "nkbin", save_network_nkbin),
-        ]
-
-    @classmethod
-    def save_analysis_data(cls):
-        from .file_definitions import save_pickle
-
-        return [("", "analysis_data", "pkl", save_pickle, False)]
-
-    @classmethod
-    def save_analysis_figure(cls):
-        from .file_definitions import save_svg
-
-        return [("", "analysis_figure", "svg", save_svg)]
+        specs = DEFAULT_SAVE_SPECS.get(identifier)
+        if specs is None:
+            raise ValueError(f"No save spec for '{identifier}' in {cls.__name__}.")
+        return specs
 
     @classmethod
     def _inject_dependencies(cls):

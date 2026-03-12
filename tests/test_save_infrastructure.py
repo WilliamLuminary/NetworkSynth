@@ -28,7 +28,8 @@ _nk.Format = type("Format", (), {"NetworkitBinary": 0})
 _nk.writeGraph = lambda *a, **kw: None
 sys.modules.setdefault("networkit", _nk)
 
-from configs import BaseConfig, DataType  # noqa: E402
+from configs import BaseConfig  # noqa: E402
+from configs.file_definitions import DEFAULT_SAVE_SPECS  # noqa: E402
 from configs.file_definitions import save_csv as _save_csv  # noqa: E402
 from configs.file_definitions import (
     save_network_csv,
@@ -67,23 +68,20 @@ class FakeGraph:
 
 class TestDispatcher:
     def test_known_identifier(self):
-        specs = BaseConfig.save(DataType.ORIGINAL_IMAGE)
+        specs = BaseConfig.save("original_image")
         assert isinstance(specs, list) and len(specs) >= 1
         assert specs[0][2] == "png"
 
     def test_missing_identifier_raises(self):
-        with pytest.raises(ValueError, match="No save method"):
+        with pytest.raises(ValueError, match="No save spec"):
             BaseConfig.save("this_does_not_exist")
 
-    def test_all_datatypes_have_save_methods(self):
-        for attr in dir(DataType):
-            if attr.startswith("_"):
-                continue
-            identifier = getattr(DataType, attr)
-            specs = BaseConfig.save(identifier)
+    def test_all_default_specs_are_valid(self):
+        assert len(DEFAULT_SAVE_SPECS) >= 1, "DEFAULT_SAVE_SPECS is empty"
+        for identifier, specs in DEFAULT_SAVE_SPECS.items():
             assert (
                 isinstance(specs, list) and len(specs) >= 1
-            ), f"save_{identifier} returned empty"
+            ), f"{identifier} returned empty"
             for s in specs:
                 assert len(s) >= 4, f"spec too short for {identifier}: {s}"
                 assert callable(s[3]), f"save_fn not callable for {identifier}"
@@ -96,29 +94,29 @@ class TestDispatcher:
 
 class TestSpecs:
     def test_original_network_formats(self):
-        specs = BaseConfig.save(DataType.ORIGINAL_NETWORK)
+        specs = BaseConfig.save("original_network")
         exts = {s[2] for s in specs}
         assert "csv" in exts
         assert "nkbin" in exts
 
     def test_synthetic_export_formats(self):
-        specs = BaseConfig.save(DataType.SYNTHETIC_EXPORT)
+        specs = BaseConfig.save("synthetic_export")
         exts = {s[2] for s in specs}
         assert "csv" in exts
         assert "nkbin" in exts
 
     def test_synthetic_graph_default_webp(self):
-        specs = BaseConfig.save(DataType.SYNTHETIC_GRAPH)
+        specs = BaseConfig.save("synthetic_graph")
         assert len(specs) == 1
         assert specs[0][2] == "webp"
 
     def test_analysis_data_no_timestamp(self):
-        specs = BaseConfig.save(DataType.ANALYSIS_DATA)
+        specs = BaseConfig.save("analysis_data")
         assert len(specs[0]) == 5
         assert specs[0][4] is False
 
     def test_analysis_figure_has_timestamp(self):
-        specs = BaseConfig.save(DataType.ANALYSIS_FIGURE)
+        specs = BaseConfig.save("analysis_figure")
         assert len(specs[0]) == 4  # no 5th element → defaults to True
 
 
@@ -138,6 +136,9 @@ class TestModeOverrides:
             if name.isupper() or name.startswith("save_"):
                 snapshot[name] = getattr(BaseConfig, name)
         yield
+        for name in list(vars(BaseConfig)):
+            if name.startswith("save_") and name not in snapshot:
+                delattr(BaseConfig, name)
         for name, value in snapshot.items():
             setattr(BaseConfig, name, value)
 
@@ -145,7 +146,7 @@ class TestModeOverrides:
         from configs.mosaic_mode.config_sample import SampleConfig as MosaicConfig
 
         MosaicConfig._inject_dependencies()
-        specs = BaseConfig.save(DataType.SYNTHETIC_GRAPH)
+        specs = BaseConfig.save("synthetic_graph")
         exts = [s[2] for s in specs]
         assert "webp" in exts
         assert "png" in exts
@@ -168,9 +169,9 @@ class TestModeOverrides:
         from configs.analyze_mode.config_sample import SampleConfig as AnaConfig
 
         AnaConfig._inject_dependencies()
-        specs = BaseConfig.save(DataType.ANALYSIS_DATA)
+        specs = BaseConfig.save("analysis_data")
         assert specs[0][4] is False
-        specs = BaseConfig.save(DataType.ANALYSIS_FIGURE)
+        specs = BaseConfig.save("analysis_figure")
         assert specs[0][2] == "svg"
 
 
@@ -193,19 +194,17 @@ class TestSaverPaths:
     def test_single_spec_path(self, saver_in_tmpdir):
         saver = saver_in_tmpdir
         recorded = []
-        original_save = BaseConfig.save_original_image
 
         def fake_save_fn(content, path):
             recorded.append(path)
 
-        # Temporarily override to use our fake save_fn
         BaseConfig.save_original_image = classmethod(
             lambda cls: [("original", "original_image", "png", fake_save_fn)]
         )
         try:
-            saver.save("img_data", DataType.ORIGINAL_IMAGE, "pfx_")
+            saver.save("img_data", "original_image", "pfx_")
         finally:
-            BaseConfig.save_original_image = original_save
+            delattr(BaseConfig, "save_original_image")
 
         assert len(recorded) == 1
         p = recorded[0]
@@ -219,14 +218,13 @@ class TestSaverPaths:
         def fake_save_fn(content, path):
             recorded.append(path)
 
-        original_save = BaseConfig.save_analysis_data
         BaseConfig.save_analysis_data = classmethod(
             lambda cls: [("", "analysis_data", "pkl", fake_save_fn, False)]
         )
         try:
-            saver.save("data", DataType.ANALYSIS_DATA, "")
+            saver.save("data", "analysis_data", "")
         finally:
-            BaseConfig.save_analysis_data = original_save
+            delattr(BaseConfig, "save_analysis_data")
 
         assert len(recorded) == 1
         assert recorded[0].endswith("analysis_data.pkl")
@@ -238,7 +236,6 @@ class TestSaverPaths:
         def fake_save_fn(content, path):
             recorded.append(path)
 
-        original_save = BaseConfig.save_synthetic_export
         BaseConfig.save_synthetic_export = classmethod(
             lambda cls: [
                 ("synthetic", "net", "csv", fake_save_fn),
@@ -248,10 +245,10 @@ class TestSaverPaths:
         try:
             Saver.begin_batch()
             ts = Saver._batch_timestamp
-            saver.save("graph", DataType.SYNTHETIC_EXPORT, "b_")
+            saver.save("graph", "synthetic_export", "b_")
             Saver.end_batch()
         finally:
-            BaseConfig.save_synthetic_export = original_save
+            delattr(BaseConfig, "save_synthetic_export")
 
         assert len(recorded) == 2
         for p in recorded:
@@ -259,7 +256,7 @@ class TestSaverPaths:
 
     def test_none_content_skipped(self, saver_in_tmpdir):
         saver = saver_in_tmpdir
-        saver.save(None, DataType.ORIGINAL_IMAGE)  # should not raise
+        saver.save(None, "original_image")  # should not raise
 
     def test_prefix_normalization_in_run_agent(self):
         """RunAgent normalises prefix to end with '_'."""
@@ -282,16 +279,15 @@ class TestSaverPaths:
         def fake_save_fn(content, path):
             recorded.append(path)
 
-        original_save = BaseConfig.save_synthetic_export
         BaseConfig.save_synthetic_export = classmethod(
             lambda cls: [
                 ("sub/deep", "detail", "csv", fake_save_fn),
             ]
         )
         try:
-            saver.save("data", DataType.SYNTHETIC_EXPORT, "")
+            saver.save("data", "synthetic_export", "")
         finally:
-            BaseConfig.save_synthetic_export = original_save
+            delattr(BaseConfig, "save_synthetic_export")
 
         assert len(recorded) == 1
         parent = os.path.dirname(recorded[0])
@@ -360,7 +356,7 @@ class TestEndToEnd:
         saver._batch_timestamp = None
 
         data = {"hello": "world"}
-        saver.save(data, DataType.ORIGINAL_PROPERTY, "test_")
+        saver.save(data, "original_property", "test_")
 
         pkl_files = list(tmp_path.rglob("*.pkl"))
         assert len(pkl_files) == 1
@@ -377,16 +373,15 @@ class TestEndToEnd:
 
         graph = FakeGraph(n_nodes=5)
 
-        original_spec = BaseConfig.save_synthetic_export
         BaseConfig.save_synthetic_export = classmethod(
             lambda cls: [
                 ("synthetic", "synthetic_network", "csv", save_network_csv),
             ]
         )
         try:
-            saver.save(graph, DataType.SYNTHETIC_EXPORT, "exp_")
+            saver.save(graph, "synthetic_export", "exp_")
         finally:
-            BaseConfig.save_synthetic_export = original_spec
+            delattr(BaseConfig, "save_synthetic_export")
 
         csv_files = sorted(tmp_path.rglob("*.csv"))
         assert len(csv_files) == 2

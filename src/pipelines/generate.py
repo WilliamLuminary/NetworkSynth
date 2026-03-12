@@ -9,7 +9,7 @@ from typing import List
 import numpy as np
 
 from analysis import MultifractalAnalyzer
-from configs import BaseConfig, DatasetId, DataType
+from configs import BaseConfig, DatasetId
 from configs.generate_mode import GenConfig1 as GenConfig
 from graphs import GraphGenerator
 from handlers import AttributesCalculator, Mapper, RunAgent, Saver
@@ -106,7 +106,7 @@ def generate_with_multiprocessing(data_agent: RunAgent):
                     next_log += 10
 
                 if (num_figures := num_figures - 1) >= 0:
-                    data_agent.save(DataType.SYNTHETIC_GRAPH, content=synthetic_graph)
+                    data_agent.save("synthetic_graph", content=synthetic_graph)
                 data_agent.add_synthetic_graph(synthetic_graph)
                 errors.append(error)
     except KeyboardInterrupt:
@@ -126,8 +126,8 @@ def generate_with_multiprocessing(data_agent: RunAgent):
 
     if BaseConfig.FULL_ANALYSIS:
         data_agent.multifractal_analysis_in_generate_mode()
-        data_agent.save(DataType.ANALYSIS_DATA)
-        data_agent.save(DataType.ANALYSIS_FIGURE)
+        data_agent.save("analysis_data")
+        data_agent.save("analysis_figure")
 
 
 def compute_average_error(errors: List) -> float:
@@ -146,10 +146,10 @@ def run_for_dataset(dataset_id: DatasetId):
     logger.info(BaseConfig())
     data_agent = RunAgent(dataset_id=dataset_id)
     data_agent.prepare_data()
-    data_agent.save(DataType.ORIGINAL_IMAGE)
-    data_agent.save(DataType.ORIGINAL_NETWORK)
-    data_agent.save(DataType.ORIGINAL_PROPERTY)
-    data_agent.save(DataType.ORIGINAL_GRAPH)
+    data_agent.save("original_image")
+    data_agent.save("original_network")
+    data_agent.save("original_property")
+    data_agent.save("original_graph")
 
     generate_with_multiprocessing(data_agent)
 

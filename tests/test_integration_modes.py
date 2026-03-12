@@ -36,6 +36,9 @@ def _reset_singletons():
     Saver.base_output_dir = None
     Saver.mode = None
     Saver._batch_timestamp = None
+    for name in list(vars(BaseConfig)):
+        if name.startswith("save_") and name not in snapshot:
+            delattr(BaseConfig, name)
     for name, value in snapshot.items():
         setattr(BaseConfig, name, value)
 
@@ -56,7 +59,7 @@ class TestGenerateMode:
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
         SampleConfig.initialize()
 
-        from configs import BaseConfig, DataType
+        from configs import BaseConfig
         from handlers import RunAgent, Saver
 
         Saver.initialize()
@@ -64,9 +67,9 @@ class TestGenerateMode:
         agent = RunAgent(dataset_id=dataset_id)
         agent.prepare_data()
 
-        agent.save(DataType.ORIGINAL_NETWORK)
-        agent.save(DataType.ORIGINAL_GRAPH)
-        agent.save(DataType.ORIGINAL_PROPERTY)
+        agent.save("original_network")
+        agent.save("original_graph")
+        agent.save("original_property")
 
         out = agent.saver.output_dir
         assert os.path.isdir(out), f"Output dir not created: {out}"
@@ -86,7 +89,7 @@ class TestGenerateMode:
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
         SampleConfig.initialize()
 
-        from configs import BaseConfig, DataType
+        from configs import BaseConfig
         from graphs import GraphGenerator
         from handlers import RunAgent, Saver
         from utils import trim_graph
@@ -105,7 +108,7 @@ class TestGenerateMode:
         assert synth.number_of_edges() > 50
 
         agent.add_synthetic_graph(synth)
-        agent.save(DataType.SYNTHETIC_GRAPH, content=synth)
+        agent.save("synthetic_graph", content=synth)
         agent.save_synthetic_outputs("test_")
 
         out = agent.saver.output_dir
@@ -169,7 +172,7 @@ class TestMosaicMode:
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
         SampleConfig.initialize()
 
-        from configs import BaseConfig, DataType
+        from configs import BaseConfig
         from graphs import GraphGenerator
         from graphs.mosaic_stitcher import MosaicStitcher
         from handlers import RunAgent, Saver
@@ -208,7 +211,7 @@ class TestMosaicMode:
         assert mosaic.number_of_edges() > 100
 
         Saver.begin_batch()
-        agent.saver.save(mosaic, DataType.SYNTHETIC_EXPORT, "mosaic_2x2_")
+        agent.saver.save(mosaic, "synthetic_export", "mosaic_2x2_")
         Saver.end_batch()
 
         out = agent.saver.output_dir
@@ -237,7 +240,7 @@ class TestScalingMode:
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
         SampleConfig.initialize()
 
-        from configs import BaseConfig, DataType
+        from configs import BaseConfig
         from graphs import GraphGenerator
         from handlers import RunAgent, Saver
         from utils import trim_graph
@@ -261,7 +264,7 @@ class TestScalingMode:
         assert scaled.number_of_edges() > 200
 
         Saver.begin_batch()
-        agent.saver.save(scaled, DataType.SYNTHETIC_EXPORT, "scaled_2x2_")
+        agent.saver.save(scaled, "synthetic_export", "scaled_2x2_")
         Saver.end_batch()
 
         out = agent.saver.output_dir

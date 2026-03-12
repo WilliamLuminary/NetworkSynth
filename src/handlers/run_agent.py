@@ -7,7 +7,6 @@ from configs import (
     FILE_CONFIGURATIONS,
     BaseConfig,
     DatasetId,
-    DataType,
     Mode,
     PlotConfig,
 )
@@ -111,11 +110,11 @@ class RunAgent:
 
     def save_synthetic_outputs(self, prefix: str):
         """Save synthetic networks (collection pkl + per-graph exports)."""
-        self.save(DataType.SYNTHETIC_NETWORK, prefix)
+        self.save("synthetic_network", prefix)
         graphs = self.data_loader.get_synthetic_networks()
         for i, g in enumerate(graphs):
             Saver.begin_batch()
-            self.saver.save(g, DataType.SYNTHETIC_EXPORT, f"{prefix}_n{i}_")
+            self.saver.save(g, "synthetic_export", f"{prefix}_n{i}_")
             Saver.end_batch()
 
     def save(
@@ -125,7 +124,7 @@ class RunAgent:
         *,
         content=None,
     ):
-        """Save content identified by *identifier* (a DataType constant).
+        """Save content identified by *identifier* (a plain string).
 
         If *content* is not provided, loads it from internal state.
         """
@@ -136,7 +135,7 @@ class RunAgent:
         prefix = f"{prefix}_" if prefix and not prefix.endswith("_") else (prefix or "")
 
         if content is not None:
-            if identifier == DataType.SYNTHETIC_GRAPH:
+            if identifier == "synthetic_graph":
                 content = plot_network(
                     data_type=identifier,
                     graph=content,
@@ -147,23 +146,23 @@ class RunAgent:
             self.saver.save(content, identifier, prefix)
             return
 
-        if identifier == DataType.ORIGINAL_IMAGE:
+        if identifier == "original_image":
             content = self.data_loader.get_original_image()
 
-        elif identifier == DataType.ORIGINAL_NETWORK:
+        elif identifier == "original_network":
             content = self.data_loader.get_original_network()
 
-        elif identifier == DataType.ORIGINAL_PROPERTY:
+        elif identifier == "original_property":
             import dataclasses
 
             assert self.attributes, "Attributes not initialized."
             content = dataclasses.asdict(self.attributes)
 
-        elif identifier == DataType.ORIGINAL_GRAPH:
+        elif identifier == "original_graph":
             original_network = self.data_loader.get_original_network()
             original_image = self.data_loader.get_original_image()
             content = plot_network(
-                data_type=DataType.ORIGINAL_GRAPH,
+                data_type="original_graph",
                 graph=original_network,
                 background=original_image,
                 show=True,
@@ -171,10 +170,10 @@ class RunAgent:
             if not self.saver:
                 return
 
-        elif identifier == DataType.SYNTHETIC_NETWORK:
+        elif identifier == "synthetic_network":
             content = self.data_loader.get_synthetic_networks()
 
-        elif identifier == DataType.ANALYSIS_DATA:
+        elif identifier == "analysis_data":
             content = {
                 "original_multifractal_analysis_results": (
                     self.batch_processor.get_original_data()
@@ -184,7 +183,7 @@ class RunAgent:
                 ),
             }
 
-        elif identifier == DataType.ANALYSIS_FIGURE:
+        elif identifier == "analysis_figure":
             for image_name, image in self.batch_processor.get_images().items():
                 self.saver.save(image, identifier, f"{image_name}_")
             return
@@ -216,7 +215,7 @@ def plot_network(data_type: str, graph: SynthGraph, **kwargs):
         f"{data_type} shouldn't call " f"{inspect.currentframe().f_code.co_name}."
     )
 
-    if data_type == DataType.ORIGINAL_GRAPH:
+    if data_type == "original_graph":
         frame = (
             (0, BaseConfig.FRAME_SIZE[0]),
             (0, BaseConfig.FRAME_SIZE[1]),
@@ -256,7 +255,7 @@ def plot_network(data_type: str, graph: SynthGraph, **kwargs):
     ax.set_xlim(frame[0])
     ax.set_ylim(frame[1])
 
-    if data_type == DataType.ORIGINAL_GRAPH:
+    if data_type == "original_graph":
         image = kwargs.get("background", None)
         if image is not None:
             alpha = getattr(file_config, "alpha", 1.0)

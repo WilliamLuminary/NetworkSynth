@@ -84,25 +84,6 @@ class DatasetId:
         raise AttributeError("DatasetId is immutable")
 
 
-class DataType:
-    """String-constant identifiers for save dispatch.
-
-    Each constant maps to a ``save_<identifier>`` classmethod on the
-    mode config (e.g. ``save_original_network``).  Used as the
-    *identifier* argument to ``Saver.save()``.
-    """
-
-    ORIGINAL_IMAGE = "original_image"
-    ORIGINAL_GRAPH = "original_graph"
-    ORIGINAL_PROPERTY = "original_property"
-    ORIGINAL_NETWORK = "original_network"
-    SYNTHETIC_GRAPH = "synthetic_graph"
-    SYNTHETIC_NETWORK = "synthetic_network"
-    SYNTHETIC_EXPORT = "synthetic_export"
-    ANALYSIS_DATA = "analysis_data"
-    ANALYSIS_FIGURE = "analysis_figure"
-
-
 class AnalysisMode(Enum):
     BASIC = auto()
     FULL = auto()
