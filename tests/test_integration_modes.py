@@ -327,7 +327,7 @@ class TestAnalyzeMode:
 
 class TestSnapshotMode:
     def test_generate_with_snapshots(self, tmp_path):
-        """Generate a single network with BFS snapshots at interval=10."""
+        """Generate a single network with BFS snapshots via Snapshot1x1Config."""
         from configs.generate_mode.config_snapshot_1x1 import Snapshot1x1Config
 
         Snapshot1x1Config.BASE_OUTPUT_PATH = str(tmp_path)
