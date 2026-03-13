@@ -13,20 +13,31 @@ Covers:
 import csv
 import os
 import pickle
+import sys
+import types
 
 import numpy as np
 import pytest
 
 pytestmark = pytest.mark.unit
 
-from configs import BaseConfig
-from configs.file_definitions import DEFAULT_SAVE_SPECS
-from configs.file_definitions import save_csv as _save_csv
+# ---------------------------------------------------------------------------
+# Stub networkit so the full import chain works without the C extension.
+# ---------------------------------------------------------------------------
+_nk = types.ModuleType("networkit")
+_nk.Graph = type("Graph", (), {})
+_nk.Format = type("Format", (), {"NetworkitBinary": 0})
+_nk.writeGraph = lambda *a, **kw: None
+sys.modules.setdefault("networkit", _nk)
+
+from configs import BaseConfig  # noqa: E402
+from configs.file_definitions import DEFAULT_SAVE_SPECS  # noqa: E402
+from configs.file_definitions import save_csv as _save_csv  # noqa: E402
 from configs.file_definitions import (
     save_network_csv,
 )
 from configs.file_definitions import save_pickle as _save_pickle
-from handlers.saver import Saver
+from handlers.saver import Saver  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Helpers
