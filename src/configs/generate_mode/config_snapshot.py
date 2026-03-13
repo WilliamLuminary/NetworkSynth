@@ -1,12 +1,9 @@
 # src/configs/generate_mode/config_snapshot.py
 """
-Generate-mode config for snapshot & metric-selection generation.
+Generate-mode config for sample_A.
 
 Uses the hybrid-mode sample_A data with its tuned node/edge factors.
-
-Two run modes (toggle by setting one to 0):
-  SNAPSHOT_INTERVAL > 0  →  BFS snapshot visualisation (single network)
-  SELECT_BEST > 0        →  generate many, rank by 5 metrics, save best
+Base class for Snapshot1x1Config / Snapshot3x3Config variants.
 """
 import logging
 import os
@@ -32,14 +29,11 @@ class SnapshotConfig(BaseConfig):
     CLOSED_NODES_FACTOR = 1.0
     CLOSED_EDGES_FACTOR = 1.5
 
-    # --- Snapshot mode (set SNAPSHOT_INTERVAL = 0 to disable) ---
     SNAPSHOT_INTERVAL = 0
+    SELECT_BEST = 0
 
-    # --- Metric selection mode (set SELECT_BEST = 0 to disable) ---
-    SELECT_BEST = 3
-
-    SYNTHETIC_GRAPH_NUMBER = 3
-    SYNTHETIC_NETWORK_NUMBER = 20
+    SYNTHETIC_GRAPH_NUMBER = 1
+    SYNTHETIC_NETWORK_NUMBER = 1
 
     MAX_ATTEMPTS = 50
     ERROR_TOLERANCE = 0.15
