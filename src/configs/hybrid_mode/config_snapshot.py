@@ -15,4 +15,4 @@ from .config_sample import SampleConfig
 class SnapshotConfig(SampleConfig):
     """Hybrid mode with Phase 2 snapshots enabled."""
 
-    SNAPSHOT_INTERVAL: int = 1
+    SNAPSHOT_INTERVAL: int = 4

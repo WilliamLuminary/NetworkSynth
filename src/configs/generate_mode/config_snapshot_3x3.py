@@ -13,9 +13,9 @@ class Snapshot3x3Config(SnapshotConfig):
     SYNTHETIC_FRAME_SIZE: Tuple[int, int] = (1530, 1530)
 
     SNAPSHOT_INTERVAL = 50
-    SELECT_BEST = 0
-    SYNTHETIC_GRAPH_NUMBER = 1
-    SYNTHETIC_NETWORK_NUMBER = 1
+    SELECT_BEST = 3
+    SYNTHETIC_GRAPH_NUMBER = 3
+    SYNTHETIC_NETWORK_NUMBER = 20
 
     PLOT_STYLE: dict = {
         "dpi": 300,
