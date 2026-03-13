@@ -1,14 +1,20 @@
 import time
-from time import sleep
 
-import numpy as np
-from matplotlib import pyplot as plt
-from scipy.stats import pearsonr
+import matplotlib
+
+matplotlib.use("Agg")
+
+import numpy as np  # noqa: E402
+import pytest  # noqa: E402
+from matplotlib import pyplot as plt  # noqa: E402
+from scipy.stats import pearsonr  # noqa: E402
 
 from configs import GenConfig1
 from handlers import Mapper
 
 GenConfig1.initialize()
+
+pytestmark = [pytest.mark.requires_fixture_data, pytest.mark.slow]
 
 
 def profile_mapper_time(mapper, graph, iterations=10):
@@ -42,37 +48,33 @@ def compute_quality(mapper, graph):
     return mae, corr
 
 
-def plot_map(mapper, sample_graph):
-    # noinspection PyProtectedMember
-    ori_lengths, ori_weights = Mapper._compute_edge_metrics(sample_graph)
-    for _ in range(10):
-        new_graph = sample_graph.copy()
-        new_graph.make_unweighted()
-        mapper.assign_weights(new_graph)
-        # noinspection PyProtectedMember
-        new_lengths, new_weights = Mapper._compute_edge_metrics(new_graph)
-        plt.figure(figsize=(8, 6))
-        plt.scatter(
-            ori_lengths, ori_weights, c="blue", alpha=0.3, label="Original Data"
-        )
-        plt.scatter(
-            new_lengths, new_weights, c="orange", alpha=0.3, label="Mapped Weights"
-        )
-        plt.title("Edge Length vs Weight with Basket-Based Mapping")
-        plt.xlabel("Length")
-        plt.ylabel("Weight")
-        plt.legend()
-        plt.grid(False)
-        plt.show()
-        print("Check the plot for the comparison of original and mapped weights.")
-        plt.close()
-        sleep(0.1)
-
-
-def test_mapper(load_weighted_test_synth_graph):
+@pytest.mark.manual
+def test_mapper(load_weighted_test_synth_graph, tmp_path):
+    """Visual comparison — generates plot files instead of showing interactively."""
     sample_graph = load_weighted_test_synth_graph
     mapper = Mapper(sample_graph)
-    plot_map(mapper, sample_graph)
+
+    # noinspection PyProtectedMember
+    ori_lengths, ori_weights = Mapper._compute_edge_metrics(sample_graph)
+
+    new_graph = sample_graph.copy()
+    new_graph.make_unweighted()
+    mapper.assign_weights(new_graph)
+    # noinspection PyProtectedMember
+    new_lengths, new_weights = Mapper._compute_edge_metrics(new_graph)
+
+    plt.figure(figsize=(8, 6))
+    plt.scatter(ori_lengths, ori_weights, c="blue", alpha=0.3, label="Original Data")
+    plt.scatter(new_lengths, new_weights, c="orange", alpha=0.3, label="Mapped Weights")
+    plt.title("Edge Length vs Weight with Basket-Based Mapping")
+    plt.xlabel("Length")
+    plt.ylabel("Weight")
+    plt.legend()
+    plt.grid(False)
+    plt.savefig(tmp_path / "mapper_comparison.png", dpi=100)
+    plt.close()
+
+    assert (tmp_path / "mapper_comparison.png").exists()
 
 
 def test_mapper_performance(load_weighted_test_synth_graph):
@@ -95,4 +97,3 @@ def test_mapper_quality(load_weighted_test_synth_graph):
 
     print()
     print(f"Mapper: MAE = {mae1:.4f}, Corr = {corr1:.4f}")
-    # assert abs(corr1 - corr2) < 0.1
