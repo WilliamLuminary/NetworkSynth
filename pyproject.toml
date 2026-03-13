@@ -1,0 +1,11 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "unit: pure unit tests — no heavy deps, no sample data",
+    "integration: end-to-end pipeline tests — need networkit + sample data",
+    "requires_fixture_data: tests that load pkl fixtures from tests/data/",
+    "slow: long-running tests (profiling, large graphs)",
+    "manual: interactive / visual tests not suited for CI",
+]
+addopts = "-ra --strict-markers"

@@ -57,6 +57,7 @@ class BaseConfig:
     ERROR_TOLERANCE = 0.15  # Generally should be 0.15
 
     SNAPSHOT_INTERVAL: int = 0  # 0 = disabled; N = snapshot every N new nodes
+    SELECT_BEST: int = 0  # 0 = disabled; N = keep N best networks by metric distance
 
     DISABLE_SAVING: bool = False
     DISABLE_SAVING_NOTE: str = ""
