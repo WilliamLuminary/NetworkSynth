@@ -273,6 +273,9 @@ class GraphGenerator:
         tile_data_list: List[Dict],
         global_frame: Tuple[Tuple[float, float], Tuple[float, float]],
         max_rounds: int,
+        *,
+        snapshot_callback=None,
+        snapshot_round_interval: int = 0,
     ) -> SynthGraph:
         """Phase 2: populate grids from tiles, then BFS from frontier nodes.
 
@@ -288,8 +291,26 @@ class GraphGenerator:
           - ``positions``: list of (x, y) in **global** coordinates
           - ``edges``:     list of ((x1,y1),(x2,y2)) in global coordinates
           - ``frontier``:  list of :class:`FrontierDescriptor` in global coords
+
+        Parameters
+        ----------
+        snapshot_callback : callable, optional
+            ``callback(positions, edges, global_frame, index)`` called
+            after assembly and every *snapshot_round_interval* rounds.
+        snapshot_round_interval : int
+            Fire *snapshot_callback* every this many Phase 2 rounds.
+            0 disables snapshots.
         """
         GraphNode.reset()
+
+        take_snapshots = snapshot_callback is not None and snapshot_round_interval > 0
+
+        def _fire_snapshot(idx):
+            positions = [
+                n.position for cell in GraphNode.node_grid.values() for n in cell
+            ]
+            edges = list({e for cell in GraphNode.edge_grid.values() for e in cell})
+            snapshot_callback(positions, edges, global_frame, idx)
 
         frontier_positions: set = set()
         for tile in tile_data_list:
@@ -339,6 +360,11 @@ class GraphGenerator:
 
         del position_to_node, frontier_positions
 
+        snapshot_idx = 0
+        if take_snapshots:
+            _fire_snapshot(snapshot_idx)
+            snapshot_idx += 1
+
         for round_num in range(max_rounds):
             rng.shuffle(frontier)
             next_frontier: list = []
@@ -369,7 +395,14 @@ class GraphGenerator:
 
             frontier = next_frontier
 
+            if take_snapshots and (round_num + 1) % snapshot_round_interval == 0:
+                _fire_snapshot(snapshot_idx)
+                snapshot_idx += 1
+
         del seen_frontier_ids
+
+        if take_snapshots:
+            _fire_snapshot(snapshot_idx)
 
         all_nodes: set = set()
         for cell_nodes in GraphNode.node_grid.values():

@@ -1,9 +1,12 @@
 # src/configs/generate_mode/config_snapshot.py
 """
-Generate-mode config for snapshot generation.
+Generate-mode config for snapshot & metric-selection generation.
 
-Uses the hybrid-mode sample_A data with its tuned node/edge factors,
-and enables BFS snapshots every SNAPSHOT_INTERVAL nodes.
+Uses the hybrid-mode sample_A data with its tuned node/edge factors.
+
+Two run modes (toggle by setting one to 0):
+  SNAPSHOT_INTERVAL > 0  →  BFS snapshot visualisation (single network)
+  SELECT_BEST > 0        →  generate many, rank by 5 metrics, save best
 """
 import logging
 import os
@@ -24,20 +27,35 @@ class SnapshotConfig(BaseConfig):
 
     IMAGE_SIZE: Tuple[int, int] = (510, 510)
     FRAME_SIZE: Tuple[int, int] = (510, 510)
-    SYNTHETIC_FRAME_SIZE: Tuple[int, int] = (510, 510)
+    SYNTHETIC_FRAME_SIZE: Tuple[int, int] = (1530, 1530)
 
     CLOSED_NODES_FACTOR = 1.0
     CLOSED_EDGES_FACTOR = 1.5
 
-    SNAPSHOT_INTERVAL = 10
+    # --- Snapshot mode (set SNAPSHOT_INTERVAL = 0 to disable) ---
+    SNAPSHOT_INTERVAL = 0
 
-    SYNTHETIC_GRAPH_NUMBER = 1
-    SYNTHETIC_NETWORK_NUMBER = 0
+    # --- Metric selection mode (set SELECT_BEST = 0 to disable) ---
+    SELECT_BEST = 3
+
+    SYNTHETIC_GRAPH_NUMBER = 3
+    SYNTHETIC_NETWORK_NUMBER = 20
 
     MAX_ATTEMPTS = 50
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = True
     FULL_ANALYSIS = False
+
+    # Shared visual style for both BFS snapshots and final synthetic plots.
+    # Adjust node_size / line_width when SYNTHETIC_FRAME_SIZE differs
+    # from FRAME_SIZE — larger frames need thinner strokes.
+    #   1×1 (510):  node_size=6.0, line_width=3.0
+    #   3×3 (1530): node_size=2.0, line_width=1.0
+    PLOT_STYLE: dict = {
+        "dpi": 300,
+        "node_size": 1.5,
+        "line_width": 1.5,
+    }
 
     BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, "samples", "hybrid_mode")
 
@@ -47,6 +65,13 @@ class SnapshotConfig(BaseConfig):
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
         cls._inject_dependencies()
+
+        from configs.file_definitions import FILE_CONFIGURATIONS
+
+        style = cls.PLOT_STYLE
+        syn_cfg = FILE_CONFIGURATIONS["synthetic_graph"]
+        syn_cfg.node_size = style.get("node_size", syn_cfg.node_size)
+        syn_cfg.line_width = style.get("line_width", syn_cfg.line_width)
 
     @staticmethod
     def load_original_network(dataset_id: DatasetId):

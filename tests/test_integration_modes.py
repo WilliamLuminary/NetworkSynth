@@ -10,6 +10,8 @@ import os
 
 import pytest
 
+pytestmark = pytest.mark.integration
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
