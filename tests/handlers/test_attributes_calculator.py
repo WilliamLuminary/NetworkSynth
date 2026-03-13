@@ -3,6 +3,8 @@ import pickle
 import numpy as np
 import pytest
 
+nk = pytest.importorskip("networkit", reason="networkit required for handler tests")
+
 from handlers.attributes_calculator import AttributesCalculator
 
 pytestmark = pytest.mark.requires_fixture_data

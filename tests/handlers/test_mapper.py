@@ -6,6 +6,9 @@ matplotlib.use("Agg")
 
 import numpy as np  # noqa: E402
 import pytest  # noqa: E402
+
+nk = pytest.importorskip("networkit", reason="networkit required for mapper tests")
+
 from matplotlib import pyplot as plt  # noqa: E402
 from scipy.stats import pearsonr  # noqa: E402
 
