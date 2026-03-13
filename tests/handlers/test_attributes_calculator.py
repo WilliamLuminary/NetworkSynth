@@ -1,10 +1,11 @@
-import os
 import pickle
 
 import numpy as np
 import pytest
 
 from handlers.attributes_calculator import AttributesCalculator
+
+pytestmark = pytest.mark.requires_fixture_data
 
 
 def compare_dicts_of_floats(
@@ -49,34 +50,23 @@ def test_attributes_calculators_equivalence(load_weighted_test_synth_graph):
     )
 
 
-def test_pickle_io(load_unweighted_test_synth_graph):
+def test_pickle_io(load_unweighted_test_synth_graph, tmp_path):
     sample_graph = load_unweighted_test_synth_graph
     attr_cal = AttributesCalculator()
     attr_cal.analyze(sample_graph)
-    pickle_file_path = os.path.join("data", "attr_dict.pkl")
-    _test_dump(attr_cal, pickle_file_path)
-    loaded_data = _test_dump_type(pickle_file_path)
-    _test_reconstruction(attr_cal, loaded_data)
 
+    pickle_file_path = str(tmp_path / "attr_dict.pkl")
 
-def _test_reconstruction(attr_cal, loaded_data):
-    reconstructed_attr_cal = AttributesCalculator(**loaded_data)
-    assert attr_cal == reconstructed_attr_cal
+    import dataclasses
 
-
-def _test_dump(attr_cal, pickle_file_path):
     with open(pickle_file_path, "wb") as f:
-        import dataclasses
-
         # noinspection PyTypeChecker
         pickle.dump(dataclasses.asdict(attr_cal), f)
-    assert os.path.exists(pickle_file_path)
+    assert (tmp_path / "attr_dict.pkl").exists()
 
-
-def _test_dump_type(pickle_file_path):
     with open(pickle_file_path, "rb") as f:
-        load_file = pickle.load(f)
-    from typing import Dict
+        loaded_data = pickle.load(f)
+    assert isinstance(loaded_data, dict)
 
-    assert isinstance(load_file, Dict)
-    return load_file
+    reconstructed_attr_cal = AttributesCalculator(**loaded_data)
+    assert attr_cal == reconstructed_attr_cal

@@ -19,6 +19,8 @@ import types
 import numpy as np
 import pytest
 
+pytestmark = pytest.mark.unit
+
 # ---------------------------------------------------------------------------
 # Stub networkit so the full import chain works without the C extension.
 # ---------------------------------------------------------------------------
