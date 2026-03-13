@@ -318,3 +318,103 @@ class TestAnalyzeMode:
             f"assortativity={result['assortativity']:.4f}, "
             f"tau_list length={len(result['tau_list'])}"
         )
+
+
+# ------------------------------------------------------------------ #
+# Snapshot mode
+# ------------------------------------------------------------------ #
+
+
+class TestSnapshotMode:
+    def test_generate_with_snapshots(self, tmp_path):
+        """Generate a single network with BFS snapshots at interval=10."""
+        from configs.generate_mode.config_snapshot_1x1 import Snapshot1x1Config
+
+        Snapshot1x1Config.BASE_OUTPUT_PATH = str(tmp_path)
+        Snapshot1x1Config.initialize()
+
+        from configs import BaseConfig
+        from handlers import RunAgent, Saver
+
+        Saver.initialize()
+        dataset_id = BaseConfig.get_datasets()[0]
+        agent = RunAgent(dataset_id=dataset_id)
+        agent.prepare_data()
+
+        from graphs import GraphGenerator
+        from utils import save_bfs_snapshot, trim_graph
+
+        snapshot_dir = os.path.join(agent.saver.output_dir, "snapshots")
+        os.makedirs(snapshot_dir, exist_ok=True)
+
+        style = getattr(BaseConfig, "PLOT_STYLE", {})
+        recorded_calls = []
+
+        def on_snapshot(positions, edges, frame, step_idx):
+            recorded_calls.append(step_idx)
+            save_bfs_snapshot(
+                positions, edges, frame, step_idx, snapshot_dir, dpi=72, **{
+                    k: v for k, v in style.items() if k != "dpi"
+                }
+            )
+
+        generator = GraphGenerator(agent.attributes)
+        synth = generator.generate_network_with_snapshots(
+            snapshot_callback=on_snapshot,
+            snapshot_interval=BaseConfig.SNAPSHOT_INTERVAL,
+        )
+        synth = trim_graph(synth, agent.attributes.average_degree)
+        agent.mapper.assign_weights(synth)
+
+        assert synth.number_of_nodes() > 50
+        assert synth.number_of_edges() > 50
+
+        # Verify snapshot callback was invoked
+        assert len(recorded_calls) > 0, "No snapshots were recorded"
+
+        # Verify PNG files were created
+        snapshot_files = [
+            f for f in os.listdir(snapshot_dir) if f.endswith(".png")
+        ]
+        assert len(snapshot_files) == len(recorded_calls)
+
+        logger.info(
+            f"Snapshot mode: {synth.number_of_nodes()} nodes, "
+            f"{synth.number_of_edges()} edges, "
+            f"{len(snapshot_files)} snapshots"
+        )
+
+    def test_compute_and_rank_metrics(self, tmp_path):
+        """Generate a network and compute quality metrics for ranking."""
+        from configs.generate_mode.config_sample import SampleConfig
+
+        SampleConfig.DATASETS = SampleConfig.DATASETS[:1]
+        SampleConfig.SYNTHETIC_NETWORK_NUMBER = 0
+        SampleConfig.SYNTHETIC_GRAPH_NUMBER = 0
+        SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
+        SampleConfig.initialize()
+
+        from configs import BaseConfig
+        from handlers import RunAgent, Saver
+        from utils import compute_network_metrics, metric_distance
+
+        Saver.initialize()
+        dataset_id = BaseConfig.get_datasets()[0]
+        agent = RunAgent(dataset_id=dataset_id)
+        agent.prepare_data()
+
+        original = agent.get_original_network()
+        ref_metrics = compute_network_metrics(original)
+
+        # Metrics should be well-formed
+        assert ref_metrics["node_count"] > 0
+        assert ref_metrics["avg_degree"] > 0
+
+        # Distance to self should be zero
+        assert metric_distance(ref_metrics, ref_metrics) == pytest.approx(0.0)
+
+        logger.info(
+            f"Metrics: nodes={ref_metrics['node_count']}, "
+            f"avg_deg={ref_metrics['avg_degree']:.2f}, "
+            f"avg_clust={ref_metrics['avg_clustering']:.4f}"
+        )
