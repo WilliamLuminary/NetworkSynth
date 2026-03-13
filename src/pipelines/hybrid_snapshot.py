@@ -23,6 +23,7 @@ from graphs.graph_generator import FrontierDescriptor
 from handlers import RunAgent, Saver
 from pipelines.hybrid import (
     _apply_dataset_factors,
+    _write_report,
     generate_random_centers,
     log_connectivity,
     plot_hybrid_network,
@@ -205,7 +206,13 @@ def run_hybrid_snapshot_for_dataset(
 
     mapper.assign_weights(hybrid_graph)
 
-    # --- Save final outputs ---
+    # --- Save original/ outputs ---
+    data_agent.save("original_image")
+    data_agent.save("original_network")
+    data_agent.save("original_property")
+    data_agent.save("original_graph")
+
+    # --- Save synthetic/ outputs ---
     data_agent.add_synthetic_graph(hybrid_graph)
     prefix = f"hybrid_snapshot_{len(centers)}centers"
 
@@ -214,6 +221,21 @@ def run_hybrid_snapshot_for_dataset(
     fig = plot_hybrid_network(hybrid_graph)
     data_agent.saver.save(fig, "synthetic_graph", f"{prefix}_")
     Saver.end_batch()
+
+    # --- Write reports ---
+    original_network = data_agent.get_original_network()
+    _write_report(
+        os.path.join(data_agent.saver.output_dir, "original", "report.txt"),
+        "Original Network",
+        original_network.number_of_nodes(),
+        original_network.number_of_edges(),
+    )
+    _write_report(
+        os.path.join(data_agent.saver.output_dir, "synthetic", "report.txt"),
+        "Synthetic Network",
+        hybrid_graph.number_of_nodes(),
+        hybrid_graph.number_of_edges(),
+    )
 
     logger.info(
         f"Hybrid snapshot complete — "

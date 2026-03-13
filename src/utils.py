@@ -280,9 +280,11 @@ def save_bfs_snapshot(
     index: int,
     output_dir: str,
     *,
-    dpi: int = 150,
+    dpi: int = 300,
+    node_size: float = 6.0,
+    line_width: float = 3.0,
 ) -> None:
-    """Render a lightweight BFS snapshot and save as PNG.
+    """Render a BFS snapshot matching the original-network plot style.
 
     Parameters
     ----------
@@ -293,46 +295,56 @@ def save_bfs_snapshot(
         Snapshot sequence number (used in filename).
     output_dir : str
     dpi : int
+    node_size : float
+        Marker diameter in points (same unit as ``ax.plot`` markersize).
+    line_width : float
+        Edge line width in points.
     """
     import os
 
-    from matplotlib.collections import LineCollection
     from matplotlib.figure import Figure
+    from matplotlib.patches import Rectangle
 
     frame_w = frame[0][1] - frame[0][0]
     frame_h = frame[1][1] - frame[1][0]
     aspect = frame_w / frame_h if frame_h > 0 else 1.0
-    fig_h = 8
+    fig_h = 10
     fig = Figure(figsize=(fig_h * aspect, fig_h), dpi=dpi)
     ax = fig.add_subplot(111)
 
-    if edges:
-        segments = [[(e[0][0], e[0][1]), (e[1][0], e[1][1])] for e in edges]
-        lc = LineCollection(segments, colors="red", linewidths=0.5)
-        ax.add_collection(lc)
+    for edge in edges:
+        ax.plot(
+            [edge[0][0], edge[1][0]],
+            [edge[0][1], edge[1][1]],
+            "r-",
+            linewidth=line_width,
+            zorder=2,
+        )
 
-    if node_positions:
-        xs = [p[0] for p in node_positions]
-        ys = [p[1] for p in node_positions]
-        ax.scatter(xs, ys, s=1, c="blue", zorder=2)
+    for pos in node_positions:
+        ax.plot(pos[0], pos[1], "bo", markersize=node_size, zorder=3)
 
     ax.set_xlim(frame[0])
     ax.set_ylim(frame[1])
-    ax.set_title(
-        f"Step {index} \u2014 {len(node_positions)} nodes, {len(edges)} edges",
-        fontsize=10,
+    ax.add_patch(
+        Rectangle(
+            (frame[0][0], frame[1][0]),
+            frame_w,
+            frame_h,
+            facecolor="none",
+            edgecolor=(0, 0, 0, 0.8),
+            linewidth=2,
+            zorder=1,
+        )
     )
     ax.set_xticks([])
     ax.set_yticks([])
-    ax.set_aspect("equal")
     ax.axis("off")
-    fig.tight_layout(pad=0.5)
 
     path = os.path.join(output_dir, f"snapshot_{index:05d}.png")
     fig.savefig(path, dpi=dpi, bbox_inches="tight")
-    ax.clear()
     fig.clear()
-    del ax, fig
+    del fig
 
 
 def save_hybrid_snapshot(
@@ -342,55 +354,54 @@ def save_hybrid_snapshot(
     index: int,
     output_dir: str,
     *,
-    dpi: int = 100,
-    node_size: float = 0.1,
+    node_size: float = 0.01,
     line_width: float = 0.1,
+    margin_frac: float = 0.02,
+    dpi: int | None = None,
 ) -> None:
     """Render a snapshot of a large hybrid network and save as PNG.
 
-    Tuned for networks with 100K+ nodes: tiny markers, thin lines,
-    low DPI.  Uses fixed *frame* limits so all snapshots are aligned.
+    Style matches ``plot_hybrid_network`` exactly: tiny markers, thin
+    lines, ``recommend_dpi``, fig height 12.  Uses fixed *frame* limits
+    so all snapshots are aligned for animation.
     """
     import os
 
     from matplotlib.collections import LineCollection
     from matplotlib.figure import Figure
 
+    if dpi is None:
+        dpi = recommend_dpi(len(node_positions))
+
     frame_w = frame[0][1] - frame[0][0]
     frame_h = frame[1][1] - frame[1][0]
+    mx = frame_w * margin_frac
+    my = frame_h * margin_frac
     aspect = frame_w / frame_h if frame_h > 0 else 1.0
-    fig_h = 10
+    fig_h = 12
     fig = Figure(figsize=(fig_h * aspect, fig_h), dpi=dpi)
     ax = fig.add_subplot(111)
 
     if edges:
         segments = [[(e[0][0], e[0][1]), (e[1][0], e[1][1])] for e in edges]
-        lc = LineCollection(segments, colors="red", linewidths=line_width)
+        lc = LineCollection(segments, colors="red", linewidths=line_width, zorder=2)
         ax.add_collection(lc)
 
     if node_positions:
         xs = [p[0] for p in node_positions]
         ys = [p[1] for p in node_positions]
-        ax.scatter(xs, ys, s=node_size, c="blue", zorder=2, edgecolors="none")
+        ax.scatter(xs, ys, s=node_size, c="blue", zorder=3, edgecolors="none")
 
-    ax.set_xlim(frame[0])
-    ax.set_ylim(frame[1])
-    ax.set_title(
-        f"Phase 2 — step {index} \u2014 "
-        f"{len(node_positions):,} nodes, {len(edges):,} edges",
-        fontsize=10,
-    )
+    ax.set_xlim(frame[0][0] - mx, frame[0][1] + mx)
+    ax.set_ylim(frame[1][0] - my, frame[1][1] + my)
     ax.set_xticks([])
     ax.set_yticks([])
-    ax.set_aspect("equal")
     ax.axis("off")
-    fig.tight_layout(pad=0.5)
 
     path = os.path.join(output_dir, f"snapshot_{index:05d}.png")
     fig.savefig(path, dpi=dpi, bbox_inches="tight")
-    ax.clear()
     fig.clear()
-    del ax, fig
+    del fig
 
 
 def trim_graph(graph: SynthGraph, tar_avg_deg: float) -> SynthGraph:

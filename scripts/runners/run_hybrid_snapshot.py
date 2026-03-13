@@ -69,9 +69,10 @@ from configs import BaseConfig
 from configs.enums import DatasetId
 from configs.hybrid_mode import HybridConfig
 from handlers import Saver
-from pipelines.hybrid_snapshot import run_hybrid_snapshot_for_dataset
+from pipelines.hybrid import run_hybrid_for_dataset
 
 HybridConfig.TARGET_SCALE = (args.scale, args.scale)
+HybridConfig.SNAPSHOT_INTERVAL = args.interval
 HybridConfig.initialize()
 
 dataset_id = DatasetId(f"sample_{args.config}")
@@ -87,10 +88,7 @@ t_start = time.time()
 
 try:
     Saver.initialize()
-    run_hybrid_snapshot_for_dataset(
-        dataset_id,
-        snapshot_round_interval=args.interval,
-    )
+    run_hybrid_for_dataset(dataset_id)
 except KeyboardInterrupt:
     logger.critical("Interrupted by user")
 except Exception:

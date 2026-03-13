@@ -39,10 +39,33 @@ def cmd_scaling(_args):
     main()
 
 
-def cmd_hybrid(_args):
+def cmd_hybrid(args):
+    config_cls = None
+    config_name = getattr(args, "config", None)
+    if config_name:
+        import configs.hybrid_mode as hm
+
+        cls_name = f"HybridConfig{config_name.capitalize()}"
+        config_cls = getattr(hm, cls_name, None)
+        if config_cls is None:
+            available = [n for n in dir(hm) if n.startswith("HybridConfig")]
+            raise SystemExit(
+                f"Unknown hybrid config '{config_name}'. " f"Available: {available}"
+            )
+
+    dataset = getattr(args, "dataset", None)
+    if dataset:
+        if config_cls is None:
+            from configs.hybrid_mode import HybridConfig as _HC
+
+            config_cls = _HC
+        from configs.enums import DatasetId
+
+        config_cls.DATASETS = [DatasetId(f"sample_{dataset}")]
+
     from pipelines.hybrid import main
 
-    main()
+    main(config_cls=config_cls)
 
 
 def cmd_sweep(args):
@@ -82,6 +105,22 @@ def main():
     for name, (help_text, func) in COMMANDS.items():
         p = sub.add_parser(name, help=help_text)
         p.set_defaults(func=func)
+
+        if name == "hybrid":
+            p.add_argument(
+                "--config",
+                default=None,
+                help=(
+                    "Hybrid config variant (e.g. 'snapshot'). "
+                    "Omit for default. Maps to HybridConfig<Name>."
+                ),
+            )
+            p.add_argument(
+                "--dataset",
+                choices=["A", "B", "C", "D"],
+                default=None,
+                help="Run for a single dataset (A/B/C/D). Omit to run all.",
+            )
 
         if name == "sweep":
             p.add_argument(

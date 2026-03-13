@@ -146,57 +146,105 @@ def compute_average_error(errors: List) -> float:
 
 
 def _generate_single_network(
-    exit_event, attributes: AttributesCalculator, mapper: Mapper
+    exit_event, std_err_fea, attributes: AttributesCalculator, mapper: Mapper
 ):
-    """Generate one network without multifractal quality gating."""
+    """Generate one network with multifractal error gating and retry loop."""
     if exit_event.is_set():
-        return None
+        return None, float("inf")
+
     generator = GraphGenerator(attributes)
-    try:
-        graph = generator.generate_network()
-        graph = trim_graph(graph, attributes.average_degree)
-        mapper.assign_weights(graph)
-        return graph
-    except KeyboardInterrupt:
-        raise
-    except Exception as exc:
-        logger.error(f"Generation failed: {exc}", exc_info=True)
-        return None
+    for attempt in range(BaseConfig.MAX_ATTEMPTS):
+        try:
+            graph = generator.generate_network()
+            graph = trim_graph(graph, attributes.average_degree)
+            mapper.assign_weights(graph)
+
+            if exit_event.is_set():
+                return None, float("inf")
+
+            err_fea = MultifractalAnalyzer(graph).analyze_error_features()
+            error = MultifractalAnalyzer.analyze_error(err_fea, std_err_fea)
+            if error < BaseConfig.ERROR_TOLERANCE:
+                return graph, error
+
+            logger.debug(
+                f"Attempt {attempt + 1}: error {error:.4f} >= "
+                f"{BaseConfig.ERROR_TOLERANCE}"
+            )
+        except KeyboardInterrupt:
+            raise
+        except Exception as exc:
+            logger.error(f"Attempt {attempt + 1} failed: {exc}", exc_info=True)
+
+    logger.warning("Max attempts reached. Returning None.")
+    return None, float("inf")
 
 
 def _generate_single_network_with_snapshots(
     exit_event,
+    std_err_fea,
     attributes: AttributesCalculator,
     mapper: Mapper,
     snapshot_dir: str,
     snapshot_interval: int,
+    snapshot_style: dict | None = None,
 ):
-    """Generate one network with BFS snapshots saved to *snapshot_dir*."""
+    """Generate one network with BFS snapshots and error gating.
+
+    On retry, old snapshots are cleared so the final set matches the
+    network that actually passed the error tolerance.
+    """
     if exit_event.is_set():
-        return None
-    os.makedirs(snapshot_dir, exist_ok=True)
+        return None, float("inf")
 
-    def on_snapshot(positions, edges, frame, step_idx):
-        save_bfs_snapshot(positions, edges, frame, step_idx, snapshot_dir)
-
+    style = snapshot_style or {}
     generator = GraphGenerator(attributes)
-    try:
-        graph = generator.generate_network_with_snapshots(
-            snapshot_callback=on_snapshot,
-            snapshot_interval=snapshot_interval,
-        )
-        graph = trim_graph(graph, attributes.average_degree)
-        mapper.assign_weights(graph)
-        return graph
-    except KeyboardInterrupt:
-        raise
-    except Exception as exc:
-        logger.error(f"Generation failed: {exc}", exc_info=True)
-        return None
+    for attempt in range(BaseConfig.MAX_ATTEMPTS):
+        try:
+            if attempt > 0 and os.path.isdir(snapshot_dir):
+                for fname in os.listdir(snapshot_dir):
+                    os.remove(os.path.join(snapshot_dir, fname))
+            os.makedirs(snapshot_dir, exist_ok=True)
+
+            def on_snapshot(positions, edges, frame, step_idx):
+                save_bfs_snapshot(
+                    positions, edges, frame, step_idx, snapshot_dir, **style
+                )
+
+            graph = generator.generate_network_with_snapshots(
+                snapshot_callback=on_snapshot,
+                snapshot_interval=snapshot_interval,
+            )
+            graph = trim_graph(graph, attributes.average_degree)
+            mapper.assign_weights(graph)
+
+            if exit_event.is_set():
+                return None, float("inf")
+
+            err_fea = MultifractalAnalyzer(graph).analyze_error_features()
+            error = MultifractalAnalyzer.analyze_error(err_fea, std_err_fea)
+            if error < BaseConfig.ERROR_TOLERANCE:
+                return graph, error
+
+            logger.debug(
+                f"Attempt {attempt + 1}: error {error:.4f} >= "
+                f"{BaseConfig.ERROR_TOLERANCE}"
+            )
+        except KeyboardInterrupt:
+            raise
+        except Exception as exc:
+            logger.error(f"Attempt {attempt + 1} failed: {exc}", exc_info=True)
+
+    logger.warning("Max attempts reached. Returning None.")
+    return None, float("inf")
 
 
 def generate_and_select(data_agent: RunAgent):
     """Generate many networks, rank by metric distance to original, save best.
+
+    Each candidate is validated with the multifractal error check
+    (same as the standard generate mode).  Workers retry up to
+    ``MAX_ATTEMPTS`` times until a network passes ``ERROR_TOLERANCE``.
 
     When ``SNAPSHOT_INTERVAL > 0``, each candidate also gets BFS
     snapshots under ``candidates/network_XX/snapshots/``.  After
@@ -207,9 +255,12 @@ def generate_and_select(data_agent: RunAgent):
     num_network = BaseConfig.SYNTHETIC_NETWORK_NUMBER
     select_best = BaseConfig.SELECT_BEST
     snapshot_interval = BaseConfig.SNAPSHOT_INTERVAL
+    snapshot_style = getattr(BaseConfig, "SNAPSHOT_STYLE", {})
     use_snapshots = snapshot_interval > 0
 
-    ref_metrics = compute_network_metrics(data_agent.get_original_network())
+    original_network = data_agent.get_original_network()
+    ref_metrics = compute_network_metrics(original_network)
+    std_err_fea = MultifractalAnalyzer(original_network).analyze_error_features()
     logger.info("Original metrics: %s", _fmt_metrics(ref_metrics))
 
     candidates_dir = os.path.join(data_agent.saver.output_dir, "candidates")
@@ -220,7 +271,9 @@ def generate_and_select(data_agent: RunAgent):
     exit_event = Manager().Event()
     max_workers = BaseConfig.get_max_workers(num_network)
     logger.info(
-        f"Generating {num_network} networks with {max_workers} worker(s)"
+        f"Generating {num_network} networks with {max_workers} worker(s), "
+        f"error_tolerance={BaseConfig.ERROR_TOLERANCE}, "
+        f"max_attempts={BaseConfig.MAX_ATTEMPTS}"
         + (f", snapshots every {snapshot_interval} nodes" if use_snapshots else "")
     )
     futures = []
@@ -238,15 +291,18 @@ def generate_and_select(data_agent: RunAgent):
                     future = executor.submit(
                         _generate_single_network_with_snapshots,
                         exit_event,
+                        std_err_fea,
                         data_agent.attributes,
                         data_agent.mapper,
                         snap_dir,
                         snapshot_interval,
+                        snapshot_style,
                     )
                 else:
                     future = executor.submit(
                         _generate_single_network,
                         exit_event,
+                        std_err_fea,
                         data_agent.attributes,
                         data_agent.mapper,
                     )
@@ -255,9 +311,14 @@ def generate_and_select(data_agent: RunAgent):
 
             for done_count, future in enumerate(as_completed(futures), start=1):
                 original_idx = future_to_idx[future]
-                graph = future.result()
+                graph, mf_error = future.result()
                 if graph is not None:
-                    graphs.append((original_idx, graph))
+                    graphs.append((original_idx, graph, mf_error))
+                else:
+                    logger.warning(
+                        f"Network {original_idx:02d} failed after "
+                        f"{BaseConfig.MAX_ATTEMPTS} attempts"
+                    )
                 if done_count % max(1, num_network // 10) == 0:
                     logger.info(
                         f"({done_count}/{num_network}) " f"{len(graphs)} valid so far"
@@ -274,20 +335,25 @@ def generate_and_select(data_agent: RunAgent):
         logger.error("No valid networks generated.")
         return
 
+    logger.info(
+        f"{len(graphs)}/{num_network} networks passed error tolerance "
+        f"({BaseConfig.ERROR_TOLERANCE})"
+    )
+
     logger.info(f"Evaluating metrics on {len(graphs)} networks ...")
     ranked = []
-    for original_idx, g in graphs:
+    for original_idx, g, mf_error in graphs:
         m = compute_network_metrics(g)
         d = metric_distance(m, ref_metrics)
-        ranked.append((d, original_idx, g, m))
+        ranked.append((d, original_idx, g, m, mf_error))
     ranked.sort(key=lambda x: x[0])
 
     _log_ranking_table(ranked, ref_metrics)
 
     best = ranked[:select_best]
-    best_indices = {idx for _, idx, _, _ in best}
+    best_indices = {idx for _, idx, _, _, _ in best}
 
-    for _, _, graph, _ in best:
+    for _, _, graph, _, _ in best:
         data_agent.save("synthetic_graph", content=graph)
         data_agent.add_synthetic_graph(graph)
 
@@ -296,7 +362,7 @@ def generate_and_select(data_agent: RunAgent):
 
     # Clean up non-best candidate directories
     if use_snapshots:
-        all_indices = {idx for idx, _ in graphs}
+        all_indices = {idx for idx, _, _ in graphs}
         removed = 0
         for idx in all_indices - best_indices:
             network_dir = os.path.join(candidates_dir, f"network_{idx:02d}")
@@ -323,20 +389,21 @@ def _fmt_metrics(m: dict) -> str:
 
 def _log_ranking_table(ranked, ref_metrics):
     hdr = (
-        f"{'Rank':>4} {'Dist':>8} {'Nodes':>7} {'AvgDeg':>7} "
+        f"{'Rank':>4} {'Dist':>8} {'MFErr':>8} {'Nodes':>7} {'AvgDeg':>7} "
         f"{'Clust':>8} {'Length':>8} {'Angle':>8}"
     )
     sep = "-" * len(hdr)
     lines = ["\n" + sep, hdr, sep]
-    for rank, (dist, _, _, m) in enumerate(ranked, 1):
+    for rank, (dist, _, _, m, mf_err) in enumerate(ranked, 1):
         lines.append(
-            f"{rank:4d} {dist:8.4f} {m['node_count']:7d} {m['avg_degree']:7.2f} "
+            f"{rank:4d} {dist:8.4f} {mf_err:8.4f} "
+            f"{m['node_count']:7d} {m['avg_degree']:7.2f} "
             f"{m['avg_clustering']:8.4f} {m['avg_length']:8.2f} {m['avg_angle']:8.2f}"
         )
     lines.append(sep)
     r = ref_metrics
     lines.append(
-        f"{'Orig':>4} {'':>8} {r['node_count']:7d} {r['avg_degree']:7.2f} "
+        f"{'Orig':>4} {'':>8} {'':>8} {r['node_count']:7d} {r['avg_degree']:7.2f} "
         f"{r['avg_clustering']:8.4f} {r['avg_length']:8.2f} {r['avg_angle']:8.2f}"
     )
     lines.append(sep)
@@ -351,7 +418,8 @@ def _save_metric_report(ranked, ref_metrics, path):
         w.writerow(
             [
                 "rank",
-                "distance",
+                "metric_distance",
+                "multifractal_error",
                 "node_count",
                 "avg_degree",
                 "avg_clustering",
@@ -363,6 +431,7 @@ def _save_metric_report(ranked, ref_metrics, path):
             [
                 "original",
                 "",
+                "",
                 ref_metrics["node_count"],
                 ref_metrics["avg_degree"],
                 ref_metrics["avg_clustering"],
@@ -370,11 +439,12 @@ def _save_metric_report(ranked, ref_metrics, path):
                 ref_metrics["avg_angle"],
             ]
         )
-        for rank, (dist, _, _, m) in enumerate(ranked, 1):
+        for rank, (dist, _, _, m, mf_err) in enumerate(ranked, 1):
             w.writerow(
                 [
                     rank,
                     f"{dist:.6f}",
+                    f"{mf_err:.6f}",
                     m["node_count"],
                     f"{m['avg_degree']:.4f}",
                     f"{m['avg_clustering']:.6f}",
@@ -390,9 +460,10 @@ def generate_with_snapshots(data_agent: RunAgent):
     os.makedirs(snapshot_dir, exist_ok=True)
 
     interval = BaseConfig.SNAPSHOT_INTERVAL
+    style = getattr(BaseConfig, "SNAPSHOT_STYLE", {})
 
     def on_snapshot(positions, edges, frame, step_idx):
-        save_bfs_snapshot(positions, edges, frame, step_idx, snapshot_dir)
+        save_bfs_snapshot(positions, edges, frame, step_idx, snapshot_dir, **style)
 
     generator = GraphGenerator(data_agent.attributes)
     synthetic_graph = generator.generate_network_with_snapshots(

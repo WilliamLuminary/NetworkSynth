@@ -27,24 +27,35 @@ class SnapshotConfig(BaseConfig):
 
     IMAGE_SIZE: Tuple[int, int] = (510, 510)
     FRAME_SIZE: Tuple[int, int] = (510, 510)
-    SYNTHETIC_FRAME_SIZE: Tuple[int, int] = (510, 510)
+    SYNTHETIC_FRAME_SIZE: Tuple[int, int] = (1530, 1530)
 
     CLOSED_NODES_FACTOR = 1.0
     CLOSED_EDGES_FACTOR = 1.5
 
     # --- Snapshot mode (set SNAPSHOT_INTERVAL = 0 to disable) ---
-    SNAPSHOT_INTERVAL = 10
+    SNAPSHOT_INTERVAL = 50
 
     # --- Metric selection mode (set SELECT_BEST = 0 to disable) ---
-    SELECT_BEST = 5
+    SELECT_BEST = 0
 
     SYNTHETIC_GRAPH_NUMBER = 1
-    SYNTHETIC_NETWORK_NUMBER = 20
+    SYNTHETIC_NETWORK_NUMBER = 1
 
     MAX_ATTEMPTS = 50
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = True
     FULL_ANALYSIS = False
+
+    # Visual style for BFS snapshot PNGs.
+    # Adjust node_size / line_width when SYNTHETIC_FRAME_SIZE differs
+    # from FRAME_SIZE — larger frames need thinner strokes.
+    #   1×1 (510):  node_size=6.0, line_width=3.0
+    #   3×3 (1530): node_size=2.0, line_width=1.0
+    SNAPSHOT_STYLE: dict = {
+        "dpi": 300,
+        "node_size": 1.5,
+        "line_width": 1.5,
+    }
 
     BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, "samples", "hybrid_mode")
 
