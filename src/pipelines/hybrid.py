@@ -9,7 +9,12 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 import logging
 import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import (
+    Future,
+    ProcessPoolExecutor,
+    ThreadPoolExecutor,
+    as_completed,
+)
 from typing import Dict, List, Tuple
 
 import networkit as nk
@@ -19,15 +24,12 @@ from matplotlib.collections import LineCollection
 
 from analysis import MultifractalAnalyzer
 from configs import BaseConfig
-from configs.hybrid_mode import HybridConfig
 from graphs import GraphGenerator
 from graphs._graph_node import GraphNode
 from graphs.graph_generator import FrontierDescriptor
 from graphs.synth_graph import SynthGraph
 from handlers import AttributesCalculator, Mapper, RunAgent, Saver
-from utils import build_graph, finalize_plot, trim_graph
-
-HybridConfig.initialize()
+from utils import build_graph, finalize_plot, save_hybrid_snapshot, trim_graph
 
 logger = logging.getLogger(__name__)
 SIGINT_INFO = "SIGINT received. Terminating…"
@@ -241,8 +243,14 @@ def run_phase2(
     whiteboard_w: float,
     whiteboard_h: float,
     max_rounds: int,
+    snapshot_dir: str | None = None,
+    snapshot_round_interval: int = 0,
 ) -> SynthGraph:
-    """Offset tiles to their global center positions, then continue BFS."""
+    """Offset tiles to their global center positions, then continue BFS.
+
+    When *snapshot_round_interval* > 0, Phase 2 snapshots are rendered
+    asynchronously in background threads and saved to *snapshot_dir*.
+    """
     frame_w, frame_h = BaseConfig.SYNTHETIC_FRAME_SIZE
     margin_x = frame_w
     margin_y = frame_h
@@ -251,9 +259,16 @@ def run_phase2(
         (-margin_y, whiteboard_h + margin_y),
     )
 
+    take_snapshots = snapshot_round_interval > 0 and snapshot_dir is not None
+
     logger.info(
         f"Phase 2: whiteboard {whiteboard_w:.0f}×{whiteboard_h:.0f}, "
         f"global_frame={global_frame}"
+        + (
+            f", snapshot every {snapshot_round_interval} round(s)"
+            if take_snapshots
+            else ""
+        )
     )
 
     tile_data_list: List[dict] = []
@@ -288,9 +303,57 @@ def run_phase2(
         )
 
     GraphNode.initialize(attributes)
-    graph = GraphGenerator.assemble_and_continue(
-        tile_data_list, global_frame, max_rounds
-    )
+
+    if take_snapshots:
+        os.makedirs(snapshot_dir, exist_ok=True)
+        plot_executor = ThreadPoolExecutor(max_workers=2)
+        pending: List[Future] = []
+
+        def on_snapshot(positions, edges, frame, idx):
+            pos_arr = np.array(positions, dtype=np.float64)
+            edge_arr = np.array(edges, dtype=np.float64)
+            np.save(
+                os.path.join(snapshot_dir, f"snapshot_{idx:05d}_positions.npy"), pos_arr
+            )
+            np.save(
+                os.path.join(snapshot_dir, f"snapshot_{idx:05d}_edges.npy"), edge_arr
+            )
+
+            future = plot_executor.submit(
+                save_hybrid_snapshot,
+                positions,
+                edges,
+                frame,
+                idx,
+                snapshot_dir,
+            )
+            pending.append(future)
+            logger.info(
+                f"Snapshot {idx} queued: {len(positions):,} nodes, "
+                f"{len(edges):,} edges  "
+                f"(pending plots: {sum(1 for f in pending if not f.done())})"
+            )
+
+        graph = GraphGenerator.assemble_and_continue(
+            tile_data_list,
+            global_frame,
+            max_rounds,
+            snapshot_callback=on_snapshot,
+            snapshot_round_interval=snapshot_round_interval,
+        )
+
+        remaining = sum(1 for f in pending if not f.done())
+        if remaining:
+            logger.info(f"Generation done. Waiting for {remaining} snapshot plot(s)...")
+        for f in pending:
+            f.result()
+        plot_executor.shutdown(wait=False)
+        logger.info(f"All {len(pending)} snapshot(s) saved to {snapshot_dir}")
+    else:
+        graph = GraphGenerator.assemble_and_continue(
+            tile_data_list, global_frame, max_rounds
+        )
+
     return graph
 
 
@@ -441,9 +504,23 @@ def run_hybrid_for_dataset(dataset_id):
     nk.setNumberOfThreads(max_threads)
     logger.info(f"Phase 2: restored networkit threads to {max_threads}")
 
+    snapshot_interval = getattr(BaseConfig, "SNAPSHOT_INTERVAL", 0)
+    snapshot_dir = (
+        os.path.join(data_agent.saver.output_dir, "snapshots")
+        if snapshot_interval > 0
+        else None
+    )
+
     t1 = time.time()
     hybrid_graph = run_phase2(
-        tile_results, attributes, centers, whiteboard_w, whiteboard_h, max_rounds
+        tile_results,
+        attributes,
+        centers,
+        whiteboard_w,
+        whiteboard_h,
+        max_rounds,
+        snapshot_dir=snapshot_dir,
+        snapshot_round_interval=snapshot_interval,
     )
     logger.info(f"Phase 2 elapsed: {time.time() - t1:.1f}s")
 
@@ -458,7 +535,13 @@ def run_hybrid_for_dataset(dataset_id):
 
     mapper.assign_weights(hybrid_graph)
 
-    # --- Save ---
+    # --- Save original/ ---
+    data_agent.save("original_image")
+    data_agent.save("original_network")
+    data_agent.save("original_property")
+    data_agent.save("original_graph")
+
+    # --- Save synthetic/ ---
     data_agent.add_synthetic_graph(hybrid_graph)
     prefix = f"hybrid_{len(centers)}centers"
 
@@ -487,6 +570,7 @@ def run_hybrid_for_dataset(dataset_id):
         f"Hybrid complete — "
         f"{hybrid_graph.number_of_nodes():,} nodes, "
         f"{hybrid_graph.number_of_edges():,} edges"
+        + (f", snapshots in {snapshot_dir}" if snapshot_dir else "")
     )
 
 
@@ -495,7 +579,13 @@ def run_hybrid_for_dataset(dataset_id):
 # ------------------------------------------------------------------ #
 
 
-def main():
+def main(config_cls=None):
+    if config_cls is None:
+        from configs.hybrid_mode import HybridConfig
+
+        config_cls = HybridConfig
+    config_cls.initialize()
+
     try:
         Saver.initialize()
         for dataset_id in BaseConfig.get_datasets():

@@ -55,6 +55,7 @@ class SampleConfig(BaseConfig):
     # width and 100× the original frame height.
     TARGET_SCALE: Tuple[int, int] = (100, 100)
 
+    NUM_CENTERS: int = 2000
     PHASE2_MAX_ROUNDS: int = 500
     MIN_CENTER_DISTANCE_FACTOR: float = 1.5
 
