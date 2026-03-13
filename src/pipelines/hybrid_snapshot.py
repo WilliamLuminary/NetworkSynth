@@ -10,6 +10,7 @@ reusing its Phase 1 runner and helper functions.
 import logging
 import os
 import time
+from concurrent.futures import Future, ThreadPoolExecutor
 from typing import Dict, List, Tuple
 
 import networkit as nk
@@ -90,9 +91,23 @@ def run_phase2_with_snapshots(
 
     os.makedirs(snapshot_dir, exist_ok=True)
 
+    plot_executor = ThreadPoolExecutor(max_workers=2)
+    pending: List[Future] = []
+
     def on_snapshot(positions, edges, frame, idx):
-        save_hybrid_snapshot(positions, edges, frame, idx, snapshot_dir)
-        logger.info(f"Snapshot {idx}: {len(positions):,} nodes, {len(edges):,} edges")
+        future = plot_executor.submit(
+            save_hybrid_snapshot,
+            positions,
+            edges,
+            frame,
+            idx,
+            snapshot_dir,
+        )
+        pending.append(future)
+        logger.info(
+            f"Snapshot {idx} queued: {len(positions):,} nodes, "
+            f"{len(edges):,} edges  (pending plots: {sum(1 for f in pending if not f.done())})"
+        )
 
     GraphNode.initialize(attributes)
     graph = GraphGenerator.assemble_and_continue(
@@ -102,6 +117,17 @@ def run_phase2_with_snapshots(
         snapshot_callback=on_snapshot,
         snapshot_round_interval=snapshot_round_interval,
     )
+
+    remaining = sum(1 for f in pending if not f.done())
+    if remaining:
+        logger.info(
+            f"Generation done. Waiting for {remaining} snapshot plot(s) to finish..."
+        )
+    for f in pending:
+        f.result()
+    plot_executor.shutdown(wait=False)
+    logger.info(f"All {len(pending)} snapshot(s) saved to {snapshot_dir}")
+
     return graph
 
 
