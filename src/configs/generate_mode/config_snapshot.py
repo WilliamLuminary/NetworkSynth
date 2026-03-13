@@ -33,25 +33,25 @@ class SnapshotConfig(BaseConfig):
     CLOSED_EDGES_FACTOR = 1.5
 
     # --- Snapshot mode (set SNAPSHOT_INTERVAL = 0 to disable) ---
-    SNAPSHOT_INTERVAL = 50
+    SNAPSHOT_INTERVAL = 0
 
     # --- Metric selection mode (set SELECT_BEST = 0 to disable) ---
-    SELECT_BEST = 0
+    SELECT_BEST = 3
 
-    SYNTHETIC_GRAPH_NUMBER = 1
-    SYNTHETIC_NETWORK_NUMBER = 1
+    SYNTHETIC_GRAPH_NUMBER = 3
+    SYNTHETIC_NETWORK_NUMBER = 20
 
     MAX_ATTEMPTS = 50
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = True
     FULL_ANALYSIS = False
 
-    # Visual style for BFS snapshot PNGs.
+    # Shared visual style for both BFS snapshots and final synthetic plots.
     # Adjust node_size / line_width when SYNTHETIC_FRAME_SIZE differs
     # from FRAME_SIZE — larger frames need thinner strokes.
     #   1×1 (510):  node_size=6.0, line_width=3.0
     #   3×3 (1530): node_size=2.0, line_width=1.0
-    SNAPSHOT_STYLE: dict = {
+    PLOT_STYLE: dict = {
         "dpi": 300,
         "node_size": 1.5,
         "line_width": 1.5,
@@ -65,6 +65,13 @@ class SnapshotConfig(BaseConfig):
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
         cls._inject_dependencies()
+
+        from configs.file_definitions import FILE_CONFIGURATIONS
+
+        style = cls.PLOT_STYLE
+        syn_cfg = FILE_CONFIGURATIONS["synthetic_graph"]
+        syn_cfg.node_size = style.get("node_size", syn_cfg.node_size)
+        syn_cfg.line_width = style.get("line_width", syn_cfg.line_width)
 
     @staticmethod
     def load_original_network(dataset_id: DatasetId):

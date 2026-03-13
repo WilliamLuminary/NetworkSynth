@@ -10,7 +10,6 @@ import numpy as np
 
 from analysis import MultifractalAnalyzer
 from configs import BaseConfig, DatasetId
-from configs.generate_mode import GenConfigSnapshot as GenConfig
 from graphs import GraphGenerator
 from handlers import AttributesCalculator, Mapper, RunAgent, Saver
 from utils import (
@@ -19,9 +18,6 @@ from utils import (
     save_bfs_snapshot,
     trim_graph,
 )
-
-GenConfig.initialize()
-# BaseConfig.disable_saving("debug")
 
 logger = logging.getLogger(__name__)
 SIGINT_INFO = "SIGINT received. Terminating child process..."
@@ -191,49 +187,71 @@ def _generate_single_network_with_snapshots(
 ):
     """Generate one network with BFS snapshots and error gating.
 
-    On retry, old snapshots are cleared so the final set matches the
-    network that actually passed the error tolerance.
+    Snapshot rendering runs in a thread pool so the BFS loop is not
+    blocked.  On retry, pending plots are drained before the snapshot
+    directory is cleared.
     """
+    from concurrent.futures import ThreadPoolExecutor
+
     if exit_event.is_set():
         return None, float("inf")
 
     style = snapshot_style or {}
     generator = GraphGenerator(attributes)
-    for attempt in range(BaseConfig.MAX_ATTEMPTS):
-        try:
-            if attempt > 0 and os.path.isdir(snapshot_dir):
-                for fname in os.listdir(snapshot_dir):
-                    os.remove(os.path.join(snapshot_dir, fname))
-            os.makedirs(snapshot_dir, exist_ok=True)
+    plot_pool = ThreadPoolExecutor(max_workers=2)
+    plot_futures = []
 
-            def on_snapshot(positions, edges, frame, step_idx):
-                save_bfs_snapshot(
-                    positions, edges, frame, step_idx, snapshot_dir, **style
+    try:
+        for attempt in range(BaseConfig.MAX_ATTEMPTS):
+            try:
+                if attempt > 0:
+                    for fut in plot_futures:
+                        fut.cancel()
+                    plot_futures.clear()
+                    if os.path.isdir(snapshot_dir):
+                        for fname in os.listdir(snapshot_dir):
+                            os.remove(os.path.join(snapshot_dir, fname))
+                os.makedirs(snapshot_dir, exist_ok=True)
+
+                def on_snapshot(positions, edges, frame, step_idx):
+                    fut = plot_pool.submit(
+                        save_bfs_snapshot,
+                        positions,
+                        edges,
+                        frame,
+                        step_idx,
+                        snapshot_dir,
+                        **style,
+                    )
+                    plot_futures.append(fut)
+
+                graph = generator.generate_network_with_snapshots(
+                    snapshot_callback=on_snapshot,
+                    snapshot_interval=snapshot_interval,
                 )
+                graph = trim_graph(graph, attributes.average_degree)
+                mapper.assign_weights(graph)
 
-            graph = generator.generate_network_with_snapshots(
-                snapshot_callback=on_snapshot,
-                snapshot_interval=snapshot_interval,
-            )
-            graph = trim_graph(graph, attributes.average_degree)
-            mapper.assign_weights(graph)
+                if exit_event.is_set():
+                    return None, float("inf")
 
-            if exit_event.is_set():
-                return None, float("inf")
+                err_fea = MultifractalAnalyzer(graph).analyze_error_features()
+                error = MultifractalAnalyzer.analyze_error(err_fea, std_err_fea)
+                if error < BaseConfig.ERROR_TOLERANCE:
+                    for fut in plot_futures:
+                        fut.result()
+                    return graph, error
 
-            err_fea = MultifractalAnalyzer(graph).analyze_error_features()
-            error = MultifractalAnalyzer.analyze_error(err_fea, std_err_fea)
-            if error < BaseConfig.ERROR_TOLERANCE:
-                return graph, error
-
-            logger.debug(
-                f"Attempt {attempt + 1}: error {error:.4f} >= "
-                f"{BaseConfig.ERROR_TOLERANCE}"
-            )
-        except KeyboardInterrupt:
-            raise
-        except Exception as exc:
-            logger.error(f"Attempt {attempt + 1} failed: {exc}", exc_info=True)
+                logger.debug(
+                    f"Attempt {attempt + 1}: error {error:.4f} >= "
+                    f"{BaseConfig.ERROR_TOLERANCE}"
+                )
+            except KeyboardInterrupt:
+                raise
+            except Exception as exc:
+                logger.error(f"Attempt {attempt + 1} failed: {exc}", exc_info=True)
+    finally:
+        plot_pool.shutdown(wait=True)
 
     logger.warning("Max attempts reached. Returning None.")
     return None, float("inf")
@@ -255,7 +273,7 @@ def generate_and_select(data_agent: RunAgent):
     num_network = BaseConfig.SYNTHETIC_NETWORK_NUMBER
     select_best = BaseConfig.SELECT_BEST
     snapshot_interval = BaseConfig.SNAPSHOT_INTERVAL
-    snapshot_style = getattr(BaseConfig, "SNAPSHOT_STYLE", {})
+    snapshot_style = getattr(BaseConfig, "PLOT_STYLE", {})
     use_snapshots = snapshot_interval > 0
 
     original_network = data_agent.get_original_network()
@@ -455,15 +473,33 @@ def _save_metric_report(ranked, ref_metrics, path):
 
 
 def generate_with_snapshots(data_agent: RunAgent):
-    """Generate a single network while saving intermediate BFS snapshots."""
+    """Generate a single network while saving intermediate BFS snapshots.
+
+    Snapshot rendering is offloaded to a process pool so the BFS
+    generation loop is never blocked by matplotlib / PNG I/O.
+    """
+    from concurrent.futures import ProcessPoolExecutor
+
     snapshot_dir = os.path.join(data_agent.saver.output_dir, "snapshots")
     os.makedirs(snapshot_dir, exist_ok=True)
 
     interval = BaseConfig.SNAPSHOT_INTERVAL
-    style = getattr(BaseConfig, "SNAPSHOT_STYLE", {})
+    style = getattr(BaseConfig, "PLOT_STYLE", {})
+
+    plot_pool = ProcessPoolExecutor(max_workers=2)
+    plot_futures = []
 
     def on_snapshot(positions, edges, frame, step_idx):
-        save_bfs_snapshot(positions, edges, frame, step_idx, snapshot_dir, **style)
+        fut = plot_pool.submit(
+            save_bfs_snapshot,
+            positions,
+            edges,
+            frame,
+            step_idx,
+            snapshot_dir,
+            **style,
+        )
+        plot_futures.append(fut)
 
     generator = GraphGenerator(data_agent.attributes)
     synthetic_graph = generator.generate_network_with_snapshots(
@@ -472,6 +508,11 @@ def generate_with_snapshots(data_agent: RunAgent):
     )
     synthetic_graph = trim_graph(synthetic_graph, data_agent.attributes.average_degree)
     data_agent.mapper.assign_weights(synthetic_graph)
+
+    for fut in plot_futures:
+        fut.result()
+    plot_pool.shutdown(wait=False)
+    logger.info(f"{len(plot_futures)} snapshots rendered")
 
     data_agent.save("synthetic_graph", content=synthetic_graph)
     data_agent.add_synthetic_graph(synthetic_graph)
@@ -499,7 +540,13 @@ def run_for_dataset(dataset_id: DatasetId):
         generate_with_multiprocessing(data_agent)
 
 
-def main():
+def main(config_cls=None):
+    if config_cls is None:
+        from configs.generate_mode import GenConfigSnapshot
+
+        config_cls = GenConfigSnapshot
+    config_cls.initialize()
+
     try:
         Saver.initialize()
         for dataset_id in BaseConfig.get_datasets():
