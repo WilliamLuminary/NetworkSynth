@@ -96,6 +96,11 @@ def save_png(image, filepath: str) -> None:
         raise TypeError(f"Unsupported image type: {type(image)}")
 
 
+def save_text(text: str, filepath: str) -> None:
+    with open(filepath, "w") as f:
+        f.write(text)
+
+
 def save_network_csv(graph, filepath: str) -> None:
     """Save a SynthGraph as two CSVs: edgelist and positions.
 
@@ -184,6 +189,7 @@ DEFAULT_SAVE_SPECS = {
         ("original", "original_network", "nkbin", save_network_nkbin),
     ],
     "original_property": [("original", "original_property", "pkl", save_pickle)],
+    "original_report": [("original", "report", "txt", save_text, False)],
     "original_graph": [("original", "original_graph", "svg", save_svg)],
     "synthetic_graph": [("synthetic", "synthetic_graph", "webp", save_webp)],
     "synthetic_network": [("synthetic", "synthetic_network", "pkl", save_pickle)],

@@ -114,9 +114,9 @@ def plot(
 
     if workers is None:
         cpu_count = os.cpu_count() or 1
-        n_workers = min(max(1, cpu_count // 2), 20)
+        n_workers = min(max(1, cpu_count // 2), 20, len(pairs))
     else:
-        n_workers = workers
+        n_workers = min(workers, len(pairs))
     print(
         f"Plotting {len(pairs)} snapshot(s) with {n_workers} worker(s), "
         f"dpi={dpi}, node_size={node_size}, line_width={line_width}"

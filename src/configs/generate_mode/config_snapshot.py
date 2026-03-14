@@ -20,7 +20,12 @@ logger = logging.getLogger(__name__)
 
 
 class SnapshotConfig(BaseConfig):
-    DATASETS = [DatasetId("sample_A")]
+    DATASETS = [
+        DatasetId("sample_A"),
+        DatasetId("sample_B"),
+        DatasetId("sample_C"),
+        DatasetId("sample_D"),
+    ]
 
     IMAGE_SIZE: Tuple[int, int] = (510, 510)
     FRAME_SIZE: Tuple[int, int] = (510, 510)
@@ -33,7 +38,7 @@ class SnapshotConfig(BaseConfig):
     SELECT_BEST = 0
 
     SYNTHETIC_GRAPH_NUMBER = 1
-    SYNTHETIC_NETWORK_NUMBER = 1
+    SYNTHETIC_NETWORK_NUMBER = 0
 
     MAX_ATTEMPTS = 50
     ERROR_TOLERANCE = 0.15
@@ -47,8 +52,8 @@ class SnapshotConfig(BaseConfig):
     #   3×3 (1530): node_size=2.0, line_width=1.0
     PLOT_STYLE: dict = {
         "dpi": 300,
-        "node_size": 1.0,
-        "line_width": 1.0,
+        "node_size": 0.5,
+        "line_width": 0.5,
     }
 
     BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, "samples", "hybrid_mode")

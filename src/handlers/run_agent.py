@@ -158,6 +158,10 @@ class RunAgent:
             assert self.attributes, "Attributes not initialized."
             content = dataclasses.asdict(self.attributes)
 
+        elif identifier == "original_report":
+            original_network = self.data_loader.get_original_network()
+            content = _build_original_report(original_network, self.attributes)
+
         elif identifier == "original_graph":
             original_network = self.data_loader.get_original_network()
             original_image = self.data_loader.get_original_image()
@@ -194,6 +198,31 @@ class RunAgent:
 
         if content is not None:
             self.saver.save(content, identifier, prefix)
+
+
+# ---------------------------------------------------------------------------
+# Original-network report
+# ---------------------------------------------------------------------------
+
+
+def _build_original_report(graph: SynthGraph, attributes) -> str:
+    lines = [
+        "Original Network Report",
+        "=" * 40,
+        f"Nodes:              {graph.number_of_nodes()}",
+        f"Edges:              {graph.number_of_edges()}",
+    ]
+    if attributes:
+        lines.append(f"Average degree:     {attributes.average_degree:.4f}")
+        lines.append(f"Average edge length:{attributes.average_length:.4f}")
+        if attributes.degree_distribution:
+            lines.append("")
+            lines.append("Degree distribution:")
+            for deg in sorted(attributes.degree_distribution):
+                frac = attributes.degree_distribution[deg]
+                lines.append(f"  degree {deg:>3d}: {frac:.4f}")
+    lines.append("")
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------

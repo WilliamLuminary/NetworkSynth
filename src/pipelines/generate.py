@@ -243,6 +243,10 @@ def generate_with_multiprocessing(data_agent: RunAgent):
         BaseConfig.SYNTHETIC_NETWORK_NUMBER,
         BaseConfig.SYNTHETIC_GRAPH_NUMBER,
     )
+    if num_network <= 0:
+        logger.info("SYNTHETIC_NETWORK_NUMBER is 0 — skipping synthetic generation.")
+        return
+
     errors, futures = [], []
     from multiprocessing import Manager
 
@@ -375,6 +379,7 @@ def run_for_dataset(dataset_id: DatasetId):
     data_agent.save("original_image")
     data_agent.save("original_network")
     data_agent.save("original_property")
+    data_agent.save("original_report")
     data_agent.save("original_graph")
 
     if BaseConfig.SNAPSHOT_INTERVAL > 0:

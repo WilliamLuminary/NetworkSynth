@@ -39,7 +39,7 @@ def _render_snapshots(snapshot_data, output_dir, style):
         return
 
     with ProcessPoolExecutor(
-        max_workers=BaseConfig.get_snapshot_plot_workers()
+        max_workers=min(BaseConfig.get_snapshot_plot_workers(), len(snapshot_data))
     ) as pool:
         futs = [
             pool.submit(
@@ -305,6 +305,7 @@ def run_for_dataset(dataset_id: DatasetId):
     data_agent.save("original_image")
     data_agent.save("original_network")
     data_agent.save("original_property")
+    data_agent.save("original_report")
     data_agent.save("original_graph")
 
     generate_and_select(data_agent)
