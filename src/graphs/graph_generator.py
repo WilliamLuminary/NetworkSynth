@@ -161,6 +161,13 @@ class GraphGenerator:
 
         take_snapshots = snapshot_callback is not None and snapshot_interval > 0
         snapshot_idx = 0
+
+        if take_snapshots:
+            snapshot_callback(
+                [n.position for n in node_set], edge_set, frame, snapshot_idx
+            )
+            snapshot_idx += 1
+
         next_snapshot_at = snapshot_interval if take_snapshots else float("inf")
 
         node_queue = deque([root_node])

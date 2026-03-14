@@ -306,7 +306,12 @@ def run_phase2(
 
     if take_snapshots:
         os.makedirs(snapshot_dir, exist_ok=True)
-        plot_executor = ThreadPoolExecutor(max_workers=2)
+        snapshot_style = getattr(BaseConfig, "HYBRID_SNAPSHOT_STYLE", {})
+        gen_workers = BaseConfig.get_max_workers()
+        nproc = os.cpu_count() or 1
+        plot_workers = max(nproc - gen_workers, gen_workers)
+        plot_executor = ThreadPoolExecutor(max_workers=plot_workers)
+        logger.info(f"Snapshot plot pool: {plot_workers} threads (nproc={nproc})")
         pending: List[Future] = []
 
         def on_snapshot(positions, edges, frame, idx):
@@ -326,6 +331,7 @@ def run_phase2(
                 frame,
                 idx,
                 snapshot_dir,
+                **snapshot_style,
             )
             pending.append(future)
             logger.info(
