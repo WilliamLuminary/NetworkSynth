@@ -28,6 +28,8 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
+from utils import save_hybrid_snapshot
+
 
 def find_snapshot_pairs(snapshot_dir):
     """Return sorted list of (index, pos_path, edge_path) tuples."""
@@ -48,8 +50,6 @@ def find_snapshot_pairs(snapshot_dir):
 
 def _plot_one(idx, pos_path, edge_path, snapshot_dir, frame, style):
     import numpy as np
-
-    from utils import save_hybrid_snapshot
 
     positions = np.load(pos_path).tolist()
     edges = np.load(edge_path).tolist()
