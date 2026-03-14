@@ -160,7 +160,12 @@ def generate_and_select(data_agent: RunAgent):
     original_network = data_agent.get_original_network()
     original_node_count = original_network.number_of_nodes()
     ref_metrics = compute_network_metrics(original_network)
-    std_err_fea = MultifractalAnalyzer(original_network).analyze_error_features()
+    skip_mf = BaseConfig.ERROR_TOLERANCE <= 0
+    std_err_fea = (
+        None
+        if skip_mf
+        else MultifractalAnalyzer(original_network).analyze_error_features()
+    )
     logger.info("Original metrics: %s", _fmt_metrics(ref_metrics))
 
     candidates_dir = os.path.join(data_agent.saver.output_dir, "candidates")
@@ -170,13 +175,17 @@ def generate_and_select(data_agent: RunAgent):
 
     exit_event = Manager().Event()
     max_workers = BaseConfig.get_max_workers(num_network)
-    early_node_count = original_node_count if use_snapshots else 0
+    early_node_count = original_node_count if use_snapshots and not skip_mf else 0
     logger.info(
         f"Generating {num_network} networks with {max_workers} worker(s), "
         f"selecting top {select_best}, "
-        f"error_tolerance={BaseConfig.ERROR_TOLERANCE}, "
-        f"max_attempts={BaseConfig.MAX_ATTEMPTS}"
-        + (f", snapshots every {snapshot_interval} nodes" if use_snapshots else "")
+        + (
+            f"error_tolerance={BaseConfig.ERROR_TOLERANCE}, "
+            f"max_attempts={BaseConfig.MAX_ATTEMPTS}"
+            if not skip_mf
+            else "MF error check DISABLED, "
+        )
+        + (f"snapshots every {snapshot_interval} nodes" if use_snapshots else "")
         + (f", early MF check at ~{early_node_count} nodes" if early_node_count else "")
     )
     futures = []

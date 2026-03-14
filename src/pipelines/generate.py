@@ -59,6 +59,8 @@ def generate_synthetic_network(
     if _should_exit(exit_event):
         return None, float("inf")
 
+    tolerance = BaseConfig.ERROR_TOLERANCE
+    skip_mf = tolerance <= 0
     generator = GraphGenerator(attributes)
     for attempt in range(BaseConfig.MAX_ATTEMPTS):
         try:
@@ -69,9 +71,12 @@ def generate_synthetic_network(
             if _should_exit(exit_event):
                 return None, float("inf")
 
+            if skip_mf:
+                return synthetic_graph, 0.0
+
             err_fea = MultifractalAnalyzer(synthetic_graph).analyze_error_features()
             error_ = MultifractalAnalyzer.analyze_error(err_fea, std_err_fea)
-            if error_ < BaseConfig.ERROR_TOLERANCE:
+            if error_ < tolerance:
                 return synthetic_graph, error_
 
         except KeyboardInterrupt:
@@ -91,6 +96,8 @@ def _generate_single_network(
     if exit_event.is_set():
         return None, float("inf")
 
+    tolerance = BaseConfig.ERROR_TOLERANCE
+    skip_mf = tolerance <= 0
     generator = GraphGenerator(attributes)
     for attempt in range(BaseConfig.MAX_ATTEMPTS):
         try:
@@ -101,15 +108,15 @@ def _generate_single_network(
             if exit_event.is_set():
                 return None, float("inf")
 
+            if skip_mf:
+                return graph, 0.0
+
             err_fea = MultifractalAnalyzer(graph).analyze_error_features()
             error = MultifractalAnalyzer.analyze_error(err_fea, std_err_fea)
-            if error < BaseConfig.ERROR_TOLERANCE:
+            if error < tolerance:
                 return graph, error
 
-            logger.debug(
-                f"Attempt {attempt + 1}: error {error:.4f} >= "
-                f"{BaseConfig.ERROR_TOLERANCE}"
-            )
+            logger.debug(f"Attempt {attempt + 1}: error {error:.4f} >= {tolerance}")
         except KeyboardInterrupt:
             raise
         except Exception as exc:
@@ -148,6 +155,7 @@ def _generate_single_network_collecting_snapshots(
         return None, float("inf"), []
 
     tolerance = BaseConfig.ERROR_TOLERANCE
+    skip_mf = tolerance <= 0
     avg_degree = attributes.average_degree
     generator = GraphGenerator(attributes)
     for attempt in range(BaseConfig.MAX_ATTEMPTS):
@@ -162,7 +170,8 @@ def _generate_single_network_collecting_snapshots(
                 snapshots.append((positions, edges, frame, step_idx))
 
                 if (
-                    early_check_node_count > 0
+                    not skip_mf
+                    and early_check_node_count > 0
                     and not early_checked
                     and len(positions) >= early_check_node_count
                 ):
@@ -194,6 +203,9 @@ def _generate_single_network_collecting_snapshots(
 
             if exit_event.is_set():
                 return None, float("inf"), []
+
+            if skip_mf:
+                return graph, 0.0, snapshots
 
             err_fea = MultifractalAnalyzer(graph).analyze_error_features()
             error = MultifractalAnalyzer.analyze_error(err_fea, std_err_fea)
@@ -234,13 +246,12 @@ def generate_with_multiprocessing(data_agent: RunAgent):
     from multiprocessing import Manager
 
     exit_event = Manager().Event()
-    std_err_fea = (
-        None
-        if BaseConfig.SYNTHETIC_NETWORK_NUMBER == 0
-        else MultifractalAnalyzer(
+    if BaseConfig.ERROR_TOLERANCE <= 0 or BaseConfig.SYNTHETIC_NETWORK_NUMBER == 0:
+        std_err_fea = None
+    else:
+        std_err_fea = MultifractalAnalyzer(
             data_agent.get_original_network()
         ).analyze_error_features()
-    )
 
     max_workers = BaseConfig.get_max_workers(num_network)
     logger.info(f"Using {max_workers} worker(s) for {num_network} networks")
