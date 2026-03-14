@@ -57,6 +57,7 @@ class BaseConfig:
     ERROR_TOLERANCE = 0.15  # Generally should be 0.15
 
     SNAPSHOT_INTERVAL: int = 0  # 0 = disabled; N = snapshot every N new nodes
+    SNAPSHOT_PLOT_WORKERS: int = 20
     SELECT_BEST: int = 0  # 0 = disabled; N = keep N best networks by metric distance
 
     DISABLE_SAVING: bool = False
@@ -71,12 +72,18 @@ class BaseConfig:
 
     @classmethod
     def get_max_workers(cls, num_tasks: int = None) -> int:
-        """Return number of worker processes, capped by MAX_WORKERS."""
+        """Return number of worker processes, capped by half the CPUs and MAX_WORKERS."""
         cpu_count = os.cpu_count() or 1
-        max_workers = min(max(1, cpu_count - 1), cls.MAX_WORKERS)
+        max_workers = min(max(1, cpu_count // 2), cls.MAX_WORKERS)
         if num_tasks is not None:
             max_workers = min(max_workers, num_tasks)
         return max_workers
+
+    @classmethod
+    def get_snapshot_plot_workers(cls) -> int:
+        """Return number of snapshot plotting workers, capped by half the CPUs and SNAPSHOT_PLOT_WORKERS."""
+        cpu_count = os.cpu_count() or 1
+        return min(max(1, cpu_count // 2), cls.SNAPSHOT_PLOT_WORKERS)
 
     @classmethod
     def initialize(cls):

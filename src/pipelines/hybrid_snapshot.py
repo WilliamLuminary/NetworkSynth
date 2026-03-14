@@ -92,7 +92,9 @@ def run_phase2_with_snapshots(
 
     os.makedirs(snapshot_dir, exist_ok=True)
 
-    plot_executor = ThreadPoolExecutor(max_workers=2)
+    plot_executor = ThreadPoolExecutor(
+        max_workers=BaseConfig.get_snapshot_plot_workers()
+    )
     pending: List[Future] = []
 
     def on_snapshot(positions, edges, frame, idx):

@@ -38,7 +38,9 @@ def _render_snapshots(snapshot_data, output_dir, style):
     if not snapshot_data:
         return
 
-    with ProcessPoolExecutor(max_workers=2) as pool:
+    with ProcessPoolExecutor(
+        max_workers=BaseConfig.get_snapshot_plot_workers()
+    ) as pool:
         futs = [
             pool.submit(
                 save_bfs_snapshot,

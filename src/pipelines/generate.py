@@ -326,7 +326,7 @@ def generate_with_snapshots(data_agent: RunAgent):
     interval = BaseConfig.SNAPSHOT_INTERVAL
     style = getattr(BaseConfig, "PLOT_STYLE", {})
 
-    plot_pool = ProcessPoolExecutor(max_workers=2)
+    plot_pool = ProcessPoolExecutor(max_workers=BaseConfig.get_snapshot_plot_workers())
     plot_futures = []
 
     def on_snapshot(positions, edges, frame, step_idx):
