@@ -74,7 +74,7 @@ def plot(
         line_width:   Edge line width in points.
         workers:      Parallel threads (default: min(cpu_count // 2, 20)).
     """
-    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from concurrent.futures import ProcessPoolExecutor, as_completed
 
     import numpy as np
 
@@ -118,11 +118,11 @@ def plot(
     else:
         n_workers = workers
     print(
-        f"Plotting {len(pairs)} snapshot(s) with {n_workers} thread(s), "
+        f"Plotting {len(pairs)} snapshot(s) with {n_workers} worker(s), "
         f"dpi={dpi}, node_size={node_size}, line_width={line_width}"
     )
 
-    with ThreadPoolExecutor(max_workers=n_workers) as executor:
+    with ProcessPoolExecutor(max_workers=n_workers) as executor:
         futures = {
             executor.submit(_plot_one, idx, pp, ep, snapshot_dir, frame, style): idx
             for idx, pp, ep in pairs
