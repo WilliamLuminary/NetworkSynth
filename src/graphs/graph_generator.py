@@ -307,12 +307,13 @@ class GraphGenerator:
             ``callback(positions, edges, global_frame, index)`` called
             after assembly and every *snapshot_round_interval* rounds.
         snapshot_round_interval : int
-            Fire *snapshot_callback* every this many Phase 2 rounds.
-            0 disables snapshots.
+            >0: fire *snapshot_callback* every N rounds (linear).
+            <0: fire ~|N| log-spaced snapshots across all rounds.
+            0: disable snapshots.
         """
         GraphNode.reset()
 
-        take_snapshots = snapshot_callback is not None and snapshot_round_interval > 0
+        take_snapshots = snapshot_callback is not None and snapshot_round_interval != 0
 
         def _fire_snapshot(idx):
             positions = [
