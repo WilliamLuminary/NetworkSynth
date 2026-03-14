@@ -177,7 +177,7 @@ class MultifractalAnalyzer:
         self.q_ = None
         self.weighted = BaseConfig.MEASURE_WEIGHTED if graph.is_weighted() else False
         if BaseConfig.MEASURE_WEIGHTED is not self.weighted:
-            print("Unweighted graph! Can't perform weighted analysis.")
+            logger.debug("Unweighted graph — falling back to unweighted analysis.")
         self._inv_graph: nk.Graph | None = None
         self._uw_graph: nk.Graph | None = None
 

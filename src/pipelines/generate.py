@@ -26,6 +26,26 @@ logger = logging.getLogger(__name__)
 SIGINT_INFO = "SIGINT received. Terminating child process..."
 
 
+def _build_temp_graph(positions, edges):
+    """Build a lightweight SynthGraph from raw BFS callback data.
+
+    Used for the early multifractal pre-check so we can detect bad
+    networks before the BFS finishes growing the full frame.
+    """
+    from graphs.synth_graph import SynthGraph
+
+    pos_arr = np.array(positions)
+    pos_to_idx = {pos: i for i, pos in enumerate(positions)}
+    edge_indices = []
+    for p1, p2 in edges:
+        u = pos_to_idx.get(p1)
+        v = pos_to_idx.get(p2)
+        if u is not None and v is not None:
+            edge_indices.append([u, v])
+    edge_arr = np.array(edge_indices) if edge_indices else np.empty((0, 2), dtype=int)
+    return SynthGraph.from_edge_list(pos_arr, edge_arr).largest_connected_component()
+
+
 def _should_exit(exit_event) -> bool:
     if exit_event.is_set():
         logger.info(SIGINT_INFO)
@@ -105,29 +125,70 @@ def _generate_single_network_collecting_snapshots(
     attributes: AttributesCalculator,
     mapper: Mapper,
     snapshot_interval: int,
+    early_check_node_count: int = 0,
 ):
     """Generate one network, collecting raw snapshot data in memory.
 
     Returns ``(graph, error, snapshots)`` where *snapshots* is a list
     of ``(positions, edges, frame, step_idx)`` tuples.  No rendering
     happens here — the caller decides which candidates are worth plotting.
+
+    Parameters
+    ----------
+    early_check_node_count : int
+        When > 0, run a multifractal pre-check once the BFS reaches this
+        many nodes (typically the original network's node count, i.e.
+        ~1×1 scale).  The partial network is trimmed and weighted before
+        comparison so the MF features are comparable to the original's.
+        If the error already exceeds ``ERROR_TOLERANCE``, the BFS is
+        aborted immediately — saving the cost of growing the remaining
+        network + running full analysis on the large graph.
     """
     if exit_event.is_set():
         return None, float("inf"), []
 
+    tolerance = BaseConfig.ERROR_TOLERANCE
+    avg_degree = attributes.average_degree
     generator = GraphGenerator(attributes)
     for attempt in range(BaseConfig.MAX_ATTEMPTS):
         snapshots = []
+        early_aborted = False
+        early_checked = False
 
         try:
 
             def on_snapshot(positions, edges, frame, step_idx):
+                nonlocal early_aborted, early_checked
                 snapshots.append((positions, edges, frame, step_idx))
+
+                if (
+                    early_check_node_count > 0
+                    and not early_checked
+                    and len(positions) >= early_check_node_count
+                ):
+                    early_checked = True
+                    temp_graph = _build_temp_graph(positions, edges)
+                    temp_graph = trim_graph(temp_graph, avg_degree)
+                    mapper.assign_weights(temp_graph)
+                    err_fea = MultifractalAnalyzer(temp_graph).analyze_error_features()
+                    error = MultifractalAnalyzer.analyze_error(err_fea, std_err_fea)
+                    if error >= tolerance:
+                        logger.debug(
+                            f"Attempt {attempt + 1}: early MF pre-check "
+                            f"failed at {len(positions)} nodes "
+                            f"(error {error:.4f} >= {tolerance})"
+                        )
+                        early_aborted = True
+                        return False
 
             graph = generator.generate_network_with_snapshots(
                 snapshot_callback=on_snapshot,
                 snapshot_interval=snapshot_interval,
             )
+
+            if early_aborted:
+                continue
+
             graph = trim_graph(graph, attributes.average_degree)
             mapper.assign_weights(graph)
 
@@ -136,13 +197,10 @@ def _generate_single_network_collecting_snapshots(
 
             err_fea = MultifractalAnalyzer(graph).analyze_error_features()
             error = MultifractalAnalyzer.analyze_error(err_fea, std_err_fea)
-            if error < BaseConfig.ERROR_TOLERANCE:
+            if error < tolerance:
                 return graph, error, snapshots
 
-            logger.debug(
-                f"Attempt {attempt + 1}: error {error:.4f} >= "
-                f"{BaseConfig.ERROR_TOLERANCE}"
-            )
+            logger.debug(f"Attempt {attempt + 1}: error {error:.4f} >= {tolerance}")
         except KeyboardInterrupt:
             raise
         except Exception as exc:

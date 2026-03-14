@@ -176,9 +176,11 @@ class GraphGenerator:
                         node_queue.append(child)
 
             if take_snapshots and len(node_set) >= next_snapshot_at:
-                snapshot_callback(
+                result = snapshot_callback(
                     [n.position for n in node_set], edge_set, frame, snapshot_idx
                 )
+                if result is False:
+                    return node_set, edge_set
                 snapshot_idx += 1
                 next_snapshot_at += snapshot_interval
 
