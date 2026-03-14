@@ -12,7 +12,7 @@ from .config_snapshot import SnapshotConfig
 class Snapshot3x3Config(SnapshotConfig):
     SYNTHETIC_FRAME_SIZE: Tuple[int, int] = (1530, 1530)
 
-    SNAPSHOT_INTERVAL = 50
+    SNAPSHOT_INTERVAL = 150
     SELECT_BEST = 3
     SYNTHETIC_GRAPH_NUMBER = 3
     SYNTHETIC_NETWORK_NUMBER = 20
@@ -21,5 +21,5 @@ class Snapshot3x3Config(SnapshotConfig):
     PLOT_STYLE: dict = {
         "dpi": 300,
         "node_size": 1.5,
-        "line_width": 1.5,
+        "line_width": 1.0,
     }

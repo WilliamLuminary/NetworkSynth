@@ -27,7 +27,7 @@ class SnapshotConfig(BaseConfig):
     SYNTHETIC_FRAME_SIZE: Tuple[int, int] = (1530, 1530)
 
     CLOSED_NODES_FACTOR = 1.0
-    CLOSED_EDGES_FACTOR = 1.5
+    CLOSED_EDGES_FACTOR = 1.3
 
     SNAPSHOT_INTERVAL = 0
     SELECT_BEST = 0
@@ -47,8 +47,8 @@ class SnapshotConfig(BaseConfig):
     #   3×3 (1530): node_size=2.0, line_width=1.0
     PLOT_STYLE: dict = {
         "dpi": 300,
-        "node_size": 1.5,
-        "line_width": 1.5,
+        "node_size": 1.0,
+        "line_width": 1.0,
     }
 
     BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, "samples", "hybrid_mode")
