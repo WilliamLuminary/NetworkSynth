@@ -15,7 +15,10 @@ from .config_sample import SampleConfig
 class SnapshotConfig(SampleConfig):
     """Hybrid mode with Phase 2 snapshots enabled."""
 
-    SNAPSHOT_INTERVAL: int = 3
+    # Snapshot schedule:
+    #   N > 0  →  linear: every N rounds (e.g. 3 = rounds 3, 6, 9, ...)
+    #   N < 0  →  log-spaced: ~|N| total snapshots (e.g. -60 = ~60 snapshots)
+    SNAPSHOT_INTERVAL: int = -60
 
     # Visual style for hybrid Phase 2 snapshot PNGs.
     # Adjust these to control resolution and appearance.

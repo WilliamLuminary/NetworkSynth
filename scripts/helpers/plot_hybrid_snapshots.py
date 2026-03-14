@@ -2,7 +2,7 @@
 
 Scans a snapshots directory for *_positions.npy / *_edges.npy pairs
 and renders any that are missing a corresponding .png (or all, with
---force).  Useful for re-plotting with different visual settings
+force=True).  Useful for re-plotting with different visual settings
 without re-running the full pipeline.
 
 Usage:
@@ -19,10 +19,9 @@ Examples:
     # Re-plot ALL with custom style:
     python scripts/helpers/plot_hybrid_snapshots.py \\
         data/output/hybrid_mode_.../sample_A/snapshots \\
-        --force --dpi 300 --node-size 0.05 --line-width 0.2
+        --force --dpi 300 --node_size 0.05 --line_width 0.2
 """
 
-import argparse
 import os
 import re
 import sys
@@ -47,7 +46,7 @@ def find_snapshot_pairs(snapshot_dir):
     return pairs
 
 
-def plot_one(idx, pos_path, edge_path, snapshot_dir, frame, style):
+def _plot_one(idx, pos_path, edge_path, snapshot_dir, frame, style):
     import numpy as np
 
     from utils import save_hybrid_snapshot
@@ -57,28 +56,29 @@ def plot_one(idx, pos_path, edge_path, snapshot_dir, frame, style):
     save_hybrid_snapshot(positions, edges, frame, idx, snapshot_dir, **style)
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Re-plot hybrid snapshot PNGs from .npy data"
-    )
-    parser.add_argument("snapshot_dir", help="Path to the snapshots/ directory")
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Re-plot all snapshots, even if PNG already exists",
-    )
-    parser.add_argument("--dpi", type=int, default=600)
-    parser.add_argument("--node-size", type=float, default=0.01)
-    parser.add_argument("--line-width", type=float, default=0.1)
-    parser.add_argument(
-        "--workers",
-        type=int,
-        default=None,
-        help="Number of parallel threads (default: cpu_count)",
-    )
-    args = parser.parse_args()
+def plot(
+    snapshot_dir: str,
+    force: bool = False,
+    dpi: int = 600,
+    node_size: float = 0.01,
+    line_width: float = 0.1,
+    workers: int = None,
+):
+    """Re-plot hybrid snapshot PNGs from saved .npy data.
 
-    snapshot_dir = os.path.abspath(args.snapshot_dir)
+    Args:
+        snapshot_dir: Path to the snapshots/ directory.
+        force:        Re-plot all, even if PNG already exists.
+        dpi:          Output resolution in dots per inch.
+        node_size:    Scatter marker area in points².
+        line_width:   Edge line width in points.
+        workers:      Parallel threads (default: cpu_count).
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    import numpy as np
+
+    snapshot_dir = os.path.abspath(snapshot_dir)
     if not os.path.isdir(snapshot_dir):
         sys.exit(f"Directory not found: {snapshot_dir}")
 
@@ -86,7 +86,7 @@ def main():
     if not pairs:
         sys.exit(f"No *_positions.npy / *_edges.npy pairs found in {snapshot_dir}")
 
-    if not args.force:
+    if not force:
         pairs = [
             (idx, pp, ep)
             for idx, pp, ep in pairs
@@ -95,8 +95,6 @@ def main():
         if not pairs:
             print("All PNGs already exist. Use --force to re-plot.")
             return
-
-    import numpy as np
 
     all_pos = np.load(pairs[-1][1])
     x_min, y_min = all_pos.min(axis=0)
@@ -108,23 +106,21 @@ def main():
     )
 
     style = {
-        "dpi": args.dpi,
-        "node_size": args.node_size,
-        "line_width": args.line_width,
+        "dpi": dpi,
+        "node_size": node_size,
+        "line_width": line_width,
         "margin_frac": 0.0,
     }
 
-    workers = args.workers or os.cpu_count() or 1
+    n_workers = workers or os.cpu_count() or 1
     print(
-        f"Plotting {len(pairs)} snapshot(s) with {workers} thread(s), "
-        f"dpi={args.dpi}, node_size={args.node_size}, line_width={args.line_width}"
+        f"Plotting {len(pairs)} snapshot(s) with {n_workers} thread(s), "
+        f"dpi={dpi}, node_size={node_size}, line_width={line_width}"
     )
 
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-
-    with ThreadPoolExecutor(max_workers=workers) as executor:
+    with ThreadPoolExecutor(max_workers=n_workers) as executor:
         futures = {
-            executor.submit(plot_one, idx, pp, ep, snapshot_dir, frame, style): idx
+            executor.submit(_plot_one, idx, pp, ep, snapshot_dir, frame, style): idx
             for idx, pp, ep in pairs
         }
         done = 0
@@ -143,4 +139,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import fire
+
+    fire.Fire(plot)
