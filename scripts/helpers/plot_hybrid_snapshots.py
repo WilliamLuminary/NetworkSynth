@@ -72,7 +72,7 @@ def plot(
         dpi:          Output resolution in dots per inch.
         node_size:    Scatter marker area in points².
         line_width:   Edge line width in points.
-        workers:      Parallel threads (default: cpu_count).
+        workers:      Parallel threads (default: min(cpu_count // 2, 20)).
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -112,7 +112,11 @@ def plot(
         "margin_frac": 0.0,
     }
 
-    n_workers = workers or os.cpu_count() or 1
+    if workers is None:
+        cpu_count = os.cpu_count() or 1
+        n_workers = min(max(1, cpu_count // 2), 20)
+    else:
+        n_workers = workers
     print(
         f"Plotting {len(pairs)} snapshot(s) with {n_workers} thread(s), "
         f"dpi={dpi}, node_size={node_size}, line_width={line_width}"
