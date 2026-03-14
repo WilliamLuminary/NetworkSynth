@@ -29,8 +29,9 @@ SIGINT_INFO = "SIGINT received. Terminating child process..."
 def _build_temp_graph(positions, edges):
     """Build a lightweight SynthGraph from raw BFS callback data.
 
-    Used for the early multifractal pre-check so we can detect bad
-    networks before the BFS finishes growing the full frame.
+    Both *positions* and *edges* are already snapshot-time copies
+    (positions is a new list, edges is a ``set()`` copy made inside
+    ``_bfs_network``), so no shared-reference issues arise.
     """
     from graphs.synth_graph import SynthGraph
 
@@ -143,13 +144,13 @@ def _generate_single_network_collecting_snapshots(
     Parameters
     ----------
     early_check_node_count : int
-        When > 0, run a multifractal pre-check once the BFS reaches this
-        many nodes (typically the original network's node count, i.e.
-        ~1×1 scale).  The partial network is trimmed and weighted before
-        comparison so the MF features are comparable to the original's.
-        If the error already exceeds ``ERROR_TOLERANCE``, the BFS is
-        aborted immediately — saving the cost of growing the remaining
-        network + running full analysis on the large graph.
+        When > 0 **and** ``ERROR_TOLERANCE > 0``, run a multifractal
+        pre-check once the BFS reaches this many nodes (typically the
+        original network's node count, i.e. ~1×1 scale).  The partial
+        network is trimmed and weighted so its MF features are
+        comparable to the original's.  If the error already exceeds
+        ``ERROR_TOLERANCE``, the BFS is aborted immediately.
+        Disabled automatically when ``ERROR_TOLERANCE <= 0``.
     """
     if exit_event.is_set():
         return None, float("inf"), []

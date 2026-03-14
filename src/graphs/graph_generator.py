@@ -164,7 +164,7 @@ class GraphGenerator:
 
         if take_snapshots:
             snapshot_callback(
-                [n.position for n in node_set], edge_set, frame, snapshot_idx
+                [n.position for n in node_set], set(edge_set), frame, snapshot_idx
             )
             snapshot_idx += 1
 
@@ -184,7 +184,7 @@ class GraphGenerator:
 
             if take_snapshots and len(node_set) >= next_snapshot_at:
                 result = snapshot_callback(
-                    [n.position for n in node_set], edge_set, frame, snapshot_idx
+                    [n.position for n in node_set], set(edge_set), frame, snapshot_idx
                 )
                 if result is False:
                     return node_set, edge_set
@@ -193,7 +193,7 @@ class GraphGenerator:
 
         if take_snapshots:
             snapshot_callback(
-                [n.position for n in node_set], edge_set, frame, snapshot_idx
+                [n.position for n in node_set], set(edge_set), frame, snapshot_idx
             )
 
         return node_set, edge_set
