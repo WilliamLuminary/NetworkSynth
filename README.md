@@ -303,11 +303,11 @@ NetworkX (`networkx`) remains installed as a dependency but is only imported
 in three specific places:
 
 
-| File                                        | Purpose                                                                                                        |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `graphs/synth_graph.py`                 | `from_networkx()` — converts legacy `nx.Graph` pickle files to `SynthGraph`                                    |
-| `configs/analyze_mode/config_sample.py` | Detects old `.pkl` files containing `nx.Graph` and converts them via `SynthGraph.from_networkx()`              |
-| `analysis/multifractal_analyzer.py`     | `to_networkx()` — converts back to `nx.Graph` only for `GraphRicciCurvature` (which requires `nx.Graph` input) |
+| File                                     | Purpose                                                                          |
+| ---------------------------------------- | -------------------------------------------------------------------------------- |
+| `graphs/synth_graph.py`                  | `from_networkx()` — converts legacy `nx.Graph` pickle files to `SynthGraph`      |
+| `configs/analyze_mode/config_sample.py`  | Detects old `.pkl` files containing `nx.Graph` and converts via `from_networkx()` |
+| `scripts/helpers/convert_pkl_network.py` | Standalone converter — reads `nx.Graph` pickles, exports CSV + NetworKit binary   |
 
 
 All graph algorithms (Dijkstra, betweenness, closeness, eigenvector
