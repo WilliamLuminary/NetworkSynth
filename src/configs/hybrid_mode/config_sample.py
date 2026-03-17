@@ -70,10 +70,15 @@ class SampleConfig(BaseConfig):
     # Per-dataset overrides for (CLOSED_NODES_FACTOR, CLOSED_EDGES_FACTOR).
     # Datasets not listed here use the defaults above.
     DATASET_FACTORS: Dict[str, Tuple[float, float]] = {
-        "sample_A": (1.0, 1.5),
-        "sample_B": (1.8, 1.5),
-        "sample_C": (1.3, 1.6),
-        "sample_D": (1.5, 1.3),
+        # "sample_A": (1.0, 1.5),
+        # "sample_B": (1.8, 1.5),
+        # "sample_C": (1.3, 1.6),
+        # "sample_D": (1.5, 1.3),
+        # These are the values from the sweep
+        "sample_A": (1.0, 1.4),
+        "sample_B": (1.8, 1.2),
+        "sample_C": (1.3, 1.3),
+        "sample_D": (1.5, 1.0),
     }
 
     SYNTHETIC_GRAPH_NUMBER = 0
