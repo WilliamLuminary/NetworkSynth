@@ -10,10 +10,9 @@ Usage:
     python scripts/helpers/plot_hybrid_original.py --sample A --output my_plot.png --no_background
 """
 
+import logging
 import os
 import sys
-
-import logging
 
 import cv2
 import numpy as np
