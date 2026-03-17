@@ -1,6 +1,6 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["."]
 markers = [
     "unit: pure unit tests — no heavy deps, no sample data",
     "integration: end-to-end pipeline tests — need networkit + sample data",

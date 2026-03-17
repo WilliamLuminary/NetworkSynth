@@ -41,8 +41,6 @@ NPY_PATH = os.path.join(SYNTH_DIR, "hybrid_50x50_lcc_positions.npy")
 OUT_EDGELIST = os.path.join(SYNTH_DIR, "hybrid_50x50_lcc_edgelist.csv")
 OUT_POSITIONS = os.path.join(SYNTH_DIR, "hybrid_50x50_lcc_positions.csv")
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
-
 from configs import BaseConfig
 from configs.hybrid_mode import HybridConfig
 
