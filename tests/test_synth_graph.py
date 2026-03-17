@@ -1,6 +1,6 @@
 # tests/test_synth_graph.py
 """
-Unit tests for the SynthGraph class in src/graphs/synth_graph.py.
+Unit tests for the SynthGraph class in graphs/synth_graph.py.
 
 Covers:
   - Core properties (number_of_nodes, number_of_edges, is_weighted)

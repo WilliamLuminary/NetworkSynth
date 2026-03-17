@@ -1,6 +1,6 @@
 # tests/test_utils.py
 """
-Unit tests for utility functions in src/utils.py.
+Unit tests for utility functions in utils.py.
 
 Covers:
   - calculate_frame()    → frame from graph or center position
