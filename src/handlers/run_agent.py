@@ -214,7 +214,7 @@ def _build_original_report(graph: SynthGraph, attributes) -> str:
     ]
     if attributes:
         lines.append(f"Average degree:     {attributes.average_degree:.4f}")
-        lines.append(f"Average edge length:{attributes.average_length:.4f}")
+        lines.append(f"Average edge length: {attributes.average_length:.4f}")
         if attributes.degree_distribution:
             lines.append("")
             lines.append("Degree distribution:")
