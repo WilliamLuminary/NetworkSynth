@@ -1,4 +1,4 @@
-# src/run.py
+# run.py
 """
 Unified entry point for all NetworkSynth pipelines.
 
