@@ -10,11 +10,8 @@ Usage (from project root):
     python scripts/run_generate_top2.py
 """
 import os
-import sys
 
 os.environ.setdefault("OMP_NUM_THREADS", "1")
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
 import logging
 
