@@ -1,12 +1,9 @@
 # src/configs/generate_mode/config_snapshot.py
 """
-Generate-mode config for snapshot & metric-selection generation.
+Generate-mode config for sample_A.
 
 Uses the hybrid-mode sample_A data with its tuned node/edge factors.
-
-Two run modes (toggle by setting one to 0):
-  SNAPSHOT_INTERVAL > 0  →  BFS snapshot visualisation (single network)
-  SELECT_BEST > 0        →  generate many, rank by 5 metrics, save best
+Base class for Snapshot1x1Config / Snapshot3x3Config variants.
 """
 import logging
 import os
@@ -23,23 +20,25 @@ logger = logging.getLogger(__name__)
 
 
 class SnapshotConfig(BaseConfig):
-    DATASETS = [DatasetId("sample_A")]
+    DATASETS = [
+        DatasetId("sample_A"),
+        DatasetId("sample_B"),
+        DatasetId("sample_C"),
+        DatasetId("sample_D"),
+    ]
 
     IMAGE_SIZE: Tuple[int, int] = (510, 510)
     FRAME_SIZE: Tuple[int, int] = (510, 510)
     SYNTHETIC_FRAME_SIZE: Tuple[int, int] = (1530, 1530)
 
     CLOSED_NODES_FACTOR = 1.0
-    CLOSED_EDGES_FACTOR = 1.5
+    CLOSED_EDGES_FACTOR = 1.3
 
-    # --- Snapshot mode (set SNAPSHOT_INTERVAL = 0 to disable) ---
     SNAPSHOT_INTERVAL = 0
+    SELECT_BEST = 0
 
-    # --- Metric selection mode (set SELECT_BEST = 0 to disable) ---
-    SELECT_BEST = 3
-
-    SYNTHETIC_GRAPH_NUMBER = 3
-    SYNTHETIC_NETWORK_NUMBER = 20
+    SYNTHETIC_GRAPH_NUMBER = 1
+    SYNTHETIC_NETWORK_NUMBER = 0
 
     MAX_ATTEMPTS = 50
     ERROR_TOLERANCE = 0.15
@@ -53,8 +52,8 @@ class SnapshotConfig(BaseConfig):
     #   3×3 (1530): node_size=2.0, line_width=1.0
     PLOT_STYLE: dict = {
         "dpi": 300,
-        "node_size": 1.5,
-        "line_width": 1.5,
+        "node_size": 0.5,
+        "line_width": 0.5,
     }
 
     BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, "samples", "hybrid_mode")
