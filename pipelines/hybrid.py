@@ -3,6 +3,7 @@
 Hybrid pipeline — parallel seed tiles (Phase 1) + frontier continuation (Phase 2).
 """
 
+import gc
 import os
 
 os.environ.setdefault("OMP_NUM_THREADS", "1")
@@ -175,7 +176,8 @@ def run_phase1(
 
     from multiprocessing import Manager
 
-    exit_event = Manager().Event()
+    manager = Manager()
+    exit_event = manager.Event()
     num_workers = BaseConfig.get_max_workers(num_centers)
 
     logger.info(
@@ -215,6 +217,8 @@ def run_phase1(
         logger.info(SIGINT_INFO)
         exit_event.set()
         raise
+    finally:
+        manager.shutdown()
 
     if failed:
         logger.warning(f"{len(failed)} tiles failed: {failed[:20]}")
@@ -356,8 +360,10 @@ def run_phase2(
             logger.info(f"Generation done. Waiting for {remaining} snapshot plot(s)...")
         for f in pending:
             f.result()
-        plot_executor.shutdown(wait=False)
-        logger.info(f"All {len(pending)} snapshot(s) saved to {snapshot_dir}")
+        num_snapshots = len(pending)
+        plot_executor.shutdown(wait=True)
+        del pending, plot_executor
+        logger.info(f"All {num_snapshots} snapshot(s) saved to {snapshot_dir}")
     else:
         graph = GraphGenerator.assemble_and_continue(
             tile_data_list, global_frame, max_rounds
@@ -581,6 +587,13 @@ def run_hybrid_for_dataset(dataset_id):
         f"{hybrid_graph.number_of_edges():,} edges"
         + (f", snapshots in {snapshot_dir}" if snapshot_dir else "")
     )
+
+    # --- Free heavy objects so memory is reclaimed before the next dataset ---
+    GraphNode.reset()
+    del tile_results, hybrid_graph, data_agent, original_network
+    del attributes, mapper, std_err_fea, centers
+    gc.collect()
+    logger.info("Resources released for dataset %s", dataset_id)
 
 
 # ------------------------------------------------------------------ #
