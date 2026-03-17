@@ -260,11 +260,11 @@ Best `(CLOSED_NODES_FACTOR, CLOSED_EDGES_FACTOR)` per dataset from hyperparamete
 | B       | 0.7         | 2.0         | 0.054 | 36%          | Lowest error w/ usable success (best combined) |
 | B       | 0.4         | 2.0         | 0.086 | 46%          | Balanced |
 | B       | 1.9         | 1.9         | 0.119 | 55%          | Highest success rate |
-| C       | 1.3         | 1.6         | 0.091 | 71%          | Lowest error at ≥70% success |
+| C       | 1.3         | 1.6         | 0.091 | 71%          | Lowest error at ≥70% success (local test) |
 | C       | 1.6         | 1.6         | 0.095 | 76%          | Best balance                 |
 | C       | 0.6         | 1.7         | 0.102 | 80%          | Highest success rate         |
 | D       | 1.8         | 1.7         | 0.086 | 32%          | Lowest error at ≥30% success |
-| D       | 1.5         | 1.3         | 0.101 | 69%          | Best balance                 |
+| D       | 1.5         | 1.3         | 0.101 | 69%          | Best balance (local test)    |
 | D       | 1.0         | 0.7         | 0.102 | 82%          | Highest success rate         |
 
 

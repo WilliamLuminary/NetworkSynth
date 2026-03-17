@@ -161,6 +161,13 @@ class GraphGenerator:
 
         take_snapshots = snapshot_callback is not None and snapshot_interval > 0
         snapshot_idx = 0
+
+        if take_snapshots:
+            snapshot_callback(
+                [n.position for n in node_set], set(edge_set), frame, snapshot_idx
+            )
+            snapshot_idx += 1
+
         next_snapshot_at = snapshot_interval if take_snapshots else float("inf")
 
         node_queue = deque([root_node])
@@ -176,15 +183,17 @@ class GraphGenerator:
                         node_queue.append(child)
 
             if take_snapshots and len(node_set) >= next_snapshot_at:
-                snapshot_callback(
-                    [n.position for n in node_set], edge_set, frame, snapshot_idx
+                result = snapshot_callback(
+                    [n.position for n in node_set], set(edge_set), frame, snapshot_idx
                 )
+                if result is False:
+                    return node_set, edge_set
                 snapshot_idx += 1
                 next_snapshot_at += snapshot_interval
 
         if take_snapshots:
             snapshot_callback(
-                [n.position for n in node_set], edge_set, frame, snapshot_idx
+                [n.position for n in node_set], set(edge_set), frame, snapshot_idx
             )
 
         return node_set, edge_set
@@ -298,12 +307,13 @@ class GraphGenerator:
             ``callback(positions, edges, global_frame, index)`` called
             after assembly and every *snapshot_round_interval* rounds.
         snapshot_round_interval : int
-            Fire *snapshot_callback* every this many Phase 2 rounds.
-            0 disables snapshots.
+            >0: fire *snapshot_callback* every N rounds (linear).
+            <0: fire ~|N| log-spaced snapshots across all rounds.
+            0: disable snapshots.
         """
         GraphNode.reset()
 
-        take_snapshots = snapshot_callback is not None and snapshot_round_interval > 0
+        take_snapshots = snapshot_callback is not None and snapshot_round_interval != 0
 
         def _fire_snapshot(idx):
             positions = [
@@ -365,6 +375,21 @@ class GraphGenerator:
             _fire_snapshot(snapshot_idx)
             snapshot_idx += 1
 
+        snapshot_log = snapshot_round_interval < 0
+        if snapshot_log:
+            desired_count = abs(snapshot_round_interval)
+            log_multiplier = (
+                max_rounds ** (1.0 / desired_count) if desired_count > 1 else 2.0
+            )
+            next_snapshot_round = 1
+            logger.info(
+                f"Log snapshot schedule: ~{desired_count} snapshots, "
+                f"multiplier={log_multiplier:.3f}"
+            )
+        else:
+            log_multiplier = 1.0
+            next_snapshot_round = snapshot_round_interval
+
         for round_num in range(max_rounds):
             rng.shuffle(frontier)
             next_frontier: list = []
@@ -395,9 +420,16 @@ class GraphGenerator:
 
             frontier = next_frontier
 
-            if take_snapshots and (round_num + 1) % snapshot_round_interval == 0:
+            if take_snapshots and (round_num + 1) >= next_snapshot_round:
                 _fire_snapshot(snapshot_idx)
                 snapshot_idx += 1
+                if snapshot_log:
+                    next_snapshot_round = max(
+                        next_snapshot_round + 1,
+                        int(next_snapshot_round * log_multiplier),
+                    )
+                else:
+                    next_snapshot_round += snapshot_round_interval
 
         del seen_frontier_ids
 

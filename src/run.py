@@ -4,9 +4,9 @@ Unified entry point for all NetworkSynth pipelines.
 
 Usage
 -----
-    python run.py generate                          Default (Snapshot config)
-    python run.py generate --config Snapshot1x1     1×1 BFS snapshot (interval=10)
-    python run.py generate --config Snapshot3x3     3×3 BFS snapshot (interval=50)
+    python run.py generate                          Standard generation (default config)
+    python run.py generate --config Snapshot1x1     Single network + BFS snapshots
+    python run.py generate_select --config Snapshot3x3   Generate 20, rank, pick top 3
     python run.py from_props                        Generate from pre-computed attributes
     python run.py mosaic                            Mosaic: parallel tiles + stitch
     python run.py scaling                           Scaling: multi-root synchronized BFS
@@ -43,6 +43,29 @@ class CLI:
                 )
 
         from pipelines.generate import main
+
+        main(config_cls=config_cls)
+
+    def generate_select(self, config: str = None):
+        """Generate N candidates, rank by metrics, select top K.
+
+        Args:
+            config: Config variant name, e.g. 'Snapshot3x3'.
+                    Maps to GenConfig<Name>. Omit for default (Snapshot).
+        """
+        config_cls = None
+        if config:
+            import configs.generate_mode as gm
+
+            cls_name = f"GenConfig{config}"
+            config_cls = getattr(gm, cls_name, None)
+            if config_cls is None:
+                available = [n for n in dir(gm) if n.startswith("GenConfig")]
+                raise SystemExit(
+                    f"Unknown generate config '{config}'. " f"Available: {available}"
+                )
+
+        from pipelines.generate_select import main
 
         main(config_cls=config_cls)
 

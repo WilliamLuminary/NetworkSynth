@@ -249,7 +249,8 @@ def run_phase2(
     """Offset tiles to their global center positions, then continue BFS.
 
     When *snapshot_round_interval* > 0, Phase 2 snapshots are rendered
-    asynchronously in background threads and saved to *snapshot_dir*.
+    every N rounds.  When < 0, ~|N| log-spaced snapshots are taken.
+    Snapshots are saved asynchronously in background threads to *snapshot_dir*.
     """
     frame_w, frame_h = BaseConfig.SYNTHETIC_FRAME_SIZE
     margin_x = frame_w
@@ -259,13 +260,17 @@ def run_phase2(
         (-margin_y, whiteboard_h + margin_y),
     )
 
-    take_snapshots = snapshot_round_interval > 0 and snapshot_dir is not None
+    take_snapshots = snapshot_round_interval != 0 and snapshot_dir is not None
 
     logger.info(
         f"Phase 2: whiteboard {whiteboard_w:.0f}×{whiteboard_h:.0f}, "
         f"global_frame={global_frame}"
         + (
-            f", snapshot every {snapshot_round_interval} round(s)"
+            (
+                f", snapshot every {snapshot_round_interval} round(s)"
+                if snapshot_round_interval > 0
+                else f", ~{abs(snapshot_round_interval)} log-spaced snapshots"
+            )
             if take_snapshots
             else ""
         )
@@ -306,7 +311,10 @@ def run_phase2(
 
     if take_snapshots:
         os.makedirs(snapshot_dir, exist_ok=True)
-        plot_executor = ThreadPoolExecutor(max_workers=2)
+        snapshot_style = getattr(BaseConfig, "HYBRID_SNAPSHOT_STYLE", {})
+        plot_workers = BaseConfig.get_snapshot_plot_workers()
+        plot_executor = ThreadPoolExecutor(max_workers=plot_workers)
+        logger.info(f"Snapshot plot pool: {plot_workers} threads")
         pending: List[Future] = []
 
         def on_snapshot(positions, edges, frame, idx):
@@ -326,6 +334,7 @@ def run_phase2(
                 frame,
                 idx,
                 snapshot_dir,
+                **snapshot_style,
             )
             pending.append(future)
             logger.info(
@@ -507,7 +516,7 @@ def run_hybrid_for_dataset(dataset_id):
     snapshot_interval = getattr(BaseConfig, "SNAPSHOT_INTERVAL", 0)
     snapshot_dir = (
         os.path.join(data_agent.saver.output_dir, "snapshots")
-        if snapshot_interval > 0
+        if snapshot_interval != 0
         else None
     )
 
