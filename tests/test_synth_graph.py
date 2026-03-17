@@ -22,7 +22,6 @@ pytestmark = pytest.mark.unit
 
 from graphs.synth_graph import SynthGraph
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -46,9 +45,7 @@ def _make_disconnected_graph() -> SynthGraph:
     g.addEdge(0, 1)
     g.addEdge(1, 2)
     g.addEdge(3, 4)
-    positions = np.array(
-        [[0, 0], [1, 0], [2, 0], [10, 10], [11, 10]], dtype=np.float64
-    )
+    positions = np.array([[0, 0], [1, 0], [2, 0], [10, 10], [11, 10]], dtype=np.float64)
     return SynthGraph(g, positions)
 
 

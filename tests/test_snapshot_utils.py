@@ -53,7 +53,13 @@ class TestComputeNetworkMetrics:
 
         graph = _make_synth_graph()
         metrics = compute_network_metrics(graph)
-        expected = {"node_count", "avg_degree", "avg_clustering", "avg_length", "avg_angle"}
+        expected = {
+            "node_count",
+            "avg_degree",
+            "avg_clustering",
+            "avg_length",
+            "avg_angle",
+        }
         assert set(metrics.keys()) == expected
 
     def test_node_count_matches(self):
@@ -143,9 +149,7 @@ class TestSaveBfsSnapshot:
             )
 
         for i in range(3):
-            assert os.path.isfile(
-                os.path.join(str(tmp_path), f"snapshot_{i:05d}.png")
-            )
+            assert os.path.isfile(os.path.join(str(tmp_path), f"snapshot_{i:05d}.png"))
 
 
 # ---------------------------------------------------------------------------

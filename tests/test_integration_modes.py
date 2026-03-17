@@ -354,7 +354,11 @@ class TestSnapshotMode:
             recorded_calls.append(step_idx)
             # Use low dpi for speed; pass node_size/line_width from PLOT_STYLE
             save_bfs_snapshot(
-                positions, edges, frame, step_idx, snapshot_dir,
+                positions,
+                edges,
+                frame,
+                step_idx,
+                snapshot_dir,
                 dpi=72,
                 node_size=style.get("node_size", 6.0),
                 line_width=style.get("line_width", 3.0),
@@ -376,9 +380,7 @@ class TestSnapshotMode:
 
         # Verify PNG files were created (fewer than calls due to BFS retries
         # overwriting snapshots from failed attempts)
-        snapshot_files = [
-            f for f in os.listdir(snapshot_dir) if f.endswith(".png")
-        ]
+        snapshot_files = [f for f in os.listdir(snapshot_dir) if f.endswith(".png")]
         assert len(snapshot_files) > 0, "No snapshot PNGs found"
 
         logger.info(

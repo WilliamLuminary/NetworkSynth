@@ -81,9 +81,7 @@ class TestCalculateFrame:
 
         graph = _make_graph(n=5)
         with pytest.raises(ValueError, match="Only"):
-            calculate_frame(
-                graph=graph, center_position=(0, 0), frame_range=(100, 100)
-            )
+            calculate_frame(graph=graph, center_position=(0, 0), frame_range=(100, 100))
 
 
 # ---------------------------------------------------------------------------
