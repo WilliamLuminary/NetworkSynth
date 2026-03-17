@@ -76,9 +76,9 @@ class SampleConfig(BaseConfig):
         # "sample_D": (1.5, 1.3),
         # These are the values from the sweep
         "sample_A": (1.0, 1.4),
-        "sample_B": (1.8, 1.2),
+        "sample_B": (1.5, 1.0),
         "sample_C": (1.3, 1.3),
-        "sample_D": (1.5, 1.0),
+        "sample_D": (1.3, 0.8),
     }
 
     SYNTHETIC_GRAPH_NUMBER = 0
