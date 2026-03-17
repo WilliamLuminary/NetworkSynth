@@ -33,7 +33,7 @@ pre-commit run --all-files  # manual full check
    cd NetworkSynth
    pip install -r requirements.txt  # Python 3.10+
 
-   python src/main.py
+   python -m run generate
   ```
 2. **Prepare Sample Data**
   ```
@@ -86,7 +86,7 @@ dataset[1]      # "10kX"
 
 ### Creating a New Config
 
-1. Create `src/configs/generate_mode/config_mydata.py`:
+1. Create `configs/generate_mode/config_mydata.py`:
 
 ```python
 from typing import List
@@ -128,11 +128,10 @@ class ConfigMydata(BaseConfig):
         ...
 ```
 
-2. Update `src/main.py`:
+2. Run with your config:
 
-```python
-from config.generate_mode import GenConfigMydata as GenConfig
-GenConfig.initialize()
+```bash
+python -m run generate --config Mydata
 ```
 
 The config is automatically exported as `GenConfigMydata` based on the naming convention.
@@ -151,7 +150,7 @@ Pipeline  →  Saver.save(content, identifier, prefix)
               Serializer(content, filepath)  →  writes to disk
 ```
 
-**Layer 1 — Serializers** (`src/configs/file_definitions.py`): Pure `(content, filepath)` functions.
+**Layer 1 — Serializers** (`configs/file_definitions.py`): Pure `(content, filepath)` functions.
 
 | Serializer | Output |
 | --- | --- |
@@ -166,7 +165,7 @@ Pipeline  →  Saver.save(content, identifier, prefix)
 
 **Layer 2 — Config save methods** (`BaseConfig` + mode overrides): Each `save_*` classmethod returns a list of spec tuples — no dependency on the Saver.
 
-**Layer 3 — Saver** (`src/handlers/saver.py`): Single public method `save()`. Gets specs from the config, builds file paths, creates directories, and calls the serializer with `(content, filepath)`.
+**Layer 3 — Saver** (`handlers/saver.py`): Single public method `save()`. Gets specs from the config, builds file paths, creates directories, and calls the serializer with `(content, filepath)`.
 
 #### How specs work
 
@@ -217,7 +216,7 @@ Only override what differs — everything else is inherited from `BaseConfig`.
 
 To save a new type of data:
 
-1. Add a constant to `DataType` in `src/configs/enums.py`:
+1. Add a constant to `DataType` in `configs/enums.py`:
 
 ```python
 class DataType:
@@ -283,7 +282,7 @@ Best `(CLOSED_NODES_FACTOR, CLOSED_EDGES_FACTOR)` per dataset from hyperparamete
 
 ## Graph Architecture: SynthGraph
 
-The codebase uses `SynthGraph` (defined in `src/graphs/synth_graph.py`) as its
+The codebase uses `SynthGraph` (defined in `graphs/synth_graph.py`) as its
 primary graph representation. It wraps a **NetworKit** `nk.Graph` (C++ engine)
 together with a NumPy positions array, replacing the previous `nx.Graph`.
 
@@ -306,9 +305,9 @@ in three specific places:
 
 | File                                        | Purpose                                                                                                        |
 | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `src/graphs/synth_graph.py`                 | `from_networkx()` — converts legacy `nx.Graph` pickle files to `SynthGraph`                                    |
-| `src/configs/analyze_mode/config_sample.py` | Detects old `.pkl` files containing `nx.Graph` and converts them via `SynthGraph.from_networkx()`              |
-| `src/analysis/multifractal_analyzer.py`     | `to_networkx()` — converts back to `nx.Graph` only for `GraphRicciCurvature` (which requires `nx.Graph` input) |
+| `graphs/synth_graph.py`                 | `from_networkx()` — converts legacy `nx.Graph` pickle files to `SynthGraph`                                    |
+| `configs/analyze_mode/config_sample.py` | Detects old `.pkl` files containing `nx.Graph` and converts them via `SynthGraph.from_networkx()`              |
+| `analysis/multifractal_analyzer.py`     | `to_networkx()` — converts back to `nx.Graph` only for `GraphRicciCurvature` (which requires `nx.Graph` input) |
 
 
 All graph algorithms (Dijkstra, betweenness, closeness, eigenvector
