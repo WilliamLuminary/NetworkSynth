@@ -1,14 +1,16 @@
 # src/utils.py
+from __future__ import annotations
+
 import functools
 import logging
 import time
-from typing import Tuple, Union
+from typing import TYPE_CHECKING, Tuple, Union
 
 import numpy as np
 from numpy import ndarray
 
-from configs import BaseConfig
-from graphs.synth_graph import SynthGraph
+if TYPE_CHECKING:
+    from graphs.synth_graph import SynthGraph
 
 
 def calculate_frame(
@@ -16,7 +18,10 @@ def calculate_frame(
     center_position: Union[tuple, list, ndarray] = None,
     frame_range: Tuple[int, int] = None,
 ) -> tuple[tuple[float, float], tuple[float, float]]:
-    frame_range = frame_range or BaseConfig.SYNTHETIC_FRAME_SIZE
+    if frame_range is None:
+        from configs import BaseConfig
+
+        frame_range = BaseConfig.SYNTHETIC_FRAME_SIZE
     if graph is None:
         if not center_position:
             raise ValueError(
@@ -64,16 +69,22 @@ def build_graph(*args, arg_type: str = "adjacency_matrix") -> SynthGraph:
 
 
 def _from_adjacency_matrix(positions: np.ndarray, adjacency_matrix) -> SynthGraph:
+    from graphs.synth_graph import SynthGraph
+
     graph = SynthGraph.from_sparse_matrix(positions, adjacency_matrix)
     return graph.largest_connected_component()
 
 
 def _from_graph_node(nodes: set, edges: set) -> SynthGraph:
+    from graphs.synth_graph import SynthGraph
+
     graph = SynthGraph.from_graph_nodes(nodes, edges)
     return graph.largest_connected_component()
 
 
 def _from_edge_list(positions: np.ndarray, edge_list: np.ndarray) -> SynthGraph:
+    from graphs.synth_graph import SynthGraph
+
     graph = SynthGraph.from_edge_list(positions, edge_list)
     return graph.largest_connected_component()
 
@@ -457,6 +468,8 @@ def trim_graph(graph: SynthGraph, tar_avg_deg: float) -> SynthGraph:
         else:
             for i in range(len(kept_src)):
                 new_nk.addEdge(int(kept_src[i]), int(kept_dst[i]))
+
+        from graphs.synth_graph import SynthGraph
 
         graph = SynthGraph(new_nk, graph.positions())
         logger.debug(
