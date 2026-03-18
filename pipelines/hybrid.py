@@ -11,10 +11,11 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 import logging
 import time
 from concurrent.futures import (
+    FIRST_COMPLETED,
     Future,
     ProcessPoolExecutor,
     ThreadPoolExecutor,
-    as_completed,
+    wait,
 )
 from typing import Dict, List, Tuple
 
@@ -184,41 +185,67 @@ def run_phase1(
         f"Phase 1: generating {num_centers:,} seed tiles " f"with {num_workers} workers"
     )
 
-    tile_args = [
-        (i, exit_event, attributes, std_err_fea, mapper) for i in range(num_centers)
-    ]
-
     tile_results: Dict[int, dict] = {}
     failed = []
 
     try:
         with ProcessPoolExecutor(max_workers=num_workers) as executor:
-            futures = {
-                executor.submit(_generate_tile_worker, a): a[0] for a in tile_args
-            }
+            max_in_flight = max(1, num_workers * 2)
+            next_tile_idx = 0
+            futures: Dict[Future, int] = {}
+            while next_tile_idx < num_centers and len(futures) < max_in_flight:
+                args = (
+                    next_tile_idx,
+                    exit_event,
+                    attributes,
+                    std_err_fea,
+                    mapper,
+                )
+                futures[executor.submit(_generate_tile_worker, args)] = next_tile_idx
+                next_tile_idx += 1
+
             completed = 0
             next_log_pct = 10
-            for future in as_completed(futures):
-                tile_idx, data = future.result()
-                completed += 1
-                progress = round(completed / num_centers * 100, 1)
-                if progress >= next_log_pct:
-                    err_str = f", error={data['error']:.4f}" if data else ""
-                    logger.info(
-                        f"Phase 1 progress: {progress}% "
-                        f"({completed:,}/{num_centers:,}){err_str}"
-                    )
-                    next_log_pct += 10
-                if data is not None:
-                    tile_results[tile_idx] = data
-                else:
-                    failed.append(tile_idx)
+            while futures:
+                done, _ = wait(futures, return_when=FIRST_COMPLETED)
+                for future in done:
+                    futures.pop(future)
+                    tile_idx, data = future.result()
+                    completed += 1
+                    progress = round(completed / num_centers * 100, 1)
+                    if progress >= next_log_pct:
+                        err_str = f", error={data['error']:.4f}" if data else ""
+                        logger.info(
+                            f"Phase 1 progress: {progress}% "
+                            f"({completed:,}/{num_centers:,}){err_str}"
+                        )
+                        next_log_pct += 10
+                    if data is not None:
+                        tile_results[tile_idx] = data
+                    else:
+                        failed.append(tile_idx)
+
+                    if next_tile_idx < num_centers:
+                        args = (
+                            next_tile_idx,
+                            exit_event,
+                            attributes,
+                            std_err_fea,
+                            mapper,
+                        )
+                        futures[executor.submit(_generate_tile_worker, args)] = (
+                            next_tile_idx
+                        )
+                        next_tile_idx += 1
     except KeyboardInterrupt:
         logger.info(SIGINT_INFO)
         exit_event.set()
         raise
     finally:
-        manager.shutdown()
+        try:
+            manager.shutdown()
+        except Exception as exc:
+            logger.warning("Failed to shut down multiprocessing manager: %s", exc)
 
     if failed:
         logger.warning(f"{len(failed)} tiles failed: {failed[:20]}")
@@ -281,7 +308,10 @@ def run_phase2(
     )
 
     tile_data_list: List[dict] = []
-    for tile_idx, data in tile_results.items():
+    # Order is irrelevant here; we index center offsets by tile_idx.
+    # popitem() lets us consume input in-place to minimize peak memory.
+    while tile_results:
+        tile_idx, data = tile_results.popitem()
         cx, cy = centers[tile_idx]
 
         offset_positions = [(x + cx, y + cy) for x, y in data["positions"]]
@@ -360,6 +390,9 @@ def run_phase2(
             logger.info(f"Generation done. Waiting for {remaining} snapshot plot(s)...")
         for f in pending:
             f.result()
+        # f.result() waits for task completion; wait=True also waits for the
+        # executor threads to terminate so thread-local plotting resources are
+        # cleaned up before continuing to the next dataset.
         plot_executor.shutdown(wait=True)
         logger.info(f"All {len(pending)} snapshot(s) saved to {snapshot_dir}")
     else:

@@ -274,7 +274,11 @@ class TestResourceRelease:
             "run_phase1",
             _fail_phase1,
         )
-        monkeypatch.setattr(hybrid.GraphNode, "reset", lambda: reset_calls.append(True))
+
+        def _record_reset():
+            reset_calls.append(True)
+
+        monkeypatch.setattr(hybrid.GraphNode, "reset", _record_reset)
         monkeypatch.setattr(hybrid.plt, "close", lambda arg: close_calls.append(arg))
         monkeypatch.setattr(hybrid.gc, "collect", lambda: gc_calls.append(True) or 0)
 
@@ -284,3 +288,59 @@ class TestResourceRelease:
         assert len(reset_calls) == 1
         assert close_calls == ["all"]
         assert len(gc_calls) == 1
+
+    def test_run_phase2_consumes_tile_results_to_limit_peak_memory(self, monkeypatch):
+        from pipelines import hybrid
+
+        class DummyConfig:
+            SYNTHETIC_FRAME_SIZE = (10, 10)
+
+            @staticmethod
+            def get_snapshot_plot_workers():
+                return 1
+
+        captured = {}
+
+        def _fake_assemble(tile_data_list, global_frame, max_rounds, **_kwargs):
+            captured["tiles"] = tile_data_list
+            captured["global_frame"] = global_frame
+            captured["max_rounds"] = max_rounds
+            return "graph"
+
+        monkeypatch.setattr(hybrid, "BaseConfig", DummyConfig)
+        monkeypatch.setattr(hybrid.GraphNode, "initialize", lambda _attrs: None)
+        monkeypatch.setattr(
+            hybrid.GraphGenerator, "assemble_and_continue", _fake_assemble
+        )
+
+        desc = SimpleNamespace(
+            position=(1.0, 2.0),
+            degree=3,
+            base_angle=45.0,
+            clockwise=True,
+            parent_position=(0.0, 1.0),
+        )
+        tile_results = {
+            0: {
+                "positions": [(1.0, 1.0)],
+                "edges": [((1.0, 1.0), (2.0, 2.0))],
+                "frontier": [desc],
+            }
+        }
+        centers = [(10.0, 20.0)]
+
+        graph = hybrid.run_phase2(
+            tile_results,
+            attributes=SimpleNamespace(),
+            centers=centers,
+            whiteboard_w=100.0,
+            whiteboard_h=100.0,
+            max_rounds=5,
+            snapshot_dir=None,
+            snapshot_round_interval=0,
+        )
+
+        assert graph == "graph"
+        assert tile_results == {}
+        assert len(captured["tiles"]) == 1
+        assert captured["tiles"][0]["positions"] == [(11.0, 21.0)]
