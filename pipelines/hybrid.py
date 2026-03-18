@@ -539,14 +539,18 @@ def run_hybrid_for_dataset(dataset_id):
     )
     logger.info(f"Phase 2 elapsed: {time.time() - t1:.1f}s")
 
+    # --- Free Phase 1 tile data before post-processing ---
+    del tile_results
+    GraphNode.reset()
+    gc.collect()
+
     hybrid_graph = trim_graph(hybrid_graph, attributes.average_degree)
     log_connectivity(hybrid_graph, "Pre-LCC")
 
     hybrid_graph = hybrid_graph.largest_connected_component()
-    logger.info(
-        f"After LCC: {hybrid_graph.number_of_nodes():,} nodes, "
-        f"{hybrid_graph.number_of_edges():,} edges"
-    )
+    num_nodes = hybrid_graph.number_of_nodes()
+    num_edges = hybrid_graph.number_of_edges()
+    logger.info(f"After LCC: {num_nodes:,} nodes, {num_edges:,} edges")
 
     mapper.assign_weights(hybrid_graph)
 
@@ -562,11 +566,9 @@ def run_hybrid_for_dataset(dataset_id):
 
     Saver.begin_batch()
     data_agent.saver.save(hybrid_graph, "synthetic_export", f"{prefix}_")
-    fig = plot_hybrid_network(hybrid_graph)
-    data_agent.saver.save(fig, "synthetic_graph", f"{prefix}_")
     Saver.end_batch()
 
-    # --- Write reports ---
+    # --- Write reports before plotting (plotting is memory-intensive) ---
     original_network = data_agent.get_original_network()
     _write_report(
         os.path.join(data_agent.saver.output_dir, "original", "report.txt"),
@@ -577,22 +579,31 @@ def run_hybrid_for_dataset(dataset_id):
     _write_report(
         os.path.join(data_agent.saver.output_dir, "synthetic", "report.txt"),
         "Synthetic Network",
-        hybrid_graph.number_of_nodes(),
-        hybrid_graph.number_of_edges(),
+        num_nodes,
+        num_edges,
     )
+
+    # --- Plot synthetic graph (high memory) ---
+    # Free everything we can before rendering.
+    saver = data_agent.saver
+    del data_agent, original_network, attributes, mapper
+    del std_err_fea, centers
+    gc.collect()
+
+    Saver.begin_batch()
+    fig = plot_hybrid_network(hybrid_graph)
+    del hybrid_graph
+    gc.collect()
+    saver.save(fig, "synthetic_graph", f"{prefix}_")
+    Saver.end_batch()
+    del fig, saver
+    gc.collect()
 
     logger.info(
         f"Hybrid complete — "
-        f"{hybrid_graph.number_of_nodes():,} nodes, "
-        f"{hybrid_graph.number_of_edges():,} edges"
+        f"{num_nodes:,} nodes, {num_edges:,} edges"
         + (f", snapshots in {snapshot_dir}" if snapshot_dir else "")
     )
-
-    # --- Free heavy objects so memory is reclaimed before the next dataset ---
-    GraphNode.reset()
-    del tile_results, hybrid_graph, data_agent, original_network
-    del attributes, mapper, std_err_fea, centers
-    gc.collect()
     logger.info("Resources released for dataset %s", dataset_id)
 
 
