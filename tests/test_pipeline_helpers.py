@@ -11,6 +11,8 @@ Covers:
 
 import csv
 import os
+from collections import defaultdict
+from types import SimpleNamespace
 
 import pytest
 
@@ -194,3 +196,88 @@ class TestGenerateRandomCenters:
         # Very large min_distance relative to area → few centers
         centers = generate_random_centers(100, 100, min_distance=80, max_centers=0)
         assert len(centers) <= 3  # very hard to fit many
+
+
+class TestResourceRelease:
+    def test_graphnode_reset_reinitializes_spatial_grids(self):
+        from graphs._graph_node import GraphNode
+
+        GraphNode.node_grid = defaultdict(set)
+        GraphNode.edge_grid = defaultdict(set)
+        old_node_grid = GraphNode.node_grid
+        old_edge_grid = GraphNode.edge_grid
+
+        GraphNode.reset()
+
+        assert GraphNode.node_grid is not old_node_grid
+        assert GraphNode.edge_grid is not old_edge_grid
+        assert GraphNode.node_grid == defaultdict(set)
+        assert GraphNode.edge_grid == defaultdict(set)
+
+    def test_run_hybrid_for_dataset_releases_resources_on_failure(self, monkeypatch):
+        from pipelines import hybrid
+
+        class DummyConfig:
+            TARGET_SCALE = (1, 1)
+            PHASE2_MAX_ROUNDS = 1
+            SYNTHETIC_FRAME_SIZE = (1, 1)
+            MIN_CENTER_DISTANCE_FACTOR = 1.0
+            NUM_CENTERS = 1
+            SNAPSHOT_INTERVAL = 0
+
+            @staticmethod
+            def get_datasets():
+                return [("dummy",)]
+
+        class DummyRunAgent:
+            def __init__(self, dataset_id):
+                self.dataset_id = dataset_id
+                self.attributes = SimpleNamespace(average_degree=2)
+                self.mapper = SimpleNamespace(assign_weights=lambda _graph: None)
+                self.saver = SimpleNamespace(output_dir="/tmp")
+
+            def prepare_data(self):
+                return None
+
+            def get_original_network(self):
+                return object()
+
+        class DummyAnalyzer:
+            def __init__(self, _graph):
+                pass
+
+            def analyze_error_features(self):
+                return {}
+
+        reset_calls = []
+        close_calls = []
+        gc_calls = []
+
+        monkeypatch.setattr(hybrid, "BaseConfig", DummyConfig)
+        monkeypatch.setattr(hybrid, "_apply_dataset_factors", lambda _dataset_id: None)
+        monkeypatch.setattr(hybrid, "RunAgent", DummyRunAgent)
+        monkeypatch.setattr(hybrid, "MultifractalAnalyzer", DummyAnalyzer)
+        monkeypatch.setattr(
+            hybrid,
+            "generate_random_centers",
+            lambda *_args, **_kwargs: [(0.0, 0.0)],
+        )
+
+        def _fail_phase1(*_args, **_kwargs):
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(
+            hybrid,
+            "run_phase1",
+            _fail_phase1,
+        )
+        monkeypatch.setattr(hybrid.GraphNode, "reset", lambda: reset_calls.append(True))
+        monkeypatch.setattr(hybrid.plt, "close", lambda arg: close_calls.append(arg))
+        monkeypatch.setattr(hybrid.gc, "collect", lambda: gc_calls.append(True) or 0)
+
+        with pytest.raises(RuntimeError, match="boom"):
+            hybrid.run_hybrid_for_dataset(("dummy",))
+
+        assert len(reset_calls) == 1
+        assert close_calls == ["all"]
+        assert len(gc_calls) == 1
