@@ -11,6 +11,7 @@ Covers:
 
 import csv
 import os
+import tempfile
 from collections import defaultdict
 from types import SimpleNamespace
 
@@ -211,8 +212,10 @@ class TestResourceRelease:
 
         assert GraphNode.node_grid is not old_node_grid
         assert GraphNode.edge_grid is not old_edge_grid
-        assert GraphNode.node_grid == defaultdict(set)
-        assert GraphNode.edge_grid == defaultdict(set)
+        assert len(GraphNode.node_grid) == 0
+        assert len(GraphNode.edge_grid) == 0
+        assert isinstance(GraphNode.node_grid, defaultdict)
+        assert isinstance(GraphNode.edge_grid, defaultdict)
 
     def test_run_hybrid_for_dataset_releases_resources_on_failure(self, monkeypatch):
         from pipelines import hybrid
@@ -234,7 +237,7 @@ class TestResourceRelease:
                 self.dataset_id = dataset_id
                 self.attributes = SimpleNamespace(average_degree=2)
                 self.mapper = SimpleNamespace(assign_weights=lambda _graph: None)
-                self.saver = SimpleNamespace(output_dir="/tmp")
+                self.saver = SimpleNamespace(output_dir=tempfile.gettempdir())
 
             def prepare_data(self):
                 return None

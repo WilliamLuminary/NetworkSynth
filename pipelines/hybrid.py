@@ -360,10 +360,8 @@ def run_phase2(
             logger.info(f"Generation done. Waiting for {remaining} snapshot plot(s)...")
         for f in pending:
             f.result()
-        num_snapshots = len(pending)
         plot_executor.shutdown(wait=True)
-        del pending, plot_executor
-        logger.info(f"All {num_snapshots} snapshot(s) saved to {snapshot_dir}")
+        logger.info(f"All {len(pending)} snapshot(s) saved to {snapshot_dir}")
     else:
         graph = GraphGenerator.assemble_and_continue(
             tile_data_list, global_frame, max_rounds
