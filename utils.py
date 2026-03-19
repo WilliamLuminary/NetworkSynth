@@ -13,6 +13,20 @@ if TYPE_CHECKING:
     from graphs.synth_graph import SynthGraph
 
 
+def log_memory(label: str = "") -> None:
+    """Log current process RSS memory usage (only when BaseConfig.LOG_MEMORY is True)."""
+    from configs import BaseConfig
+
+    if not BaseConfig.LOG_MEMORY:
+        return
+
+    import psutil
+
+    process = psutil.Process()
+    rss_gb = process.memory_info().rss / (1024**3)
+    logging.getLogger(__name__).info(f"[MEMORY] {label}: RSS = {rss_gb:.2f} GB")
+
+
 def calculate_frame(
     graph: SynthGraph = None,
     center_position: Union[tuple, list, ndarray] = None,

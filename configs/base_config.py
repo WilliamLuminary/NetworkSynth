@@ -60,6 +60,7 @@ class BaseConfig:
     SNAPSHOT_PLOT_WORKERS: int = 20
     SELECT_BEST: int = 0  # 0 = disabled; N = keep N best networks by metric distance
 
+    LOG_MEMORY: bool = False
     DISABLE_SAVING: bool = False
     DISABLE_SAVING_NOTE: str = ""
 

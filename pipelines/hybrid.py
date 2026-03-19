@@ -30,7 +30,13 @@ from graphs._graph_node import GraphNode
 from graphs.graph_generator import FrontierDescriptor
 from graphs.synth_graph import SynthGraph
 from handlers import AttributesCalculator, Mapper, RunAgent, Saver
-from utils import build_graph, finalize_plot, save_hybrid_snapshot, trim_graph
+from utils import (
+    build_graph,
+    finalize_plot,
+    log_memory,
+    save_hybrid_snapshot,
+    trim_graph,
+)
 
 logger = logging.getLogger(__name__)
 SIGINT_INFO = "SIGINT received. Terminating…"
@@ -477,6 +483,7 @@ def _apply_dataset_factors(dataset_id):
 
 def run_hybrid_for_dataset(dataset_id):
     logger.info(f"=== Hybrid pipeline for dataset: {dataset_id} ===")
+    log_memory(f"Start dataset {dataset_id}")
     _apply_dataset_factors(dataset_id)
     logger.info(BaseConfig())
 
@@ -506,9 +513,11 @@ def run_hybrid_for_dataset(dataset_id):
     )
 
     # --- Phase 1 ---
+    log_memory(f"Before Phase 1 ({dataset_id})")
     t0 = time.time()
     tile_results = run_phase1(attributes, mapper, std_err_fea, len(centers))
     logger.info(f"Phase 1 elapsed: {time.time() - t0:.1f}s")
+    log_memory(f"After Phase 1 ({dataset_id})")
 
     if not tile_results:
         logger.error("No tiles generated. Aborting.")
@@ -526,6 +535,7 @@ def run_hybrid_for_dataset(dataset_id):
         else None
     )
 
+    log_memory(f"Before Phase 2 ({dataset_id})")
     t1 = time.time()
     hybrid_graph = run_phase2(
         tile_results,
@@ -538,11 +548,13 @@ def run_hybrid_for_dataset(dataset_id):
         snapshot_round_interval=snapshot_interval,
     )
     logger.info(f"Phase 2 elapsed: {time.time() - t1:.1f}s")
+    log_memory(f"After Phase 2 ({dataset_id})")
 
     # --- Free Phase 1 tile data before post-processing ---
     del tile_results
     GraphNode.reset()
     gc.collect()
+    log_memory(f"After Phase 2 cleanup ({dataset_id})")
 
     hybrid_graph = trim_graph(hybrid_graph, attributes.average_degree)
     log_connectivity(hybrid_graph, "Pre-LCC")
@@ -590,6 +602,7 @@ def run_hybrid_for_dataset(dataset_id):
     del std_err_fea, centers
     gc.collect()
 
+    log_memory(f"Before plotting ({dataset_id})")
     Saver.begin_batch()
     fig = plot_hybrid_network(hybrid_graph)
     del hybrid_graph
@@ -599,6 +612,11 @@ def run_hybrid_for_dataset(dataset_id):
     del fig, saver
     gc.collect()
 
+    # Ensure all matplotlib figures are closed to prevent memory leaks.
+    plt.close("all")
+    gc.collect()
+
+    log_memory(f"End dataset {dataset_id}")
     logger.info(
         f"Hybrid complete — "
         f"{num_nodes:,} nodes, {num_edges:,} edges"
@@ -612,6 +630,33 @@ def run_hybrid_for_dataset(dataset_id):
 # ------------------------------------------------------------------ #
 
 
+def _run_dataset_in_subprocess(dataset_id):
+    """Run a single dataset in a child process for full memory isolation.
+
+    When the child exits, the OS reclaims *all* of its memory — no
+    fragmentation carries over to the next dataset.
+    """
+    import multiprocessing as mp
+
+    def _target():
+        try:
+            run_hybrid_for_dataset(dataset_id)
+        except KeyboardInterrupt:
+            logger.info(SIGINT_INFO)
+
+    proc = mp.Process(target=_target, name=f"hybrid-{dataset_id}")
+    proc.start()
+    proc.join()
+
+    if proc.exitcode != 0:
+        logger.error(
+            f"Dataset {dataset_id} subprocess exited with code {proc.exitcode}"
+        )
+    else:
+        logger.info(f"Dataset {dataset_id} subprocess finished successfully")
+    log_memory(f"Main process after {dataset_id} subprocess")
+
+
 def main(config_cls=None):
     if config_cls is None:
         from configs.hybrid_mode import HybridConfig
@@ -622,7 +667,7 @@ def main(config_cls=None):
     try:
         Saver.initialize()
         for dataset_id in BaseConfig.get_datasets():
-            run_hybrid_for_dataset(dataset_id)
+            _run_dataset_in_subprocess(dataset_id)
     except KeyboardInterrupt:
         logger.critical("MAIN PROCESS: Forcing immediate shutdown!")
 

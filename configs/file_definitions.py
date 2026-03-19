@@ -88,6 +88,10 @@ def save_png(image, filepath: str) -> None:
 
     if isinstance(image, Figure):
         image.savefig(filepath, format="png", bbox_inches="tight")
+
+        from matplotlib import pyplot as _plt
+
+        _plt.close(image)
     elif isinstance(image, ndarray):
         import cv2
 
