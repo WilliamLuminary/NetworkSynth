@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 def log_memory(label: str = "") -> None:
     """Log current process RSS memory usage (only when BaseConfig.LOG_MEMORY is True)."""
     from configs import BaseConfig
+    from configs.base_config import tagged
 
     if not BaseConfig.LOG_MEMORY:
         return
@@ -24,7 +25,10 @@ def log_memory(label: str = "") -> None:
 
     process = psutil.Process()
     rss_gb = process.memory_info().rss / (1024**3)
-    logging.getLogger(__name__).info(f"[MEMORY] {label}: RSS = {rss_gb:.2f} GB")
+    logging.getLogger(__name__).info(
+        f"{label}: RSS = {rss_gb:.2f} GB",
+        extra=tagged("MEMORY"),
+    )
 
 
 def calculate_frame(

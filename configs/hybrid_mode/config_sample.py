@@ -41,6 +41,8 @@ logger = logging.getLogger(__name__)
 class SampleConfig(BaseConfig):
     """Hybrid mode sample — parallel seed tiles + frontier continuation."""
 
+    LOG_MEMORY = True
+
     DATASETS = [
         DatasetId("sample_A"),
         DatasetId("sample_B"),

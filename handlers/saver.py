@@ -10,6 +10,7 @@ from configs import (
     DatasetId,
     Mode,
 )
+from configs.base_config import tagged
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +88,9 @@ class Saver:
                 f"{BaseConfig.OUTPUT_DENOTE}_results_{_time_id()}",
             )
             _ensure_directory(cls.base_output_dir)
-            logger.info(f"Base Output directory: {cls.base_output_dir}")
+            logger.info(
+                f"Base Output directory: {cls.base_output_dir}", extra=tagged("IO")
+            )
             latest_link_path = os.path.join(
                 BaseConfig.BASE_OUTPUT_PATH, "latest_result"
             )
@@ -144,7 +147,7 @@ class Saver:
             _ensure_directory(os.path.dirname(abs_path), exist_ok=True)
 
             save_fn(content, abs_path)
-            logger.info(f"Saved file: {abs_path}")
+            logger.info(f"Saved file: {abs_path}", extra=tagged("IO"))
 
 
 def _is_junction(path: str) -> bool:
@@ -217,7 +220,7 @@ def _update_soft_link(link_path: str, target_path: str) -> None:
 
 def _ensure_directory(path: str, exist_ok=False) -> None:
     if not exist_ok and not os.path.exists(path):
-        logger.info(f"Create new directory: {path}")
+        logger.info(f"Create new directory: {path}", extra=tagged("IO"))
     os.makedirs(path, exist_ok=exist_ok)
 
 

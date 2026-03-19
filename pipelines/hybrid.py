@@ -25,6 +25,7 @@ from matplotlib.collections import LineCollection
 
 from analysis import MultifractalAnalyzer
 from configs import BaseConfig
+from configs.base_config import tagged
 from graphs import GraphGenerator
 from graphs._graph_node import GraphNode
 from graphs.graph_generator import FrontierDescriptor
@@ -85,7 +86,8 @@ def generate_random_centers(
     logger.info(
         f"Placed {len(centers):,} random centers "
         f"(whiteboard {whiteboard_w:.0f}×{whiteboard_h:.0f}, "
-        f"min_dist={min_distance:.0f})"
+        f"min_dist={min_distance:.0f})",
+        extra=tagged("PHASE1"),
     )
     return centers
 
@@ -159,15 +161,21 @@ def _generate_tile_worker(args):
         if best_result is not None:
             logger.warning(
                 f"Tile {tile_idx}: max attempts reached "
-                f"(best error={best_error:.4f})"
+                f"(best error={best_error:.4f})",
+                extra=tagged("TILE"),
             )
             return tile_idx, best_result
 
-        logger.error(f"Tile {tile_idx}: all attempts produced <100 nodes")
+        logger.error(
+            f"Tile {tile_idx}: all attempts produced <100 nodes",
+            extra=tagged("TILE"),
+        )
         return tile_idx, None
 
     except Exception as exc:
-        logger.error(f"Tile {tile_idx} failed: {exc}", exc_info=True)
+        logger.error(
+            f"Tile {tile_idx} failed: {exc}", exc_info=True, extra=tagged("TILE")
+        )
         return tile_idx, None
 
 
@@ -187,7 +195,8 @@ def run_phase1(
     num_workers = BaseConfig.get_max_workers(num_centers)
 
     logger.info(
-        f"Phase 1: generating {num_centers:,} seed tiles " f"with {num_workers} workers"
+        f"Phase 1: generating {num_centers:,} seed tiles with {num_workers} workers",
+        extra=tagged("PHASE1"),
     )
 
     tile_args = [
@@ -212,7 +221,8 @@ def run_phase1(
                     err_str = f", error={data['error']:.4f}" if data else ""
                     logger.info(
                         f"Phase 1 progress: {progress}% "
-                        f"({completed:,}/{num_centers:,}){err_str}"
+                        f"({completed:,}/{num_centers:,}){err_str}",
+                        extra=tagged("PHASE1"),
                     )
                     next_log_pct += 10
                 if data is not None:
@@ -227,7 +237,10 @@ def run_phase1(
         manager.shutdown()
 
     if failed:
-        logger.warning(f"{len(failed)} tiles failed: {failed[:20]}")
+        logger.warning(
+            f"{len(failed)} tiles failed: {failed[:20]}",
+            extra=tagged("PHASE1"),
+        )
 
     errors = [d["error"] for d in tile_results.values()]
     successful = sum(1 for e in errors if e < BaseConfig.ERROR_TOLERANCE)
@@ -236,7 +249,8 @@ def run_phase1(
         f"Phase 1 complete: {successful:,}/{num_centers:,} centers successful "
         f"(tol={BaseConfig.ERROR_TOLERANCE}), "
         f"{over_tol:,} over tolerance, {len(failed):,} failed, "
-        f"avg error={np.mean(errors):.4f}"
+        f"avg error={np.mean(errors):.4f}",
+        extra=tagged("PHASE1"),
     )
     return tile_results
 
@@ -283,7 +297,8 @@ def run_phase2(
             )
             if take_snapshots
             else ""
-        )
+        ),
+        extra=tagged("PHASE2"),
     )
 
     tile_data_list: List[dict] = []
@@ -324,7 +339,9 @@ def run_phase2(
         snapshot_style = getattr(BaseConfig, "HYBRID_SNAPSHOT_STYLE", {})
         plot_workers = BaseConfig.get_snapshot_plot_workers()
         plot_executor = ThreadPoolExecutor(max_workers=plot_workers)
-        logger.info(f"Snapshot plot pool: {plot_workers} threads")
+        logger.info(
+            f"Snapshot plot pool: {plot_workers} threads", extra=tagged("SNAPSHOT")
+        )
         pending: List[Future] = []
 
         def on_snapshot(positions, edges, frame, idx):
@@ -350,7 +367,8 @@ def run_phase2(
             logger.info(
                 f"Snapshot {idx} queued: {len(positions):,} nodes, "
                 f"{len(edges):,} edges  "
-                f"(pending plots: {sum(1 for f in pending if not f.done())})"
+                f"(pending plots: {sum(1 for f in pending if not f.done())})",
+                extra=tagged("SNAPSHOT"),
             )
 
         graph = GraphGenerator.assemble_and_continue(
@@ -363,13 +381,19 @@ def run_phase2(
 
         remaining = sum(1 for f in pending if not f.done())
         if remaining:
-            logger.info(f"Generation done. Waiting for {remaining} snapshot plot(s)...")
+            logger.info(
+                f"Generation done. Waiting for {remaining} snapshot plot(s)...",
+                extra=tagged("SNAPSHOT"),
+            )
         for f in pending:
             f.result()
         num_snapshots = len(pending)
         plot_executor.shutdown(wait=True)
         del pending, plot_executor
-        logger.info(f"All {num_snapshots} snapshot(s) saved to {snapshot_dir}")
+        logger.info(
+            f"All {num_snapshots} snapshot(s) saved to {snapshot_dir}",
+            extra=tagged("SNAPSHOT"),
+        )
     else:
         graph = GraphGenerator.assemble_and_continue(
             tile_data_list, global_frame, max_rounds
@@ -391,10 +415,11 @@ def log_connectivity(graph: SynthGraph, label: str = ""):
     n = graph.number_of_nodes()
     logger.info(
         f"{label} connectivity: {cc.numberOfComponents()} components, "
-        f"LCC={sizes[0]:,} ({sizes[0]/n*100:.2f}% of {n:,} nodes)"
+        f"LCC={sizes[0]:,} ({sizes[0]/n*100:.2f}% of {n:,} nodes)",
+        extra=tagged("STATS"),
     )
     if len(sizes) > 1:
-        logger.info(f"  top-5 sizes: {sizes[:5]}")
+        logger.info(f"  top-5 sizes: {sizes[:5]}", extra=tagged("STATS"))
 
 
 # ------------------------------------------------------------------ #
@@ -468,7 +493,7 @@ def _write_report(path: str, title: str, num_nodes: int, num_edges: int):
         f.write(f"{title}\n")
         f.write(f"Nodes: {num_nodes:,}\n")
         f.write(f"Edges: {num_edges:,}\n")
-    logger.info(f"Report saved: {path}")
+    logger.info(f"Report saved: {path}", extra=tagged("IO"))
 
 
 def _apply_dataset_factors(dataset_id):
@@ -482,7 +507,10 @@ def _apply_dataset_factors(dataset_id):
 
 
 def run_hybrid_for_dataset(dataset_id):
-    logger.info(f"=== Hybrid pipeline for dataset: {dataset_id} ===")
+    logger.info(
+        f"=== Hybrid pipeline for dataset: {dataset_id} ===",
+        extra=tagged("PIPELINE", dataset=str(dataset_id)),
+    )
     log_memory(f"Start dataset {dataset_id}")
     _apply_dataset_factors(dataset_id)
     logger.info(BaseConfig())
@@ -516,17 +544,26 @@ def run_hybrid_for_dataset(dataset_id):
     log_memory(f"Before Phase 1 ({dataset_id})")
     t0 = time.time()
     tile_results = run_phase1(attributes, mapper, std_err_fea, len(centers))
-    logger.info(f"Phase 1 elapsed: {time.time() - t0:.1f}s")
+    logger.info(
+        f"Phase 1 elapsed: {time.time() - t0:.1f}s",
+        extra=tagged("PHASE1", dataset=str(dataset_id)),
+    )
     log_memory(f"After Phase 1 ({dataset_id})")
 
     if not tile_results:
-        logger.error("No tiles generated. Aborting.")
+        logger.error(
+            "No tiles generated. Aborting.",
+            extra=tagged("PHASE1", dataset=str(dataset_id)),
+        )
         return
 
     # --- Phase 2 (single-process: restore full networkit threading) ---
     max_threads = os.cpu_count() or 1
     nk.setNumberOfThreads(max_threads)
-    logger.info(f"Phase 2: restored networkit threads to {max_threads}")
+    logger.info(
+        f"Phase 2: restored networkit threads to {max_threads}",
+        extra=tagged("PHASE2", dataset=str(dataset_id)),
+    )
 
     snapshot_interval = getattr(BaseConfig, "SNAPSHOT_INTERVAL", 0)
     snapshot_dir = (
@@ -547,7 +584,10 @@ def run_hybrid_for_dataset(dataset_id):
         snapshot_dir=snapshot_dir,
         snapshot_round_interval=snapshot_interval,
     )
-    logger.info(f"Phase 2 elapsed: {time.time() - t1:.1f}s")
+    logger.info(
+        f"Phase 2 elapsed: {time.time() - t1:.1f}s",
+        extra=tagged("PHASE2", dataset=str(dataset_id)),
+    )
     log_memory(f"After Phase 2 ({dataset_id})")
 
     # --- Free Phase 1 tile data before post-processing ---
@@ -562,7 +602,10 @@ def run_hybrid_for_dataset(dataset_id):
     hybrid_graph = hybrid_graph.largest_connected_component()
     num_nodes = hybrid_graph.number_of_nodes()
     num_edges = hybrid_graph.number_of_edges()
-    logger.info(f"After LCC: {num_nodes:,} nodes, {num_edges:,} edges")
+    logger.info(
+        f"After LCC: {num_nodes:,} nodes, {num_edges:,} edges",
+        extra=tagged("STATS", dataset=str(dataset_id)),
+    )
 
     mapper.assign_weights(hybrid_graph)
 
@@ -620,9 +663,14 @@ def run_hybrid_for_dataset(dataset_id):
     logger.info(
         f"Hybrid complete — "
         f"{num_nodes:,} nodes, {num_edges:,} edges"
-        + (f", snapshots in {snapshot_dir}" if snapshot_dir else "")
+        + (f", snapshots in {snapshot_dir}" if snapshot_dir else ""),
+        extra=tagged("PIPELINE", dataset=str(dataset_id)),
     )
-    logger.info("Resources released for dataset %s", dataset_id)
+    logger.info(
+        "Resources released for dataset %s",
+        dataset_id,
+        extra=tagged("PIPELINE", dataset=str(dataset_id)),
+    )
 
 
 # ------------------------------------------------------------------ #
@@ -650,10 +698,14 @@ def _run_dataset_in_subprocess(dataset_id):
 
     if proc.exitcode != 0:
         logger.error(
-            f"Dataset {dataset_id} subprocess exited with code {proc.exitcode}"
+            f"Dataset {dataset_id} subprocess exited with code {proc.exitcode}",
+            extra=tagged("PIPELINE", dataset=str(dataset_id)),
         )
     else:
-        logger.info(f"Dataset {dataset_id} subprocess finished successfully")
+        logger.info(
+            f"Dataset {dataset_id} subprocess finished successfully",
+            extra=tagged("PIPELINE", dataset=str(dataset_id)),
+        )
     log_memory(f"Main process after {dataset_id} subprocess")
 
 
