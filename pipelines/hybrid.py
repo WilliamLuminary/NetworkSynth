@@ -129,6 +129,9 @@ def _generate_tile_worker(args):
         best_result = None
 
         for attempt in range(BaseConfig.MAX_ATTEMPTS):
+            if exit_event.is_set():
+                break
+
             result = GraphGenerator._bfs_network_with_frontier()
             inner_nodes, inner_edges, frontier_descs, all_positions, all_edge_tuples = (
                 result
@@ -206,33 +209,36 @@ def run_phase1(
     tile_results: Dict[int, dict] = {}
     failed = []
 
+    executor = ProcessPoolExecutor(max_workers=num_workers)
     try:
-        with ProcessPoolExecutor(max_workers=num_workers) as executor:
-            futures = {
-                executor.submit(_generate_tile_worker, a): a[0] for a in tile_args
-            }
-            completed = 0
-            next_log_pct = 10
-            for future in as_completed(futures):
-                tile_idx, data = future.result()
-                completed += 1
-                progress = round(completed / num_centers * 100, 1)
-                if progress >= next_log_pct:
-                    err_str = f", error={data['error']:.4f}" if data else ""
-                    logger.info(
-                        f"Phase 1 progress: {progress}% "
-                        f"({completed:,}/{num_centers:,}){err_str}",
-                        extra=tagged("PHASE1"),
-                    )
-                    next_log_pct += 10
-                if data is not None:
-                    tile_results[tile_idx] = data
-                else:
-                    failed.append(tile_idx)
+        futures = {
+            executor.submit(_generate_tile_worker, a): a[0] for a in tile_args
+        }
+        completed = 0
+        next_log_pct = 10
+        for future in as_completed(futures):
+            tile_idx, data = future.result()
+            completed += 1
+            progress = round(completed / num_centers * 100, 1)
+            if progress >= next_log_pct:
+                err_str = f", error={data['error']:.4f}" if data else ""
+                logger.info(
+                    f"Phase 1 progress: {progress}% "
+                    f"({completed:,}/{num_centers:,}){err_str}",
+                    extra=tagged("PHASE1"),
+                )
+                next_log_pct += 10
+            if data is not None:
+                tile_results[tile_idx] = data
+            else:
+                failed.append(tile_idx)
     except KeyboardInterrupt:
         logger.info(SIGINT_INFO)
         exit_event.set()
+        executor.shutdown(wait=False, cancel_futures=True)
         raise
+    else:
+        executor.shutdown(wait=True)
     finally:
         manager.shutdown()
 
@@ -694,7 +700,21 @@ def _run_dataset_in_subprocess(dataset_id):
 
     proc = mp.Process(target=_target, name=f"hybrid-{dataset_id}")
     proc.start()
-    proc.join()
+
+    try:
+        proc.join()
+    except KeyboardInterrupt:
+        logger.info(SIGINT_INFO)
+        # Give child a chance to shut down cleanly
+        proc.join(timeout=5)
+        if proc.is_alive():
+            logger.warning("Child process did not exit in time, terminating…")
+            proc.terminate()
+            proc.join(timeout=5)
+            if proc.is_alive():
+                proc.kill()
+                proc.join()
+        raise
 
     if proc.exitcode != 0:
         logger.error(
@@ -721,7 +741,7 @@ def main(config_cls=None):
         for dataset_id in BaseConfig.get_datasets():
             _run_dataset_in_subprocess(dataset_id)
     except KeyboardInterrupt:
-        logger.critical("MAIN PROCESS: Forcing immediate shutdown!")
+        logger.info("Shutdown complete.")
 
 
 if __name__ == "__main__":

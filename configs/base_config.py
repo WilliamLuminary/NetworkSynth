@@ -2,7 +2,7 @@
 import json
 import logging
 import os
-import time
+import uuid
 from typing import List, Optional, Tuple
 
 from .enums import DatasetId
@@ -15,11 +15,19 @@ class _JsonFormatter(logging.Formatter):
 
     Recognised ``extra`` keys (``tag``, ``dataset``) are promoted to
     top-level fields so they can be filtered with ``jq``.
+
+    Each entry includes a ``run_id`` so concurrent runs appending to the
+    same file can be distinguished: ``jq 'select(.run_id == "abc123")'``.
     """
+
+    def __init__(self, run_id: str, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.run_id = run_id
 
     def format(self, record: logging.LogRecord) -> str:
         entry = {
             "ts": self.formatTime(record, self.default_time_format),
+            "run_id": self.run_id,
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -196,35 +204,40 @@ class BaseConfig:
             extra=tagged("CONFIG"),
         )
 
+    _logger_initialized = False
+
     @classmethod
     def _setup_logger(cls, log_level=None, details=None):
+        if BaseConfig._logger_initialized:
+            return
         log_level = log_level or logging.INFO
         details = details or ""
         _logger = logging.getLogger()
-        if not _logger.hasHandlers():
-            _logger.setLevel(log_level)
+        _logger.setLevel(log_level)
 
-            # Console: human-readable plain text
-            console_handler = logging.StreamHandler()
-            console_handler.setLevel(log_level)
-            # noinspection SpellCheckingInspection
-            console_formatter = logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            )
-            console_handler.setFormatter(console_formatter)
+        # Console: human-readable plain text
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(log_level)
+        # noinspection SpellCheckingInspection
+        console_formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
+        console_handler.setFormatter(console_formatter)
 
-            # File: JSON lines (one JSON object per line, queryable with jq)
-            logs_dir = os.path.join(BaseConfig.BASE_OUTPUT_PATH, "logs")
-            os.makedirs(logs_dir, exist_ok=True)
-            timestamp = time.strftime("%Y%m%d_%H%M%S")
-            file_handler = logging.FileHandler(
-                os.path.join(logs_dir, f"project_{details}_{timestamp}.jsonl")
-            )
-            file_handler.setLevel(log_level)
-            file_handler.setFormatter(_JsonFormatter())
+        # File: JSON lines (one JSON object per line, queryable with jq)
+        logs_dir = os.path.join(BaseConfig.BASE_OUTPUT_PATH, "logs")
+        os.makedirs(logs_dir, exist_ok=True)
+        file_handler = logging.FileHandler(
+            os.path.join(logs_dir, f"project_{details}.jsonl"),
+            mode="a",
+        )
+        file_handler.setLevel(log_level)
+        run_id = uuid.uuid4().hex[:8]
+        file_handler.setFormatter(_JsonFormatter(run_id=run_id))
 
-            _logger.addHandler(console_handler)
-            _logger.addHandler(file_handler)
+        _logger.addHandler(console_handler)
+        _logger.addHandler(file_handler)
+        BaseConfig._logger_initialized = True
 
     def __str__(self):
         def is_method_like(attr_value):
