@@ -208,9 +208,7 @@ def run_phase1(
 
     executor = ProcessPoolExecutor(max_workers=num_workers)
     try:
-        futures = {
-            executor.submit(_generate_tile_worker, a): a[0] for a in tile_args
-        }
+        futures = {executor.submit(_generate_tile_worker, a): a[0] for a in tile_args}
         completed = 0
         next_log_pct = 10
         for future in as_completed(futures):

@@ -516,20 +516,27 @@ def save_hybrid_snapshot(
             [((e[0][0], e[0][1]), (e[1][0], e[1][1])) for e in edges],
             dtype=np.float64,
         )
-        pts_u = np.column_stack([
-            ((edge_arr[:, 0, 0] - x_min) * sx).astype(np.int32),
-            ((y_max - edge_arr[:, 0, 1]) * sy).astype(np.int32),
-        ])
-        pts_v = np.column_stack([
-            ((edge_arr[:, 1, 0] - x_min) * sx).astype(np.int32),
-            ((y_max - edge_arr[:, 1, 1]) * sy).astype(np.int32),
-        ])
+        pts_u = np.column_stack(
+            [
+                ((edge_arr[:, 0, 0] - x_min) * sx).astype(np.int32),
+                ((y_max - edge_arr[:, 0, 1]) * sy).astype(np.int32),
+            ]
+        )
+        pts_v = np.column_stack(
+            [
+                ((edge_arr[:, 1, 0] - x_min) * sx).astype(np.int32),
+                ((y_max - edge_arr[:, 1, 1]) * sy).astype(np.int32),
+            ]
+        )
         segments = np.stack([pts_u, pts_v], axis=1).astype(np.int32)
         BATCH = 1_000_000
         for start in range(0, len(segments), BATCH):
             cv2.polylines(
-                canvas, segments[start : start + BATCH],
-                isClosed=False, color=(0, 0, 255), thickness=1,
+                canvas,
+                segments[start : start + BATCH],
+                isClosed=False,
+                color=(0, 0, 255),
+                thickness=1,
             )
 
     # Draw nodes

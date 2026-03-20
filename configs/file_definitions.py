@@ -89,9 +89,9 @@ def save_svg(fig, filepath: str) -> None:
 
 
 def save_png(image, filepath: str) -> None:
-    from PIL import Image as _Image
     from matplotlib.figure import Figure
     from numpy import ndarray
+    from PIL import Image as _Image
 
     if isinstance(image, _Image.Image):
         image.save(filepath, "png")
