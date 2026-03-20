@@ -61,8 +61,8 @@ class GraphNode:
     @classmethod
     def reset(cls):
         cls.id_counter = itertools.count()
-        cls.node_grid.clear()
-        cls.edge_grid.clear()
+        cls.node_grid = defaultdict(set)
+        cls.edge_grid = defaultdict(set)
         cls._aborted_edge = 0
         cls._merged_edge = 0
 
