@@ -209,10 +209,12 @@ def run_hybrid_snapshot_for_dataset(
     mapper.assign_weights(hybrid_graph)
 
     # --- Save original/ outputs ---
+    Saver.begin_batch()
     data_agent.save("original_image")
     data_agent.save("original_network")
     data_agent.save("original_property")
     data_agent.save("original_graph")
+    Saver.end_batch()
 
     # --- Save synthetic/ outputs ---
     data_agent.add_synthetic_graph(hybrid_graph)
