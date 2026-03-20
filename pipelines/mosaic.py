@@ -12,16 +12,13 @@ import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Dict, Tuple
 
-from matplotlib import pyplot as plt
-from matplotlib.collections import LineCollection
-
 from configs import BaseConfig
 from configs.mosaic_mode import MosaicConfig
 from graphs import GraphGenerator
 from graphs.mosaic_stitcher import MosaicStitcher
 from graphs.synth_graph import SynthGraph
 from handlers import AttributesCalculator, RunAgent, Saver
-from utils import finalize_plot, trim_graph
+from utils import render_network, trim_graph
 
 MosaicConfig.initialize()
 
@@ -229,8 +226,8 @@ def run_mosaic_for_dataset(dataset_id):
     prefix = f"mosaic_{BaseConfig.GRID_ROWS}x{BaseConfig.GRID_COLS}"
     Saver.begin_batch()
     data_agent.saver.save(mosaic_graph, "synthetic_export", f"{prefix}_")
-    mosaic_fig = plot_mosaic_network(mosaic_graph)
-    data_agent.saver.save(mosaic_fig, "synthetic_graph", f"{prefix}_")
+    mosaic_img = plot_mosaic_network(mosaic_graph)
+    data_agent.saver.save(mosaic_img, "synthetic_graph", f"{prefix}_")
     Saver.end_batch()
 
     logger.info(
@@ -243,87 +240,12 @@ def run_mosaic_for_dataset(dataset_id):
 # ------------------------------------------------------------------ #
 # Mosaic-aware plotting
 # ------------------------------------------------------------------ #
-def plot_mosaic_network(
-    graph: SynthGraph,
-    node_size: float = 0.01,
-    line_width: float = 0.1,
-    margin_frac: float = 0.02,
-    dpi: int = None,
-):
+def plot_mosaic_network(graph: SynthGraph, margin_frac: float = 0.02, dpi: int = None):
+    """Render a mosaic network to a PIL Image (CV2-backed, memory-safe).
+
+    Includes a black border rectangle around the bounding box.
     """
-    Plot the full stitched mosaic network using batched
-    matplotlib primitives (``LineCollection`` + ``scatter``)
-    so even million-node graphs render without OOM.
-
-    Returns
-    -------
-    np.ndarray
-        RGBA image array of the figure.
-    """
-    from utils import recommend_dpi
-
-    if dpi is None:
-        dpi = recommend_dpi(graph.number_of_nodes())
-
-    pos_arr = graph.positions()
-
-    x_min, y_min = pos_arr.min(axis=0)
-    x_max, y_max = pos_arr.max(axis=0)
-
-    mx = (x_max - x_min) * margin_frac
-    my = (y_max - y_min) * margin_frac
-    x_min -= mx
-    x_max += mx
-    y_min -= my
-    y_max += my
-
-    frame_w = x_max - x_min
-    frame_h = y_max - y_min
-    aspect = frame_w / frame_h if frame_h else 1.0
-    fig_h = 12
-    fig_w = fig_h * aspect
-
-    fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=dpi)
-
-    segments = []
-    for u, v in graph.edges():
-        pu, pv = pos_arr[u], pos_arr[v]
-        segments.append([pu, pv])
-    lc = LineCollection(
-        segments,
-        colors="red",
-        linewidths=line_width,
-        zorder=2,
-    )
-    ax.add_collection(lc)
-
-    ax.scatter(
-        pos_arr[:, 0],
-        pos_arr[:, 1],
-        s=node_size,
-        c="blue",
-        zorder=3,
-        edgecolors="none",
-    )
-
-    ax.set_xlim(x_min, x_max)
-    ax.set_ylim(y_min, y_max)
-    ax.add_patch(
-        plt.Rectangle(
-            (x_min, y_min),
-            frame_w,
-            frame_h,
-            facecolor="none",
-            edgecolor=(0, 0, 0, 0.8),
-            linewidth=2,
-            zorder=1,
-        )
-    )
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.axis("off")
-
-    return finalize_plot(fig, show=False)
+    return render_network(graph, margin_frac=margin_frac, dpi=dpi, border=True)
 
 
 # ------------------------------------------------------------------ #

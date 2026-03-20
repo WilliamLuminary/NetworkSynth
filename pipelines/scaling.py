@@ -5,15 +5,12 @@ Scaling pipeline — multi-root synchronized BFS for large networks.
 
 import logging
 
-from matplotlib import pyplot as plt
-from matplotlib.collections import LineCollection
-
 from configs import BaseConfig
 from configs.scaling_mode import ScalingConfig
 from graphs import GraphGenerator
 from graphs.synth_graph import SynthGraph
 from handlers import RunAgent, Saver
-from utils import finalize_plot, trim_graph
+from utils import render_network, trim_graph
 
 ScalingConfig.initialize()
 
@@ -54,8 +51,8 @@ def run_scaling_for_dataset(dataset_id):
 
     Saver.begin_batch()
     data_agent.saver.save(scaled_graph, "synthetic_export", f"{prefix}_")
-    scaled_fig = plot_scaled_network(scaled_graph)
-    data_agent.saver.save(scaled_fig, "synthetic_graph", f"{prefix}_")
+    scaled_img = plot_scaled_network(scaled_graph)
+    data_agent.saver.save(scaled_img, "synthetic_graph", f"{prefix}_")
     Saver.end_batch()
 
     logger.info(
@@ -68,71 +65,9 @@ def run_scaling_for_dataset(dataset_id):
 # ------------------------------------------------------------------ #
 # Efficient plotting for large networks
 # ------------------------------------------------------------------ #
-def plot_scaled_network(
-    graph: SynthGraph,
-    node_size: float = 0.01,
-    line_width: float = 0.1,
-    margin_frac: float = 0.02,
-    dpi: int = None,
-):
-    """Plot the full scaled network using batched matplotlib primitives
-    (``LineCollection`` + ``scatter``) so large graphs render efficiently.
-
-    Returns an RGBA image array.
-    """
-    from utils import recommend_dpi
-
-    if dpi is None:
-        dpi = recommend_dpi(graph.number_of_nodes())
-
-    pos_arr = graph.positions()
-
-    x_min, y_min = pos_arr.min(axis=0)
-    x_max, y_max = pos_arr.max(axis=0)
-
-    mx = (x_max - x_min) * margin_frac
-    my = (y_max - y_min) * margin_frac
-    x_min -= mx
-    x_max += mx
-    y_min -= my
-    y_max += my
-
-    frame_w = x_max - x_min
-    frame_h = y_max - y_min
-    aspect = frame_w / frame_h if frame_h else 1.0
-    fig_h = 12
-    fig_w = fig_h * aspect
-
-    fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=dpi)
-
-    segments = []
-    for u, v in graph.edges():
-        pu, pv = pos_arr[u], pos_arr[v]
-        segments.append([pu, pv])
-    lc = LineCollection(
-        segments,
-        colors="red",
-        linewidths=line_width,
-        zorder=2,
-    )
-    ax.add_collection(lc)
-
-    ax.scatter(
-        pos_arr[:, 0],
-        pos_arr[:, 1],
-        s=node_size,
-        c="blue",
-        zorder=3,
-        edgecolors="none",
-    )
-
-    ax.set_xlim(x_min, x_max)
-    ax.set_ylim(y_min, y_max)
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.axis("off")
-
-    return finalize_plot(fig, show=False)
+def plot_scaled_network(graph: SynthGraph, margin_frac: float = 0.02, dpi: int = None):
+    """Render a scaled network to a PIL Image (CV2-backed, memory-safe)."""
+    return render_network(graph, margin_frac=margin_frac, dpi=dpi)
 
 
 # ------------------------------------------------------------------ #

@@ -14,6 +14,9 @@ wandb~=0.25.0
 fire~=0.7.1
 tqdm~=4.67.0
 
+# Monitoring
+psutil~=7.0.0
+
 # Dev / testing
 pytest~=9.0.2
 pre-commit~=4.5.1

@@ -8,6 +8,7 @@ from typing import Dict, List, Optional, Tuple, Union
 from numpy import ndarray
 
 from configs import BaseConfig
+from configs.base_config import tagged
 from utils import build_graph, calculate_frame
 
 from ._graph_node import GraphNode
@@ -126,7 +127,8 @@ class GraphGenerator:
             f"Scaled generation: {scale_rows}×{scale_cols} roots, "
             f"spacing=({spacing_w:.0f}, {spacing_h:.0f}) "
             f"(factor={root_spacing_factor}), "
-            f"global_frame={global_frame}"
+            f"global_frame={global_frame}",
+            extra=tagged("PHASE1"),
         )
 
         nodes, edges = self._multi_root_bfs(root_positions, global_frame, max_rounds)
@@ -343,7 +345,8 @@ class GraphGenerator:
 
         logger.info(
             f"Phase 2: assembled {len(position_to_node):,} interior nodes, "
-            f"{total_edges:,} edges in edge_grid"
+            f"{total_edges:,} edges in edge_grid",
+            extra=tagged("PHASE2"),
         )
 
         frontier: list = []
@@ -366,7 +369,10 @@ class GraphGenerator:
                 frontier.append(fnode)
                 seen_frontier_ids.add(id(fnode))
 
-        logger.info(f"Phase 2: {len(frontier):,} frontier nodes ready for expansion")
+        logger.info(
+            f"Phase 2: {len(frontier):,} frontier nodes ready for expansion",
+            extra=tagged("PHASE2"),
+        )
 
         del position_to_node, frontier_positions
 
@@ -384,52 +390,79 @@ class GraphGenerator:
             next_snapshot_round = 1
             logger.info(
                 f"Log snapshot schedule: ~{desired_count} snapshots, "
-                f"multiplier={log_multiplier:.3f}"
+                f"multiplier={log_multiplier:.3f}",
+                extra=tagged("SNAPSHOT"),
             )
         else:
             log_multiplier = 1.0
             next_snapshot_round = snapshot_round_interval
 
-        for round_num in range(max_rounds):
-            rng.shuffle(frontier)
-            next_frontier: list = []
+        import signal
 
-            for node in frontier:
-                if not _within_frame(node.position, global_frame):
-                    continue
-                if node.generate_children():
-                    for child in node.children:
-                        if child != node and id(child) not in seen_frontier_ids:
-                            seen_frontier_ids.add(id(child))
-                            next_frontier.append(child)
+        _interrupted = False
+        _prev_handler = signal.getsignal(signal.SIGINT)
 
-            if not next_frontier:
-                logger.info(
-                    f"Phase 2 round {round_num}: converged. "
-                    f"merged={GraphNode._merged_edge:,}, "
-                    f"aborted={GraphNode._aborted_edge:,}"
-                )
-                break
+        def _on_sigint(sig, frame):
+            nonlocal _interrupted
+            _interrupted = True
 
-            if (round_num + 1) % 10 == 0 or round_num == 0:
-                logger.info(
-                    f"Phase 2 round {round_num}: frontier={len(next_frontier):,}, "
-                    f"merged={GraphNode._merged_edge:,}, "
-                    f"aborted={GraphNode._aborted_edge:,}"
-                )
+        signal.signal(signal.SIGINT, _on_sigint)
 
-            frontier = next_frontier
-
-            if take_snapshots and (round_num + 1) >= next_snapshot_round:
-                _fire_snapshot(snapshot_idx)
-                snapshot_idx += 1
-                if snapshot_log:
-                    next_snapshot_round = max(
-                        next_snapshot_round + 1,
-                        int(next_snapshot_round * log_multiplier),
+        try:
+            for round_num in range(max_rounds):
+                if _interrupted:
+                    logger.info(
+                        f"Phase 2 interrupted at round {round_num}.",
+                        extra=tagged("PHASE2"),
                     )
-                else:
-                    next_snapshot_round += snapshot_round_interval
+                    break
+
+                rng.shuffle(frontier)
+                next_frontier: list = []
+
+                for node in frontier:
+                    if not _within_frame(node.position, global_frame):
+                        continue
+                    if node.generate_children():
+                        for child in node.children:
+                            if child != node and id(child) not in seen_frontier_ids:
+                                seen_frontier_ids.add(id(child))
+                                next_frontier.append(child)
+
+                if not next_frontier:
+                    logger.info(
+                        f"Phase 2 round {round_num}: converged. "
+                        f"merged={GraphNode._merged_edge:,}, "
+                        f"aborted={GraphNode._aborted_edge:,}",
+                        extra=tagged("PHASE2"),
+                    )
+                    break
+
+                if (round_num + 1) % 10 == 0 or round_num == 0:
+                    logger.info(
+                        f"Phase 2 round {round_num}: frontier={len(next_frontier):,}, "
+                        f"merged={GraphNode._merged_edge:,}, "
+                        f"aborted={GraphNode._aborted_edge:,}",
+                        extra=tagged("PHASE2"),
+                    )
+
+                frontier = next_frontier
+
+                if take_snapshots and (round_num + 1) >= next_snapshot_round:
+                    _fire_snapshot(snapshot_idx)
+                    snapshot_idx += 1
+                    if snapshot_log:
+                        next_snapshot_round = max(
+                            next_snapshot_round + 1,
+                            int(next_snapshot_round * log_multiplier),
+                        )
+                    else:
+                        next_snapshot_round += snapshot_round_interval
+        finally:
+            signal.signal(signal.SIGINT, _prev_handler)
+
+        if _interrupted:
+            raise KeyboardInterrupt
 
         del seen_frontier_ids
 
@@ -448,7 +481,8 @@ class GraphGenerator:
             f"Phase 2 complete: {len(all_nodes):,} nodes, "
             f"{len(all_edges):,} edges, "
             f"merged={GraphNode._merged_edge:,}, "
-            f"aborted={GraphNode._aborted_edge:,}"
+            f"aborted={GraphNode._aborted_edge:,}",
+            extra=tagged("PHASE2"),
         )
 
         graph = SynthGraph.from_graph_nodes(all_nodes, all_edges)
@@ -491,12 +525,13 @@ class GraphGenerator:
                     frontier.append(child)
 
             if (i + 1) % max(1, n_roots // 10) == 0:
-                logger.info(f"Root init: {i + 1:,}/{n_roots:,}")
+                logger.info(f"Root init: {i + 1:,}/{n_roots:,}", extra=tagged("BFS"))
 
         logger.info(
             f"Initialized {n_roots:,} roots → "
             f"{len(all_nodes):,} nodes, {len(all_edges):,} edges, "
-            f"frontier={len(frontier):,}"
+            f"frontier={len(frontier):,}",
+            extra=tagged("BFS"),
         )
 
         # --- Phase 2: round-by-round expansion ---
@@ -518,7 +553,8 @@ class GraphGenerator:
             if not next_frontier:
                 logger.info(
                     f"Round {round_num}: converged (no new nodes). "
-                    f"Total: {len(all_nodes):,} nodes, {len(all_edges):,} edges"
+                    f"Total: {len(all_nodes):,} nodes, {len(all_edges):,} edges",
+                    extra=tagged("BFS"),
                 )
                 break
 
@@ -527,7 +563,8 @@ class GraphGenerator:
                     f"Round {round_num}: frontier={len(next_frontier):,}, "
                     f"nodes={len(all_nodes):,}, edges={len(all_edges):,}, "
                     f"merged={GraphNode._merged_edge:,}, "
-                    f"aborted={GraphNode._aborted_edge:,}"
+                    f"aborted={GraphNode._aborted_edge:,}",
+                    extra=tagged("BFS"),
                 )
 
             frontier = next_frontier
@@ -536,7 +573,8 @@ class GraphGenerator:
             f"Multi-root BFS complete: {len(all_nodes):,} nodes, "
             f"{len(all_edges):,} edges, "
             f"merged={GraphNode._merged_edge:,}, "
-            f"aborted={GraphNode._aborted_edge:,}"
+            f"aborted={GraphNode._aborted_edge:,}",
+            extra=tagged("BFS"),
         )
         return all_nodes, all_edges
 
