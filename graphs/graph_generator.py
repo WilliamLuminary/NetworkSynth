@@ -397,48 +397,72 @@ class GraphGenerator:
             log_multiplier = 1.0
             next_snapshot_round = snapshot_round_interval
 
-        for round_num in range(max_rounds):
-            rng.shuffle(frontier)
-            next_frontier: list = []
+        import signal
 
-            for node in frontier:
-                if not _within_frame(node.position, global_frame):
-                    continue
-                if node.generate_children():
-                    for child in node.children:
-                        if child != node and id(child) not in seen_frontier_ids:
-                            seen_frontier_ids.add(id(child))
-                            next_frontier.append(child)
+        _interrupted = False
+        _prev_handler = signal.getsignal(signal.SIGINT)
 
-            if not next_frontier:
-                logger.info(
-                    f"Phase 2 round {round_num}: converged. "
-                    f"merged={GraphNode._merged_edge:,}, "
-                    f"aborted={GraphNode._aborted_edge:,}",
-                    extra=tagged("PHASE2"),
-                )
-                break
+        def _on_sigint(sig, frame):
+            nonlocal _interrupted
+            _interrupted = True
 
-            if (round_num + 1) % 10 == 0 or round_num == 0:
-                logger.info(
-                    f"Phase 2 round {round_num}: frontier={len(next_frontier):,}, "
-                    f"merged={GraphNode._merged_edge:,}, "
-                    f"aborted={GraphNode._aborted_edge:,}",
-                    extra=tagged("PHASE2"),
-                )
+        signal.signal(signal.SIGINT, _on_sigint)
 
-            frontier = next_frontier
-
-            if take_snapshots and (round_num + 1) >= next_snapshot_round:
-                _fire_snapshot(snapshot_idx)
-                snapshot_idx += 1
-                if snapshot_log:
-                    next_snapshot_round = max(
-                        next_snapshot_round + 1,
-                        int(next_snapshot_round * log_multiplier),
+        try:
+            for round_num in range(max_rounds):
+                if _interrupted:
+                    logger.info(
+                        f"Phase 2 interrupted at round {round_num}.",
+                        extra=tagged("PHASE2"),
                     )
-                else:
-                    next_snapshot_round += snapshot_round_interval
+                    break
+
+                rng.shuffle(frontier)
+                next_frontier: list = []
+
+                for node in frontier:
+                    if not _within_frame(node.position, global_frame):
+                        continue
+                    if node.generate_children():
+                        for child in node.children:
+                            if child != node and id(child) not in seen_frontier_ids:
+                                seen_frontier_ids.add(id(child))
+                                next_frontier.append(child)
+
+                if not next_frontier:
+                    logger.info(
+                        f"Phase 2 round {round_num}: converged. "
+                        f"merged={GraphNode._merged_edge:,}, "
+                        f"aborted={GraphNode._aborted_edge:,}",
+                        extra=tagged("PHASE2"),
+                    )
+                    break
+
+                if (round_num + 1) % 10 == 0 or round_num == 0:
+                    logger.info(
+                        f"Phase 2 round {round_num}: frontier={len(next_frontier):,}, "
+                        f"merged={GraphNode._merged_edge:,}, "
+                        f"aborted={GraphNode._aborted_edge:,}",
+                        extra=tagged("PHASE2"),
+                    )
+
+                frontier = next_frontier
+
+                if take_snapshots and (round_num + 1) >= next_snapshot_round:
+                    _fire_snapshot(snapshot_idx)
+                    snapshot_idx += 1
+                    if snapshot_log:
+                        next_snapshot_round = max(
+                            next_snapshot_round + 1,
+                            int(next_snapshot_round * log_multiplier),
+                        )
+                    else:
+                        next_snapshot_round += snapshot_round_interval
+        finally:
+            signal.signal(signal.SIGINT, _prev_handler)
+
+        if _interrupted:
+            raise KeyboardInterrupt
 
         del seen_frontier_ids
 
