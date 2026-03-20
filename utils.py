@@ -182,10 +182,7 @@ def recommend_dpi_cv2(num_nodes: int) -> int:
 
     Returns one of 450, 600, 900, 1200, 1500, or 2100.
     """
-    for threshold, dpi in _DPI_TIERS:
-        if num_nodes < threshold:
-            return dpi + _DPI_BOOST
-    return 1800 + _DPI_BOOST
+    return recommend_dpi(num_nodes) + _DPI_BOOST
 
 
 _WEBP_MAX_PX = 16383
@@ -232,7 +229,10 @@ def render_network(
 
     frame_w = x_max - x_min
     frame_h = y_max - y_min
-    aspect = frame_w / frame_h if frame_h else 1.0
+    # Guard against degenerate bounding boxes (all nodes at same position)
+    frame_w = max(frame_w, 1e-12)
+    frame_h = max(frame_h, 1e-12)
+    aspect = frame_w / frame_h
 
     img_h = min(int(12 * dpi), _WEBP_MAX_PX)
     img_w = min(int(12 * dpi * aspect), _WEBP_MAX_PX)

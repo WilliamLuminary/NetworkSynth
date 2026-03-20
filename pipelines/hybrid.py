@@ -207,6 +207,7 @@ def run_phase1(
     failed = []
 
     executor = ProcessPoolExecutor(max_workers=num_workers)
+    interrupted = False
     try:
         futures = {executor.submit(_generate_tile_worker, a): a[0] for a in tile_args}
         completed = 0
@@ -230,11 +231,10 @@ def run_phase1(
     except KeyboardInterrupt:
         logger.info(SIGINT_INFO)
         exit_event.set()
-        executor.shutdown(wait=False, cancel_futures=True)
+        interrupted = True
         raise
-    else:
-        executor.shutdown(wait=True)
     finally:
+        executor.shutdown(wait=not interrupted, cancel_futures=interrupted)
         manager.shutdown()
 
     if failed:
@@ -627,6 +627,14 @@ def run_hybrid_for_dataset(dataset_id):
 # ------------------------------------------------------------------ #
 
 
+def _subprocess_target(dataset_id):
+    """Top-level target for child processes (must be picklable for spawn)."""
+    try:
+        run_hybrid_for_dataset(dataset_id)
+    except KeyboardInterrupt:
+        logger.info(SIGINT_INFO)
+
+
 def _run_dataset_in_subprocess(dataset_id):
     """Run a single dataset in a child process for full memory isolation.
 
@@ -635,13 +643,9 @@ def _run_dataset_in_subprocess(dataset_id):
     """
     import multiprocessing as mp
 
-    def _target():
-        try:
-            run_hybrid_for_dataset(dataset_id)
-        except KeyboardInterrupt:
-            logger.info(SIGINT_INFO)
-
-    proc = mp.Process(target=_target, name=f"hybrid-{dataset_id}")
+    proc = mp.Process(
+        target=_subprocess_target, args=(dataset_id,), name=f"hybrid-{dataset_id}"
+    )
     proc.start()
 
     try:
