@@ -565,10 +565,12 @@ def run_hybrid_for_dataset(dataset_id):
     mapper.assign_weights(hybrid_graph)
 
     # --- Save original/ ---
+    Saver.begin_batch()
     data_agent.save("original_image")
     data_agent.save("original_network")
     data_agent.save("original_property")
     data_agent.save("original_graph")
+    Saver.end_batch()
 
     # --- Save synthetic/ ---
     data_agent.add_synthetic_graph(hybrid_graph)
@@ -576,7 +578,6 @@ def run_hybrid_for_dataset(dataset_id):
 
     Saver.begin_batch()
     data_agent.saver.save(hybrid_graph, "synthetic_export", f"{prefix}_")
-    Saver.end_batch()
 
     # --- Write reports before plotting (plotting is memory-intensive) ---
     original_network = data_agent.get_original_network()
@@ -601,7 +602,6 @@ def run_hybrid_for_dataset(dataset_id):
     gc.collect()
 
     log_memory(f"Before plotting ({dataset_id})")
-    Saver.begin_batch()
     img = plot_hybrid_network(hybrid_graph)
     del hybrid_graph
     gc.collect()
