@@ -163,9 +163,11 @@ _DPI_TIERS = [
     (20_000_000, 1200),
 ]
 
+_DPI_BOOST = 300  # extra DPI headroom for CV2-based rendering
+
 
 def recommend_dpi(num_nodes: int) -> int:
-    """Pick a standard DPI based on network size.
+    """Pick a standard DPI based on network size (matplotlib paths).
 
     Returns one of 150, 300, 600, 900, 1200, or 1800.
     """
@@ -173,6 +175,17 @@ def recommend_dpi(num_nodes: int) -> int:
         if num_nodes < threshold:
             return dpi
     return 1800
+
+
+def recommend_dpi_cv2(num_nodes: int) -> int:
+    """Pick DPI for the CV2/OpenCV renderer (+300 over matplotlib tiers).
+
+    Returns one of 450, 600, 900, 1200, 1500, or 2100.
+    """
+    for threshold, dpi in _DPI_TIERS:
+        if num_nodes < threshold:
+            return dpi + _DPI_BOOST
+    return 1800 + _DPI_BOOST
 
 
 _WEBP_MAX_PX = 16383
@@ -205,7 +218,7 @@ def render_network(
     from PIL import Image
 
     if dpi is None:
-        dpi = recommend_dpi(graph.number_of_nodes())
+        dpi = recommend_dpi_cv2(graph.number_of_nodes())
 
     pos_arr = graph.positions()
     x_min, y_min = pos_arr.min(axis=0)
@@ -459,54 +472,76 @@ def save_hybrid_snapshot(
     index: int,
     output_dir: str,
     *,
-    node_size: float = 0.01,
-    line_width: float = 0.1,
     margin_frac: float = 0.02,
     dpi: int | None = None,
+    **_kwargs,
 ) -> None:
     """Render a snapshot of a large hybrid network and save as PNG.
 
-    Style matches ``plot_hybrid_network`` exactly: tiny markers, thin
-    lines, ``recommend_dpi``, fig height 12.  Uses fixed *frame* limits
-    so all snapshots are aligned for animation.
+    Uses the CV2 renderer for consistency with ``render_network`` and
+    to avoid OOM on large intermediate snapshots.  Uses fixed *frame*
+    limits so all snapshots are aligned for animation.
     """
     import os
 
-    from matplotlib.collections import LineCollection
-    from matplotlib.figure import Figure
+    import cv2
 
     if dpi is None:
-        dpi = recommend_dpi(len(node_positions))
+        dpi = recommend_dpi_cv2(len(node_positions))
 
     frame_w = frame[0][1] - frame[0][0]
     frame_h = frame[1][1] - frame[1][0]
     mx = frame_w * margin_frac
     my = frame_h * margin_frac
     aspect = frame_w / frame_h if frame_h > 0 else 1.0
-    fig_h = 12
-    fig = Figure(figsize=(fig_h * aspect, fig_h), dpi=dpi)
-    ax = fig.add_subplot(111)
 
+    x_min = frame[0][0] - mx
+    x_max = frame[0][1] + mx
+    y_min = frame[1][0] - my
+    y_max = frame[1][1] + my
+    total_w = x_max - x_min
+    total_h = y_max - y_min
+
+    img_h = min(int(12 * dpi), _WEBP_MAX_PX)
+    img_w = min(int(12 * dpi * aspect), _WEBP_MAX_PX)
+
+    canvas = np.full((img_h, img_w, 3), 255, dtype=np.uint8)
+
+    sx = (img_w - 1) / total_w
+    sy = (img_h - 1) / total_h
+
+    # Draw edges
     if edges:
-        segments = [[(e[0][0], e[0][1]), (e[1][0], e[1][1])] for e in edges]
-        lc = LineCollection(segments, colors="red", linewidths=line_width, zorder=2)
-        ax.add_collection(lc)
+        edge_arr = np.asarray(
+            [((e[0][0], e[0][1]), (e[1][0], e[1][1])) for e in edges],
+            dtype=np.float64,
+        )
+        pts_u = np.column_stack([
+            ((edge_arr[:, 0, 0] - x_min) * sx).astype(np.int32),
+            ((y_max - edge_arr[:, 0, 1]) * sy).astype(np.int32),
+        ])
+        pts_v = np.column_stack([
+            ((edge_arr[:, 1, 0] - x_min) * sx).astype(np.int32),
+            ((y_max - edge_arr[:, 1, 1]) * sy).astype(np.int32),
+        ])
+        segments = np.stack([pts_u, pts_v], axis=1).astype(np.int32)
+        BATCH = 1_000_000
+        for start in range(0, len(segments), BATCH):
+            cv2.polylines(
+                canvas, segments[start : start + BATCH],
+                isClosed=False, color=(0, 0, 255), thickness=1,
+            )
 
+    # Draw nodes
     if node_positions:
-        xs = [p[0] for p in node_positions]
-        ys = [p[1] for p in node_positions]
-        ax.scatter(xs, ys, s=node_size, c="blue", zorder=3, edgecolors="none")
-
-    ax.set_xlim(frame[0][0] - mx, frame[0][1] + mx)
-    ax.set_ylim(frame[1][0] - my, frame[1][1] + my)
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.axis("off")
+        pos_arr = np.asarray(node_positions, dtype=np.float64)
+        px = ((pos_arr[:, 0] - x_min) * sx).astype(np.int32)
+        py = ((y_max - pos_arr[:, 1]) * sy).astype(np.int32)
+        valid = (px >= 0) & (px < img_w) & (py >= 0) & (py < img_h)
+        canvas[py[valid], px[valid]] = np.array([255, 0, 0], dtype=np.uint8)
 
     path = os.path.join(output_dir, f"snapshot_{index:05d}.png")
-    fig.savefig(path, dpi=dpi, bbox_inches="tight")
-    fig.clear()
-    del fig
+    cv2.imwrite(path, canvas)
 
 
 def trim_graph(graph: SynthGraph, tar_avg_deg: float) -> SynthGraph:
