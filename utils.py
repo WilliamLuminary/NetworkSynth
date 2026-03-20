@@ -178,6 +178,82 @@ def recommend_dpi(num_nodes: int) -> int:
 _WEBP_MAX_PX = 16383
 
 
+def render_network(
+    graph: SynthGraph,
+    margin_frac: float = 0.02,
+    dpi: int = None,
+    border: bool = False,
+):
+    """Render a SynthGraph to a PIL Image using OpenCV.
+
+    Only allocates a fixed-size pixel buffer (H × W × 3 bytes) regardless
+    of the number of nodes/edges, avoiding OOM on multi-million-element
+    graphs.
+
+    Parameters
+    ----------
+    graph : SynthGraph
+    margin_frac : float
+        Fractional margin around the bounding box.
+    dpi : int, optional
+        Resolution. Auto-selected from node count if omitted.
+    border : bool
+        If True, draw a thin black rectangle around the bounding box
+        (used by the mosaic pipeline).
+    """
+    import cv2
+    from PIL import Image
+
+    if dpi is None:
+        dpi = recommend_dpi(graph.number_of_nodes())
+
+    pos_arr = graph.positions()
+    x_min, y_min = pos_arr.min(axis=0)
+    x_max, y_max = pos_arr.max(axis=0)
+    mx = (x_max - x_min) * margin_frac
+    my = (y_max - y_min) * margin_frac
+    x_min -= mx
+    x_max += mx
+    y_min -= my
+    y_max += my
+
+    frame_w = x_max - x_min
+    frame_h = y_max - y_min
+    aspect = frame_w / frame_h if frame_h else 1.0
+
+    img_h = min(int(12 * dpi), _WEBP_MAX_PX)
+    img_w = min(int(12 * dpi * aspect), _WEBP_MAX_PX)
+
+    canvas = np.full((img_h, img_w, 3), 255, dtype=np.uint8)
+
+    sx = (img_w - 1) / frame_w
+    sy = (img_h - 1) / frame_h
+    px = ((pos_arr[:, 0] - x_min) * sx).astype(np.int32)
+    py = ((y_max - pos_arr[:, 1]) * sy).astype(np.int32)
+
+    # Edges (red, batched)
+    edge_color = (0, 0, 255)  # BGR
+    BATCH = 1_000_000
+    edge_list = np.asarray(list(graph.edges()), dtype=np.int64)
+    for start in range(0, len(edge_list), BATCH):
+        batch = edge_list[start : start + BATCH]
+        pts_u = np.column_stack([px[batch[:, 0]], py[batch[:, 0]]])
+        pts_v = np.column_stack([px[batch[:, 1]], py[batch[:, 1]]])
+        segments = np.stack([pts_u, pts_v], axis=1).astype(np.int32)
+        cv2.polylines(canvas, segments, isClosed=False, color=edge_color, thickness=1)
+    del edge_list
+
+    # Nodes (blue, direct pixel write)
+    node_color_bgr = np.array([255, 0, 0], dtype=np.uint8)
+    valid = (px >= 0) & (px < img_w) & (py >= 0) & (py < img_h)
+    canvas[py[valid], px[valid]] = node_color_bgr
+
+    if border:
+        cv2.rectangle(canvas, (0, 0), (img_w - 1, img_h - 1), (0, 0, 0), 2)
+
+    return Image.fromarray(cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB))
+
+
 def save_figure_as_webp(fig, filepath: str, *, dpi: int = None, lossless: bool = True):
     """Rasterise a matplotlib Figure and save as WebP via Pillow.
 

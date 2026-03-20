@@ -85,7 +85,7 @@ class Saver:
             cls.mode = Mode.GEN
             cls.base_output_dir = os.path.join(
                 BaseConfig.BASE_OUTPUT_PATH,
-                f"{BaseConfig.OUTPUT_DENOTE}_results_{_time_id()}",
+                f"{BaseConfig.OUTPUT_DENOTE}_results_{_time_id()}_{BaseConfig.RUN_ID}",
             )
             _ensure_directory(cls.base_output_dir)
             logger.info(

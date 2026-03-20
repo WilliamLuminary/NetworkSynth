@@ -54,19 +54,25 @@ def save_networkit(content, filepath: str) -> None:
         _logger.info(f"Saved companion positions: {pos_path}")
 
 
-def save_webp(fig, filepath: str) -> None:
+def save_webp(fig_or_image, filepath: str) -> None:
+    from PIL import Image as _Image
+
+    if isinstance(fig_or_image, _Image.Image):
+        fig_or_image.save(filepath, "webp", lossless=True)
+        return
+
     from matplotlib.figure import Figure
 
     assert isinstance(
-        fig, Figure
-    ), f"WebP saving expects a matplotlib Figure, got {type(fig).__name__}."
+        fig_or_image, Figure
+    ), f"WebP saving expects a matplotlib Figure or PIL Image, got {type(fig_or_image).__name__}."
     from utils import save_figure_as_webp
 
-    save_figure_as_webp(fig, filepath)
+    save_figure_as_webp(fig_or_image, filepath)
 
     from matplotlib import pyplot as _plt
 
-    _plt.close(fig)
+    _plt.close(fig_or_image)
 
 
 def save_svg(fig, filepath: str) -> None:
@@ -83,10 +89,13 @@ def save_svg(fig, filepath: str) -> None:
 
 
 def save_png(image, filepath: str) -> None:
+    from PIL import Image as _Image
     from matplotlib.figure import Figure
     from numpy import ndarray
 
-    if isinstance(image, Figure):
+    if isinstance(image, _Image.Image):
+        image.save(filepath, "png")
+    elif isinstance(image, Figure):
         image.savefig(filepath, format="png", bbox_inches="tight")
 
         from matplotlib import pyplot as _plt

@@ -220,8 +220,8 @@ def run_hybrid_snapshot_for_dataset(
 
     Saver.begin_batch()
     data_agent.saver.save(hybrid_graph, "synthetic_export", f"{prefix}_")
-    fig = plot_hybrid_network(hybrid_graph)
-    data_agent.saver.save(fig, "synthetic_graph", f"{prefix}_")
+    img = plot_hybrid_network(hybrid_graph)
+    data_agent.saver.save(img, "synthetic_graph", f"{prefix}_")
     Saver.end_batch()
 
     # --- Write reports ---

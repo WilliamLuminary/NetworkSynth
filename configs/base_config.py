@@ -205,6 +205,7 @@ class BaseConfig:
         )
 
     _logger_initialized = False
+    RUN_ID: str = ""
 
     @classmethod
     def _setup_logger(cls, log_level=None, details=None):
@@ -212,6 +213,9 @@ class BaseConfig:
             return
         log_level = log_level or logging.INFO
         details = details or ""
+
+        BaseConfig.RUN_ID = uuid.uuid4().hex[:8]
+
         _logger = logging.getLogger()
         _logger.setLevel(log_level)
 
@@ -232,8 +236,7 @@ class BaseConfig:
             mode="a",
         )
         file_handler.setLevel(log_level)
-        run_id = uuid.uuid4().hex[:8]
-        file_handler.setFormatter(_JsonFormatter(run_id=run_id))
+        file_handler.setFormatter(_JsonFormatter(run_id=BaseConfig.RUN_ID))
 
         _logger.addHandler(console_handler)
         _logger.addHandler(file_handler)
