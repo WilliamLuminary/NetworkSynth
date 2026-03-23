@@ -352,15 +352,15 @@ class GraphGenerator:
                             return True
             return False
 
-        # Deep interior tracking (included in output, excluded from grids)
-        deep_interior_nodes: set = set()
+        # Deep interior edge tracking (included in output, excluded from
+        # edge_grid).  All NODES stay in node_grid so close-node merging
+        # works correctly and prevents overlapping structures.
         deep_interior_edges: set = set()
 
         def _fire_snapshot(idx):
             positions = [
                 n.position for cell in GraphNode.node_grid.values() for n in cell
             ]
-            positions.extend(n.position for n in deep_interior_nodes)
             edges = list({e for cell in GraphNode.edge_grid.values() for e in cell})
             edges.extend(deep_interior_edges)
             snapshot_callback(positions, edges, global_frame, idx)
@@ -377,11 +377,7 @@ class GraphGenerator:
         for tile in tile_data_list:
             for pos in tile["positions"]:
                 if pos not in position_to_node and pos not in frontier_positions:
-                    if _near_any_frontier(pos):
-                        node = GraphNode.create_interior_node(pos)
-                    else:
-                        node = GraphNode.create_passive_node(pos)
-                        deep_interior_nodes.add(node)
+                    node = GraphNode.create_interior_node(pos)
                     position_to_node[pos] = node
             for edge in tile["edges"]:
                 if _near_any_frontier(edge[0]) or _near_any_frontier(edge[1]):
@@ -394,8 +390,7 @@ class GraphGenerator:
         del _frontier_hash
 
         logger.info(
-            f"Phase 2: assembled {len(position_to_node):,} interior nodes "
-            f"({len(deep_interior_nodes):,} passive), "
+            f"Phase 2: assembled {len(position_to_node):,} interior nodes, "
             f"{total_grid_edges:,} grid edges, "
             f"{total_passive_edges:,} passive edges",
             extra=tagged("PHASE2"),
@@ -524,7 +519,6 @@ class GraphGenerator:
         all_nodes: set = set()
         for cell_nodes in GraphNode.node_grid.values():
             all_nodes.update(cell_nodes)
-        all_nodes.update(deep_interior_nodes)
 
         all_edges: set = set()
         for cell_edges in GraphNode.edge_grid.values():
