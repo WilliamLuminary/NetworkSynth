@@ -90,6 +90,24 @@ class GraphNode:
         return node
 
     @classmethod
+    def create_passive_node(cls, position):
+        """Node for deep interior tile positions — NOT added to ``node_grid``.
+
+        Included in the final graph output but does not participate in
+        spatial proximity checks during frontier expansion, preventing
+        artificial density from crowding gap-fill regions.
+        """
+        node = object.__new__(cls)
+        node.id = next(cls.id_counter)
+        node.position = position
+        node.degree = 2
+        node.children = [None, None]
+        node.parent = None
+        node.clockwise = False
+        node.base_angle = 0.0
+        return node
+
+    @classmethod
     def create_frontier_node(cls, position, degree, base_angle, clockwise, parent_node):
         """Create a frontier node ready for ``generate_children()``.
 

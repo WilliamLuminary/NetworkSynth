@@ -317,11 +317,52 @@ class GraphGenerator:
 
         take_snapshots = snapshot_callback is not None and snapshot_round_interval != 0
 
+        # --- Boundary-band filtering --------------------------------- #
+        # Only register tile nodes/edges within a band around frontier
+        # positions in the spatial grids.  Deep interior nodes/edges are
+        # tracked separately and included in the final output but do NOT
+        # participate in spatial proximity checks.  This prevents the
+        # pre-populated grid from creating artificially dense conditions
+        # for frontier expansion, so gap-fill patterns match Phase 1
+        # tile interiors.
+        band_distance = GraphNode._avg_length * (
+            1.0 + max(GraphNode._closed_nodes_factor, GraphNode._closed_edges_factor)
+        )
+        band_sq = band_distance * band_distance
+
+        # Spatial hash of ALL frontier positions for fast proximity check
+        from collections import defaultdict as _ddict
+
+        _frontier_hash: Dict[Tuple[int, int], List[Tuple[float, float]]] = _ddict(list)
+        for tile in tile_data_list:
+            for desc in tile["frontier"]:
+                fx, fy = desc.position
+                key = (int(fx // band_distance), int(fy // band_distance))
+                _frontier_hash[key].append(desc.position)
+
+        def _near_any_frontier(pos):
+            px, py = pos
+            key = (int(px // band_distance), int(py // band_distance))
+            for dx in range(-1, 2):
+                for dy in range(-1, 2):
+                    for fp in _frontier_hash.get((key[0] + dx, key[1] + dy), ()):
+                        ddx = px - fp[0]
+                        ddy = py - fp[1]
+                        if ddx * ddx + ddy * ddy <= band_sq:
+                            return True
+            return False
+
+        # Deep interior tracking (included in output, excluded from grids)
+        deep_interior_nodes: set = set()
+        deep_interior_edges: set = set()
+
         def _fire_snapshot(idx):
             positions = [
                 n.position for cell in GraphNode.node_grid.values() for n in cell
             ]
+            positions.extend(n.position for n in deep_interior_nodes)
             edges = list({e for cell in GraphNode.edge_grid.values() for e in cell})
+            edges.extend(deep_interior_edges)
             snapshot_callback(positions, edges, global_frame, idx)
 
         frontier_positions: set = set()
@@ -330,22 +371,33 @@ class GraphGenerator:
                 frontier_positions.add(desc.position)
 
         position_to_node: Dict[Tuple[float, float], GraphNode] = {}
-        total_edges = 0
+        total_grid_edges = 0
+        total_passive_edges = 0
 
-        all_edges: set = set()
         for tile in tile_data_list:
             for pos in tile["positions"]:
                 if pos not in position_to_node and pos not in frontier_positions:
-                    node = GraphNode.create_interior_node(pos)
+                    if _near_any_frontier(pos):
+                        node = GraphNode.create_interior_node(pos)
+                    else:
+                        node = GraphNode.create_passive_node(pos)
+                        deep_interior_nodes.add(node)
                     position_to_node[pos] = node
             for edge in tile["edges"]:
-                GraphNode.register_edge(edge)
-                all_edges.add(edge)
-                total_edges += 1
+                if _near_any_frontier(edge[0]) or _near_any_frontier(edge[1]):
+                    GraphNode.register_edge(edge)
+                    total_grid_edges += 1
+                else:
+                    deep_interior_edges.add(edge)
+                    total_passive_edges += 1
+
+        del _frontier_hash
 
         logger.info(
-            f"Phase 2: assembled {len(position_to_node):,} interior nodes, "
-            f"{total_edges:,} edges in edge_grid",
+            f"Phase 2: assembled {len(position_to_node):,} interior nodes "
+            f"({len(deep_interior_nodes):,} passive), "
+            f"{total_grid_edges:,} grid edges, "
+            f"{total_passive_edges:,} passive edges",
             extra=tagged("PHASE2"),
         )
 
@@ -374,7 +426,7 @@ class GraphGenerator:
             extra=tagged("PHASE2"),
         )
 
-        del position_to_node, frontier_positions
+        del position_to_node, frontier_positions, _near_any_frontier
 
         snapshot_idx = 0
         if take_snapshots:
@@ -472,10 +524,12 @@ class GraphGenerator:
         all_nodes: set = set()
         for cell_nodes in GraphNode.node_grid.values():
             all_nodes.update(cell_nodes)
+        all_nodes.update(deep_interior_nodes)
 
         all_edges: set = set()
         for cell_edges in GraphNode.edge_grid.values():
             all_edges.update(cell_edges)
+        all_edges.update(deep_interior_edges)
 
         logger.info(
             f"Phase 2 complete: {len(all_nodes):,} nodes, "
