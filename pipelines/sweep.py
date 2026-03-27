@@ -10,7 +10,7 @@ from multiprocessing import Manager
 import numpy as np
 import wandb
 
-from analysis import MultifractalAnalyzer
+from analysis.error_checker import ErrorChecker, create_error_checker
 
 # noinspection PyUnresolvedReferences
 from configs import BaseConfig, DatasetId
@@ -53,7 +53,7 @@ def _build_factors(lo, hi, step=0.1):
 logger = logging.getLogger(__name__)
 
 
-def _generate_with_factors(exit_event, std_err_fea, attributes, mapper, nf, ef):
+def _generate_with_factors(exit_event, error_checker: ErrorChecker, attributes, mapper, nf, ef):
     """Spawn-safe: uses the same BFS path as the hybrid tile generator."""
     import random
 
@@ -84,9 +84,8 @@ def _generate_with_factors(exit_event, std_err_fea, attributes, mapper, nf, ef):
             if exit_event.is_set():
                 return None, float("inf")
 
-            err_fea = MultifractalAnalyzer(graph).analyze_error_features()
-            error = MultifractalAnalyzer.analyze_error(err_fea, std_err_fea)
-            if error < BaseConfig.ERROR_TOLERANCE:
+            passed, error = error_checker.check(graph)
+            if passed:
                 return graph, error
         except KeyboardInterrupt:
             raise
@@ -96,7 +95,7 @@ def _generate_with_factors(exit_event, std_err_fea, attributes, mapper, nf, ef):
     return None, float("inf")
 
 
-def generate_networks(data_agent, std_err_fea, nf, ef):
+def generate_networks(data_agent, error_checker: ErrorChecker, nf, ef):
     """Generate networks with the given factors. Return (avg_error, success_rate)."""
     num_network = BaseConfig.SYNTHETIC_NETWORK_NUMBER
     exit_event = Manager().Event()
@@ -110,7 +109,7 @@ def generate_networks(data_agent, std_err_fea, nf, ef):
                 executor.submit(
                     _generate_with_factors,
                     exit_event,
-                    std_err_fea,
+                    error_checker,
                     data_agent.attributes,
                     data_agent.mapper,
                     nf,
@@ -156,9 +155,8 @@ def run_for_dataset(dataset_id: DatasetId, node_factors, edge_factors) -> None:
 
     data_agent = RunAgent(dataset_id=dataset_id)
     data_agent.prepare_data()
-    std_err_fea = MultifractalAnalyzer(
-        data_agent.get_original_network()
-    ).analyze_error_features()
+    error_checker = create_error_checker(BaseConfig.ERROR_TOLERANCE)
+    error_checker.compute_reference(data_agent.get_original_network())
 
     sweep_config = {
         "name": f"sweep-{dataset_id}",
@@ -176,7 +174,7 @@ def run_for_dataset(dataset_id: DatasetId, node_factors, edge_factors) -> None:
             ef = wandb.config.edge_factor
             logger.info(f"Trial: nf={nf}, ef={ef}")
 
-            error, success_rate = generate_networks(data_agent, std_err_fea, nf, ef)
+            error, success_rate = generate_networks(data_agent, error_checker, nf, ef)
             if error is None:
                 error = float("inf")
 

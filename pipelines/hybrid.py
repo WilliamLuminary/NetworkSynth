@@ -21,7 +21,7 @@ from typing import Dict, List, Tuple
 import networkit as nk
 import numpy as np
 
-from analysis import MultifractalAnalyzer
+from analysis.error_checker import ErrorChecker, create_error_checker
 from configs import BaseConfig
 from configs.base_config import tagged
 from graphs import GraphGenerator
@@ -108,7 +108,7 @@ def _generate_tile_worker(args):
     """
     import random
 
-    tile_idx, exit_event, attributes, std_err_fea, mapper = args
+    tile_idx, exit_event, attributes, error_checker, mapper = args
 
     nk.setNumberOfThreads(1)
 
@@ -150,8 +150,7 @@ def _generate_tile_worker(args):
             graph = trim_graph(graph, attributes.average_degree)
             mapper.assign_weights(graph)
 
-            err_fea = MultifractalAnalyzer(graph).analyze_error_features()
-            error = MultifractalAnalyzer.analyze_error(err_fea, std_err_fea)
+            passed, error = error_checker.check(graph)
 
             tile_payload = {
                 "error": error,
@@ -160,7 +159,7 @@ def _generate_tile_worker(args):
                 "frontier": frontier_descs,
             }
 
-            if error < BaseConfig.ERROR_TOLERANCE:
+            if passed:
                 return tile_idx, tile_payload
 
             if error < best_error:
@@ -191,7 +190,7 @@ def _generate_tile_worker(args):
 def run_phase1(
     attributes: AttributesCalculator,
     mapper: Mapper,
-    std_err_fea,
+    error_checker: ErrorChecker,
     num_centers: int,
 ) -> Dict[int, dict]:
     """Generate all seed tiles in parallel and return their raw data."""
@@ -209,7 +208,7 @@ def run_phase1(
     )
 
     tile_args = [
-        (i, exit_event, attributes, std_err_fea, mapper) for i in range(num_centers)
+        (i, exit_event, attributes, error_checker, mapper) for i in range(num_centers)
     ]
 
     tile_results: Dict[int, dict] = {}
@@ -482,9 +481,8 @@ def run_hybrid_for_dataset(dataset_id):
     attributes = data_agent.attributes
     mapper = data_agent.mapper
 
-    std_err_fea = MultifractalAnalyzer(
-        data_agent.get_original_network()
-    ).analyze_error_features()
+    error_checker = create_error_checker(BaseConfig.ERROR_TOLERANCE)
+    error_checker.compute_reference(data_agent.get_original_network())
 
     scale_rows, scale_cols = BaseConfig.TARGET_SCALE
     max_rounds = BaseConfig.PHASE2_MAX_ROUNDS
@@ -505,7 +503,7 @@ def run_hybrid_for_dataset(dataset_id):
     # --- Phase 1 ---
     log_memory(f"Before Phase 1 ({dataset_id})")
     t0 = time.time()
-    tile_results = run_phase1(attributes, mapper, std_err_fea, len(centers))
+    tile_results = run_phase1(attributes, mapper, error_checker, len(centers))
     logger.info(
         f"Phase 1 elapsed: {time.time() - t0:.1f}s",
         extra=tagged("PHASE1", dataset=str(dataset_id)),
@@ -605,7 +603,7 @@ def run_hybrid_for_dataset(dataset_id):
     # Free everything we can before rendering.
     saver = data_agent.saver
     del data_agent, original_network, attributes, mapper
-    del std_err_fea, centers
+    del error_checker, centers
     gc.collect()
 
     log_memory(f"Before plotting ({dataset_id})")
