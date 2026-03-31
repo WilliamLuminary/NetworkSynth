@@ -137,6 +137,15 @@ def _generate_tile_worker(args):
             if not inner_nodes or len(inner_nodes) < BaseConfig.MIN_TILE_NODES:
                 continue
 
+            # Skip multifractal analysis when tolerance is infinite.
+            if BaseConfig.ERROR_TOLERANCE == float("inf"):
+                return tile_idx, {
+                    "error": 0.0,
+                    "positions": all_positions,
+                    "edges": all_edge_tuples,
+                    "frontier": frontier_descs,
+                }
+
             graph = build_graph(inner_nodes, inner_edges, arg_type="graph_node")
             graph = trim_graph(graph, attributes.average_degree)
             mapper.assign_weights(graph)
