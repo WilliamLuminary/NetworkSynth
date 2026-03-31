@@ -167,7 +167,7 @@ def _generate_tile_worker(args):
             return tile_idx, best_result
 
         logger.error(
-            f"Tile {tile_idx}: all attempts produced <100 nodes",
+            f"Tile {tile_idx}: all attempts produced <{BaseConfig.MIN_TILE_NODES} nodes",
             extra=tagged("TILE"),
         )
         return tile_idx, None
