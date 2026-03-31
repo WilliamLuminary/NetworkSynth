@@ -21,12 +21,12 @@ class FastConfig(SampleConfig):
 
     # Accept the first valid tile immediately — no multifractal error filtering.
     ERROR_TOLERANCE = float("inf")
-    MAX_ATTEMPTS = 1
+    MAX_ATTEMPTS = 10
 
     # Small frame so Phase 1 generates tiny seed tiles (just enough for
     # frontier nodes).  The whiteboard size is unaffected since it is
     # based on IMAGE_SIZE × TARGET_SCALE.
-    SYNTHETIC_FRAME_SIZE: Tuple[int, int] = (50, 50)
+    SYNTHETIC_FRAME_SIZE: Tuple[int, int] = (100, 100)
     MIN_TILE_NODES = 10
 
     # Fewer seed centers for a faster run.
