@@ -158,10 +158,10 @@ def run_hybrid_snapshot_for_dataset(
     max_rounds = BaseConfig.PHASE2_MAX_ROUNDS
     min_dist_factor = getattr(BaseConfig, "MIN_CENTER_DISTANCE_FACTOR", 1.5)
 
-    frame_w, frame_h = BaseConfig.SYNTHETIC_FRAME_SIZE
-    whiteboard_w = scale_cols * frame_w
-    whiteboard_h = scale_rows * frame_h
-    min_distance = min_dist_factor * max(frame_w, frame_h)
+    img_h, img_w = BaseConfig.IMAGE_SIZE
+    whiteboard_w = scale_cols * img_w
+    whiteboard_h = scale_rows * img_h
+    min_distance = min_dist_factor * max(img_w, img_h)
 
     max_centers = getattr(BaseConfig, "NUM_CENTERS", 0)
 

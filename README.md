@@ -323,6 +323,70 @@ natively.
 | `load_original_image(dataset_id)`   | `np.ndarray` or `None` | CV2-compatible grayscale                                  |
 
 
+## Log Analysis with `jq`
+
+All pipeline runs emit structured **JSON lines** (`.jsonl`) logs to `data/output/logs/`. Each log entry contains:
+
+```json
+{
+  "ts": "2026-03-27 22:24:37",
+  "run_id": "304868d0",
+  "level": "INFO",
+  "logger": "handlers.saver",
+  "message": "Create new directory: ...",
+  "tag": "IO",
+  "dataset": "sample_A"
+}
+```
+
+| Field | Description |
+| --- | --- |
+| `ts` | Timestamp |
+| `run_id` | 8-char hex ID unique to each run (safe for concurrent appends) |
+| `level` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
+| `logger` | Python module that emitted the record |
+| `message` | Human-readable message |
+| `tag` | *(optional)* Phase or category — `PHASE1`, `PHASE2`, `SNAPSHOT`, `IO`, `MEMORY`, `CONFIG`, `PIPELINE` |
+| `dataset` | *(optional)* Dataset identifier, e.g. `sample_A` |
+
+### Common queries
+
+```bash
+# Set the log file (tab-complete friendly)
+LOG=data/output/logs/project_SampleConfig.jsonl
+
+# Show all entries from a specific run
+jq 'select(.run_id == "304868d0")' "$LOG"
+
+# Filter by tag (e.g. only Phase 1 events)
+jq 'select(.tag == "PHASE1")' "$LOG"
+
+# Show errors only
+jq 'select(.level == "ERROR")' "$LOG"
+
+# Errors with their tracebacks
+jq 'select(.level == "ERROR") | {message, exception}' "$LOG"
+
+# Messages for a specific dataset
+jq 'select(.dataset == "sample_A") | .message' "$LOG"
+
+# Combine filters: Phase 2 warnings for a dataset
+jq 'select(.tag == "PHASE2" and .dataset == "sample_A" and .level == "WARNING")' "$LOG"
+
+# Memory usage entries
+jq 'select(.tag == "MEMORY") | "\(.ts) \(.message)"' "$LOG"
+
+# List all run IDs in a file
+jq -s '[.[].run_id] | unique' "$LOG"
+
+# Count entries per tag
+jq -s 'group_by(.tag) | map({tag: .[0].tag, count: length})' "$LOG"
+
+# Follow a live run (stream mode)
+tail -f "$LOG" | jq --unbuffered 'select(.tag == "PHASE1")'
+```
+
+
 ## Troubleshooting
 
 **Missing Input Files**
