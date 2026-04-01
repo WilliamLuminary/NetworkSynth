@@ -134,8 +134,17 @@ def _generate_tile_worker(args):
                 result
             )
 
-            if not inner_nodes or len(inner_nodes) < 100:
+            if not inner_nodes or len(inner_nodes) < BaseConfig.MIN_TILE_NODES:
                 continue
+
+            # Skip multifractal analysis when tolerance is infinite.
+            if BaseConfig.ERROR_TOLERANCE == float("inf"):
+                return tile_idx, {
+                    "error": 0.0,
+                    "positions": all_positions,
+                    "edges": all_edge_tuples,
+                    "frontier": frontier_descs,
+                }
 
             graph = build_graph(inner_nodes, inner_edges, arg_type="graph_node")
             graph = trim_graph(graph, attributes.average_degree)
@@ -167,7 +176,7 @@ def _generate_tile_worker(args):
             return tile_idx, best_result
 
         logger.error(
-            f"Tile {tile_idx}: all attempts produced <100 nodes",
+            f"Tile {tile_idx}: all attempts produced <{BaseConfig.MIN_TILE_NODES} nodes",
             extra=tagged("TILE"),
         )
         return tile_idx, None
@@ -481,10 +490,10 @@ def run_hybrid_for_dataset(dataset_id):
     max_rounds = BaseConfig.PHASE2_MAX_ROUNDS
     min_dist_factor = getattr(BaseConfig, "MIN_CENTER_DISTANCE_FACTOR", 1.5)
 
-    frame_w, frame_h = BaseConfig.SYNTHETIC_FRAME_SIZE
-    whiteboard_w = scale_cols * frame_w
-    whiteboard_h = scale_rows * frame_h
-    min_distance = min_dist_factor * max(frame_w, frame_h)
+    img_h, img_w = BaseConfig.IMAGE_SIZE
+    whiteboard_w = scale_cols * img_w
+    whiteboard_h = scale_rows * img_h
+    min_distance = min_dist_factor * max(img_w, img_h)
 
     max_centers = getattr(BaseConfig, "NUM_CENTERS", 0)
 

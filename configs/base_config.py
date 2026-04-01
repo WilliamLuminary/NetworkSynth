@@ -101,6 +101,7 @@ class BaseConfig:
 
     MAX_ATTEMPTS = 10
     ERROR_TOLERANCE = 0.15  # Generally should be 0.15
+    MIN_TILE_NODES = 100
 
     SNAPSHOT_INTERVAL: int = 0  # 0 = disabled; N = snapshot every N new nodes
     SNAPSHOT_PLOT_WORKERS: int = 20
