@@ -447,7 +447,10 @@ class GraphGenerator:
                 node = frontier.pop()
                 pops_this_round += 1
 
-                if _within_frame(node.position, global_frame) and node.generate_children():
+                if (
+                    _within_frame(node.position, global_frame)
+                    and node.generate_children()
+                ):
                     for child in node.children:
                         if child != node and id(child) not in seen_frontier_ids:
                             seen_frontier_ids.add(id(child))
