@@ -408,56 +408,90 @@ class GraphGenerator:
 
         signal.signal(signal.SIGINT, _on_sigint)
 
+        # Randomized-pop frontier expansion.
+        #
+        # The classic round-based BFS processes all frontier nodes of
+        # generation N before any of generation N+1, which deposits a
+        # concentric shell of new nodes at each round and creates a
+        # visible "ripple" artifact centered on every seed tile.
+        #
+        # To break the synchronized wavefront, we pop a *uniformly
+        # random* element from the frontier on every step (O(1) via
+        # swap-to-end) and append new children back into the same list.
+        # Children from different generations get interleaved, so the
+        # radial coherence that produced the ripples is lost.
+        #
+        # ``max_rounds``, logging, and snapshots are preserved by
+        # tracking a "virtual round": each virtual round processes a
+        # number of pops equal to the frontier size at the start of
+        # that round, mirroring the old per-round work budget.
         try:
-            for round_num in range(max_rounds):
+            virtual_round = 0
+            pops_this_round = 0
+            round_size = len(frontier)
+
+            while frontier:
                 if _interrupted:
                     logger.info(
-                        f"Phase 2 interrupted at round {round_num}.",
+                        f"Phase 2 interrupted at round {virtual_round}.",
                         extra=tagged("PHASE2"),
                     )
                     break
 
-                rng.shuffle(frontier)
-                next_frontier: list = []
+                # O(1) random pop: swap chosen index with the tail,
+                # then pop the tail.
+                last = len(frontier) - 1
+                idx = rng.randint(0, last)
+                if idx != last:
+                    frontier[idx], frontier[last] = frontier[last], frontier[idx]
+                node = frontier.pop()
+                pops_this_round += 1
 
-                for node in frontier:
-                    if not _within_frame(node.position, global_frame):
-                        continue
-                    if node.generate_children():
-                        for child in node.children:
-                            if child != node and id(child) not in seen_frontier_ids:
-                                seen_frontier_ids.add(id(child))
-                                next_frontier.append(child)
+                if (
+                    _within_frame(node.position, global_frame)
+                    and node.generate_children()
+                ):
+                    for child in node.children:
+                        if child != node and id(child) not in seen_frontier_ids:
+                            seen_frontier_ids.add(id(child))
+                            frontier.append(child)
 
-                if not next_frontier:
-                    logger.info(
-                        f"Phase 2 round {round_num}: converged. "
-                        f"merged={GraphNode._merged_edge:,}, "
-                        f"aborted={GraphNode._aborted_edge:,}",
-                        extra=tagged("PHASE2"),
-                    )
-                    break
-
-                if (round_num + 1) % 10 == 0 or round_num == 0:
-                    logger.info(
-                        f"Phase 2 round {round_num}: frontier={len(next_frontier):,}, "
-                        f"merged={GraphNode._merged_edge:,}, "
-                        f"aborted={GraphNode._aborted_edge:,}",
-                        extra=tagged("PHASE2"),
-                    )
-
-                frontier = next_frontier
-
-                if take_snapshots and (round_num + 1) >= next_snapshot_round:
-                    _fire_snapshot(snapshot_idx)
-                    snapshot_idx += 1
-                    if snapshot_log:
-                        next_snapshot_round = max(
-                            next_snapshot_round + 1,
-                            int(next_snapshot_round * log_multiplier),
+                # Virtual-round boundary: we've processed as many pops
+                # as there were nodes at the start of this round.
+                if pops_this_round >= round_size:
+                    if not frontier:
+                        logger.info(
+                            f"Phase 2 round {virtual_round}: converged. "
+                            f"merged={GraphNode._merged_edge:,}, "
+                            f"aborted={GraphNode._aborted_edge:,}",
+                            extra=tagged("PHASE2"),
                         )
-                    else:
-                        next_snapshot_round += snapshot_round_interval
+                        break
+
+                    if (virtual_round + 1) % 10 == 0 or virtual_round == 0:
+                        logger.info(
+                            f"Phase 2 round {virtual_round}: frontier={len(frontier):,}, "
+                            f"merged={GraphNode._merged_edge:,}, "
+                            f"aborted={GraphNode._aborted_edge:,}",
+                            extra=tagged("PHASE2"),
+                        )
+
+                    if take_snapshots and (virtual_round + 1) >= next_snapshot_round:
+                        _fire_snapshot(snapshot_idx)
+                        snapshot_idx += 1
+                        if snapshot_log:
+                            next_snapshot_round = max(
+                                next_snapshot_round + 1,
+                                int(next_snapshot_round * log_multiplier),
+                            )
+                        else:
+                            next_snapshot_round += snapshot_round_interval
+
+                    virtual_round += 1
+                    if virtual_round >= max_rounds:
+                        break
+                    pops_this_round = 0
+                    round_size = len(frontier)
         finally:
             signal.signal(signal.SIGINT, _prev_handler)
 
