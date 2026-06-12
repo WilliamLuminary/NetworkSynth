@@ -2,7 +2,7 @@
 """
 Hybrid mode fast configuration.
 
-Skips Phase 1 quality checking by setting ERROR_TOLERANCE to infinity
+Skips Phase 1 quality checking by setting ERROR_CHECKER to "none"
 (first valid tile is accepted) and uses a small SYNTHETIC_FRAME_SIZE
 so each seed tile is tiny.  Phase 2 then fills the full whiteboard
 (whose size is based on IMAGE_SIZE × TARGET_SCALE).
@@ -19,8 +19,8 @@ from .config_sample import SampleConfig
 class FastConfig(SampleConfig):
     """Hybrid mode with Phase 1 quality check bypassed."""
 
-    # Accept the first valid tile immediately — no multifractal error filtering.
-    ERROR_TOLERANCE = float("inf")
+    # Accept the first valid tile immediately — no error checking computed at all.
+    ERROR_CHECKER = "none"
     MAX_ATTEMPTS = 10
 
     # Small frame so Phase 1 generates tiny seed tiles (just enough for
