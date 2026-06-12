@@ -274,7 +274,8 @@ Best `(CLOSED_NODES_FACTOR, CLOSED_EDGES_FACTOR)` per dataset from hyperparamete
 | -------------------------- | -------------- | ------------------------------------- |
 | `CLOSED_NODES_FACTOR`      | 0.5-2.0        | Node merging likelihood               |
 | `CLOSED_EDGES_FACTOR`      | 0.5-2.0        | Edge proximity tolerance              |
-| `ERROR_TOLERANCE`          | 0.1-0.5        | Multifractal similarity threshold     |
+| `ERROR_CHECKER`            | `multifractal` / `none` | Quality-gate algorithm; `none` skips checking |
+| `ERROR_TOLERANCE`          | 0.1-0.5        | Similarity threshold (used by `multifractal`) |
 | `SYNTHETIC_NETWORK_NUMBER` | 1-100          | Networks to generate per dataset      |
 | `SYNTHETIC_GRAPH_NUMBER`   | 0-10           | Graphs to visualize (≤ network count) |
 | `MAX_ATTEMPTS`             | 5-20           | Retry attempts per network            |
