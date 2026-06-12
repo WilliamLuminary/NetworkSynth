@@ -61,6 +61,21 @@ class SampleConfig(BaseConfig):
     PHASE2_MAX_ROUNDS: int = 500
     MIN_CENTER_DISTANCE_FACTOR: float = 1.5
 
+    # --- Phase 1 tile frame sizing ---
+    # How big each seed tile is allowed to grow before Phase 2 takes over.
+    #
+    # Fixed mode: set TILE_FRAME_SIZE = (w, h) to give every tile the same
+    # frame. Leave it None to size each tile automatically.
+    #
+    # Auto mode (TILE_FRAME_SIZE = None): each tile's frame side =
+    # nearest-neighbor distance * TILE_FRAME_FACTOR, clamped up to
+    # MIN_TILE_FRAME so tiles never get too small to produce a usable
+    # network. Factor 0.5 leaves a gap (~half the spacing) for Phase 2 to
+    # stitch; smaller factor = wider gap.
+    TILE_FRAME_SIZE: Tuple[int, int] = None
+    TILE_FRAME_FACTOR: float = 0.5
+    MIN_TILE_FRAME: float = 382.0
+
     # --- Network generation parameters ---
     IMAGE_SIZE: Tuple[int, int] = (510, 510)
     FRAME_SIZE: Tuple[int, int] = (510, 510)
