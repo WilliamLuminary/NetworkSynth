@@ -1,3 +1,6 @@
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -5,6 +8,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+target/
 
 # Installer logs
 pip-log.txt
@@ -12,8 +16,25 @@ pip-delete-this-directory.txt
 
 # PyBuilder
 .pybuilder/
-target/
 
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
+__pypackages__/
+
+# ---------------------------------------------------------------------------
+# Environments
+# ---------------------------------------------------------------------------
+.env
+.venv
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# ---------------------------------------------------------------------------
+# Notebooks
+# ---------------------------------------------------------------------------
 # Jupyter Notebook
 .ipynb_checkpoints
 
@@ -21,27 +42,29 @@ target/
 profile_default/
 ipython_config.py
 
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
-__pypackages__/
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
+# ---------------------------------------------------------------------------
+# IDEs / Editors
+# ---------------------------------------------------------------------------
 # PyCharm
 .idea/
 
 # VSCode
 .vscode/
 
-# Mac OS
+# ---------------------------------------------------------------------------
+# OS
+# ---------------------------------------------------------------------------
+# macOS
 .DS_Store
 
+# ---------------------------------------------------------------------------
+# Experiment tracking
+# ---------------------------------------------------------------------------
+wandb/
+
+# ---------------------------------------------------------------------------
+# Project-specific
+# ---------------------------------------------------------------------------
 # Private files
 credentials/*
 !credentials/.keep
@@ -57,8 +80,7 @@ data/output/*
 # Keep some files in the data/input/samples directory
 !data/input/samples/
 
-wandb/
-
+# Analysis: ignore generated artifacts but keep source notebooks/scripts
 src/anal/*
 !src/anal/*.py
 !src/anal/*.ipynb

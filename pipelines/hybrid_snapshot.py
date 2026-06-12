@@ -139,7 +139,7 @@ def run_hybrid_snapshot_for_dataset(
     snapshot_round_interval: int = 1,
 ):
     """Run the hybrid pipeline for one dataset with Phase 2 snapshots."""
-    from analysis import MultifractalAnalyzer
+    from analysis.error_checker import create_error_checker
 
     logger.info(f"=== Hybrid snapshot pipeline for dataset: {dataset_id} ===")
     _apply_dataset_factors(dataset_id)
@@ -150,9 +150,8 @@ def run_hybrid_snapshot_for_dataset(
     attributes = data_agent.attributes
     mapper = data_agent.mapper
 
-    std_err_fea = MultifractalAnalyzer(
-        data_agent.get_original_network()
-    ).analyze_error_features()
+    error_checker = create_error_checker()
+    error_checker.compute_reference(data_agent.get_original_network())
 
     scale_rows, scale_cols = BaseConfig.TARGET_SCALE
     max_rounds = BaseConfig.PHASE2_MAX_ROUNDS
@@ -171,7 +170,7 @@ def run_hybrid_snapshot_for_dataset(
 
     # --- Phase 1 (reused from hybrid.py) ---
     t0 = time.time()
-    tile_results = run_phase1(attributes, mapper, std_err_fea, len(centers))
+    tile_results = run_phase1(attributes, mapper, error_checker, len(centers))
     logger.info(f"Phase 1 elapsed: {time.time() - t0:.1f}s")
 
     if not tile_results:
