@@ -85,8 +85,26 @@ class MultifractalErrorChecker(ErrorChecker):
         return error < self.tolerance, error
 
 
-def create_error_checker(tolerance: float) -> ErrorChecker:
-    """Factory: return a NullErrorChecker when tolerance <= 0, else Multifractal."""
-    if tolerance <= 0:
-        return NullErrorChecker()
-    return MultifractalErrorChecker(tolerance)
+_CHECKERS = {
+    "none": lambda cfg: NullErrorChecker(),
+    "multifractal": lambda cfg: MultifractalErrorChecker(cfg.ERROR_TOLERANCE),
+}
+
+
+def create_error_checker() -> ErrorChecker:
+    """Build the checker selected by ``BaseConfig.ERROR_CHECKER``.
+
+    To add an algorithm: implement an :class:`ErrorChecker` subclass and
+    register a builder in ``_CHECKERS`` keyed by its config name.  Each
+    builder receives the config so it can read whatever parameters its
+    algorithm needs.
+    """
+    from configs import BaseConfig
+
+    name = BaseConfig.ERROR_CHECKER
+    builder = _CHECKERS.get(name)
+    if builder is None:
+        raise ValueError(
+            f"Unknown ERROR_CHECKER {name!r}; available: {sorted(_CHECKERS)}"
+        )
+    return builder(BaseConfig)

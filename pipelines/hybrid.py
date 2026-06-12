@@ -481,7 +481,7 @@ def run_hybrid_for_dataset(dataset_id):
     attributes = data_agent.attributes
     mapper = data_agent.mapper
 
-    error_checker = create_error_checker(BaseConfig.ERROR_TOLERANCE)
+    error_checker = create_error_checker()
     error_checker.compute_reference(data_agent.get_original_network())
 
     scale_rows, scale_cols = BaseConfig.TARGET_SCALE

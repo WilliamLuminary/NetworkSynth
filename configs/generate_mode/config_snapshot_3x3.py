@@ -16,6 +16,7 @@ class Snapshot3x3Config(SnapshotConfig):
     SELECT_BEST = 3
     SYNTHETIC_GRAPH_NUMBER = 3
     SYNTHETIC_NETWORK_NUMBER = 20
+    ERROR_CHECKER = "none"
     ERROR_TOLERANCE = 0
 
     PLOT_STYLE: dict = {

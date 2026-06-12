@@ -12,7 +12,7 @@ import csv
 import logging
 import os
 
-from analysis.error_checker import create_error_checker
+from analysis.error_checker import NullErrorChecker, create_error_checker
 from configs import BaseConfig, DatasetId
 from handlers import RunAgent, Saver
 from pipelines.generate import (
@@ -162,8 +162,8 @@ def generate_and_select(data_agent: RunAgent):
     original_network = data_agent.get_original_network()
     original_node_count = original_network.number_of_nodes()
     ref_metrics = compute_network_metrics(original_network)
-    skip_mf = BaseConfig.ERROR_TOLERANCE <= 0
-    error_checker = create_error_checker(BaseConfig.ERROR_TOLERANCE)
+    error_checker = create_error_checker()
+    skip_mf = isinstance(error_checker, NullErrorChecker)
     if not skip_mf:
         error_checker.compute_reference(original_network)
     logger.info("Original metrics: %s", _fmt_metrics(ref_metrics))

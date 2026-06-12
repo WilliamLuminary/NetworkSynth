@@ -155,7 +155,7 @@ def run_for_dataset(dataset_id: DatasetId, node_factors, edge_factors) -> None:
 
     data_agent = RunAgent(dataset_id=dataset_id)
     data_agent.prepare_data()
-    error_checker = create_error_checker(BaseConfig.ERROR_TOLERANCE)
+    error_checker = create_error_checker()
     error_checker.compute_reference(data_agent.get_original_network())
 
     sweep_config = {

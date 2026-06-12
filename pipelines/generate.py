@@ -229,8 +229,8 @@ def generate_with_multiprocessing(data_agent: RunAgent):
     from multiprocessing import Manager
 
     exit_event = Manager().Event()
-    error_checker = create_error_checker(BaseConfig.ERROR_TOLERANCE)
-    if BaseConfig.SYNTHETIC_NETWORK_NUMBER > 0 and BaseConfig.ERROR_TOLERANCE > 0:
+    error_checker = create_error_checker()
+    if BaseConfig.SYNTHETIC_NETWORK_NUMBER > 0:
         error_checker.compute_reference(data_agent.get_original_network())
 
     max_workers = BaseConfig.get_max_workers(num_network)
