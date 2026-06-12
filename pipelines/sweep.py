@@ -53,7 +53,9 @@ def _build_factors(lo, hi, step=0.1):
 logger = logging.getLogger(__name__)
 
 
-def _generate_with_factors(exit_event, error_checker: ErrorChecker, attributes, mapper, nf, ef):
+def _generate_with_factors(
+    exit_event, error_checker: ErrorChecker, attributes, mapper, nf, ef
+):
     """Spawn-safe: uses the same BFS path as the hybrid tile generator."""
     import random
 

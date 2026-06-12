@@ -77,9 +77,7 @@ class MultifractalErrorChecker(ErrorChecker):
         from analysis.multifractal_analyzer import MultifractalAnalyzer
 
         if self._ref_features is None:
-            raise RuntimeError(
-                "compute_reference() must be called before check()"
-            )
+            raise RuntimeError("compute_reference() must be called before check()")
         err_fea = MultifractalAnalyzer(graph).analyze_error_features()
         error = MultifractalAnalyzer.analyze_error(err_fea, self._ref_features)
         return error < self.tolerance, error

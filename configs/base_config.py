@@ -100,7 +100,9 @@ class BaseConfig:
     ATTRIBUTES_DICT_DATA_PATH = None
 
     MAX_ATTEMPTS = 10
-    ERROR_CHECKER: str = "multifractal"  # quality-gate algorithm; "none" disables checking
+    ERROR_CHECKER: str = (
+        "multifractal"  # quality-gate algorithm; "none" disables checking
+    )
     ERROR_TOLERANCE = 0.15  # Generally should be 0.15
     MIN_TILE_NODES = 100
 

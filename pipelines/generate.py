@@ -55,7 +55,10 @@ def _should_exit(exit_event) -> bool:
 
 
 def generate_synthetic_network(
-    exit_event, error_checker: ErrorChecker, attributes: AttributesCalculator, mapper: Mapper
+    exit_event,
+    error_checker: ErrorChecker,
+    attributes: AttributesCalculator,
+    mapper: Mapper,
 ):
     if _should_exit(exit_event):
         return None, float("inf")
@@ -85,7 +88,10 @@ def generate_synthetic_network(
 
 
 def _generate_single_network(
-    exit_event, error_checker: ErrorChecker, attributes: AttributesCalculator, mapper: Mapper
+    exit_event,
+    error_checker: ErrorChecker,
+    attributes: AttributesCalculator,
+    mapper: Mapper,
 ):
     """Generate one network with error gating and retry loop."""
     if exit_event.is_set():
