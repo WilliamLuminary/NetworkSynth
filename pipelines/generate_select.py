@@ -164,8 +164,7 @@ def generate_and_select(data_agent: RunAgent):
     ref_metrics = compute_network_metrics(original_network)
     error_checker = create_error_checker()
     skip_mf = isinstance(error_checker, NullErrorChecker)
-    if not skip_mf:
-        error_checker.compute_reference(original_network)
+    error_checker.compute_reference(original_network)
     logger.info("Original metrics: %s", _fmt_metrics(ref_metrics))
 
     candidates_dir = os.path.join(data_agent.saver.output_dir, "candidates")

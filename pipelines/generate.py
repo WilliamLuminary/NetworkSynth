@@ -142,7 +142,8 @@ def _generate_single_network_collecting_snapshots(
         nodes (typically the original network's node count).  The partial
         network is trimmed and weighted so its features are comparable to
         the original's.  If the check fails, the BFS is aborted immediately.
-        Ignored when a ``NullErrorChecker`` is in use.
+        Has no effect on abort behavior when a ``NullErrorChecker`` is in
+        use (it never fails); callers pass 0 to skip the pre-check entirely.
     """
     if exit_event.is_set():
         return None, float("inf"), []
