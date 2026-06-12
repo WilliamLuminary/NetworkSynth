@@ -21,7 +21,7 @@ from typing import Dict, List, Tuple
 import networkit as nk
 import numpy as np
 
-from analysis.error_checker import ErrorChecker, create_error_checker
+from analysis.error_checker import ErrorChecker, NullErrorChecker, create_error_checker
 from configs import BaseConfig
 from configs.base_config import tagged
 from graphs import GraphGenerator
@@ -183,8 +183,8 @@ def _generate_tile_worker(args):
             if not inner_nodes or len(inner_nodes) < BaseConfig.MIN_TILE_NODES:
                 continue
 
-            # Skip multifractal analysis when tolerance is infinite.
-            if BaseConfig.ERROR_TOLERANCE == float("inf"):
+            # Skip quality analysis entirely when no checker is configured.
+            if isinstance(error_checker, NullErrorChecker):
                 return tile_idx, {
                     "error": 0.0,
                     "positions": all_positions,
