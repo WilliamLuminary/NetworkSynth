@@ -24,6 +24,7 @@ from handlers import RunAgent, Saver
 from pipelines.hybrid import (
     _apply_dataset_factors,
     _write_report,
+    compute_center_frames,
     generate_random_centers,
     log_connectivity,
     plot_hybrid_network,
@@ -167,10 +168,11 @@ def run_hybrid_snapshot_for_dataset(
     centers = generate_random_centers(
         whiteboard_w, whiteboard_h, min_distance, max_centers=max_centers
     )
+    frames = compute_center_frames(centers)
 
     # --- Phase 1 (reused from hybrid.py) ---
     t0 = time.time()
-    tile_results = run_phase1(attributes, mapper, error_checker, len(centers))
+    tile_results = run_phase1(attributes, mapper, error_checker, frames)
     logger.info(f"Phase 1 elapsed: {time.time() - t0:.1f}s")
 
     if not tile_results:

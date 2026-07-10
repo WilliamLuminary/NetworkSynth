@@ -21,7 +21,7 @@ from typing import Dict, List, Tuple
 import networkit as nk
 import numpy as np
 
-from analysis.error_checker import ErrorChecker, create_error_checker
+from analysis.error_checker import ErrorChecker, NullErrorChecker, create_error_checker
 from configs import BaseConfig
 from configs.base_config import tagged
 from graphs import GraphGenerator
@@ -89,6 +89,52 @@ def generate_random_centers(
     return centers
 
 
+def compute_center_frames(
+    centers: List[Tuple[float, float]],
+) -> List[Tuple[float, float]]:
+    """Decide how big each seed tile's growth frame should be.
+
+    Two modes, selected by config:
+
+    * **Fixed** — if ``TILE_FRAME_SIZE`` is set, every tile uses that one
+      frame. Fully deterministic, no measurement.
+    * **Auto** — otherwise, each tile is sized from the distance ``d`` to
+      its nearest neighboring center: frame side = ``d * TILE_FRAME_FACTOR``
+      (default 0.5), clamped to a floor of ``MIN_TILE_FRAME`` so no tile
+      ends up too small to produce a usable network.
+
+    Falls back to ``SYNTHETIC_FRAME_SIZE`` when fewer than two centers
+    exist (no neighbor to measure).
+    """
+    fixed = getattr(BaseConfig, "TILE_FRAME_SIZE", None)
+    if fixed is not None:
+        logger.info(f"Tile frames: fixed {fixed}", extra=tagged("PHASE1"))
+        return [tuple(fixed)] * len(centers)
+
+    if len(centers) < 2:
+        return [BaseConfig.SYNTHETIC_FRAME_SIZE] * len(centers)
+
+    factor = getattr(BaseConfig, "TILE_FRAME_FACTOR", 0.5)
+    floor = getattr(BaseConfig, "MIN_TILE_FRAME", 0.0)
+
+    from scipy.spatial import cKDTree
+
+    pts = np.asarray(centers, dtype=np.float64)
+    dist, _ = cKDTree(pts).query(pts, k=2)
+    nearest = dist[:, 1]
+    sides = np.maximum(nearest * factor, floor)
+    frames = [(s, s) for s in sides]
+
+    logger.info(
+        f"Tile frames: auto (factor={factor}, floor={floor:.0f}); "
+        f"nearest-neighbor dist min={nearest.min():.0f}, "
+        f"mean={nearest.mean():.0f}, max={nearest.max():.0f}; "
+        f"frame side min={sides.min():.0f}, max={sides.max():.0f}",
+        extra=tagged("PHASE1"),
+    )
+    return frames
+
+
 # ------------------------------------------------------------------ #
 # Phase 1 — parallel tile generation with quality control
 # ------------------------------------------------------------------ #
@@ -108,7 +154,7 @@ def _generate_tile_worker(args):
     """
     import random
 
-    tile_idx, exit_event, attributes, error_checker, mapper = args
+    tile_idx, exit_event, attributes, error_checker, mapper, frame_range = args
 
     nk.setNumberOfThreads(1)
 
@@ -129,7 +175,7 @@ def _generate_tile_worker(args):
             if exit_event.is_set():
                 break
 
-            result = GraphGenerator._bfs_network_with_frontier()
+            result = GraphGenerator._bfs_network_with_frontier(frame_range)
             inner_nodes, inner_edges, frontier_descs, all_positions, all_edge_tuples = (
                 result
             )
@@ -137,8 +183,8 @@ def _generate_tile_worker(args):
             if not inner_nodes or len(inner_nodes) < BaseConfig.MIN_TILE_NODES:
                 continue
 
-            # Skip multifractal analysis when tolerance is infinite.
-            if BaseConfig.ERROR_TOLERANCE == float("inf"):
+            # Skip quality analysis entirely when no checker is configured.
+            if isinstance(error_checker, NullErrorChecker):
                 return tile_idx, {
                     "error": 0.0,
                     "positions": all_positions,
@@ -191,13 +237,18 @@ def run_phase1(
     attributes: AttributesCalculator,
     mapper: Mapper,
     error_checker: ErrorChecker,
-    num_centers: int,
+    frames: List[Tuple[float, float]],
 ) -> Dict[int, dict]:
-    """Generate all seed tiles in parallel and return their raw data."""
+    """Generate all seed tiles in parallel and return their raw data.
+
+    *frames* holds the per-center frame box side for every tile; its
+    length is the number of centers to generate.
+    """
     nk.setNumberOfThreads(1)
 
     from multiprocessing import Manager
 
+    num_centers = len(frames)
     manager = Manager()
     exit_event = manager.Event()
     num_workers = BaseConfig.get_max_workers(num_centers)
@@ -208,7 +259,8 @@ def run_phase1(
     )
 
     tile_args = [
-        (i, exit_event, attributes, error_checker, mapper) for i in range(num_centers)
+        (i, exit_event, attributes, error_checker, mapper, frames[i])
+        for i in range(num_centers)
     ]
 
     tile_results: Dict[int, dict] = {}
@@ -499,11 +551,12 @@ def run_hybrid_for_dataset(dataset_id):
     centers = generate_random_centers(
         whiteboard_w, whiteboard_h, min_distance, max_centers=max_centers
     )
+    frames = compute_center_frames(centers)
 
     # --- Phase 1 ---
     log_memory(f"Before Phase 1 ({dataset_id})")
     t0 = time.time()
-    tile_results = run_phase1(attributes, mapper, error_checker, len(centers))
+    tile_results = run_phase1(attributes, mapper, error_checker, frames)
     logger.info(
         f"Phase 1 elapsed: {time.time() - t0:.1f}s",
         extra=tagged("PHASE1", dataset=str(dataset_id)),

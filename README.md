@@ -3,28 +3,6 @@
 Network Analysis
 Synthetic Generation
 
-## CI / Code Quality
-
-Every push and pull request to `main` is checked by a **GitHub Actions** workflow (`.github/workflows/pre-commit.yml`) that runs the project's [pre-commit](https://pre-commit.com/) hooks:
-
-| Hook | What it does |
-| --- | --- |
-| `trailing-whitespace` | Strips trailing whitespace |
-| `end-of-file-fixer` | Ensures files end with a newline |
-| `check-yaml` | Validates YAML syntax |
-| `check-added-large-files` | Blocks files > 100 MB in `data/input/samples/`, default limit elsewhere |
-| **Black** | Auto-formats Python code |
-| **isort** | Sorts imports (Black-compatible profile) |
-| **Flake8** | PEP 8 linting (`max-line-length=120`) |
-
-To run the same checks locally before pushing:
-
-```bash
-pip install pre-commit
-pre-commit install          # one-time setup – hooks run on every git commit
-pre-commit run --all-files  # manual full check
-```
-
 ## Quick Start
 
 1. **Install and Run**
@@ -248,6 +226,49 @@ data_agent.save(DataType.MY_CUSTOM_DATA, content=my_data)
 | `config_mydata.py`    | `ConfigMydata`    | `GenConfigMydata`    |
 
 
+## Key Parameters
+
+| Parameter                  | Typical Values | Description                           |
+| -------------------------- | -------------- | ------------------------------------- |
+| `CLOSED_NODES_FACTOR`      | 0.5-2.0        | Node merging likelihood               |
+| `CLOSED_EDGES_FACTOR`      | 0.5-2.0        | Edge proximity tolerance              |
+| `ERROR_CHECKER`            | `multifractal` / `none` | Quality-gate algorithm; `none` skips checking |
+| `ERROR_TOLERANCE`          | 0.1-0.5        | Similarity threshold (used by `multifractal`) |
+| `SYNTHETIC_NETWORK_NUMBER` | 1-100          | Networks to generate per dataset      |
+| `SYNTHETIC_GRAPH_NUMBER`   | 0-10           | Graphs to visualize (≤ network count) |
+| `MAX_ATTEMPTS`             | 5-20           | Retry attempts per network            |
+
+
+## Hybrid Mode: Tile Frame Sizing
+
+Hybrid mode (`python -m run hybrid`) builds one large network in two phases:
+
+- **Phase 1** scatters many *seed centers* across the canvas and grows an independent network *tile* around each one, in parallel.
+- **Phase 2** stitches the tiles together, continuing growth from each tile's frontier nodes to fill the gaps between them.
+
+Each tile grows inside a **frame** — a square boundary that tells the tile when to stop growing and hand off to Phase 2. The frame size therefore controls how much of the gap between neighboring tiles is left for Phase 2 to fill: a smaller frame leaves a wider seam to stitch, a larger frame makes tiles nearly touch.
+
+There are two ways to set it, selected in `configs/hybrid_mode/config_sample.py`:
+
+**Fixed** — set `TILE_FRAME_SIZE = (w, h)` and every tile uses that same frame. Deterministic; no measurement.
+
+**Auto** (default, `TILE_FRAME_SIZE = None`) — each tile is sized from the distance `d` to its nearest neighboring center:
+
+```
+frame side = max(d * TILE_FRAME_FACTOR, MIN_TILE_FRAME)
+```
+
+Tiles in crowded regions get smaller frames and tiles in open space get larger ones — each scaled to the room it actually has.
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `TILE_FRAME_SIZE` | `None` | Fixed frame `(w, h)` for every tile. `None` enables auto mode. |
+| `TILE_FRAME_FACTOR` | `0.5` | Auto mode: frame side as a fraction of the nearest-neighbor distance. Lower = wider seam for Phase 2 to stitch; higher = tiles nearly touch. |
+| `MIN_TILE_FRAME` | `382.0` | Auto mode: floor on the frame side, so closely-spaced centers still produce tiles large enough to clear `MIN_TILE_NODES`. |
+
+The Phase 1 log (tag `PHASE1`) prints the resulting frame-side min/max for each run, so you can confirm tiles aren't being shrunk below a usable size.
+
+
 ## Sweep Best Parameters
 
 Best `(CLOSED_NODES_FACTOR, CLOSED_EDGES_FACTOR)` per dataset from hyperparameter sweeps.
@@ -265,20 +286,6 @@ Best `(CLOSED_NODES_FACTOR, CLOSED_EDGES_FACTOR)` per dataset from hyperparamete
 | D       | 1.8         | 1.7         | 0.086 | 32%          | Lowest error at ≥30% success |
 | D       | 1.5         | 1.3         | 0.101 | 69%          | Best balance (local test)    |
 | D       | 1.0         | 0.7         | 0.102 | 82%          | Highest success rate         |
-
-
-## Key Parameters
-
-
-| Parameter                  | Typical Values | Description                           |
-| -------------------------- | -------------- | ------------------------------------- |
-| `CLOSED_NODES_FACTOR`      | 0.5-2.0        | Node merging likelihood               |
-| `CLOSED_EDGES_FACTOR`      | 0.5-2.0        | Edge proximity tolerance              |
-| `ERROR_CHECKER`            | `multifractal` / `none` | Quality-gate algorithm; `none` skips checking |
-| `ERROR_TOLERANCE`          | 0.1-0.5        | Similarity threshold (used by `multifractal`) |
-| `SYNTHETIC_NETWORK_NUMBER` | 1-100          | Networks to generate per dataset      |
-| `SYNTHETIC_GRAPH_NUMBER`   | 0-10           | Graphs to visualize (≤ network count) |
-| `MAX_ATTEMPTS`             | 5-20           | Retry attempts per network            |
 
 
 ## Graph Architecture: SynthGraph
@@ -409,3 +416,26 @@ MAX_ATTEMPTS = 20           # More retry attempts
 **Import Errors**
 
 - Ensure config class follows naming convention: `ConfigXxx` in `config_xxx.py`
+
+
+## CI / Code Quality
+
+Every push and pull request to `main` is checked by a **GitHub Actions** workflow (`.github/workflows/pre-commit.yml`) that runs the project's [pre-commit](https://pre-commit.com/) hooks:
+
+| Hook | What it does |
+| --- | --- |
+| `trailing-whitespace` | Strips trailing whitespace |
+| `end-of-file-fixer` | Ensures files end with a newline |
+| `check-yaml` | Validates YAML syntax |
+| `check-added-large-files` | Blocks files > 100 MB in `data/input/samples/`, default limit elsewhere |
+| **Black** | Auto-formats Python code |
+| **isort** | Sorts imports (Black-compatible profile) |
+| **Flake8** | PEP 8 linting (`max-line-length=120`) |
+
+To run the same checks locally before pushing:
+
+```bash
+pip install pre-commit
+pre-commit install          # one-time setup – hooks run on every git commit
+pre-commit run --all-files  # manual full check
+```
