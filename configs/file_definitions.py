@@ -55,10 +55,20 @@ def save_networkit(content, filepath: str) -> None:
 
 
 def save_webp(fig_or_image, filepath: str) -> None:
+    from numpy import ndarray
     from PIL import Image as _Image
 
     if isinstance(fig_or_image, _Image.Image):
         fig_or_image.save(filepath, "webp", lossless=True)
+        return
+
+    if isinstance(fig_or_image, ndarray):
+        arr = fig_or_image
+        if arr.ndim == 3 and arr.shape[2] == 3:
+            import cv2
+
+            arr = cv2.cvtColor(arr, cv2.COLOR_BGR2RGB)
+        _Image.fromarray(arr).save(filepath, "webp", lossless=True)
         return
 
     from matplotlib.figure import Figure
@@ -195,23 +205,26 @@ INPLACE_DIR = ""
 #
 # The dispatcher checks for a save_<identifier> method first; if none
 # exists, it falls back to this dict.
+# Default formats: images -> webp, network exports -> csv.
+# The save_svg (vector image) and save_network_nkbin (.nkbin + companion
+# .npy positions) serializers remain available and can be re-enabled per
+# config by defining a save_<identifier>() classmethod.
 DEFAULT_SAVE_SPECS = {
-    "original_image": [("original", "original_image", "png", save_png)],
+    "original_image": [("original", "original_image", "webp", save_webp)],
     "original_network": [
         ("original", "original_network", "csv", save_network_csv),
-        ("original", "original_network", "nkbin", save_network_nkbin),
     ],
     "original_property": [("original", "original_property", "pkl", save_pickle)],
     "original_report": [("original", "report", "txt", save_text, False)],
-    "original_graph": [("original", "original_graph", "svg", save_svg)],
+    "original_graph": [("original", "original_graph", "webp", save_webp)],
     "synthetic_graph": [("synthetic", "synthetic_graph", "webp", save_webp)],
+    "synthetic_report": [("synthetic", "report", "txt", save_text, False)],
     "synthetic_network": [("synthetic", "synthetic_network", "pkl", save_pickle)],
     "synthetic_export": [
         ("synthetic", "synthetic_network", "csv", save_network_csv),
-        ("synthetic", "synthetic_network", "nkbin", save_network_nkbin),
     ],
     "analysis_data": [("", "analysis_data", "pkl", save_pickle, False)],
-    "analysis_figure": [("", "analysis_figure", "svg", save_svg)],
+    "analysis_figure": [("", "analysis_figure", "webp", save_webp)],
 }
 
 FILE_CONFIGURATIONS = {

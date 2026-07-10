@@ -276,7 +276,9 @@ def plot_network(data_type: str, graph: SynthGraph, **kwargs):
             zorder=2,
         )
 
-    node_size = file_config.node_size
+    node_size = file_config.node_size * getattr(
+        BaseConfig, "ORIGINAL_GRAPH_NODE_SCALE", 1.0
+    )
     for node in graph.nodes():
         pos = positions[node]
         ax.plot(pos[0], pos[1], "bo", markersize=node_size, zorder=2)
