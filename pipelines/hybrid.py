@@ -489,7 +489,7 @@ def log_connectivity(graph: SynthGraph, label: str = ""):
 
 
 def plot_hybrid_network(graph: SynthGraph, margin_frac: float = 0.02, dpi: int = None):
-    """Render a hybrid graph to a PIL Image (CV2-backed, memory-safe)."""
+    """Render a hybrid graph to a BGR ndarray (CV2-backed, memory-safe)."""
     from utils import render_network
 
     return render_network(graph, margin_frac=margin_frac, dpi=dpi)
@@ -500,13 +500,8 @@ def plot_hybrid_network(graph: SynthGraph, margin_frac: float = 0.02, dpi: int =
 # ------------------------------------------------------------------ #
 
 
-def _write_report(path: str, title: str, num_nodes: int, num_edges: int):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w") as f:
-        f.write(f"{title}\n")
-        f.write(f"Nodes: {num_nodes:,}\n")
-        f.write(f"Edges: {num_edges:,}\n")
-    logger.info(f"Report saved: {path}", extra=tagged("IO"))
+def _report_text(title: str, num_nodes: int, num_edges: int) -> str:
+    return f"{title}\nNodes: {num_nodes:,}\nEdges: {num_edges:,}\n"
 
 
 def _apply_dataset_factors(dataset_id):
@@ -639,17 +634,17 @@ def run_hybrid_for_dataset(dataset_id):
 
     # --- Write reports before plotting (plotting is memory-intensive) ---
     original_network = data_agent.get_original_network()
-    _write_report(
-        os.path.join(data_agent.saver.output_dir, "original", "report.txt"),
-        "Original Network",
-        original_network.number_of_nodes(),
-        original_network.number_of_edges(),
+    data_agent.saver.save(
+        _report_text(
+            "Original Network",
+            original_network.number_of_nodes(),
+            original_network.number_of_edges(),
+        ),
+        "original_report",
     )
-    _write_report(
-        os.path.join(data_agent.saver.output_dir, "synthetic", "report.txt"),
-        "Synthetic Network",
-        num_nodes,
-        num_edges,
+    data_agent.saver.save(
+        _report_text("Synthetic Network", num_nodes, num_edges),
+        "synthetic_report",
     )
 
     # --- Plot synthetic graph (high memory) ---
