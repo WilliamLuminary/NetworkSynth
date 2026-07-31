@@ -23,7 +23,7 @@ from graphs.graph_generator import FrontierDescriptor
 from handlers import RunAgent, Saver
 from pipelines.hybrid import (
     _apply_dataset_factors,
-    _write_report,
+    _report_text,
     compute_center_frames,
     generate_random_centers,
     log_connectivity,
@@ -229,17 +229,21 @@ def run_hybrid_snapshot_for_dataset(
 
     # --- Write reports ---
     original_network = data_agent.get_original_network()
-    _write_report(
-        os.path.join(data_agent.saver.output_dir, "original", "report.txt"),
-        "Original Network",
-        original_network.number_of_nodes(),
-        original_network.number_of_edges(),
+    data_agent.saver.save(
+        _report_text(
+            "Original Network",
+            original_network.number_of_nodes(),
+            original_network.number_of_edges(),
+        ),
+        "original_report",
     )
-    _write_report(
-        os.path.join(data_agent.saver.output_dir, "synthetic", "report.txt"),
-        "Synthetic Network",
-        hybrid_graph.number_of_nodes(),
-        hybrid_graph.number_of_edges(),
+    data_agent.saver.save(
+        _report_text(
+            "Synthetic Network",
+            hybrid_graph.number_of_nodes(),
+            hybrid_graph.number_of_edges(),
+        ),
+        "synthetic_report",
     )
 
     logger.info(
