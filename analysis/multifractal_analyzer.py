@@ -469,7 +469,7 @@ class MultifractalAnalyzer:
                 nk_graph = uw
 
         try:
-            ec = nk.centrality.EigenvectorCentrality(nk_graph, tol=1e-6)
+            ec = nk.centrality.EigenvectorCentrality(nk_graph, tol=1e-9)
             ec.run()
             return ec.scores()
         except Exception:
@@ -488,6 +488,11 @@ class MultifractalAnalyzer:
             for u, v in nk_graph.iterEdges():
                 uw.addEdge(u, v)
             nk_graph = uw
+
+        # nk.distance.Diameter returns an int, silently flooring weighted
+        # distances (4.7 -> 4, 0.3 -> 0).  Safe only because the graph above
+        # is unweighted, making the hop diameter integral by definition.
+        assert not nk_graph.isWeighted(), "hop diameter needs an unweighted graph"
 
         algo = (
             getattr(nk.distance.DiameterAlgo, "Exact", None)
