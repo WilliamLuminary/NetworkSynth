@@ -72,7 +72,7 @@ class TestDispatcher:
     def test_known_identifier(self):
         specs = BaseConfig.save("original_image")
         assert isinstance(specs, list) and len(specs) >= 1
-        assert specs[0][2] == "png"
+        assert specs[0][2] == "webp"
 
     def test_missing_identifier_raises(self):
         with pytest.raises(ValueError, match="No save spec"):
@@ -98,14 +98,12 @@ class TestSpecs:
     def test_original_network_formats(self):
         specs = BaseConfig.save("original_network")
         exts = {s[2] for s in specs}
-        assert "csv" in exts
-        assert "nkbin" in exts
+        assert exts == {"csv"}
 
     def test_synthetic_export_formats(self):
         specs = BaseConfig.save("synthetic_export")
         exts = {s[2] for s in specs}
-        assert "csv" in exts
-        assert "nkbin" in exts
+        assert exts == {"csv"}
 
     def test_synthetic_graph_default_webp(self):
         specs = BaseConfig.save("synthetic_graph")
@@ -174,7 +172,7 @@ class TestModeOverrides:
         specs = BaseConfig.save("analysis_data")
         assert specs[0][4] is False
         specs = BaseConfig.save("analysis_figure")
-        assert specs[0][2] == "svg"
+        assert specs[0][2] == "webp"
 
 
 # ---------------------------------------------------------------------------
