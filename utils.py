@@ -233,12 +233,19 @@ def render_network(
     frame_h = max(frame_h, 1e-12)
     aspect = frame_w / frame_h
 
+    from configs import BaseConfig
+
+    # Max pixel size of the render. Config-controllable via RENDER_MAX_PX;
+    # capped at the WebP 16383px hard limit. A large network at the 16383px
+    # limit produces a ~190MP image most viewers cannot open, so configs can
+    # lower this to a viewable size.
+    max_px = min(getattr(BaseConfig, "RENDER_MAX_PX", _WEBP_MAX_PX), _WEBP_MAX_PX)
     img_h = int(12 * dpi)
     img_w = int(12 * dpi * aspect)
-    # Clamp to the WebP limit while preserving aspect: when either axis
-    # exceeds the cap, scale both by the same factor (clamping each axis
-    # independently would square a rectangular network).
-    clamp = min(1.0, _WEBP_MAX_PX / max(img_h, img_w))
+    # Clamp to max_px while preserving aspect: when either axis exceeds the
+    # cap, scale both by the same factor (clamping each axis independently
+    # would square a rectangular network).
+    clamp = min(1.0, max_px / max(img_h, img_w))
     img_h = max(1, int(img_h * clamp))
     img_w = max(1, int(img_w * clamp))
 
@@ -507,12 +514,19 @@ def save_hybrid_snapshot(
     total_w = x_max - x_min
     total_h = y_max - y_min
 
+    from configs import BaseConfig
+
+    # Max pixel size of the render. Config-controllable via RENDER_MAX_PX;
+    # capped at the WebP 16383px hard limit. A large network at the 16383px
+    # limit produces a ~190MP image most viewers cannot open, so configs can
+    # lower this to a viewable size.
+    max_px = min(getattr(BaseConfig, "RENDER_MAX_PX", _WEBP_MAX_PX), _WEBP_MAX_PX)
     img_h = int(12 * dpi)
     img_w = int(12 * dpi * aspect)
-    # Clamp to the WebP limit while preserving aspect: when either axis
-    # exceeds the cap, scale both by the same factor (clamping each axis
-    # independently would square a rectangular network).
-    clamp = min(1.0, _WEBP_MAX_PX / max(img_h, img_w))
+    # Clamp to max_px while preserving aspect: when either axis exceeds the
+    # cap, scale both by the same factor (clamping each axis independently
+    # would square a rectangular network).
+    clamp = min(1.0, max_px / max(img_h, img_w))
     img_h = max(1, int(img_h * clamp))
     img_w = max(1, int(img_w * clamp))
 

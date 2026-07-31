@@ -86,6 +86,11 @@ class ConfigDickson(BaseConfig):
     # Shrink the node markers in the original_graph render (dense gel
     # networks look cleaner with smaller dots). Default elsewhere is 1.0.
     ORIGINAL_GRAPH_NODE_SCALE = 0.5
+
+    # Cap the synthetic-graph render size. At the 16383px WebP limit an 11M+
+    # node network produces a ~190-megapixel image that most viewers refuse
+    # to open; 8000px stays detailed but opens everywhere.
+    RENDER_MAX_PX = 8000
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = True
     FULL_ANALYSIS = False
