@@ -194,7 +194,7 @@ def render_network(
     dpi: int = None,
     border: bool = False,
 ):
-    """Render a SynthGraph to a PIL Image using OpenCV.
+    """Render a SynthGraph to a BGR ndarray using OpenCV.
 
     Only allocates a fixed-size pixel buffer (H × W × 3 bytes) regardless
     of the number of nodes/edges, avoiding OOM on multi-million-element
@@ -212,7 +212,6 @@ def render_network(
         (used by the mosaic pipeline).
     """
     import cv2
-    from PIL import Image
 
     if dpi is None:
         dpi = recommend_dpi_cv2(graph.number_of_nodes())
@@ -234,8 +233,21 @@ def render_network(
     frame_h = max(frame_h, 1e-12)
     aspect = frame_w / frame_h
 
-    img_h = min(int(12 * dpi), _WEBP_MAX_PX)
-    img_w = min(int(12 * dpi * aspect), _WEBP_MAX_PX)
+    from configs import BaseConfig
+
+    # Max pixel size of the render. Config-controllable via RENDER_MAX_PX;
+    # capped at the WebP 16383px hard limit. A large network at the 16383px
+    # limit produces a ~190MP image most viewers cannot open, so configs can
+    # lower this to a viewable size.
+    max_px = min(getattr(BaseConfig, "RENDER_MAX_PX", _WEBP_MAX_PX), _WEBP_MAX_PX)
+    img_h = int(12 * dpi)
+    img_w = int(12 * dpi * aspect)
+    # Clamp to max_px while preserving aspect: when either axis exceeds the
+    # cap, scale both by the same factor (clamping each axis independently
+    # would square a rectangular network).
+    clamp = min(1.0, max_px / max(img_h, img_w))
+    img_h = max(1, int(img_h * clamp))
+    img_w = max(1, int(img_w * clamp))
 
     canvas = np.full((img_h, img_w, 3), 255, dtype=np.uint8)
 
@@ -264,7 +276,7 @@ def render_network(
     if border:
         cv2.rectangle(canvas, (0, 0), (img_w - 1, img_h - 1), (0, 0, 0), 2)
 
-    return Image.fromarray(cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB))
+    return canvas
 
 
 def save_figure_as_webp(fig, filepath: str, *, dpi: int = None, lossless: bool = True):
@@ -502,8 +514,21 @@ def save_hybrid_snapshot(
     total_w = x_max - x_min
     total_h = y_max - y_min
 
-    img_h = min(int(12 * dpi), _WEBP_MAX_PX)
-    img_w = min(int(12 * dpi * aspect), _WEBP_MAX_PX)
+    from configs import BaseConfig
+
+    # Max pixel size of the render. Config-controllable via RENDER_MAX_PX;
+    # capped at the WebP 16383px hard limit. A large network at the 16383px
+    # limit produces a ~190MP image most viewers cannot open, so configs can
+    # lower this to a viewable size.
+    max_px = min(getattr(BaseConfig, "RENDER_MAX_PX", _WEBP_MAX_PX), _WEBP_MAX_PX)
+    img_h = int(12 * dpi)
+    img_w = int(12 * dpi * aspect)
+    # Clamp to max_px while preserving aspect: when either axis exceeds the
+    # cap, scale both by the same factor (clamping each axis independently
+    # would square a rectangular network).
+    clamp = min(1.0, max_px / max(img_h, img_w))
+    img_h = max(1, int(img_h * clamp))
+    img_w = max(1, int(img_w * clamp))
 
     canvas = np.full((img_h, img_w, 3), 255, dtype=np.uint8)
 

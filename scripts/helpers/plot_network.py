@@ -84,8 +84,11 @@ def plot_single(
     if output is None:
         output = nkbin.rsplit(".", 1)[0] + f".{fmt}"
 
-    img.save(output, fmt, **({"lossless": True} if fmt == "webp" else {}))
-    print(f"Saved: {output} ({img.size[0]}x{img.size[1]})")
+    # img is a BGR ndarray; the production serializers handle it.
+    from configs.file_definitions import save_png, save_webp
+
+    (save_webp if fmt == "webp" else save_png)(img, output)
+    print(f"Saved: {output} ({img.shape[1]}x{img.shape[0]})")
 
 
 def main(
