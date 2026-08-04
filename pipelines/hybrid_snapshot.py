@@ -15,7 +15,7 @@ from typing import Dict, List, Tuple
 
 import networkit as nk
 
-from configs import BaseConfig
+from configs import BaseConfig, SynthParams
 from configs.enums import DatasetId
 from graphs import GraphGenerator
 from graphs._graph_node import GraphNode
@@ -113,7 +113,9 @@ def run_phase2_with_snapshots(
             f"{len(edges):,} edges  (pending plots: {sum(1 for f in pending if not f.done())})"
         )
 
-    GraphNode.initialize(attributes)
+    # TODO: built here rather than passed from the
+    # parent, so this path is still fork-dependent.
+    GraphNode.initialize(attributes, SynthParams.from_config(BaseConfig))
     graph = GraphGenerator.assemble_and_continue(
         tile_data_list,
         global_frame,

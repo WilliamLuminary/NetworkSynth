@@ -3,6 +3,8 @@
 import numpy as np
 import pytest
 
+from configs import BaseConfig
+
 pytestmark = pytest.mark.requires_fixture_data
 
 from analysis.multifractal_analyzer import MultifractalAnalyzer
@@ -23,7 +25,11 @@ def _ensure_ana_config():
 
 
 def test_calculate_multifractal_taus(load_unweighted_test_synth_graph):
-    analyzer = MultifractalAnalyzer(load_unweighted_test_synth_graph)
+    analyzer = MultifractalAnalyzer(
+        load_unweighted_test_synth_graph,
+        BaseConfig.MEASURE_WEIGHTED,
+        BaseConfig.FULL_Q_BAND,
+    )
     with analyzer.set_q(MultifractalAnalyzer.full_q):
         tau_list, zq_list = analyzer._compute_multifractal_taus()
 
@@ -34,7 +40,11 @@ def test_calculate_multifractal_taus(load_unweighted_test_synth_graph):
 
 
 def test_n_spectrum(load_unweighted_test_synth_graph):
-    analyzer = MultifractalAnalyzer(load_unweighted_test_synth_graph)
+    analyzer = MultifractalAnalyzer(
+        load_unweighted_test_synth_graph,
+        BaseConfig.MEASURE_WEIGHTED,
+        BaseConfig.FULL_Q_BAND,
+    )
     with analyzer.set_q(MultifractalAnalyzer.full_q):
         tau_list, _ = analyzer._compute_multifractal_taus()
         alpha_0, width, al_list, fal_list = analyzer._compute_n_spectrum(tau_list)
@@ -46,7 +56,11 @@ def test_n_spectrum(load_unweighted_test_synth_graph):
 
 
 def test_n_dimension(load_unweighted_test_synth_graph):
-    analyzer = MultifractalAnalyzer(load_unweighted_test_synth_graph)
+    analyzer = MultifractalAnalyzer(
+        load_unweighted_test_synth_graph,
+        BaseConfig.MEASURE_WEIGHTED,
+        BaseConfig.FULL_Q_BAND,
+    )
     with analyzer.set_q(MultifractalAnalyzer.full_q):
         tau_list, _ = analyzer._compute_multifractal_taus()
         dim_list, dim_max, dim_min, diff, valid_q = analyzer._compute_n_dimension(
@@ -66,7 +80,9 @@ def test_n_dimension(load_unweighted_test_synth_graph):
 
 def test_node_dimension(load_unweighted_test_synth_graph):
     synth_graph = load_unweighted_test_synth_graph
-    analyzer = MultifractalAnalyzer(synth_graph)
+    analyzer = MultifractalAnalyzer(
+        synth_graph, BaseConfig.MEASURE_WEIGHTED, BaseConfig.FULL_Q_BAND
+    )
     node_dimension = analyzer._compute_node_dimension()
 
     assert isinstance(node_dimension, dict)
@@ -76,7 +92,9 @@ def test_node_dimension(load_unweighted_test_synth_graph):
 
 def test_centralities(load_unweighted_test_synth_graph):
     synth_graph = load_unweighted_test_synth_graph
-    analyzer = MultifractalAnalyzer(synth_graph)
+    analyzer = MultifractalAnalyzer(
+        synth_graph, BaseConfig.MEASURE_WEIGHTED, BaseConfig.FULL_Q_BAND
+    )
     centralities = analyzer._compute_centralities()
 
     expected_keys = {"nfd", "closeness", "degree", "clustering"}
@@ -93,7 +111,11 @@ def test_centralities(load_unweighted_test_synth_graph):
 
 
 def test_betweenness(load_unweighted_test_synth_graph):
-    analyzer = MultifractalAnalyzer(load_unweighted_test_synth_graph)
+    analyzer = MultifractalAnalyzer(
+        load_unweighted_test_synth_graph,
+        BaseConfig.MEASURE_WEIGHTED,
+        BaseConfig.FULL_Q_BAND,
+    )
     betweenness = analyzer._compute_betweenness()
 
     assert isinstance(betweenness, list)
@@ -109,7 +131,9 @@ def test_betweenness(load_unweighted_test_synth_graph):
 
 def test_ricci_curvature(load_unweighted_test_synth_graph):
     synth_graph = load_unweighted_test_synth_graph
-    analyzer = MultifractalAnalyzer(synth_graph)
+    analyzer = MultifractalAnalyzer(
+        synth_graph, BaseConfig.MEASURE_WEIGHTED, BaseConfig.FULL_Q_BAND
+    )
     ricci = analyzer._compute_ollivier_ricci_curvature()
 
     assert isinstance(ricci, list)
@@ -123,7 +147,11 @@ def test_ricci_curvature(load_unweighted_test_synth_graph):
 
 
 def test_assortativity(load_unweighted_test_synth_graph):
-    analyzer = MultifractalAnalyzer(load_unweighted_test_synth_graph)
+    analyzer = MultifractalAnalyzer(
+        load_unweighted_test_synth_graph,
+        BaseConfig.MEASURE_WEIGHTED,
+        BaseConfig.FULL_Q_BAND,
+    )
     assortativity = analyzer._compute_assortativity()
 
     assert isinstance(assortativity, float)
@@ -138,7 +166,9 @@ def test_assortativity(load_unweighted_test_synth_graph):
 
 def test_eigenvector_centrality(load_unweighted_test_synth_graph):
     synth_graph = load_unweighted_test_synth_graph
-    analyzer = MultifractalAnalyzer(synth_graph)
+    analyzer = MultifractalAnalyzer(
+        synth_graph, BaseConfig.MEASURE_WEIGHTED, BaseConfig.FULL_Q_BAND
+    )
     eigenvector = analyzer._compute_eigenvector_centrality()
 
     assert isinstance(eigenvector, list)
@@ -153,7 +183,11 @@ def test_eigenvector_centrality(load_unweighted_test_synth_graph):
 
 
 def test_diameter(load_unweighted_test_synth_graph):
-    analyzer = MultifractalAnalyzer(load_unweighted_test_synth_graph)
+    analyzer = MultifractalAnalyzer(
+        load_unweighted_test_synth_graph,
+        BaseConfig.MEASURE_WEIGHTED,
+        BaseConfig.FULL_Q_BAND,
+    )
     diameter = analyzer._compute_diameter()
 
     assert isinstance(diameter, (int, float))

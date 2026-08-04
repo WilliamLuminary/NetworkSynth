@@ -17,7 +17,7 @@ from typing import List
 import numpy as np
 
 from analysis.error_checker import ErrorChecker, create_error_checker
-from configs import BaseConfig, DatasetId
+from configs import BaseConfig, DatasetId, SynthParams
 from graphs import GraphGenerator
 from handlers import AttributesCalculator, Mapper, RunAgent, Saver
 from utils import save_bfs_snapshot, trim_graph
@@ -59,12 +59,13 @@ def generate_synthetic_network(
     error_checker: ErrorChecker,
     attributes: AttributesCalculator,
     mapper: Mapper,
+    params: SynthParams,
 ):
     if _should_exit(exit_event):
         return None, float("inf")
 
-    generator = GraphGenerator(attributes)
-    for attempt in range(BaseConfig.MAX_ATTEMPTS):
+    generator = GraphGenerator(attributes, params)
+    for attempt in range(params.max_attempts):
         try:
             synthetic_graph = generator.generate_network()
             synthetic_graph = trim_graph(synthetic_graph, attributes.average_degree)
@@ -92,13 +93,14 @@ def _generate_single_network(
     error_checker: ErrorChecker,
     attributes: AttributesCalculator,
     mapper: Mapper,
+    params: SynthParams,
 ):
     """Generate one network with error gating and retry loop."""
     if exit_event.is_set():
         return None, float("inf")
 
-    generator = GraphGenerator(attributes)
-    for attempt in range(BaseConfig.MAX_ATTEMPTS):
+    generator = GraphGenerator(attributes, params)
+    for attempt in range(params.max_attempts):
         try:
             graph = generator.generate_network()
             graph = trim_graph(graph, attributes.average_degree)
@@ -127,7 +129,8 @@ def _generate_single_network_collecting_snapshots(
     attributes: AttributesCalculator,
     mapper: Mapper,
     snapshot_interval: int,
-    early_check_node_count: int = 0,
+    early_check_node_count: int,
+    params: SynthParams,
 ):
     """Generate one network, collecting raw snapshot data in memory.
 
@@ -149,8 +152,8 @@ def _generate_single_network_collecting_snapshots(
         return None, float("inf"), []
 
     avg_degree = attributes.average_degree
-    generator = GraphGenerator(attributes)
-    for attempt in range(BaseConfig.MAX_ATTEMPTS):
+    generator = GraphGenerator(attributes, params)
+    for attempt in range(params.max_attempts):
         snapshots = []
         early_aborted = False
         early_checked = False
@@ -243,6 +246,10 @@ def generate_with_multiprocessing(data_agent: RunAgent):
     max_workers = BaseConfig.get_max_workers(num_network)
     logger.info(f"Using {max_workers} worker(s) for {num_network} networks")
 
+    # Built here, in the parent, so workers receive their parameters explicitly
+    # rather than inheriting a mutated BaseConfig (which only works on `fork`).
+    params = SynthParams.from_config(BaseConfig)
+
     try:
         from concurrent.futures import ProcessPoolExecutor, as_completed
 
@@ -254,6 +261,7 @@ def generate_with_multiprocessing(data_agent: RunAgent):
                     error_checker,
                     data_agent.attributes,
                     data_agent.mapper,
+                    params,
                 )
                 for _ in range(num_network)
             ]
@@ -327,7 +335,9 @@ def generate_with_snapshots(data_agent: RunAgent):
         )
         plot_futures.append(fut)
 
-    generator = GraphGenerator(data_agent.attributes)
+    generator = GraphGenerator(
+        data_agent.attributes, SynthParams.from_config(BaseConfig)
+    )
     synthetic_graph = generator.generate_network_with_snapshots(
         snapshot_callback=on_snapshot,
         snapshot_interval=interval,

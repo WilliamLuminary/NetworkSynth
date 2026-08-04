@@ -7,7 +7,7 @@ from typing import Dict, List, Set, Tuple
 
 import numpy as np
 
-from configs import BaseConfig
+from configs import SynthParams
 
 
 class GraphNode:
@@ -35,24 +35,24 @@ class GraphNode:
     _closed_edges_factor: float
 
     @classmethod
-    def initialize(cls, attrs):
+    def initialize(cls, attrs, params: SynthParams):
         cls._degree_dist = attrs.degree_distribution
         cls._degree_trans_probs = attrs.degree_transition_probs
         cls._degree_angles = attrs.degree_angles
         cls._degree_lengths = attrs.degree_lengths
         cls._avg_length = attrs.average_length
 
-        cls._closed_nodes_thr = cls._avg_length * BaseConfig.CLOSED_NODES_FACTOR
-        cls._closed_edges_thr = cls._avg_length * BaseConfig.CLOSED_EDGES_FACTOR
+        cls._closed_nodes_thr = cls._avg_length * params.closed_nodes_factor
+        cls._closed_edges_thr = cls._avg_length * params.closed_edges_factor
         cls._closed_nodes_thr_sq = cls._closed_nodes_thr**2
         cls._closed_edges_thr_sq = cls._closed_edges_thr**2
         cls._grid_size = cls._avg_length
 
-        cls._node_search_radius = math.ceil(BaseConfig.CLOSED_NODES_FACTOR)
-        cls._edge_search_radius = math.ceil(BaseConfig.CLOSED_EDGES_FACTOR)
+        cls._node_search_radius = math.ceil(params.closed_nodes_factor)
+        cls._edge_search_radius = math.ceil(params.closed_edges_factor)
 
-        cls._closed_nodes_factor = BaseConfig.CLOSED_NODES_FACTOR
-        cls._closed_edges_factor = BaseConfig.CLOSED_EDGES_FACTOR
+        cls._closed_nodes_factor = params.closed_nodes_factor
+        cls._closed_edges_factor = params.closed_edges_factor
 
         cls.node_grid = defaultdict(set)
         cls.edge_grid = defaultdict(set)

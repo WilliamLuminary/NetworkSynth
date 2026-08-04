@@ -12,7 +12,6 @@ from scipy import sparse as sp
 from scipy.optimize import linprog
 from scipy.stats import linregress
 
-from configs import BaseConfig
 from graphs.synth_graph import SynthGraph
 
 logger = logging.getLogger(__name__)
@@ -171,12 +170,24 @@ class MultifractalAnalyzer:
     small_q = _generate_range(300)
     full_q = _generate_range(2000)
 
-    def __init__(self, graph: SynthGraph):
+    def __init__(
+        self,
+        graph: SynthGraph,
+        measure_weighted: bool,
+        full_q_band: bool,
+    ):
+        """Analyze *graph*.
+
+        Both settings are required: a spawned child re-imports ``configs``
+        unmutated, so a ``BaseConfig`` fallback here would silently analyze
+        with the wrong q-band rather than fail.
+        """
         self.graph = graph
         self.f_digit = 0
         self.q_ = None
-        self.weighted = BaseConfig.MEASURE_WEIGHTED if graph.is_weighted() else False
-        if BaseConfig.MEASURE_WEIGHTED is not self.weighted:
+        self._full_q_band = full_q_band
+        self.weighted = measure_weighted if graph.is_weighted() else False
+        if measure_weighted is not self.weighted:
             logger.debug("Unweighted graph — falling back to unweighted analysis.")
         self._inv_graph: nk.Graph | None = None
         self._uw_graph: nk.Graph | None = None
@@ -252,7 +263,7 @@ class MultifractalAnalyzer:
     # ---- public ----
 
     def analyze_error_features(self) -> MultifractalErrorFeatures:
-        q_band = self.full_q if BaseConfig.FULL_Q_BAND else self.small_q
+        q_band = self.full_q if self._full_q_band else self.small_q
         with self.set_q(q_band):
             tau_list, _ = self._compute_multifractal_taus()
             alpha_0, width, _, _ = self._compute_n_spectrum(tau_list)

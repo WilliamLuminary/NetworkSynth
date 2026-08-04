@@ -5,7 +5,7 @@ Scaling pipeline — multi-root synchronized BFS for large networks.
 
 import logging
 
-from configs import BaseConfig
+from configs import BaseConfig, SynthParams
 from configs.scaling_mode import ScalingConfig
 from graphs import GraphGenerator
 from graphs.synth_graph import SynthGraph
@@ -31,7 +31,7 @@ def run_scaling_for_dataset(dataset_id):
     attributes = data_agent.attributes
 
     # 2. Generate scaled network
-    generator = GraphGenerator(attributes)
+    generator = GraphGenerator(attributes, SynthParams.from_config(BaseConfig))
     scaled_graph = generator.generate_scaled_network(
         scale_rows=BaseConfig.SCALE_ROWS,
         scale_cols=BaseConfig.SCALE_COLS,

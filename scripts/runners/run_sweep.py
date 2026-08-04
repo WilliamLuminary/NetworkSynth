@@ -115,7 +115,9 @@ def run_for_dataset(dataset_id: DatasetId) -> None:
     data_agent = RunAgent(dataset_id=dataset_id)
     data_agent.prepare_data()
     std_err_fea = MultifractalAnalyzer(
-        data_agent.get_original_network()
+        data_agent.get_original_network(),
+        BaseConfig.MEASURE_WEIGHTED,
+        BaseConfig.FULL_Q_BAND,
     ).analyze_error_features()
 
     table = wandb.Table(columns=["node_factor", "edge_factor", "error", "success_rate"])

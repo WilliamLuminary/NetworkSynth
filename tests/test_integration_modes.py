@@ -91,7 +91,7 @@ class TestGenerateMode:
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
         SampleConfig.initialize()
 
-        from configs import BaseConfig
+        from configs import BaseConfig, SynthParams
         from graphs import GraphGenerator
         from handlers import RunAgent, Saver
         from utils import trim_graph
@@ -101,7 +101,9 @@ class TestGenerateMode:
         agent = RunAgent(dataset_id=dataset_id)
         agent.prepare_data()
 
-        generator = GraphGenerator(agent.attributes)
+        generator = GraphGenerator(
+            agent.attributes, SynthParams.from_config(BaseConfig)
+        )
         synth = generator.generate_network()
         synth = trim_graph(synth, agent.attributes.average_degree)
         agent.mapper.assign_weights(synth)
@@ -140,7 +142,7 @@ class TestFromPropsMode:
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
         SampleConfig.initialize()
 
-        from configs import BaseConfig
+        from configs import BaseConfig, SynthParams
         from graphs import GraphGenerator
         from handlers import RunAgent
         from utils import trim_graph
@@ -148,7 +150,9 @@ class TestFromPropsMode:
         agent = RunAgent(attr_path=BaseConfig.ATTRIBUTES_DICT_DATA_PATH)
         agent.prepare_data()
 
-        generator = GraphGenerator(agent.attributes)
+        generator = GraphGenerator(
+            agent.attributes, SynthParams.from_config(BaseConfig)
+        )
         synth = generator.generate_network()
         synth = trim_graph(synth, agent.attributes.average_degree)
 
@@ -174,7 +178,7 @@ class TestMosaicMode:
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
         SampleConfig.initialize()
 
-        from configs import BaseConfig
+        from configs import BaseConfig, SynthParams
         from graphs import GraphGenerator
         from graphs.mosaic_stitcher import MosaicStitcher
         from handlers import RunAgent, Saver
@@ -196,7 +200,7 @@ class TestMosaicMode:
         tile_graphs = {}
         for r in range(BaseConfig.GRID_ROWS):
             for c in range(BaseConfig.GRID_COLS):
-                gen = GraphGenerator(attributes)
+                gen = GraphGenerator(attributes, SynthParams.from_config(BaseConfig))
                 g = gen.generate_network(frame_range=tile_gen_frame)
                 g = trim_graph(g, attributes.average_degree)
                 positions = g.positions()
@@ -242,7 +246,7 @@ class TestScalingMode:
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
         SampleConfig.initialize()
 
-        from configs import BaseConfig
+        from configs import BaseConfig, SynthParams
         from graphs import GraphGenerator
         from handlers import RunAgent, Saver
         from utils import trim_graph
@@ -252,7 +256,7 @@ class TestScalingMode:
         agent = RunAgent(dataset_id=dataset_id)
         agent.prepare_data()
 
-        gen = GraphGenerator(agent.attributes)
+        gen = GraphGenerator(agent.attributes, SynthParams.from_config(BaseConfig))
         scaled = gen.generate_scaled_network(
             scale_rows=BaseConfig.SCALE_ROWS,
             scale_cols=BaseConfig.SCALE_COLS,
@@ -306,7 +310,9 @@ class TestAnalyzeMode:
         agent.prepare_data()
 
         original = agent.get_original_network()
-        analyzer = MultifractalAnalyzer(original)
+        analyzer = MultifractalAnalyzer(
+            original, BaseConfig.MEASURE_WEIGHTED, BaseConfig.FULL_Q_BAND
+        )
         result = analyzer.analyze_graph()
 
         assert "tau_list" in result
@@ -333,7 +339,7 @@ class TestSnapshotMode:
         Snapshot1x1Config.BASE_OUTPUT_PATH = str(tmp_path)
         Snapshot1x1Config.initialize()
 
-        from configs import BaseConfig
+        from configs import BaseConfig, SynthParams
         from handlers import RunAgent, Saver
 
         Saver.initialize()
@@ -364,7 +370,9 @@ class TestSnapshotMode:
                 line_width=style.get("line_width", 3.0),
             )
 
-        generator = GraphGenerator(agent.attributes)
+        generator = GraphGenerator(
+            agent.attributes, SynthParams.from_config(BaseConfig)
+        )
         synth = generator.generate_network_with_snapshots(
             snapshot_callback=on_snapshot,
             snapshot_interval=BaseConfig.SNAPSHOT_INTERVAL,

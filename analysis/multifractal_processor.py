@@ -3,6 +3,7 @@ from typing import Dict, List, Optional, Union
 
 import numpy as np
 
+from configs import BaseConfig
 from graphs.synth_graph import SynthGraph
 
 from .multifractal_analyzer import MultifractalAnalyzer
@@ -38,7 +39,9 @@ class MultifractalProcessor:
         return [self._analyze_single_graph(i, G) for i, G in enumerate(self._graphs)]
 
     def _analyze_single_graph(self, idx: int, graph: SynthGraph) -> Dict:
-        analyzer = MultifractalAnalyzer(graph)
+        analyzer = MultifractalAnalyzer(
+            graph, BaseConfig.MEASURE_WEIGHTED, BaseConfig.FULL_Q_BAND
+        )
         result = analyzer.analyze_graph()
 
         return {

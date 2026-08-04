@@ -13,7 +13,7 @@ import wandb
 from analysis.error_checker import ErrorChecker, create_error_checker
 
 # noinspection PyUnresolvedReferences
-from configs import BaseConfig, DatasetId
+from configs import BaseConfig, DatasetId, SynthParams
 from graphs import GraphGenerator
 from graphs._graph_node import GraphNode
 from handlers import RunAgent
@@ -65,7 +65,9 @@ def _generate_with_factors(
     if exit_event.is_set():
         return None, float("inf")
 
-    GraphNode.initialize(attributes)
+    # TODO: built here rather than passed from the
+    # parent, so this path is still fork-dependent.
+    GraphNode.initialize(attributes, SynthParams.from_config(BaseConfig))
 
     for attempt in range(BaseConfig.MAX_ATTEMPTS):
         seed = os.getpid() ^ attempt

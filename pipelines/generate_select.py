@@ -13,7 +13,7 @@ import logging
 import os
 
 from analysis.error_checker import NullErrorChecker, create_error_checker
-from configs import BaseConfig, DatasetId
+from configs import BaseConfig, DatasetId, SynthParams
 from handlers import RunAgent, Saver
 from pipelines.generate import (
     SIGINT_INFO,
@@ -189,6 +189,10 @@ def generate_and_select(data_agent: RunAgent):
     )
     futures = []
 
+    # Built in the parent so workers get their parameters explicitly rather
+    # than inheriting a mutated BaseConfig (which only works on `fork`).
+    params = SynthParams.from_config(BaseConfig)
+
     try:
         from concurrent.futures import ProcessPoolExecutor, as_completed
 
@@ -204,6 +208,7 @@ def generate_and_select(data_agent: RunAgent):
                         data_agent.mapper,
                         snapshot_interval,
                         early_node_count,
+                        params,
                     )
                 else:
                     future = executor.submit(
@@ -212,6 +217,7 @@ def generate_and_select(data_agent: RunAgent):
                         error_checker,
                         data_agent.attributes,
                         data_agent.mapper,
+                        params,
                     )
                 future_to_idx[future] = i
                 futures.append(future)

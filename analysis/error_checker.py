@@ -64,28 +64,52 @@ class MultifractalErrorChecker(ErrorChecker):
     the Euclidean distance between feature vectors is below *tolerance*.
     """
 
-    def __init__(self, tolerance: float) -> None:
+    def __init__(
+        self,
+        tolerance: float,
+        measure_weighted: bool,
+        full_q_band: bool,
+    ) -> None:
         self.tolerance = tolerance
+        self.measure_weighted = measure_weighted
+        self.full_q_band = full_q_band
         self._ref_features = None
 
-    def compute_reference(self, graph: SynthGraph) -> None:
+    def _analyzer(self, graph: SynthGraph):
+        """Build an analyzer with this checker's captured settings.
+
+        The checker is constructed in the parent and pickled to workers, so the
+        settings travel with it.  Reading ``BaseConfig`` inside a worker would
+        yield defaults under a ``spawn`` start method.
+        """
         from analysis.multifractal_analyzer import MultifractalAnalyzer
 
-        self._ref_features = MultifractalAnalyzer(graph).analyze_error_features()
+        return MultifractalAnalyzer(
+            graph,
+            measure_weighted=self.measure_weighted,
+            full_q_band=self.full_q_band,
+        )
+
+    def compute_reference(self, graph: SynthGraph) -> None:
+        self._ref_features = self._analyzer(graph).analyze_error_features()
 
     def check(self, graph: SynthGraph) -> Tuple[bool, float]:
         from analysis.multifractal_analyzer import MultifractalAnalyzer
 
         if self._ref_features is None:
             raise RuntimeError("compute_reference() must be called before check()")
-        err_fea = MultifractalAnalyzer(graph).analyze_error_features()
+        err_fea = self._analyzer(graph).analyze_error_features()
         error = MultifractalAnalyzer.analyze_error(err_fea, self._ref_features)
         return error < self.tolerance, error
 
 
 _CHECKERS = {
     "none": lambda cfg: NullErrorChecker(),
-    "multifractal": lambda cfg: MultifractalErrorChecker(cfg.ERROR_TOLERANCE),
+    "multifractal": lambda cfg: MultifractalErrorChecker(
+        cfg.ERROR_TOLERANCE,
+        measure_weighted=cfg.MEASURE_WEIGHTED,
+        full_q_band=cfg.FULL_Q_BAND,
+    ),
 }
 
 

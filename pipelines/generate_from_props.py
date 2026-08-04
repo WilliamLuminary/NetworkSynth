@@ -5,7 +5,7 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 import logging
 
-from configs import AttrConfig, BaseConfig
+from configs import AttrConfig, BaseConfig, SynthParams
 from graphs import GraphGenerator
 from handlers import AttributesCalculator, RunAgent
 from utils import trim_graph
@@ -28,8 +28,11 @@ def generate_synthetic_network(exit_event, attributes: AttributesCalculator):
     if _should_exit(exit_event):
         return None
 
-    generator = GraphGenerator(attributes)
-    for attempt in range(BaseConfig.MAX_ATTEMPTS):
+    # TODO: params are built here, inside the worker,
+    # so this path is still fork-dependent.
+    params = SynthParams.from_config(BaseConfig)
+    generator = GraphGenerator(attributes, params)
+    for attempt in range(params.max_attempts):
         try:
             synthetic_graph = generator.generate_network()
 

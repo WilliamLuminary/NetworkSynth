@@ -22,7 +22,7 @@ import networkit as nk
 import numpy as np
 
 from analysis.error_checker import ErrorChecker, NullErrorChecker, create_error_checker
-from configs import BaseConfig
+from configs import BaseConfig, SynthParams
 from configs.base_config import tagged
 from graphs import GraphGenerator
 from graphs._graph_node import GraphNode
@@ -166,7 +166,9 @@ def _generate_tile_worker(args):
         return tile_idx, None
 
     try:
-        GraphNode.initialize(attributes)
+        # TODO: built here rather than passed from the
+        # parent, so this path is still fork-dependent.
+        GraphNode.initialize(attributes, SynthParams.from_config(BaseConfig))
 
         best_error = float("inf")
         best_result = None
@@ -393,7 +395,9 @@ def run_phase2(
             }
         )
 
-    GraphNode.initialize(attributes)
+    # TODO: built here rather than passed from the
+    # parent, so this path is still fork-dependent.
+    GraphNode.initialize(attributes, SynthParams.from_config(BaseConfig))
 
     if take_snapshots:
         os.makedirs(snapshot_dir, exist_ok=True)

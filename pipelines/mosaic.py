@@ -12,7 +12,7 @@ import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Dict, Tuple
 
-from configs import BaseConfig
+from configs import BaseConfig, SynthParams
 from configs.mosaic_mode import MosaicConfig
 from graphs import GraphGenerator
 from graphs.mosaic_stitcher import MosaicStitcher
@@ -52,7 +52,9 @@ def generate_single_tile(args):
         return (row, col), None
 
     try:
-        generator = GraphGenerator(attributes)
+        # TODO: params are built here, inside the
+        # worker, so this path is still fork-dependent.
+        generator = GraphGenerator(attributes, SynthParams.from_config(BaseConfig))
         graph = generator.generate_network(frame_range=tile_gen_frame)
         graph = trim_graph(graph, attributes.average_degree)
 

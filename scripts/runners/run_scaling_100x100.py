@@ -40,7 +40,7 @@ ScalingConfig.initialize()
 
 import networkit as nk
 
-from configs import BaseConfig, DataType
+from configs import BaseConfig, DataType, SynthParams
 from graphs import GraphGenerator
 from handlers import RunAgent, Saver
 from utils import trim_graph
@@ -54,7 +54,7 @@ logger.info(f"average_length: {attributes.average_length:.2f}")
 logger.info(f"average_degree: {attributes.average_degree:.2f}")
 
 t0 = time.time()
-generator = GraphGenerator(attributes)
+generator = GraphGenerator(attributes, SynthParams.from_config(BaseConfig))
 scaled_graph = generator.generate_scaled_network(
     scale_rows=100,
     scale_cols=100,
