@@ -26,12 +26,14 @@ def base_config_values():
             "CLOSED_NODES_FACTOR",
             "CLOSED_EDGES_FACTOR",
             "MAX_ATTEMPTS",
+            "SEED",
         )
     }
     BaseConfig.SYNTHETIC_FRAME_SIZE = (512, 512)
     BaseConfig.CLOSED_NODES_FACTOR = 1.2
     BaseConfig.CLOSED_EDGES_FACTOR = 0.8
     BaseConfig.MAX_ATTEMPTS = 7
+    BaseConfig.SEED = None
     yield
     for name, value in saved.items():
         if value is None:
@@ -56,6 +58,7 @@ class TestFromConfig:
             CLOSED_NODES_FACTOR = 2.0
             CLOSED_EDGES_FACTOR = 3.0
             MAX_ATTEMPTS = 1
+            SEED = 123
 
         params = SynthParams.from_config(Cfg)
 
@@ -63,11 +66,12 @@ class TestFromConfig:
         assert params.closed_nodes_factor == 2.0
         assert params.closed_edges_factor == 3.0
         assert params.max_attempts == 1
+        assert params.seed == 123
 
 
 class TestImmutability:
     def test_is_frozen(self):
-        params = SynthParams((10, 10), 1.0, 1.0, 5)
+        params = SynthParams((10, 10), 1.0, 1.0, 5, None)
 
         with pytest.raises(Exception):
             params.max_attempts = 99
@@ -76,7 +80,7 @@ class TestImmutability:
         """Workers receive params by pickle under a spawn start method."""
         import pickle
 
-        params = SynthParams((128, 256), 1.5, 0.5, max_attempts=3)
+        params = SynthParams((128, 256), 1.5, 0.5, max_attempts=3, seed=42)
 
         assert pickle.loads(pickle.dumps(params)) == params
 
@@ -96,7 +100,11 @@ class TestParamsWinOverBaseConfig:
 
         # BaseConfig says 1.2 / 0.8; params say something else entirely.
         params = SynthParams(
-            (512, 512), closed_nodes_factor=5.0, closed_edges_factor=4.0, max_attempts=1
+            (512, 512),
+            closed_nodes_factor=5.0,
+            closed_edges_factor=4.0,
+            max_attempts=1,
+            seed=None,
         )
         GraphNode.initialize(Attrs(), params)
 
@@ -116,7 +124,7 @@ class TestParamsWinOverBaseConfig:
             average_length = 10.0
             average_degree = 2.0
 
-        params = SynthParams((999, 777), 1.2, 0.8, 3)
+        params = SynthParams((999, 777), 1.2, 0.8, 3, None)
         generator = GraphGenerator(Attrs(), params)
 
         assert generator._params.synthetic_frame_size == (999, 777)

@@ -98,6 +98,9 @@ def run_phase2_with_snapshots(
     )
     pending: List[Future] = []
 
+    # Read here in the parent: the plot pool runs in child processes.
+    max_px = getattr(BaseConfig, "RENDER_MAX_PX", None)
+
     def on_snapshot(positions, edges, frame, idx):
         future = plot_executor.submit(
             save_hybrid_snapshot,
@@ -106,6 +109,7 @@ def run_phase2_with_snapshots(
             frame,
             idx,
             snapshot_dir,
+            max_px=max_px,
         )
         pending.append(future)
         logger.info(
@@ -153,7 +157,7 @@ def run_hybrid_snapshot_for_dataset(
     attributes = data_agent.attributes
     mapper = data_agent.mapper
 
-    error_checker = create_error_checker()
+    error_checker = create_error_checker(BaseConfig)
     error_checker.compute_reference(data_agent.get_original_network())
 
     scale_rows, scale_cols = BaseConfig.TARGET_SCALE

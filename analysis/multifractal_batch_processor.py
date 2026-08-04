@@ -41,7 +41,12 @@ class MultifractalBatchProcessor:
         synthetic: List = None,
         original_processed: bool = False,
         synthetic_processed: bool = False,
+        *,
+        measure_weighted: bool,
+        full_q_band: bool,
     ):
+        self._measure_weighted = measure_weighted
+        self._full_q_band = full_q_band
         self._original_data = original
         self._original_processed: bool = original_processed
         self._synthetic_data = synthetic
@@ -49,10 +54,12 @@ class MultifractalBatchProcessor:
         self._images = {}
 
     @classmethod
-    def from_dict(cls, data_: Dict):
+    def from_dict(cls, data_: Dict, *, measure_weighted: bool, full_q_band: bool):
         return cls(
             original=data_["original"],
             synthetic=data_["synthetic"],
+            measure_weighted=measure_weighted,
+            full_q_band=full_q_band,
         )
 
     def process(self):
@@ -81,9 +88,10 @@ class MultifractalBatchProcessor:
         assert self._synthetic_processed, "Synthetic data has not been processed."
         return self._synthetic_data
 
-    @staticmethod
-    def _process_batch(graphs):
-        processor = MultifractalProcessor(graphs)
+    def _process_batch(self, graphs):
+        processor = MultifractalProcessor(
+            graphs, self._measure_weighted, self._full_q_band
+        )
         processor.analyze()
         return processor.get_summary_data()
 

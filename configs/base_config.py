@@ -106,6 +106,13 @@ class BaseConfig:
     ERROR_TOLERANCE = 0.15  # Generally should be 0.15
     MIN_TILE_NODES = 100
 
+    # Master seed for reproducible generation.  None = unseeded, i.e. a
+    # different network on every run (the historical behaviour).  When set,
+    # each worker is given a distinct derived seed (SEED + worker index) so
+    # candidates still differ from one another but the whole run repeats
+    # identically.
+    SEED: Optional[int] = None
+
     SNAPSHOT_INTERVAL: int = 0  # 0 = disabled; N = snapshot every N new nodes
     SNAPSHOT_PLOT_WORKERS: int = 20
     SELECT_BEST: int = 0  # 0 = disabled; N = keep N best networks by metric distance

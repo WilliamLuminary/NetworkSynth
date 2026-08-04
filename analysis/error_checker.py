@@ -113,20 +113,21 @@ _CHECKERS = {
 }
 
 
-def create_error_checker() -> ErrorChecker:
-    """Build the checker selected by ``BaseConfig.ERROR_CHECKER``.
+def create_error_checker(config) -> ErrorChecker:
+    """Build the checker selected by ``config.ERROR_CHECKER``.
+
+    The config is passed in rather than imported so this module holds no
+    dependency on the global ``BaseConfig`` namespace.
 
     To add an algorithm: implement an :class:`ErrorChecker` subclass and
     register a builder in ``_CHECKERS`` keyed by its config name.  Each
     builder receives the config so it can read whatever parameters its
     algorithm needs.
     """
-    from configs import BaseConfig
-
-    name = BaseConfig.ERROR_CHECKER
+    name = config.ERROR_CHECKER
     builder = _CHECKERS.get(name)
     if builder is None:
         raise ValueError(
             f"Unknown ERROR_CHECKER {name!r}; available: {sorted(_CHECKERS)}"
         )
-    return builder(BaseConfig)
+    return builder(config)

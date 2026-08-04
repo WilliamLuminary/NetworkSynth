@@ -3,7 +3,6 @@ from typing import Dict, List, Optional, Union
 
 import numpy as np
 
-from configs import BaseConfig
 from graphs.synth_graph import SynthGraph
 
 from .multifractal_analyzer import MultifractalAnalyzer
@@ -12,7 +11,14 @@ logger = logging.getLogger(__name__)
 
 
 class MultifractalProcessor:
-    def __init__(self, arg: Union[Dict, SynthGraph, List[Dict], List[SynthGraph]]):
+    def __init__(
+        self,
+        arg: Union[Dict, SynthGraph, List[Dict], List[SynthGraph]],
+        measure_weighted: bool,
+        full_q_band: bool,
+    ):
+        self._measure_weighted = measure_weighted
+        self._full_q_band = full_q_band
         self._graphs: Optional[List[SynthGraph]] = None
         self._analysis_results: Optional[List[Dict]] = None
         if isinstance(arg, SynthGraph):
@@ -40,7 +46,7 @@ class MultifractalProcessor:
 
     def _analyze_single_graph(self, idx: int, graph: SynthGraph) -> Dict:
         analyzer = MultifractalAnalyzer(
-            graph, BaseConfig.MEASURE_WEIGHTED, BaseConfig.FULL_Q_BAND
+            graph, self._measure_weighted, self._full_q_band
         )
         result = analyzer.analyze_graph()
 

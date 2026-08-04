@@ -65,17 +65,20 @@ def _generate_with_factors(
     if exit_event.is_set():
         return None, float("inf")
 
-    # TODO: built here rather than passed from the
-    # parent, so this path is still fork-dependent.
-    GraphNode.initialize(attributes, SynthParams.from_config(BaseConfig))
+    # TODO: params are built here rather than passed from the parent, so this
+    # path is still fork-dependent and its seeding is not reproducible.
+    params = SynthParams.from_config(BaseConfig)
+    GraphNode.initialize(attributes, params)
 
-    for attempt in range(BaseConfig.MAX_ATTEMPTS):
+    for attempt in range(params.max_attempts):
         seed = os.getpid() ^ attempt
         random.seed(seed)
         np.random.seed(seed % (2**31))
 
         try:
-            result = GraphGenerator._bfs_network_with_frontier()
+            result = GraphGenerator._bfs_network_with_frontier(
+                params.synthetic_frame_size
+            )
             inner_nodes, inner_edges, *_ = result
 
             if not inner_nodes or len(inner_nodes) < 100:
@@ -159,7 +162,7 @@ def run_for_dataset(dataset_id: DatasetId, node_factors, edge_factors) -> None:
 
     data_agent = RunAgent(dataset_id=dataset_id)
     data_agent.prepare_data()
-    error_checker = create_error_checker()
+    error_checker = create_error_checker(BaseConfig)
     error_checker.compute_reference(data_agent.get_original_network())
 
     sweep_config = {

@@ -67,7 +67,12 @@ def run_scaling_for_dataset(dataset_id):
 # ------------------------------------------------------------------ #
 def plot_scaled_network(graph: SynthGraph, margin_frac: float = 0.02, dpi: int = None):
     """Render a scaled network to a PIL Image (CV2-backed, memory-safe)."""
-    return render_network(graph, margin_frac=margin_frac, dpi=dpi)
+    return render_network(
+        graph,
+        margin_frac=margin_frac,
+        dpi=dpi,
+        max_px=getattr(BaseConfig, "RENDER_MAX_PX", None),
+    )
 
 
 # ------------------------------------------------------------------ #

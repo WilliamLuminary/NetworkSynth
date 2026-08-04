@@ -73,7 +73,7 @@ class TestCreateErrorChecker:
         BaseConfig.MEASURE_WEIGHTED = True
         BaseConfig.FULL_Q_BAND = True
 
-        checker = create_error_checker()
+        checker = create_error_checker(BaseConfig)
 
         assert isinstance(checker, MultifractalErrorChecker)
         assert checker.tolerance == 0.11
@@ -83,13 +83,13 @@ class TestCreateErrorChecker:
     def test_none_selects_the_null_checker(self, base_config_values):
         BaseConfig.ERROR_CHECKER = "none"
 
-        assert isinstance(create_error_checker(), NullErrorChecker)
+        assert isinstance(create_error_checker(BaseConfig), NullErrorChecker)
 
     def test_unknown_name_raises(self, base_config_values):
         BaseConfig.ERROR_CHECKER = "nope"
 
         with pytest.raises(ValueError, match="Unknown ERROR_CHECKER"):
-            create_error_checker()
+            create_error_checker(BaseConfig)
 
 
 class TestAnalyzerHonoursExplicitSettings:

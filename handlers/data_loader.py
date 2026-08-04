@@ -2,12 +2,19 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
-from configs import BaseConfig, DatasetId, Mode
+from configs import DatasetId, Mode
 from graphs.synth_graph import SynthGraph
 
 
 class DataLoader:
-    def __init__(self, mode, **kwargs):
+    def __init__(self, mode, config, **kwargs):
+        """Load a dataset's inputs.
+
+        *config* supplies the loader functions (``ORIGINAL_NETWORK_FUNC`` and
+        friends).  It is passed in rather than read from the global
+        ``BaseConfig`` so the active config is explicit.
+        """
+        self._config = config
         self._dataset_id: Optional[DatasetId] = None
         self._both_networks_path = None
 
@@ -59,13 +66,13 @@ class DataLoader:
             self.__attr = self._load_attr()
 
     def _load_original_image(self):
-        return BaseConfig.ORIGINAL_IMAGE_FUNC(self._dataset_id)
+        return self._config.ORIGINAL_IMAGE_FUNC(self._dataset_id)
 
     def _load_original_network(self):
-        return BaseConfig.ORIGINAL_NETWORK_FUNC(self._dataset_id)
+        return self._config.ORIGINAL_NETWORK_FUNC(self._dataset_id)
 
     def _load_both_networks(self) -> Tuple[List[SynthGraph], List[SynthGraph]]:
-        return BaseConfig.NETWORKS_FUNC(self._both_networks_path)
+        return self._config.NETWORKS_FUNC(self._both_networks_path)
 
     def _load_attr(self) -> Dict:
-        return BaseConfig.ATTRIBUTES_DICT_FUNC(self._attr_path)
+        return self._config.ATTRIBUTES_DICT_FUNC(self._attr_path)

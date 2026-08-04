@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 from numpy import ndarray
 
-from configs import BaseConfig, SynthParams
+from configs import SynthParams
 from configs.base_config import tagged
 from utils import build_graph, calculate_frame
 
@@ -145,13 +145,11 @@ class GraphGenerator:
 
     @staticmethod
     def _bfs_network(
-        frame_range: Optional[Tuple[int, int]] = None,
+        frame_range: Tuple[int, int],
         *,
         snapshot_callback=None,
         snapshot_interval: int = 0,
     ) -> Tuple[set, set]:
-        frame_range = frame_range or BaseConfig.SYNTHETIC_FRAME_SIZE
-
         GraphNode.reset()
         root_node = GraphNode((0, 0))
         node_set, edge_set = {root_node}, set()
@@ -203,7 +201,7 @@ class GraphGenerator:
 
     @staticmethod
     def _bfs_network_with_frontier(
-        frame_range: Optional[Tuple[int, int]] = None,
+        frame_range: Tuple[int, int],
     ) -> Tuple[set, set, List, List[Tuple[float, float]], list]:
         """BFS that also captures frontier descriptors for Phase-2 continuation.
 
@@ -221,8 +219,6 @@ class GraphGenerator:
         all_edges : list[tuple]
             Every edge tuple (inner + boundary).
         """
-        frame_range = frame_range or BaseConfig.SYNTHETIC_FRAME_SIZE
-
         GraphNode.reset()
         root_node = GraphNode((0, 0))
         node_set, edge_set = {root_node}, set()

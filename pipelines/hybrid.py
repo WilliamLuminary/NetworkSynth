@@ -401,7 +401,9 @@ def run_phase2(
 
     if take_snapshots:
         os.makedirs(snapshot_dir, exist_ok=True)
-        snapshot_style = getattr(BaseConfig, "HYBRID_SNAPSHOT_STYLE", {})
+        snapshot_style = dict(getattr(BaseConfig, "HYBRID_SNAPSHOT_STYLE", {}))
+        # Read here in the parent: the plot pool runs in child processes.
+        snapshot_style.setdefault("max_px", getattr(BaseConfig, "RENDER_MAX_PX", None))
         plot_workers = BaseConfig.get_snapshot_plot_workers()
         plot_executor = ThreadPoolExecutor(max_workers=plot_workers)
         logger.info(
@@ -496,7 +498,12 @@ def plot_hybrid_network(graph: SynthGraph, margin_frac: float = 0.02, dpi: int =
     """Render a hybrid graph to a BGR ndarray (CV2-backed, memory-safe)."""
     from utils import render_network
 
-    return render_network(graph, margin_frac=margin_frac, dpi=dpi)
+    return render_network(
+        graph,
+        margin_frac=margin_frac,
+        dpi=dpi,
+        max_px=getattr(BaseConfig, "RENDER_MAX_PX", None),
+    )
 
 
 # ------------------------------------------------------------------ #
@@ -523,7 +530,7 @@ def run_hybrid_for_dataset(dataset_id):
         f"=== Hybrid pipeline for dataset: {dataset_id} ===",
         extra=tagged("PIPELINE", dataset=str(dataset_id)),
     )
-    log_memory(f"Start dataset {dataset_id}")
+    log_memory(f"Start dataset {dataset_id}", BaseConfig.LOG_MEMORY)
     _apply_dataset_factors(dataset_id)
     logger.info(BaseConfig())
 
@@ -532,7 +539,7 @@ def run_hybrid_for_dataset(dataset_id):
     attributes = data_agent.attributes
     mapper = data_agent.mapper
 
-    error_checker = create_error_checker()
+    error_checker = create_error_checker(BaseConfig)
     error_checker.compute_reference(data_agent.get_original_network())
 
     scale_rows, scale_cols = BaseConfig.TARGET_SCALE
@@ -553,14 +560,14 @@ def run_hybrid_for_dataset(dataset_id):
     frames = compute_center_frames(centers)
 
     # --- Phase 1 ---
-    log_memory(f"Before Phase 1 ({dataset_id})")
+    log_memory(f"Before Phase 1 ({dataset_id})", BaseConfig.LOG_MEMORY)
     t0 = time.time()
     tile_results = run_phase1(attributes, mapper, error_checker, frames)
     logger.info(
         f"Phase 1 elapsed: {time.time() - t0:.1f}s",
         extra=tagged("PHASE1", dataset=str(dataset_id)),
     )
-    log_memory(f"After Phase 1 ({dataset_id})")
+    log_memory(f"After Phase 1 ({dataset_id})", BaseConfig.LOG_MEMORY)
 
     if not tile_results:
         logger.error(
@@ -584,7 +591,7 @@ def run_hybrid_for_dataset(dataset_id):
         else None
     )
 
-    log_memory(f"Before Phase 2 ({dataset_id})")
+    log_memory(f"Before Phase 2 ({dataset_id})", BaseConfig.LOG_MEMORY)
     t1 = time.time()
     hybrid_graph = run_phase2(
         tile_results,
@@ -600,13 +607,13 @@ def run_hybrid_for_dataset(dataset_id):
         f"Phase 2 elapsed: {time.time() - t1:.1f}s",
         extra=tagged("PHASE2", dataset=str(dataset_id)),
     )
-    log_memory(f"After Phase 2 ({dataset_id})")
+    log_memory(f"After Phase 2 ({dataset_id})", BaseConfig.LOG_MEMORY)
 
     # --- Free Phase 1 tile data before post-processing ---
     del tile_results
     GraphNode.reset()
     gc.collect()
-    log_memory(f"After Phase 2 cleanup ({dataset_id})")
+    log_memory(f"After Phase 2 cleanup ({dataset_id})", BaseConfig.LOG_MEMORY)
 
     hybrid_graph = trim_graph(hybrid_graph, attributes.average_degree)
     log_connectivity(hybrid_graph, "Pre-LCC")
@@ -658,7 +665,7 @@ def run_hybrid_for_dataset(dataset_id):
     del error_checker, centers
     gc.collect()
 
-    log_memory(f"Before plotting ({dataset_id})")
+    log_memory(f"Before plotting ({dataset_id})", BaseConfig.LOG_MEMORY)
     img = plot_hybrid_network(hybrid_graph)
     del hybrid_graph
     gc.collect()
@@ -667,7 +674,7 @@ def run_hybrid_for_dataset(dataset_id):
     del img, saver
     gc.collect()
 
-    log_memory(f"End dataset {dataset_id}")
+    log_memory(f"End dataset {dataset_id}", BaseConfig.LOG_MEMORY)
     logger.info(
         f"Hybrid complete — "
         f"{num_nodes:,} nodes, {num_edges:,} edges"
@@ -732,7 +739,7 @@ def _run_dataset_in_subprocess(dataset_id):
             f"Dataset {dataset_id} subprocess finished successfully",
             extra=tagged("PIPELINE", dataset=str(dataset_id)),
         )
-    log_memory(f"Main process after {dataset_id} subprocess")
+    log_memory(f"Main process after {dataset_id} subprocess", BaseConfig.LOG_MEMORY)
 
 
 def main(config_cls=None):

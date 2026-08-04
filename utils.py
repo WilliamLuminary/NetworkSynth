@@ -13,12 +13,32 @@ if TYPE_CHECKING:
     from graphs.synth_graph import SynthGraph
 
 
-def log_memory(label: str = "") -> None:
-    """Log current process RSS memory usage (only when BaseConfig.LOG_MEMORY is True)."""
-    from configs import BaseConfig
+def apply_seed(seed: int | None) -> None:
+    """Seed both RNGs used by generation, or leave them alone if *seed* is None.
+
+    Generation draws from ``random`` (``_graph_node``, ``graph_generator``,
+    ``mapper``) and from ``np.random`` (``_graph_node``, ``mapper``), so both
+    must be seeded for a run to be reproducible.  Call this at the top of every
+    worker, using that worker's derived seed.
+    """
+    if seed is None:
+        return
+
+    import random
+
+    random.seed(seed)
+    np.random.seed(seed % (2**32))
+
+
+def log_memory(label: str, enabled: bool) -> None:
+    """Log current process RSS memory usage when *enabled*.
+
+    The gate is a parameter rather than a config read so this stays usable from
+    worker processes, where a mutated ``BaseConfig`` is not visible.
+    """
     from configs.base_config import tagged
 
-    if not BaseConfig.LOG_MEMORY:
+    if not enabled:
         return
 
     import psutil
@@ -34,12 +54,9 @@ def log_memory(label: str = "") -> None:
 def calculate_frame(
     graph: SynthGraph = None,
     center_position: Union[tuple, list, ndarray] = None,
-    frame_range: Tuple[int, int] = None,
+    *,
+    frame_range: Tuple[int, int],
 ) -> tuple[tuple[float, float], tuple[float, float]]:
-    if frame_range is None:
-        from configs import BaseConfig
-
-        frame_range = BaseConfig.SYNTHETIC_FRAME_SIZE
     if graph is None:
         if not center_position:
             raise ValueError(
@@ -193,6 +210,7 @@ def render_network(
     margin_frac: float = 0.02,
     dpi: int = None,
     border: bool = False,
+    max_px: int | None = None,
 ):
     """Render a SynthGraph to a BGR ndarray using OpenCV.
 
@@ -233,13 +251,10 @@ def render_network(
     frame_h = max(frame_h, 1e-12)
     aspect = frame_w / frame_h
 
-    from configs import BaseConfig
-
-    # Max pixel size of the render. Config-controllable via RENDER_MAX_PX;
-    # capped at the WebP 16383px hard limit. A large network at the 16383px
-    # limit produces a ~190MP image most viewers cannot open, so configs can
-    # lower this to a viewable size.
-    max_px = min(getattr(BaseConfig, "RENDER_MAX_PX", _WEBP_MAX_PX), _WEBP_MAX_PX)
+    # Max pixel size of the render, always capped at the WebP 16383px hard
+    # limit. A large network at that limit produces a ~190MP image most viewers
+    # cannot open, so callers can pass a lower max_px.
+    max_px = min(max_px or _WEBP_MAX_PX, _WEBP_MAX_PX)
     img_h = int(12 * dpi)
     img_w = int(12 * dpi * aspect)
     # Clamp to max_px while preserving aspect: when either axis exceeds the
@@ -486,6 +501,7 @@ def save_hybrid_snapshot(
     *,
     margin_frac: float = 0.02,
     dpi: int | None = None,
+    max_px: int | None = None,
     **_kwargs,
 ) -> None:
     """Render a snapshot of a large hybrid network and save as PNG.
@@ -514,13 +530,10 @@ def save_hybrid_snapshot(
     total_w = x_max - x_min
     total_h = y_max - y_min
 
-    from configs import BaseConfig
-
-    # Max pixel size of the render. Config-controllable via RENDER_MAX_PX;
-    # capped at the WebP 16383px hard limit. A large network at the 16383px
-    # limit produces a ~190MP image most viewers cannot open, so configs can
-    # lower this to a viewable size.
-    max_px = min(getattr(BaseConfig, "RENDER_MAX_PX", _WEBP_MAX_PX), _WEBP_MAX_PX)
+    # Max pixel size of the render, always capped at the WebP 16383px hard
+    # limit. A large network at that limit produces a ~190MP image most viewers
+    # cannot open, so callers can pass a lower max_px.
+    max_px = min(max_px or _WEBP_MAX_PX, _WEBP_MAX_PX)
     img_h = int(12 * dpi)
     img_w = int(12 * dpi * aspect)
     # Clamp to max_px while preserving aspect: when either axis exceeds the

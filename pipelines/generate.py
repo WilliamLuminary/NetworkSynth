@@ -20,7 +20,7 @@ from analysis.error_checker import ErrorChecker, create_error_checker
 from configs import BaseConfig, DatasetId, SynthParams
 from graphs import GraphGenerator
 from handlers import AttributesCalculator, Mapper, RunAgent, Saver
-from utils import save_bfs_snapshot, trim_graph
+from utils import apply_seed, save_bfs_snapshot, trim_graph
 
 logger = logging.getLogger(__name__)
 SIGINT_INFO = "SIGINT received. Terminating child process..."
@@ -64,6 +64,7 @@ def generate_synthetic_network(
     if _should_exit(exit_event):
         return None, float("inf")
 
+    apply_seed(params.seed)
     generator = GraphGenerator(attributes, params)
     for attempt in range(params.max_attempts):
         try:
@@ -99,6 +100,7 @@ def _generate_single_network(
     if exit_event.is_set():
         return None, float("inf")
 
+    apply_seed(params.seed)
     generator = GraphGenerator(attributes, params)
     for attempt in range(params.max_attempts):
         try:
@@ -151,6 +153,7 @@ def _generate_single_network_collecting_snapshots(
     if exit_event.is_set():
         return None, float("inf"), []
 
+    apply_seed(params.seed)
     avg_degree = attributes.average_degree
     generator = GraphGenerator(attributes, params)
     for attempt in range(params.max_attempts):
@@ -239,7 +242,7 @@ def generate_with_multiprocessing(data_agent: RunAgent):
     from multiprocessing import Manager
 
     exit_event = Manager().Event()
-    error_checker = create_error_checker()
+    error_checker = create_error_checker(BaseConfig)
     if BaseConfig.SYNTHETIC_NETWORK_NUMBER > 0:
         error_checker.compute_reference(data_agent.get_original_network())
 
@@ -261,9 +264,9 @@ def generate_with_multiprocessing(data_agent: RunAgent):
                     error_checker,
                     data_agent.attributes,
                     data_agent.mapper,
-                    params,
+                    params.for_worker(i),
                 )
-                for _ in range(num_network)
+                for i in range(num_network)
             ]
             next_log = 10
             for idx, future in enumerate(as_completed(futures), start=1):
@@ -335,9 +338,9 @@ def generate_with_snapshots(data_agent: RunAgent):
         )
         plot_futures.append(fut)
 
-    generator = GraphGenerator(
-        data_agent.attributes, SynthParams.from_config(BaseConfig)
-    )
+    params = SynthParams.from_config(BaseConfig)
+    apply_seed(params.seed)
+    generator = GraphGenerator(data_agent.attributes, params)
     synthetic_graph = generator.generate_network_with_snapshots(
         snapshot_callback=on_snapshot,
         snapshot_interval=interval,

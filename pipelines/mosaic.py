@@ -247,7 +247,13 @@ def plot_mosaic_network(graph: SynthGraph, margin_frac: float = 0.02, dpi: int =
 
     Includes a black border rectangle around the bounding box.
     """
-    return render_network(graph, margin_frac=margin_frac, dpi=dpi, border=True)
+    return render_network(
+        graph,
+        margin_frac=margin_frac,
+        dpi=dpi,
+        border=True,
+        max_px=getattr(BaseConfig, "RENDER_MAX_PX", None),
+    )
 
 
 # ------------------------------------------------------------------ #

@@ -28,19 +28,19 @@ class RunAgent:
     ):
         if networks_path:
             self.mode = Mode.ANA
-            self.data_loader = DataLoader(Mode.ANA, path=networks_path)
+            self.data_loader = DataLoader(Mode.ANA, BaseConfig, path=networks_path)
             self.saver = Saver(output_dir=networks_path)
             self.batch_processor = None
         elif dataset_id is not None:
             self.mode = Mode.GEN
-            self.data_loader = DataLoader(Mode.GEN, dataset_id=dataset_id)
+            self.data_loader = DataLoader(Mode.GEN, BaseConfig, dataset_id=dataset_id)
             self.saver = Saver(dataset_id=dataset_id)
             self.attributes = None
             self.mapper = None
             self.batch_processor = None
         elif attr_path:
             self.mode = Mode.ATR
-            self.data_loader = DataLoader(Mode.ATR, path=attr_path)
+            self.data_loader = DataLoader(Mode.ATR, BaseConfig, path=attr_path)
             self.saver = Saver(output_dir=attr_path)
             self.attributes = None
             self.mapper = None
@@ -70,7 +70,10 @@ class RunAgent:
             from analysis import MultifractalBatchProcessor
 
             self.batch_processor = MultifractalBatchProcessor(
-                original_networks, synthetic_networks
+                original_networks,
+                synthetic_networks,
+                measure_weighted=BaseConfig.MEASURE_WEIGHTED,
+                full_q_band=BaseConfig.FULL_Q_BAND,
             )
 
         elif self.mode == Mode.ATR:
@@ -86,7 +89,10 @@ class RunAgent:
         from analysis import MultifractalBatchProcessor
 
         self.batch_processor = MultifractalBatchProcessor(
-            original_networks, synthetic_networks
+            original_networks,
+            synthetic_networks,
+            measure_weighted=BaseConfig.MEASURE_WEIGHTED,
+            full_q_band=BaseConfig.FULL_Q_BAND,
         )
         self.multifractal_analysis()
 
@@ -252,7 +258,7 @@ def plot_network(data_type: str, graph: SynthGraph, **kwargs):
     else:
         from utils import calculate_frame
 
-        frame = calculate_frame(graph)
+        frame = calculate_frame(graph, frame_range=BaseConfig.SYNTHETIC_FRAME_SIZE)
 
     frame_width = frame[0][1] - frame[0][0]
     frame_height = frame[1][1] - frame[1][0]
