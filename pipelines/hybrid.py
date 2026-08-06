@@ -16,7 +16,7 @@ from concurrent.futures import (
     ThreadPoolExecutor,
     as_completed,
 )
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import networkit as nk
 import numpy as np
@@ -50,7 +50,7 @@ def generate_random_centers(
     whiteboard_h: float,
     min_distance: float,
     max_centers: int = 0,
-    rng_seed: int = 42,
+    rng_seed: Optional[int] = None,
     max_rejections: int = 50_000,
 ) -> List[Tuple[float, float]]:
     """Place centers randomly with a minimum pairwise distance.
@@ -59,7 +59,12 @@ def generate_random_centers(
     is at least *min_distance* from every existing centre, otherwise
     discard.  Stops after *max_rejections* consecutive failures or
     when *max_centers* is reached (0 = no limit).
+
+    *rng_seed* defaults to ``BaseConfig.RANDOM_SEED``, so the center layout
+    moves with the global seed.
     """
+    if rng_seed is None:
+        rng_seed = BaseConfig.RANDOM_SEED
     gen = np.random.RandomState(rng_seed)
     centers: List[Tuple[float, float]] = []
     consecutive_rejects = 0
@@ -152,15 +157,11 @@ def _generate_tile_worker(args):
         - ``edges``    : list of ((x1,y1),…)     — local coordinates
         - ``frontier`` : list of FrontierDescriptor — local coordinates
     """
-    import random
-
     tile_idx, exit_event, attributes, error_checker, mapper, frame_range = args
 
     nk.setNumberOfThreads(1)
 
-    seed = os.getpid() ^ tile_idx
-    random.seed(seed)
-    np.random.seed(seed % (2**31))
+    BaseConfig.seed_rng(tile_idx)
 
     if exit_event.is_set():
         return tile_idx, None
@@ -581,6 +582,9 @@ def run_hybrid_for_dataset(dataset_id):
     )
 
     log_memory(f"Before Phase 2 ({dataset_id})")
+    # Phase 2 grows nodes in this process; seed past the tile index range so it
+    # does not replay a tile's random stream.
+    BaseConfig.seed_rng(len(centers))
     t1 = time.time()
     hybrid_graph = run_phase2(
         tile_results,

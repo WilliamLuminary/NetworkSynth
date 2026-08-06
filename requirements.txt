@@ -5,6 +5,7 @@ matplotlib~=3.10.0
 Pillow~=12.1.1
 scipy~=1.15.3
 networkit~=11.0
+networkx~=3.4  # only for reading legacy nx.Graph pickles (SynthGraph.from_networkx)
 scikit-learn~=1.7.2
 
 # Experiment tracking

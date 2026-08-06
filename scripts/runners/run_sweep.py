@@ -68,8 +68,9 @@ def generate_networks_multiprocess(
                     std_err_fea,
                     data_agent.attributes,
                     data_agent.mapper,
+                    worker_index=i,
                 )
-                for _ in range(num_network)
+                for i in range(num_network)
             ]
             next_log = 0
             for idx, future in enumerate(as_completed(futures), start=1):

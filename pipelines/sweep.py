@@ -7,7 +7,6 @@ import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from multiprocessing import Manager
 
-import numpy as np
 import wandb
 
 from analysis.error_checker import ErrorChecker, create_error_checker
@@ -57,8 +56,6 @@ def _generate_with_factors(
     exit_event, error_checker: ErrorChecker, attributes, mapper, nf, ef
 ):
     """Spawn-safe: uses the same BFS path as the hybrid tile generator."""
-    import random
-
     BaseConfig.CLOSED_NODES_FACTOR = nf
     BaseConfig.CLOSED_EDGES_FACTOR = ef
 
@@ -68,9 +65,7 @@ def _generate_with_factors(
     GraphNode.initialize(attributes)
 
     for attempt in range(BaseConfig.MAX_ATTEMPTS):
-        seed = os.getpid() ^ attempt
-        random.seed(seed)
-        np.random.seed(seed % (2**31))
+        BaseConfig.seed_rng(attempt)
 
         try:
             result = GraphGenerator._bfs_network_with_frontier()

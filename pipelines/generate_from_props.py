@@ -24,10 +24,13 @@ def _should_exit(exit_event) -> bool:
     return False
 
 
-def generate_synthetic_network(exit_event, attributes: AttributesCalculator):
+def generate_synthetic_network(
+    exit_event, attributes: AttributesCalculator, *, worker_index: int
+):
     if _should_exit(exit_event):
         return None
 
+    BaseConfig.seed_rng(worker_index)
     generator = GraphGenerator(attributes)
     for attempt in range(BaseConfig.MAX_ATTEMPTS):
         try:
@@ -65,9 +68,12 @@ def generate_with_multiprocessing(data_agent: RunAgent):
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
             futures = [
                 executor.submit(
-                    generate_synthetic_network, exit_event, data_agent.attributes
+                    generate_synthetic_network,
+                    exit_event,
+                    data_agent.attributes,
+                    worker_index=i,
                 )
-                for _ in range(num_network)
+                for i in range(num_network)
             ]
             next_log = 0
             for idx, future in enumerate(as_completed(futures), start=1):

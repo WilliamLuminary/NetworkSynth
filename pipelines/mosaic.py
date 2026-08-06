@@ -51,6 +51,8 @@ def generate_single_tile(args):
     if exit_event.is_set():
         return (row, col), None
 
+    BaseConfig.seed_rng(row * BaseConfig.GRID_COLS + col)
+
     try:
         generator = GraphGenerator(attributes)
         graph = generator.generate_network(frame_range=tile_gen_frame)

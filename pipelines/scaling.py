@@ -31,6 +31,7 @@ def run_scaling_for_dataset(dataset_id):
     attributes = data_agent.attributes
 
     # 2. Generate scaled network
+    BaseConfig.seed_rng(0)
     generator = GraphGenerator(attributes)
     scaled_graph = generator.generate_scaled_network(
         scale_rows=BaseConfig.SCALE_ROWS,

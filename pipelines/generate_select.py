@@ -204,6 +204,7 @@ def generate_and_select(data_agent: RunAgent):
                         data_agent.mapper,
                         snapshot_interval,
                         early_node_count,
+                        worker_index=i,
                     )
                 else:
                     future = executor.submit(
@@ -212,6 +213,7 @@ def generate_and_select(data_agent: RunAgent):
                         error_checker,
                         data_agent.attributes,
                         data_agent.mapper,
+                        worker_index=i,
                     )
                 future_to_idx[future] = i
                 futures.append(future)

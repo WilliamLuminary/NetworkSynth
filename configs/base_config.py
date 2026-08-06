@@ -2,8 +2,11 @@
 import json
 import logging
 import os
+import random
 import uuid
 from typing import List, Optional, Tuple
+
+import numpy as np
 
 from .enums import DatasetId
 
@@ -100,6 +103,7 @@ class BaseConfig:
     ATTRIBUTES_DICT_DATA_PATH = None
 
     MAX_ATTEMPTS = 10
+    RANDOM_SEED: Optional[int] = 42  # None = seed from OS entropy (non-reproducible)
     ERROR_CHECKER: str = (
         "multifractal"  # quality-gate algorithm; "none" disables checking
     )
@@ -129,6 +133,21 @@ class BaseConfig:
         if num_tasks is not None:
             max_workers = min(max_workers, num_tasks)
         return max_workers
+
+    @classmethod
+    def seed_rng(cls, index: int) -> None:
+        """Seed this process's RNGs deterministically from ``RANDOM_SEED``.
+
+        Called at the top of every worker task. ``index`` must be unique
+        within a batch, otherwise sibling workers draw the same numbers and
+        produce identical networks. When ``RANDOM_SEED`` is None the RNGs are
+        left on their OS-entropy seeding, so runs are not reproducible.
+        """
+        if cls.RANDOM_SEED is None:
+            return
+        seed = (cls.RANDOM_SEED + index) % (2**31)
+        random.seed(seed)
+        np.random.seed(seed)
 
     @classmethod
     def get_snapshot_plot_workers(cls) -> int:

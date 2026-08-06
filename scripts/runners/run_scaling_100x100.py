@@ -54,6 +54,7 @@ logger.info(f"average_length: {attributes.average_length:.2f}")
 logger.info(f"average_degree: {attributes.average_degree:.2f}")
 
 t0 = time.time()
+BaseConfig.seed_rng(0)
 generator = GraphGenerator(attributes)
 scaled_graph = generator.generate_scaled_network(
     scale_rows=100,

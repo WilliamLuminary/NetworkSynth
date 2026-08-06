@@ -48,6 +48,7 @@ def main():
     t_orig = time.perf_counter() - t0
     logger.info(f"Original MF features: {std_err_fea}  ({t_orig:.2f}s)")
 
+    BaseConfig.seed_rng(0)
     generator = GraphGenerator(data_agent.attributes)
 
     for i in range(N_SAMPLES):

@@ -59,10 +59,13 @@ def generate_synthetic_network(
     error_checker: ErrorChecker,
     attributes: AttributesCalculator,
     mapper: Mapper,
+    *,
+    worker_index: int,
 ):
     if _should_exit(exit_event):
         return None, float("inf")
 
+    BaseConfig.seed_rng(worker_index)
     generator = GraphGenerator(attributes)
     for attempt in range(BaseConfig.MAX_ATTEMPTS):
         try:
@@ -92,11 +95,14 @@ def _generate_single_network(
     error_checker: ErrorChecker,
     attributes: AttributesCalculator,
     mapper: Mapper,
+    *,
+    worker_index: int,
 ):
     """Generate one network with error gating and retry loop."""
     if exit_event.is_set():
         return None, float("inf")
 
+    BaseConfig.seed_rng(worker_index)
     generator = GraphGenerator(attributes)
     for attempt in range(BaseConfig.MAX_ATTEMPTS):
         try:
@@ -128,6 +134,8 @@ def _generate_single_network_collecting_snapshots(
     mapper: Mapper,
     snapshot_interval: int,
     early_check_node_count: int = 0,
+    *,
+    worker_index: int,
 ):
     """Generate one network, collecting raw snapshot data in memory.
 
@@ -148,6 +156,7 @@ def _generate_single_network_collecting_snapshots(
     if exit_event.is_set():
         return None, float("inf"), []
 
+    BaseConfig.seed_rng(worker_index)
     avg_degree = attributes.average_degree
     generator = GraphGenerator(attributes)
     for attempt in range(BaseConfig.MAX_ATTEMPTS):
@@ -254,8 +263,9 @@ def generate_with_multiprocessing(data_agent: RunAgent):
                     error_checker,
                     data_agent.attributes,
                     data_agent.mapper,
+                    worker_index=i,
                 )
-                for _ in range(num_network)
+                for i in range(num_network)
             ]
             next_log = 10
             for idx, future in enumerate(as_completed(futures), start=1):
@@ -327,6 +337,7 @@ def generate_with_snapshots(data_agent: RunAgent):
         )
         plot_futures.append(fut)
 
+    BaseConfig.seed_rng(0)
     generator = GraphGenerator(data_agent.attributes)
     synthetic_graph = generator.generate_network_with_snapshots(
         snapshot_callback=on_snapshot,
