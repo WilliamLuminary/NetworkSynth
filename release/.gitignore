@@ -1,0 +1,12 @@
+# Input datasets are not distributed with this release.
+data/input/*
+!data/input/.keep
+
+# Run artifacts
+data/output/*
+!data/output/.keep
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+wandb/

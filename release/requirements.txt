@@ -1,0 +1,16 @@
+# Core dependencies
+numpy~=2.2.6
+opencv-python~=4.13.0
+matplotlib~=3.10.0
+Pillow~=12.1.1
+scipy~=1.15.3
+networkit~=11.0
+networkx~=3.4  # only for reading legacy nx.Graph pickles (SynthGraph.from_networkx)
+scikit-learn~=1.7.2
+
+# CLI helpers
+fire~=0.7.1
+tqdm~=4.67.0
+
+# Monitoring
+psutil~=7.0.0
