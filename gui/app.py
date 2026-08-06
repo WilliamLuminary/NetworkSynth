@@ -206,9 +206,7 @@ class SynthesisController(QObject):
             return
         self._set_status("Cancelling…")
         try:
-            self._process.send_signal(
-                getattr(__import__("signal"), "SIGINT", 2)
-            )
+            self._process.send_signal(getattr(__import__("signal"), "SIGINT", 2))
         except (ProcessLookupError, OSError):
             pass
 
@@ -312,9 +310,7 @@ class SynthesisController(QObject):
         problems = spec_builder.validate(
             self._mode, self._edge_list, self._positions, self._output_dir, self._values
         )
-        self._set_status(
-            "Ready." if not problems else problems[0], failed=False
-        )
+        self._set_status("Ready." if not problems else problems[0], failed=False)
 
     def _set_status(self, text: str, failed: bool = False) -> None:
         self._status = text
