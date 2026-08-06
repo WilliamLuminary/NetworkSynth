@@ -18,24 +18,25 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
+
+# noinspection PyUnresolvedReferences
+from dataclasses import replace
 from itertools import product
 from typing import Tuple
 
 import wandb
 
 from analysis import MultifractalAnalyzer
-
-# noinspection PyUnresolvedReferences
-from configs import BaseConfig, DatasetId
+from configs import BaseConfig, DatasetId, SynthParams
 from configs.generate_mode import GenConfigTmp as GenConfig
-from handlers import RunAgent, Saver
+from handlers import RunAgent, create_run_paths
 from pipelines.generate import compute_average_error, generate_synthetic_network
 
 GenConfig.initialize()
 BaseConfig.SYNTHETIC_NETWORK_NUMBER = 100
 BaseConfig.SYNTHETIC_GRAPH_NUMBER = 0
 BaseConfig.disable_saving("Sweeping Experiment")
-Saver.initialize()
+run_paths = create_run_paths(GenConfig)
 
 EXPERIMENT_PROJECT_NAME = "hyperparam-tuning"
 EXPERIMENT_NAME = "mosaic-sample-sweep"
@@ -47,7 +48,7 @@ SIGINT_INFO = "SIGINT received. Terminating child process..."
 
 
 def generate_networks_multiprocess(
-    data_agent: RunAgent, std_err_fea
+    data_agent: RunAgent, std_err_fea, trial_params
 ) -> Tuple[float, float]:
     """Return (average_error, success_rate)."""
     num_network = BaseConfig.SYNTHETIC_NETWORK_NUMBER
@@ -68,8 +69,9 @@ def generate_networks_multiprocess(
                     std_err_fea,
                     data_agent.attributes,
                     data_agent.mapper,
+                    trial_params.for_worker(i),
                 )
-                for _ in range(num_network)
+                for i in range(num_network)
             ]
             next_log = 0
             for idx, future in enumerate(as_completed(futures), start=1):
@@ -102,17 +104,24 @@ def generate_networks_multiprocess(
 
 
 def run_with_params(data_agent, ef, nf, std_err_fea):
-    """Apply a single (nf, ef) pair and generate all networks for it."""
-    BaseConfig.set_node_factor(nf)
-    BaseConfig.set_edge_factor(ef)
-    logger.info(BaseConfig())
-    return generate_networks_multiprocess(data_agent, std_err_fea)
+    """Generate all networks for a single (nf, ef) pair.
+
+    The pair lives in an immutable params object rather than being written into
+    global config, so pairs cannot interfere with each other.
+    """
+    trial_params = replace(
+        SynthParams.from_config(GenConfig),
+        closed_nodes_factor=nf,
+        closed_edges_factor=ef,
+    )
+    logger.info(f"nf={nf}, ef={ef}")
+    return generate_networks_multiprocess(data_agent, std_err_fea, trial_params)
 
 
 def run_for_dataset(dataset_id: DatasetId) -> None:
     """Process a single dataset identified by DatasetId."""
     logger.info(f"Processing dataset: {dataset_id}")
-    data_agent = RunAgent(dataset_id=dataset_id)
+    data_agent = RunAgent(GenConfig, run_paths=run_paths, dataset_id=dataset_id)
     data_agent.prepare_data()
     std_err_fea = MultifractalAnalyzer(
         data_agent.get_original_network(),

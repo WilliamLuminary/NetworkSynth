@@ -126,33 +126,25 @@ class TestSpecs:
 
 
 class TestModeOverrides:
-    @pytest.fixture(autouse=True)
-    def _restore_base_config(self):
-        """Snapshot BaseConfig before each test, restore after."""
-        snapshot = {}
-        for name in dir(BaseConfig):
-            if name.startswith("__"):
-                continue
-            if name.isupper() or name.startswith("save_"):
-                snapshot[name] = getattr(BaseConfig, name)
-        yield
-        for name in list(vars(BaseConfig)):
-            if name.startswith("save_") and name not in snapshot:
-                delattr(BaseConfig, name)
-        for name, value in snapshot.items():
-            setattr(BaseConfig, name, value)
+    """A config's ``save_*`` overrides resolve on that config itself.
+
+    These used to call ``_inject_dependencies()`` and then read the specs off
+    ``BaseConfig``.  No injection is needed: ``save()`` looks up
+    ``save_<identifier>`` with ``getattr(cls, ...)``, so asking the real config
+    resolves its override through the normal MRO — and asking a *different*
+    config is unaffected, which is the point.
+    """
 
     def test_mosaic_synthetic_graph_has_png(self):
         from configs.mosaic_mode.config_sample import SampleConfig as MosaicConfig
 
-        MosaicConfig._inject_dependencies()
-        specs = BaseConfig.save("synthetic_graph")
+        specs = MosaicConfig.save("synthetic_graph")
         exts = [s[2] for s in specs]
         assert "webp" in exts
         assert "png" in exts
         assert len(specs) == 2
 
-    def test_inject_dependencies_copies_save_methods(self):
+    def test_override_resolves_on_the_defining_config(self):
         class CustomConfig(BaseConfig):
             @classmethod
             def save_test_custom(cls):
@@ -160,18 +152,24 @@ class TestModeOverrides:
 
                 return [("custom_dir", "test_detail", "pkl", save_pickle)]
 
-        CustomConfig._inject_dependencies()
-        specs = BaseConfig.save("test_custom")
+        specs = CustomConfig.save("test_custom")
         assert specs[0][0] == "custom_dir"
         assert specs[0][1] == "test_detail"
+
+    def test_override_does_not_leak_to_other_configs(self):
+        """The regression injection caused: one config changing another's specs."""
+        from configs.mosaic_mode.config_sample import SampleConfig as MosaicConfig
+
+        MosaicConfig.save("synthetic_graph")  # mosaic overrides this identifier
+
+        assert len(BaseConfig.save("synthetic_graph")) == 1
 
     def test_analyze_mode_overrides(self):
         from configs.analyze_mode.config_sample import SampleConfig as AnaConfig
 
-        AnaConfig._inject_dependencies()
-        specs = BaseConfig.save("analysis_data")
+        specs = AnaConfig.save("analysis_data")
         assert specs[0][4] is False
-        specs = BaseConfig.save("analysis_figure")
+        specs = AnaConfig.save("analysis_figure")
         assert specs[0][2] == "webp"
 
 
@@ -186,6 +184,7 @@ def saver_in_tmpdir(tmp_path):
     saver = object.__new__(Saver)
     saver.output_dir = str(tmp_path)
     saver._save_func = BaseConfig.save
+    saver._config = BaseConfig
     saver._batch_timestamp = None
     return saver
 
@@ -353,6 +352,7 @@ class TestEndToEnd:
         saver = object.__new__(Saver)
         saver.output_dir = str(tmp_path)
         saver._save_func = BaseConfig.save
+        saver._config = BaseConfig
         saver._batch_timestamp = None
 
         data = {"hello": "world"}
@@ -369,6 +369,7 @@ class TestEndToEnd:
         saver = object.__new__(Saver)
         saver.output_dir = str(tmp_path)
         saver._save_func = BaseConfig.save
+        saver._config = BaseConfig
         saver._batch_timestamp = "20250101_000000"
 
         graph = FakeGraph(n_nodes=5)

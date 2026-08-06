@@ -7,37 +7,32 @@ import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from multiprocessing import Manager
 
-import numpy as np
 import wandb
 
 from analysis.error_checker import ErrorChecker, create_error_checker
 
 # noinspection PyUnresolvedReferences
-from configs import BaseConfig, DatasetId, SynthParams
+from configs import DatasetId, SynthParams
+from configs.base_config import tagged
 from graphs import GraphGenerator
 from graphs._graph_node import GraphNode
-from handlers import RunAgent
+from handlers import RunAgent, attach_run_log, create_run_paths
 from pipelines.generate import compute_average_error
-from utils import build_graph, trim_graph
-
-_CONFIG_MAP = {
-    "A": "SweepConfigA",
-    "B": "SweepConfigB",
-    "C": "SweepConfigC",
-    "D": "SweepConfigD",
-}
+from utils import apply_seed, build_graph, trim_graph
 
 
-def _init_config(config_key=None):
-    """Resolve and initialize the sweep config. Call once before sweeping."""
-    import configs.sweep_mode as sweep_mod
+def _init_config():
+    """Initialize the sweep config. Call once before sweeping.
 
-    name = _CONFIG_MAP.get(config_key, "SweepConfig")
-    cfg = getattr(sweep_mod, name)
+    Sweeps every dataset the config lists; there is no per-dataset variant.
+    """
+    from configs.sweep_mode import SweepConfig as cfg
+
     cfg.initialize()
-    BaseConfig.SYNTHETIC_NETWORK_NUMBER = 100
-    BaseConfig.SYNTHETIC_GRAPH_NUMBER = 0
-    BaseConfig.disable_saving("Sweeping Experiment")
+    cfg.SYNTHETIC_NETWORK_NUMBER = 100
+    cfg.SYNTHETIC_GRAPH_NUMBER = 0
+    cfg.disable_saving("Sweeping Experiment")
+    return cfg
 
 
 EXPERIMENT_PROJECT_NAME = "hyperparam-tuning"
@@ -54,26 +49,23 @@ logger = logging.getLogger(__name__)
 
 
 def _generate_with_factors(
-    exit_event, error_checker: ErrorChecker, attributes, mapper, nf, ef
+    exit_event, error_checker: ErrorChecker, attributes, mapper, params
 ):
-    """Spawn-safe: uses the same BFS path as the hybrid tile generator."""
-    import random
+    """Uses the same BFS path as the hybrid tile generator.
 
-    BaseConfig.CLOSED_NODES_FACTOR = nf
-    BaseConfig.CLOSED_EDGES_FACTOR = ef
-
+    *params* already carries this trial's node/edge factors, derived in the
+    parent - no global mutation, and nothing read from inherited class state.
+    """
     if exit_event.is_set():
         return None, float("inf")
 
-    # TODO: params are built here rather than passed from the parent, so this
-    # path is still fork-dependent and its seeding is not reproducible.
-    params = SynthParams.from_config(BaseConfig)
     GraphNode.initialize(attributes, params)
 
     for attempt in range(params.max_attempts):
-        seed = os.getpid() ^ attempt
-        random.seed(seed)
-        np.random.seed(seed % (2**31))
+        # Seeded from this trial's params rather than the PID, so a seeded
+        # sweep repeats. Attempt index keeps retries from re-drawing the same
+        # failed network.
+        apply_seed(None if params.seed is None else params.seed + attempt)
 
         try:
             result = GraphGenerator._bfs_network_with_frontier(
@@ -102,11 +94,21 @@ def _generate_with_factors(
     return None, float("inf")
 
 
-def generate_networks(data_agent, error_checker: ErrorChecker, nf, ef):
+def generate_networks(data_agent, error_checker: ErrorChecker, nf, ef, config):
     """Generate networks with the given factors. Return (avg_error, success_rate)."""
-    num_network = BaseConfig.SYNTHETIC_NETWORK_NUMBER
+    from dataclasses import replace
+
+    num_network = config.SYNTHETIC_NETWORK_NUMBER
     exit_event = Manager().Event()
-    max_workers = BaseConfig.get_max_workers(num_network)
+    max_workers = config.get_max_workers(num_network)
+
+    # This trial's factors live in an immutable params object rather than being
+    # written into global config, so trials cannot interfere with each other.
+    trial_params = replace(
+        SynthParams.from_config(config),
+        closed_nodes_factor=nf,
+        closed_edges_factor=ef,
+    )
 
     errors = []
     futures = []
@@ -119,10 +121,9 @@ def generate_networks(data_agent, error_checker: ErrorChecker, nf, ef):
                     error_checker,
                     data_agent.attributes,
                     data_agent.mapper,
-                    nf,
-                    ef,
+                    trial_params.for_worker(i),
                 )
-                for _ in range(num_network)
+                for i in range(num_network)
             ]
             next_log = 10
             for idx, future in enumerate(as_completed(futures), start=1):
@@ -132,7 +133,10 @@ def generate_networks(data_agent, error_checker: ErrorChecker, nf, ef):
 
                 progress = round(idx / num_network * 100, 2)
                 if progress >= next_log:
-                    logger.info(f"({progress}%) Synthetic graph generated.")
+                    logger.info(
+                        f"({progress}%) Synthetic graph generated.",
+                        extra=tagged("PROGRESS", percent=progress),
+                    )
                     next_log += 10
 
                 errors.append(error)
@@ -149,7 +153,9 @@ def generate_networks(data_agent, error_checker: ErrorChecker, nf, ef):
     return avg_error, success_rate
 
 
-def run_for_dataset(dataset_id: DatasetId, node_factors, edge_factors) -> None:
+def run_for_dataset(
+    dataset_id: DatasetId, node_factors, edge_factors, config, run_paths
+) -> None:
     """Create a wandb sweep for a single dataset and run all trials."""
     logger.info(f"Processing dataset: {dataset_id}")
     logger.info(
@@ -160,9 +166,9 @@ def run_for_dataset(dataset_id: DatasetId, node_factors, edge_factors) -> None:
     )
     logger.info(f"  total trials: {len(node_factors) * len(edge_factors)}")
 
-    data_agent = RunAgent(dataset_id=dataset_id)
+    data_agent = RunAgent(config, run_paths=run_paths, dataset_id=dataset_id)
     data_agent.prepare_data()
-    error_checker = create_error_checker(BaseConfig)
+    error_checker = create_error_checker(config)
     error_checker.compute_reference(data_agent.get_original_network())
 
     sweep_config = {
@@ -181,7 +187,9 @@ def run_for_dataset(dataset_id: DatasetId, node_factors, edge_factors) -> None:
             ef = wandb.config.edge_factor
             logger.info(f"Trial: nf={nf}, ef={ef}")
 
-            error, success_rate = generate_networks(data_agent, error_checker, nf, ef)
+            error, success_rate = generate_networks(
+                data_agent, error_checker, nf, ef, config
+            )
             if error is None:
                 error = float("inf")
 
@@ -191,24 +199,30 @@ def run_for_dataset(dataset_id: DatasetId, node_factors, edge_factors) -> None:
     wandb.agent(sweep_id, function=trial)
 
 
-def main(config=None, nf_range=None, ef_range=None):
-    _init_config(config)
+def main(nf_range=None, ef_range=None):
+    cfg = _init_config()
 
-    nf_lo, nf_hi = nf_range or DEFAULT_NF_RANGE
-    ef_lo, ef_hi = ef_range or DEFAULT_EF_RANGE
+    # CLI argument wins, then the config's range, then the module default.
+    nf_lo, nf_hi = nf_range or getattr(cfg, "NF_RANGE", DEFAULT_NF_RANGE)
+    ef_lo, ef_hi = ef_range or getattr(cfg, "EF_RANGE", DEFAULT_EF_RANGE)
     node_factors = _build_factors(nf_lo, nf_hi)
     edge_factors = _build_factors(ef_lo, ef_hi)
 
     assert (
-        BaseConfig.SYNTHETIC_NETWORK_NUMBER != 0
+        cfg.SYNTHETIC_NETWORK_NUMBER != 0
     ), "Sweeping experiments require synthetic networks."
 
     wandb.login()
     try:
-        for dataset_id in BaseConfig.get_datasets():
-            run_for_dataset(dataset_id, node_factors, edge_factors)
+        run_paths = create_run_paths(cfg)
+        attach_run_log(run_paths.root, cfg.RUN_ID)
+        for dataset_id in cfg.get_datasets():
+            run_for_dataset(dataset_id, node_factors, edge_factors, cfg, run_paths)
     except KeyboardInterrupt:
         logger.critical("MAIN PROCESS: Forcing immediate shutdown!")
+        # Re-raised so the entry point can exit non-zero: a cancelled
+        # run must not look like a completed one to a caller.
+        raise
 
 
 if __name__ == "__main__":

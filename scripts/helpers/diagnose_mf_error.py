@@ -22,7 +22,7 @@ from analysis import MultifractalAnalyzer
 from configs import SynthParams
 from configs.generate_mode.config_snapshot_3x3 import Snapshot3x3Config
 from graphs import GraphGenerator
-from handlers import RunAgent
+from handlers import RunAgent, create_run_paths
 from utils import trim_graph
 
 N_SAMPLES = 3
@@ -32,12 +32,9 @@ def main():
     Snapshot3x3Config.ERROR_TOLERANCE = 0
     Snapshot3x3Config.initialize()
 
-    from configs import BaseConfig
-    from handlers import Saver
-
-    Saver.initialize()
-    dataset_id = BaseConfig.get_datasets()[0]
-    data_agent = RunAgent(dataset_id=dataset_id)
+    run_paths = create_run_paths(Snapshot3x3Config)
+    dataset_id = Snapshot3x3Config.get_datasets()[0]
+    data_agent = RunAgent(Snapshot3x3Config, run_paths=run_paths, dataset_id=dataset_id)
     data_agent.prepare_data()
 
     original = data_agent.get_original_network()
@@ -46,13 +43,13 @@ def main():
 
     t0 = time.perf_counter()
     std_err_fea = MultifractalAnalyzer(
-        original, BaseConfig.MEASURE_WEIGHTED, BaseConfig.FULL_Q_BAND
+        original, Snapshot3x3Config.MEASURE_WEIGHTED, Snapshot3x3Config.FULL_Q_BAND
     ).analyze_error_features()
     t_orig = time.perf_counter() - t0
     logger.info(f"Original MF features: {std_err_fea}  ({t_orig:.2f}s)")
 
     generator = GraphGenerator(
-        data_agent.attributes, SynthParams.from_config(BaseConfig)
+        data_agent.attributes, SynthParams.from_config(Snapshot3x3Config)
     )
 
     for i in range(N_SAMPLES):
@@ -86,7 +83,9 @@ def main():
 
         t0 = time.perf_counter()
         full_err_fea = MultifractalAnalyzer(
-            full_graph, BaseConfig.MEASURE_WEIGHTED, BaseConfig.FULL_Q_BAND
+            full_graph,
+            Snapshot3x3Config.MEASURE_WEIGHTED,
+            Snapshot3x3Config.FULL_Q_BAND,
         ).analyze_error_features()
         full_error = MultifractalAnalyzer.analyze_error(full_err_fea, std_err_fea)
         t_mf_full = time.perf_counter() - t0
@@ -124,7 +123,7 @@ def main():
 
             t0 = time.perf_counter()
             part_err_fea = MultifractalAnalyzer(
-                temp, BaseConfig.MEASURE_WEIGHTED, BaseConfig.FULL_Q_BAND
+                temp, Snapshot3x3Config.MEASURE_WEIGHTED, Snapshot3x3Config.FULL_Q_BAND
             ).analyze_error_features()
             part_error = MultifractalAnalyzer.analyze_error(part_err_fea, std_err_fea)
             t_mf_part = time.perf_counter() - t0

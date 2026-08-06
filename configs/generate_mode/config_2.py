@@ -52,7 +52,6 @@ class Config2(BaseConfig):
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
-        cls._inject_dependencies()
 
     @staticmethod
     def load_original_network(dataset_id: DatasetId):
@@ -70,7 +69,7 @@ class Config2(BaseConfig):
         """Load original image. dataset_id has single level: [set_name]"""
         image = _load_raw_image(dataset_id)
         image = _trim_cv2_image(image)
-        image = _resize_cv2_image(image)
+        image = _resize_cv2_image(image, Config2.FRAME_SIZE)
         return image
 
 

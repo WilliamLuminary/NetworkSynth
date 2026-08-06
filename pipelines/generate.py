@@ -17,9 +17,20 @@ from typing import List
 import numpy as np
 
 from analysis.error_checker import ErrorChecker, create_error_checker
-from configs import BaseConfig, DatasetId, SynthParams
+from configs import DatasetId, SynthParams
+from configs.base_config import tagged
 from graphs import GraphGenerator
-from handlers import AttributesCalculator, Mapper, RunAgent, Saver
+from handlers import (
+    STATUS_CANCELLED,
+    STATUS_FAILED,
+    STATUS_OK,
+    AttributesCalculator,
+    Mapper,
+    RunAgent,
+    attach_run_log,
+    create_run_paths,
+    write_manifest,
+)
 from utils import apply_seed, save_bfs_snapshot, trim_graph
 
 logger = logging.getLogger(__name__)
@@ -229,10 +240,10 @@ def compute_average_error(errors: List) -> float:
     return round(np.mean(non_outliers), 3) if non_outliers else float("inf")
 
 
-def generate_with_multiprocessing(data_agent: RunAgent):
+def generate_with_multiprocessing(data_agent: RunAgent, config):
     num_network, num_figures = (
-        BaseConfig.SYNTHETIC_NETWORK_NUMBER,
-        BaseConfig.SYNTHETIC_GRAPH_NUMBER,
+        config.SYNTHETIC_NETWORK_NUMBER,
+        config.SYNTHETIC_GRAPH_NUMBER,
     )
     if num_network <= 0:
         logger.info("SYNTHETIC_NETWORK_NUMBER is 0 — skipping synthetic generation.")
@@ -242,16 +253,16 @@ def generate_with_multiprocessing(data_agent: RunAgent):
     from multiprocessing import Manager
 
     exit_event = Manager().Event()
-    error_checker = create_error_checker(BaseConfig)
-    if BaseConfig.SYNTHETIC_NETWORK_NUMBER > 0:
+    error_checker = create_error_checker(config)
+    if config.SYNTHETIC_NETWORK_NUMBER > 0:
         error_checker.compute_reference(data_agent.get_original_network())
 
-    max_workers = BaseConfig.get_max_workers(num_network)
+    max_workers = config.get_max_workers(num_network)
     logger.info(f"Using {max_workers} worker(s) for {num_network} networks")
 
     # Built here, in the parent, so workers receive their parameters explicitly
     # rather than inheriting a mutated BaseConfig (which only works on `fork`).
-    params = SynthParams.from_config(BaseConfig)
+    params = SynthParams.from_config(config)
 
     try:
         from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -276,7 +287,10 @@ def generate_with_multiprocessing(data_agent: RunAgent):
 
                 progress = round(idx / num_network * 100, 2)
                 if progress >= next_log:
-                    logger.info(f"({progress}%) Synthetic graph generated.")
+                    logger.info(
+                        f"({progress}%) Synthetic graph generated.",
+                        extra=tagged("PROGRESS", percent=progress),
+                    )
                     next_log += 10
 
                 if (num_figures := num_figures - 1) >= 0:
@@ -298,7 +312,7 @@ def generate_with_multiprocessing(data_agent: RunAgent):
     prefix = f"len_{len(errors)}_err_{avg_err:.3f}"
     data_agent.save_synthetic_outputs(prefix)
 
-    if BaseConfig.FULL_ANALYSIS:
+    if config.FULL_ANALYSIS:
         data_agent.multifractal_analysis_in_generate_mode()
         data_agent.save("analysis_data")
         data_agent.save("analysis_figure")
@@ -309,7 +323,7 @@ def generate_with_multiprocessing(data_agent: RunAgent):
 # ------------------------------------------------------------------ #
 
 
-def generate_with_snapshots(data_agent: RunAgent):
+def generate_with_snapshots(data_agent: RunAgent, config):
     """Generate a single network while saving intermediate BFS snapshots.
 
     Snapshot rendering is offloaded to a process pool so the BFS
@@ -320,10 +334,10 @@ def generate_with_snapshots(data_agent: RunAgent):
     snapshot_dir = os.path.join(data_agent.saver.output_dir, "snapshots")
     os.makedirs(snapshot_dir, exist_ok=True)
 
-    interval = BaseConfig.SNAPSHOT_INTERVAL
-    style = getattr(BaseConfig, "PLOT_STYLE", {})
+    interval = config.SNAPSHOT_INTERVAL
+    style = getattr(config, "PLOT_STYLE", {})
 
-    plot_pool = ProcessPoolExecutor(max_workers=BaseConfig.get_snapshot_plot_workers())
+    plot_pool = ProcessPoolExecutor(max_workers=config.get_snapshot_plot_workers())
     plot_futures = []
 
     def on_snapshot(positions, edges, frame, step_idx):
@@ -338,7 +352,7 @@ def generate_with_snapshots(data_agent: RunAgent):
         )
         plot_futures.append(fut)
 
-    params = SynthParams.from_config(BaseConfig)
+    params = SynthParams.from_config(config)
     apply_seed(params.seed)
     generator = GraphGenerator(data_agent.attributes, params)
     synthetic_graph = generator.generate_network_with_snapshots(
@@ -365,11 +379,11 @@ def generate_with_snapshots(data_agent: RunAgent):
 # ------------------------------------------------------------------ #
 
 
-def run_for_dataset(dataset_id: DatasetId):
+def run_for_dataset(dataset_id: DatasetId, config, run_paths):
     """Process a single dataset identified by DatasetId."""
     logger.info(f"Processing dataset: {dataset_id}")
-    logger.info(BaseConfig())
-    data_agent = RunAgent(dataset_id=dataset_id)
+    logger.info(config())
+    data_agent = RunAgent(config, run_paths=run_paths, dataset_id=dataset_id)
     data_agent.prepare_data()
     data_agent.save("original_image")
     data_agent.save("original_network")
@@ -377,10 +391,10 @@ def run_for_dataset(dataset_id: DatasetId):
     data_agent.save("original_report")
     data_agent.save("original_graph")
 
-    if BaseConfig.SNAPSHOT_INTERVAL > 0:
-        generate_with_snapshots(data_agent)
+    if config.SNAPSHOT_INTERVAL > 0:
+        generate_with_snapshots(data_agent, config)
     else:
-        generate_with_multiprocessing(data_agent)
+        generate_with_multiprocessing(data_agent, config)
 
 
 def main(config_cls=None):
@@ -390,12 +404,27 @@ def main(config_cls=None):
         config_cls = GenConfigSnapshot
     config_cls.initialize()
 
+    run_paths = create_run_paths(config_cls)
+    attach_run_log(run_paths.root, config_cls.RUN_ID)
+    status, error = STATUS_OK, None
     try:
-        Saver.initialize()
-        for dataset_id in BaseConfig.get_datasets():
-            run_for_dataset(dataset_id)
+        for dataset_id in config_cls.get_datasets():
+            run_for_dataset(dataset_id, config_cls, run_paths)
     except KeyboardInterrupt:
+        status = STATUS_CANCELLED
         logger.critical("MAIN PROCESS: Forcing immediate shutdown!")
+        # Re-raised so the entry point can exit non-zero: a cancelled
+        # run must not look like a completed one to a caller.
+        raise
+    except Exception as exc:
+        status = STATUS_FAILED
+        error = f"{type(exc).__name__}: {exc}"
+        raise
+    finally:
+        # Written even on cancel/failure: a caller must be able to tell
+        # "manifest says cancelled" from "no manifest, we died hard".
+        if not config_cls.DISABLE_SAVING:
+            write_manifest(run_paths, status=status, error=error)
 
 
 if __name__ == "__main__":

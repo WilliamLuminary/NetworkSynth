@@ -13,8 +13,16 @@ import logging
 import os
 
 from analysis.error_checker import NullErrorChecker, create_error_checker
-from configs import BaseConfig, DatasetId, SynthParams
-from handlers import RunAgent, Saver
+from configs import DatasetId, SynthParams
+from handlers import (
+    STATUS_CANCELLED,
+    STATUS_FAILED,
+    STATUS_OK,
+    RunAgent,
+    attach_run_log,
+    create_run_paths,
+    write_manifest,
+)
 from pipelines.generate import (
     SIGINT_INFO,
     _generate_single_network,
@@ -30,7 +38,7 @@ logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------ #
 
 
-def _render_snapshots(snapshot_data, output_dir, style):
+def _render_snapshots(snapshot_data, output_dir, style, plot_workers: int):
     """Render collected snapshot data to PNGs using a process pool."""
     from concurrent.futures import ProcessPoolExecutor
 
@@ -38,9 +46,7 @@ def _render_snapshots(snapshot_data, output_dir, style):
     if not snapshot_data:
         return
 
-    with ProcessPoolExecutor(
-        max_workers=min(BaseConfig.get_snapshot_plot_workers(), len(snapshot_data))
-    ) as pool:
+    with ProcessPoolExecutor(max_workers=min(plot_workers, len(snapshot_data))) as pool:
         futs = [
             pool.submit(
                 save_bfs_snapshot,
@@ -142,7 +148,7 @@ def _save_metric_report(ranked, ref_metrics, path):
 # ------------------------------------------------------------------ #
 
 
-def generate_and_select(data_agent: RunAgent):
+def generate_and_select(data_agent: RunAgent, config):
     """Generate many networks, rank by metric distance to original, save best.
 
     Each candidate is validated with the multifractal error check.
@@ -153,16 +159,16 @@ def generate_and_select(data_agent: RunAgent):
     memory during BFS (no rendering).  Only the best candidates get
     their snapshots rendered to PNGs after ranking.
     """
-    num_network = BaseConfig.SYNTHETIC_NETWORK_NUMBER
-    select_best = BaseConfig.SELECT_BEST
-    snapshot_interval = BaseConfig.SNAPSHOT_INTERVAL
-    snapshot_style = getattr(BaseConfig, "PLOT_STYLE", {})
+    num_network = config.SYNTHETIC_NETWORK_NUMBER
+    select_best = config.SELECT_BEST
+    snapshot_interval = config.SNAPSHOT_INTERVAL
+    snapshot_style = getattr(config, "PLOT_STYLE", {})
     use_snapshots = snapshot_interval > 0
 
     original_network = data_agent.get_original_network()
     original_node_count = original_network.number_of_nodes()
     ref_metrics = compute_network_metrics(original_network)
-    error_checker = create_error_checker(BaseConfig)
+    error_checker = create_error_checker(config)
     skip_mf = isinstance(error_checker, NullErrorChecker)
     error_checker.compute_reference(original_network)
     logger.info("Original metrics: %s", _fmt_metrics(ref_metrics))
@@ -173,14 +179,14 @@ def generate_and_select(data_agent: RunAgent):
     from multiprocessing import Manager
 
     exit_event = Manager().Event()
-    max_workers = BaseConfig.get_max_workers(num_network)
+    max_workers = config.get_max_workers(num_network)
     early_node_count = original_node_count if use_snapshots and not skip_mf else 0
     logger.info(
         f"Generating {num_network} networks with {max_workers} worker(s), "
         f"selecting top {select_best}, "
         + (
-            f"error_tolerance={BaseConfig.ERROR_TOLERANCE}, "
-            f"max_attempts={BaseConfig.MAX_ATTEMPTS}"
+            f"error_tolerance={config.ERROR_TOLERANCE}, "
+            f"max_attempts={config.MAX_ATTEMPTS}"
             if not skip_mf
             else "MF error check DISABLED, "
         )
@@ -191,7 +197,7 @@ def generate_and_select(data_agent: RunAgent):
 
     # Built in the parent so workers get their parameters explicitly rather
     # than inheriting a mutated BaseConfig (which only works on `fork`).
-    params = SynthParams.from_config(BaseConfig)
+    params = SynthParams.from_config(config)
 
     try:
         from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -234,7 +240,7 @@ def generate_and_select(data_agent: RunAgent):
                 else:
                     logger.warning(
                         f"Network {original_idx:02d} failed after "
-                        f"{BaseConfig.MAX_ATTEMPTS} attempts"
+                        f"{config.MAX_ATTEMPTS} attempts"
                     )
                 if done_count % max(1, num_network // 10) == 0:
                     logger.info(
@@ -254,7 +260,7 @@ def generate_and_select(data_agent: RunAgent):
 
     logger.info(
         f"{len(graphs)}/{num_network} networks passed error tolerance "
-        f"({BaseConfig.ERROR_TOLERANCE})"
+        f"({config.ERROR_TOLERANCE})"
     )
 
     logger.info(f"Evaluating metrics on {len(graphs)} networks ...")
@@ -299,11 +305,11 @@ def generate_and_select(data_agent: RunAgent):
 # ------------------------------------------------------------------ #
 
 
-def run_for_dataset(dataset_id: DatasetId):
+def run_for_dataset(dataset_id: DatasetId, config, run_paths):
     """Process a single dataset: prepare data, then generate-and-select."""
     logger.info(f"Processing dataset: {dataset_id}")
-    logger.info(BaseConfig())
-    data_agent = RunAgent(dataset_id=dataset_id)
+    logger.info(config())
+    data_agent = RunAgent(config, run_paths=run_paths, dataset_id=dataset_id)
     data_agent.prepare_data()
     data_agent.save("original_image")
     data_agent.save("original_network")
@@ -311,7 +317,7 @@ def run_for_dataset(dataset_id: DatasetId):
     data_agent.save("original_report")
     data_agent.save("original_graph")
 
-    generate_and_select(data_agent)
+    generate_and_select(data_agent, config)
 
 
 def main(config_cls=None):
@@ -321,12 +327,27 @@ def main(config_cls=None):
         config_cls = GenConfigSnapshot
     config_cls.initialize()
 
+    run_paths = create_run_paths(config_cls)
+    attach_run_log(run_paths.root, config_cls.RUN_ID)
+    status, error = STATUS_OK, None
     try:
-        Saver.initialize()
-        for dataset_id in BaseConfig.get_datasets():
-            run_for_dataset(dataset_id)
+        for dataset_id in config_cls.get_datasets():
+            run_for_dataset(dataset_id, config_cls, run_paths)
     except KeyboardInterrupt:
+        status = STATUS_CANCELLED
         logger.critical("MAIN PROCESS: Forcing immediate shutdown!")
+        # Re-raised so the entry point can exit non-zero: a cancelled
+        # run must not look like a completed one to a caller.
+        raise
+    except Exception as exc:
+        status = STATUS_FAILED
+        error = f"{type(exc).__name__}: {exc}"
+        raise
+    finally:
+        # Written even on cancel/failure: a caller must be able to tell
+        # "manifest says cancelled" from "no manifest, we died hard".
+        if not config_cls.DISABLE_SAVING:
+            write_manifest(run_paths, status=status, error=error)
 
 
 if __name__ == "__main__":

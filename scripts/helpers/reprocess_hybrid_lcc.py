@@ -41,14 +41,13 @@ NPY_PATH = os.path.join(SYNTH_DIR, "hybrid_50x50_lcc_positions.npy")
 OUT_EDGELIST = os.path.join(SYNTH_DIR, "hybrid_50x50_lcc_edgelist.csv")
 OUT_POSITIONS = os.path.join(SYNTH_DIR, "hybrid_50x50_lcc_positions.csv")
 
-from configs import BaseConfig
 from configs.hybrid_mode import HybridConfig
 
 HybridConfig.initialize()
-BaseConfig.disable_saving("reprocessing only")
+HybridConfig.disable_saving("reprocessing only")
 
 from graphs.synth_graph import SynthGraph
-from handlers import RunAgent
+from handlers import RunAgent, create_run_paths
 
 logger.info(f"Loading graph from {NKBIN_PATH}")
 nk_graph = nk.readGraph(NKBIN_PATH, nk.Format.NetworkitBinary)
@@ -65,7 +64,8 @@ assert (
 graph = SynthGraph(nk_graph, positions)
 
 dataset_id = HybridConfig.get_datasets()[0]
-data_agent = RunAgent(dataset_id=dataset_id)
+run_paths = create_run_paths(HybridConfig)
+data_agent = RunAgent(HybridConfig, run_paths=run_paths, dataset_id=dataset_id)
 data_agent.prepare_data()
 mapper = data_agent.mapper
 

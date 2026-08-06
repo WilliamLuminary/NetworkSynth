@@ -16,20 +16,29 @@ from concurrent.futures import (
     ThreadPoolExecutor,
     as_completed,
 )
+from dataclasses import replace
 from typing import Dict, List, Tuple
 
 import networkit as nk
 import numpy as np
 
 from analysis.error_checker import ErrorChecker, NullErrorChecker, create_error_checker
-from configs import BaseConfig, SynthParams
+from configs import SynthParams
 from configs.base_config import tagged
 from graphs import GraphGenerator
 from graphs._graph_node import GraphNode
 from graphs.graph_generator import FrontierDescriptor
 from graphs.synth_graph import SynthGraph
-from handlers import AttributesCalculator, Mapper, RunAgent, Saver
+from handlers import (
+    AttributesCalculator,
+    Mapper,
+    RunAgent,
+    Saver,
+    attach_run_log,
+    create_run_paths,
+)
 from utils import (
+    apply_seed,
     build_graph,
     log_memory,
     save_hybrid_snapshot,
@@ -91,6 +100,7 @@ def generate_random_centers(
 
 def compute_center_frames(
     centers: List[Tuple[float, float]],
+    config,
 ) -> List[Tuple[float, float]]:
     """Decide how big each seed tile's growth frame should be.
 
@@ -106,16 +116,16 @@ def compute_center_frames(
     Falls back to ``SYNTHETIC_FRAME_SIZE`` when fewer than two centers
     exist (no neighbor to measure).
     """
-    fixed = getattr(BaseConfig, "TILE_FRAME_SIZE", None)
+    fixed = getattr(config, "TILE_FRAME_SIZE", None)
     if fixed is not None:
         logger.info(f"Tile frames: fixed {fixed}", extra=tagged("PHASE1"))
         return [tuple(fixed)] * len(centers)
 
     if len(centers) < 2:
-        return [BaseConfig.SYNTHETIC_FRAME_SIZE] * len(centers)
+        return [config.SYNTHETIC_FRAME_SIZE] * len(centers)
 
-    factor = getattr(BaseConfig, "TILE_FRAME_FACTOR", 0.5)
-    floor = getattr(BaseConfig, "MIN_TILE_FRAME", 0.0)
+    factor = getattr(config, "TILE_FRAME_FACTOR", 0.5)
+    floor = getattr(config, "MIN_TILE_FRAME", 0.0)
 
     from scipy.spatial import cKDTree
 
@@ -152,15 +162,22 @@ def _generate_tile_worker(args):
         - ``edges``    : list of ((x1,y1),…)     — local coordinates
         - ``frontier`` : list of FrontierDescriptor — local coordinates
     """
-    import random
-
-    tile_idx, exit_event, attributes, error_checker, mapper, frame_range = args
+    (
+        tile_idx,
+        exit_event,
+        attributes,
+        error_checker,
+        mapper,
+        frame_range,
+        params,
+        min_tile_nodes,
+    ) = args
 
     nk.setNumberOfThreads(1)
 
-    seed = os.getpid() ^ tile_idx
-    random.seed(seed)
-    np.random.seed(seed % (2**31))
+    # Seeded from the params this worker was handed, so a seeded run repeats.
+    # When unseeded this is a no-op: pool children diverge on their own.
+    apply_seed(params.seed)
 
     if exit_event.is_set():
         return tile_idx, None
@@ -168,12 +185,12 @@ def _generate_tile_worker(args):
     try:
         # TODO: built here rather than passed from the
         # parent, so this path is still fork-dependent.
-        GraphNode.initialize(attributes, SynthParams.from_config(BaseConfig))
+        GraphNode.initialize(attributes, params)
 
         best_error = float("inf")
         best_result = None
 
-        for attempt in range(BaseConfig.MAX_ATTEMPTS):
+        for attempt in range(params.max_attempts):
             if exit_event.is_set():
                 break
 
@@ -182,7 +199,7 @@ def _generate_tile_worker(args):
                 result
             )
 
-            if not inner_nodes or len(inner_nodes) < BaseConfig.MIN_TILE_NODES:
+            if not inner_nodes or len(inner_nodes) < min_tile_nodes:
                 continue
 
             # Skip quality analysis entirely when no checker is configured.
@@ -223,7 +240,7 @@ def _generate_tile_worker(args):
             return tile_idx, best_result
 
         logger.error(
-            f"Tile {tile_idx}: all attempts produced <{BaseConfig.MIN_TILE_NODES} nodes",
+            f"Tile {tile_idx}: all attempts produced <{min_tile_nodes} nodes",
             extra=tagged("TILE"),
         )
         return tile_idx, None
@@ -240,6 +257,8 @@ def run_phase1(
     mapper: Mapper,
     error_checker: ErrorChecker,
     frames: List[Tuple[float, float]],
+    config,
+    base_params: SynthParams,
 ) -> Dict[int, dict]:
     """Generate all seed tiles in parallel and return their raw data.
 
@@ -253,15 +272,26 @@ def run_phase1(
     num_centers = len(frames)
     manager = Manager()
     exit_event = manager.Event()
-    num_workers = BaseConfig.get_max_workers(num_centers)
+    num_workers = config.get_max_workers(num_centers)
 
     logger.info(
         f"Phase 1: generating {num_centers:,} seed tiles with {num_workers} workers",
         extra=tagged("PHASE1"),
     )
 
+    # Params derived per worker, so each tile is independently seeded and
+    # nothing relies on inherited class state.
     tile_args = [
-        (i, exit_event, attributes, error_checker, mapper, frames[i])
+        (
+            i,
+            exit_event,
+            attributes,
+            error_checker,
+            mapper,
+            frames[i],
+            base_params.for_worker(i),
+            config.MIN_TILE_NODES,
+        )
         for i in range(num_centers)
     ]
 
@@ -283,7 +313,7 @@ def run_phase1(
                 logger.info(
                     f"Phase 1 progress: {progress}% "
                     f"({completed:,}/{num_centers:,}){err_str}",
-                    extra=tagged("PHASE1"),
+                    extra=tagged("PHASE1", percent=progress),
                 )
                 next_log_pct += 10
             if data is not None:
@@ -306,11 +336,11 @@ def run_phase1(
         )
 
     errors = [d["error"] for d in tile_results.values()]
-    successful = sum(1 for e in errors if e < BaseConfig.ERROR_TOLERANCE)
+    successful = sum(1 for e in errors if e < config.ERROR_TOLERANCE)
     over_tol = len(tile_results) - successful
     logger.info(
         f"Phase 1 complete: {successful:,}/{num_centers:,} centers successful "
-        f"(tol={BaseConfig.ERROR_TOLERANCE}), "
+        f"(tol={config.ERROR_TOLERANCE}), "
         f"{over_tol:,} over tolerance, {len(failed):,} failed, "
         f"avg error={np.mean(errors):.4f}",
         extra=tagged("PHASE1"),
@@ -330,6 +360,8 @@ def run_phase2(
     whiteboard_w: float,
     whiteboard_h: float,
     max_rounds: int,
+    config,
+    params: SynthParams,
     snapshot_dir: str | None = None,
     snapshot_round_interval: int = 0,
 ) -> SynthGraph:
@@ -339,7 +371,7 @@ def run_phase2(
     every N rounds.  When < 0, ~|N| log-spaced snapshots are taken.
     Snapshots are saved asynchronously in background threads to *snapshot_dir*.
     """
-    frame_w, frame_h = BaseConfig.SYNTHETIC_FRAME_SIZE
+    frame_w, frame_h = config.SYNTHETIC_FRAME_SIZE
     margin_x = frame_w
     margin_y = frame_h
     global_frame = (
@@ -397,14 +429,15 @@ def run_phase2(
 
     # TODO: built here rather than passed from the
     # parent, so this path is still fork-dependent.
-    GraphNode.initialize(attributes, SynthParams.from_config(BaseConfig))
+    apply_seed(params.seed)
+    GraphNode.initialize(attributes, params)
 
     if take_snapshots:
         os.makedirs(snapshot_dir, exist_ok=True)
-        snapshot_style = dict(getattr(BaseConfig, "HYBRID_SNAPSHOT_STYLE", {}))
+        snapshot_style = dict(getattr(config, "HYBRID_SNAPSHOT_STYLE", {}))
         # Read here in the parent: the plot pool runs in child processes.
-        snapshot_style.setdefault("max_px", getattr(BaseConfig, "RENDER_MAX_PX", None))
-        plot_workers = BaseConfig.get_snapshot_plot_workers()
+        snapshot_style.setdefault("max_px", getattr(config, "RENDER_MAX_PX", None))
+        plot_workers = config.get_snapshot_plot_workers()
         plot_executor = ThreadPoolExecutor(max_workers=plot_workers)
         logger.info(
             f"Snapshot plot pool: {plot_workers} threads", extra=tagged("SNAPSHOT")
@@ -494,7 +527,12 @@ def log_connectivity(graph: SynthGraph, label: str = ""):
 # ------------------------------------------------------------------ #
 
 
-def plot_hybrid_network(graph: SynthGraph, margin_frac: float = 0.02, dpi: int = None):
+def plot_hybrid_network(
+    graph: SynthGraph,
+    margin_frac: float = 0.02,
+    dpi: int = None,
+    max_px: int | None = None,
+):
     """Render a hybrid graph to a BGR ndarray (CV2-backed, memory-safe)."""
     from utils import render_network
 
@@ -502,7 +540,7 @@ def plot_hybrid_network(graph: SynthGraph, margin_frac: float = 0.02, dpi: int =
         graph,
         margin_frac=margin_frac,
         dpi=dpi,
-        max_px=getattr(BaseConfig, "RENDER_MAX_PX", None),
+        max_px=max_px,
     )
 
 
@@ -515,59 +553,68 @@ def _report_text(title: str, num_nodes: int, num_edges: int) -> str:
     return f"{title}\nNodes: {num_nodes:,}\nEdges: {num_edges:,}\n"
 
 
-def _apply_dataset_factors(dataset_id):
-    """Apply per-dataset (nf, ef) overrides if configured."""
-    overrides = getattr(BaseConfig, "DATASET_FACTORS", {})
+def _apply_dataset_factors(dataset_id, config, params: SynthParams) -> SynthParams:
+    """Return *params* with this dataset's (nf, ef) override applied, if any.
+
+    Returns a new params object rather than mutating config, so per-dataset
+    factors cannot leak into another dataset or another run.
+    """
+    overrides = getattr(config, "DATASET_FACTORS", {})
     key = dataset_id[0]
-    if key in overrides:
-        nf, ef = overrides[key]
-        BaseConfig.set_node_factor(nf)
-        BaseConfig.set_edge_factor(ef)
+    if key not in overrides:
+        return params
+    nf, ef = overrides[key]
+    logger.info(f"Dataset {key}: factors nf={nf}, ef={ef}", extra=tagged("CONFIG"))
+    return replace(params, closed_nodes_factor=nf, closed_edges_factor=ef)
 
 
-def run_hybrid_for_dataset(dataset_id):
+def run_hybrid_for_dataset(dataset_id, config, run_paths):
     logger.info(
         f"=== Hybrid pipeline for dataset: {dataset_id} ===",
         extra=tagged("PIPELINE", dataset=str(dataset_id)),
     )
-    log_memory(f"Start dataset {dataset_id}", BaseConfig.LOG_MEMORY)
-    _apply_dataset_factors(dataset_id)
-    logger.info(BaseConfig())
+    log_memory(f"Start dataset {dataset_id}", config.LOG_MEMORY)
+    base_params = _apply_dataset_factors(
+        dataset_id, config, SynthParams.from_config(config)
+    )
+    logger.info(config())
 
-    data_agent = RunAgent(dataset_id=dataset_id)
+    data_agent = RunAgent(config, run_paths=run_paths, dataset_id=dataset_id)
     data_agent.prepare_data()
     attributes = data_agent.attributes
     mapper = data_agent.mapper
 
-    error_checker = create_error_checker(BaseConfig)
+    error_checker = create_error_checker(config)
     error_checker.compute_reference(data_agent.get_original_network())
 
-    scale_rows, scale_cols = BaseConfig.TARGET_SCALE
-    max_rounds = BaseConfig.PHASE2_MAX_ROUNDS
-    min_dist_factor = getattr(BaseConfig, "MIN_CENTER_DISTANCE_FACTOR", 1.5)
+    scale_rows, scale_cols = config.TARGET_SCALE
+    max_rounds = config.PHASE2_MAX_ROUNDS
+    min_dist_factor = getattr(config, "MIN_CENTER_DISTANCE_FACTOR", 1.5)
 
-    img_h, img_w = BaseConfig.IMAGE_SIZE
+    img_h, img_w = config.IMAGE_SIZE
     whiteboard_w = scale_cols * img_w
     whiteboard_h = scale_rows * img_h
     min_distance = min_dist_factor * max(img_w, img_h)
 
-    max_centers = getattr(BaseConfig, "NUM_CENTERS", 0)
+    max_centers = getattr(config, "NUM_CENTERS", 0)
 
     # --- Generate random centers ---
     centers = generate_random_centers(
         whiteboard_w, whiteboard_h, min_distance, max_centers=max_centers
     )
-    frames = compute_center_frames(centers)
+    frames = compute_center_frames(centers, config)
 
     # --- Phase 1 ---
-    log_memory(f"Before Phase 1 ({dataset_id})", BaseConfig.LOG_MEMORY)
+    log_memory(f"Before Phase 1 ({dataset_id})", config.LOG_MEMORY)
     t0 = time.time()
-    tile_results = run_phase1(attributes, mapper, error_checker, frames)
+    tile_results = run_phase1(
+        attributes, mapper, error_checker, frames, config, base_params
+    )
     logger.info(
         f"Phase 1 elapsed: {time.time() - t0:.1f}s",
         extra=tagged("PHASE1", dataset=str(dataset_id)),
     )
-    log_memory(f"After Phase 1 ({dataset_id})", BaseConfig.LOG_MEMORY)
+    log_memory(f"After Phase 1 ({dataset_id})", config.LOG_MEMORY)
 
     if not tile_results:
         logger.error(
@@ -584,14 +631,14 @@ def run_hybrid_for_dataset(dataset_id):
         extra=tagged("PHASE2", dataset=str(dataset_id)),
     )
 
-    snapshot_interval = getattr(BaseConfig, "SNAPSHOT_INTERVAL", 0)
+    snapshot_interval = getattr(config, "SNAPSHOT_INTERVAL", 0)
     snapshot_dir = (
         os.path.join(data_agent.saver.output_dir, "snapshots")
         if snapshot_interval != 0
         else None
     )
 
-    log_memory(f"Before Phase 2 ({dataset_id})", BaseConfig.LOG_MEMORY)
+    log_memory(f"Before Phase 2 ({dataset_id})", config.LOG_MEMORY)
     t1 = time.time()
     hybrid_graph = run_phase2(
         tile_results,
@@ -600,6 +647,8 @@ def run_hybrid_for_dataset(dataset_id):
         whiteboard_w,
         whiteboard_h,
         max_rounds,
+        config,
+        base_params,
         snapshot_dir=snapshot_dir,
         snapshot_round_interval=snapshot_interval,
     )
@@ -607,13 +656,13 @@ def run_hybrid_for_dataset(dataset_id):
         f"Phase 2 elapsed: {time.time() - t1:.1f}s",
         extra=tagged("PHASE2", dataset=str(dataset_id)),
     )
-    log_memory(f"After Phase 2 ({dataset_id})", BaseConfig.LOG_MEMORY)
+    log_memory(f"After Phase 2 ({dataset_id})", config.LOG_MEMORY)
 
     # --- Free Phase 1 tile data before post-processing ---
     del tile_results
     GraphNode.reset()
     gc.collect()
-    log_memory(f"After Phase 2 cleanup ({dataset_id})", BaseConfig.LOG_MEMORY)
+    log_memory(f"After Phase 2 cleanup ({dataset_id})", config.LOG_MEMORY)
 
     hybrid_graph = trim_graph(hybrid_graph, attributes.average_degree)
     log_connectivity(hybrid_graph, "Pre-LCC")
@@ -665,8 +714,10 @@ def run_hybrid_for_dataset(dataset_id):
     del error_checker, centers
     gc.collect()
 
-    log_memory(f"Before plotting ({dataset_id})", BaseConfig.LOG_MEMORY)
-    img = plot_hybrid_network(hybrid_graph)
+    log_memory(f"Before plotting ({dataset_id})", config.LOG_MEMORY)
+    img = plot_hybrid_network(
+        hybrid_graph, max_px=getattr(config, "RENDER_MAX_PX", None)
+    )
     del hybrid_graph
     gc.collect()
     saver.save(img, "synthetic_graph", f"{prefix}_")
@@ -674,7 +725,7 @@ def run_hybrid_for_dataset(dataset_id):
     del img, saver
     gc.collect()
 
-    log_memory(f"End dataset {dataset_id}", BaseConfig.LOG_MEMORY)
+    log_memory(f"End dataset {dataset_id}", config.LOG_MEMORY)
     logger.info(
         f"Hybrid complete — "
         f"{num_nodes:,} nodes, {num_edges:,} edges"
@@ -693,15 +744,20 @@ def run_hybrid_for_dataset(dataset_id):
 # ------------------------------------------------------------------ #
 
 
-def _subprocess_target(dataset_id):
-    """Top-level target for child processes (must be picklable for spawn)."""
+def _subprocess_target(dataset_id, config, run_paths):
+    """Top-level target for child processes (must be picklable for spawn).
+
+    A config *class* pickles as a name reference only, so the child sees the
+    values authored in its module - not any parent mutations.  On fork that is
+    moot (state is inherited); this is a step toward spawn, not a fix for it.
+    """
     try:
-        run_hybrid_for_dataset(dataset_id)
+        run_hybrid_for_dataset(dataset_id, config, run_paths)
     except KeyboardInterrupt:
         logger.info(SIGINT_INFO)
 
 
-def _run_dataset_in_subprocess(dataset_id):
+def _run_dataset_in_subprocess(dataset_id, config, run_paths):
     """Run a single dataset in a child process for full memory isolation.
 
     When the child exits, the OS reclaims *all* of its memory — no
@@ -710,7 +766,9 @@ def _run_dataset_in_subprocess(dataset_id):
     import multiprocessing as mp
 
     proc = mp.Process(
-        target=_subprocess_target, args=(dataset_id,), name=f"hybrid-{dataset_id}"
+        target=_subprocess_target,
+        args=(dataset_id, config, run_paths),
+        name=f"hybrid-{dataset_id}",
     )
     proc.start()
 
@@ -739,7 +797,7 @@ def _run_dataset_in_subprocess(dataset_id):
             f"Dataset {dataset_id} subprocess finished successfully",
             extra=tagged("PIPELINE", dataset=str(dataset_id)),
         )
-    log_memory(f"Main process after {dataset_id} subprocess", BaseConfig.LOG_MEMORY)
+    log_memory(f"Main process after {dataset_id} subprocess", config.LOG_MEMORY)
 
 
 def main(config_cls=None):
@@ -750,11 +808,15 @@ def main(config_cls=None):
     config_cls.initialize()
 
     try:
-        Saver.initialize()
-        for dataset_id in BaseConfig.get_datasets():
-            _run_dataset_in_subprocess(dataset_id)
+        run_paths = create_run_paths(config_cls)
+        attach_run_log(run_paths.root, config_cls.RUN_ID)
+        for dataset_id in config_cls.get_datasets():
+            _run_dataset_in_subprocess(dataset_id, config_cls, run_paths)
     except KeyboardInterrupt:
         logger.info("Shutdown complete.")
+        # Re-raised so the entry point can exit non-zero: a cancelled
+        # run must not look like a completed one to a caller.
+        raise
 
 
 if __name__ == "__main__":

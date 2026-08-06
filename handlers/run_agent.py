@@ -5,7 +5,6 @@ from typing import Optional
 
 from configs import (
     FILE_CONFIGURATIONS,
-    BaseConfig,
     DatasetId,
     Mode,
     PlotConfig,
@@ -21,27 +20,38 @@ logger = logging.getLogger(__name__)
 class RunAgent:
     def __init__(
         self,
+        config,
         *,
+        run_paths=None,
         dataset_id: Optional[DatasetId] = None,
         networks_path: Optional[str] = None,
         attr_path: Optional[str] = None,
     ):
+        """*config* is the active config class; it is threaded down into the
+        DataLoader and Saver rather than read from the global namespace.
+
+        *run_paths* is a :class:`~handlers.run_paths.RunPaths` value saying
+        where this run writes.  Required in GEN mode; the analysis and
+        attribute modes are handed an existing directory instead.
+        """
+        self._config = config
         if networks_path:
             self.mode = Mode.ANA
-            self.data_loader = DataLoader(Mode.ANA, BaseConfig, path=networks_path)
-            self.saver = Saver(output_dir=networks_path)
+            self.data_loader = DataLoader(Mode.ANA, config, path=networks_path)
+            self.saver = Saver(config, networks_path)
             self.batch_processor = None
         elif dataset_id is not None:
+            assert run_paths is not None, "GEN mode requires run_paths"
             self.mode = Mode.GEN
-            self.data_loader = DataLoader(Mode.GEN, BaseConfig, dataset_id=dataset_id)
-            self.saver = Saver(dataset_id=dataset_id)
+            self.data_loader = DataLoader(Mode.GEN, config, dataset_id=dataset_id)
+            self.saver = Saver(config, run_paths.for_dataset(dataset_id))
             self.attributes = None
             self.mapper = None
             self.batch_processor = None
         elif attr_path:
             self.mode = Mode.ATR
-            self.data_loader = DataLoader(Mode.ATR, BaseConfig, path=attr_path)
-            self.saver = Saver(output_dir=attr_path)
+            self.data_loader = DataLoader(Mode.ATR, config, path=attr_path)
+            self.saver = Saver(config, attr_path)
             self.attributes = None
             self.mapper = None
             self.batch_processor = None
@@ -72,8 +82,8 @@ class RunAgent:
             self.batch_processor = MultifractalBatchProcessor(
                 original_networks,
                 synthetic_networks,
-                measure_weighted=BaseConfig.MEASURE_WEIGHTED,
-                full_q_band=BaseConfig.FULL_Q_BAND,
+                measure_weighted=self._config.MEASURE_WEIGHTED,
+                full_q_band=self._config.FULL_Q_BAND,
             )
 
         elif self.mode == Mode.ATR:
@@ -91,8 +101,8 @@ class RunAgent:
         self.batch_processor = MultifractalBatchProcessor(
             original_networks,
             synthetic_networks,
-            measure_weighted=BaseConfig.MEASURE_WEIGHTED,
-            full_q_band=BaseConfig.FULL_Q_BAND,
+            measure_weighted=self._config.MEASURE_WEIGHTED,
+            full_q_band=self._config.FULL_Q_BAND,
         )
         self.multifractal_analysis()
 
@@ -146,6 +156,7 @@ class RunAgent:
                     data_type=identifier,
                     graph=content,
                     show=not self.saver,
+                    synthetic_frame_size=self._config.SYNTHETIC_FRAME_SIZE,
                 )
                 if not self.saver:
                     return
@@ -176,6 +187,8 @@ class RunAgent:
                 graph=original_network,
                 background=original_image,
                 show=True,
+                node_scale=getattr(self._config, "ORIGINAL_GRAPH_NODE_SCALE", 1.0),
+                frame_size=self._config.FRAME_SIZE,
             )
             if not self.saver:
                 return
@@ -236,7 +249,14 @@ def _build_original_report(graph: SynthGraph, attributes) -> str:
 # ---------------------------------------------------------------------------
 
 
-def plot_network(data_type: str, graph: SynthGraph, **kwargs):
+def plot_network(
+    data_type: str,
+    graph: SynthGraph,
+    node_scale: float = 1.0,
+    frame_size=None,
+    synthetic_frame_size=None,
+    **kwargs,
+):
     """Render a graph to an ndarray image.
 
     Uses matplotlib's OO API exclusively -- no pyplot globals --
@@ -251,14 +271,18 @@ def plot_network(data_type: str, graph: SynthGraph, **kwargs):
     )
 
     if data_type == "original_graph":
+        assert frame_size is not None, "original_graph requires frame_size"
         frame = (
-            (0, BaseConfig.FRAME_SIZE[0]),
-            (0, BaseConfig.FRAME_SIZE[1]),
+            (0, frame_size[0]),
+            (0, frame_size[1]),
         )
     else:
         from utils import calculate_frame
 
-        frame = calculate_frame(graph, frame_range=BaseConfig.SYNTHETIC_FRAME_SIZE)
+        assert (
+            synthetic_frame_size is not None
+        ), f"{data_type} requires synthetic_frame_size"
+        frame = calculate_frame(graph, frame_range=synthetic_frame_size)
 
     frame_width = frame[0][1] - frame[0][0]
     frame_height = frame[1][1] - frame[1][0]
@@ -282,11 +306,7 @@ def plot_network(data_type: str, graph: SynthGraph, **kwargs):
             zorder=2,
         )
 
-    node_scale = (
-        getattr(BaseConfig, "ORIGINAL_GRAPH_NODE_SCALE", 1.0)
-        if data_type == "original_graph"
-        else 1.0
-    )
+    node_scale = node_scale if data_type == "original_graph" else 1.0
     node_size = file_config.node_size * node_scale
     for node in graph.nodes():
         pos = positions[node]

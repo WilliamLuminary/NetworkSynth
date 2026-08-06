@@ -8,10 +8,8 @@ import os
 from collections import deque
 from typing import Dict
 
-from configs import AnaConfig, BaseConfig
+from configs import AnaConfig
 from handlers import RunAgent
-
-AnaConfig.initialize()
 
 logger = logging.getLogger(__name__)
 
@@ -50,10 +48,11 @@ def find_pkl_containers(base_dir: str, max_depth: int = 3) -> Dict[str, str]:
     return containers
 
 
-def main():
-    data_dict = find_pkl_containers(BaseConfig.NETWORKS_DATA_PATH)
+def main(config_cls=AnaConfig):
+    config_cls.initialize()
+    data_dict = find_pkl_containers(config_cls.NETWORKS_DATA_PATH)
     for name, path in data_dict.items():
-        data_agent = RunAgent(networks_path=path)
+        data_agent = RunAgent(config_cls, networks_path=path)
         data_agent.prepare_data()
         data_agent.multifractal_analysis()
         data_agent.save("analysis_data")

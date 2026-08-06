@@ -63,7 +63,6 @@ class SnapshotConfig(BaseConfig):
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
-        cls._inject_dependencies()
 
         from configs.file_definitions import FILE_CONFIGURATIONS
 
@@ -90,7 +89,7 @@ class SnapshotConfig(BaseConfig):
         if image is None:
             return None
         image = _trim_cv2_image(image)
-        image = _resize_cv2_image(image)
+        image = _resize_cv2_image(image, SnapshotConfig.FRAME_SIZE)
         return image
 
 

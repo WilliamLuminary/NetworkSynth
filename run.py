@@ -17,7 +17,12 @@ Usage
     python run.py sweep --config A --nf_range '(2.1,3.0)' --ef_range '(2.1,3.0)'
     python run.py analyze                           Multifractal analysis on existing results
 """
+import logging
+import sys
+
 import fire
+
+from handlers import configure_console
 
 
 class CLI:
@@ -120,17 +125,18 @@ class CLI:
 
         main(config_cls=config_cls)
 
-    def sweep(self, config: str = None, nf_range: tuple = None, ef_range: tuple = None):
-        """Hyperparameter sweep (wandb).
+    def sweep(self, nf_range: tuple = None, ef_range: tuple = None):
+        """Hyperparameter sweep (wandb) over every dataset in the sweep config.
 
         Args:
-            config: Single dataset letter (A/B/C/D). Omit to sweep all.
             nf_range: Node factor range as tuple, e.g. '(2.1, 3.0)'.
+                      Defaults to the config's NF_RANGE.
             ef_range: Edge factor range as tuple, e.g. '(2.1, 3.0)'.
+                      Defaults to the config's EF_RANGE.
         """
         from pipelines.sweep import main
 
-        main(config=config, nf_range=nf_range, ef_range=ef_range)
+        main(nf_range=nf_range, ef_range=ef_range)
 
     def analyze(self):
         """Multifractal analysis on existing results."""
@@ -139,5 +145,26 @@ class CLI:
         main()
 
 
+# SIGINT exit code. 128 + SIGINT(2), the conventional value for a process
+# terminated by Ctrl-C.  Note `fire` swallows SystemExit and reports 2, so the
+# handler must live out here rather than inside a pipeline.
+_EXIT_INTERRUPTED = 130
+
+
+def main() -> None:
+    """Run the CLI, mapping cancellation to a non-zero exit code.
+
+    Pipelines log their shutdown and re-raise; deciding the process exit status
+    is the entry point's job.  Without this a cancelled run exits 0 and any
+    caller — notably a GUI launching us as a subprocess — reads it as success.
+    """
+    configure_console()
+    try:
+        fire.Fire(CLI)
+    except KeyboardInterrupt:
+        logging.getLogger(__name__).critical("Interrupted — exiting.")
+        sys.exit(_EXIT_INTERRUPTED)
+
+
 if __name__ == "__main__":
-    fire.Fire(CLI)
+    main()

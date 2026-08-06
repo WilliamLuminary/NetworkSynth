@@ -32,7 +32,6 @@ class SampleConfig(BaseConfig):
     def initialize(cls):
         super().initialize()
         cls.ATTRIBUTES_DICT_FUNC = cls._load_attr_dict
-        cls._inject_dependencies()
 
     @staticmethod
     def _load_attr_dict(path) -> Dict:

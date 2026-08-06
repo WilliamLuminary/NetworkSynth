@@ -73,7 +73,6 @@ class Config1(BaseConfig):
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
-        cls._inject_dependencies()
 
     @classmethod
     def save_synthetic_graph(cls):
@@ -100,7 +99,7 @@ class Config1(BaseConfig):
         if image is None:
             return None
         image = _trim_cv2_image(image)
-        image = _resize_cv2_image(image)
+        image = _resize_cv2_image(image, Config1.FRAME_SIZE)
         return image
 
 

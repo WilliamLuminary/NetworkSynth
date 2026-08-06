@@ -47,3 +47,20 @@ def load_weighted_test_synth_graph():
 def load_unweighted_test_synth_graph():
     """Unweighted SynthGraph fixture."""
     return _load_synth_graph(_UNWEIGHTED_PKL)
+
+
+@pytest.fixture(autouse=True)
+def _reset_singletons():
+    """Reset the last piece of class-level state between tests.
+
+    This used to snapshot and restore every uppercase attribute and ``save_*``
+    override on ``BaseConfig``, because ``_inject_dependencies()`` copied a
+    config's values onto it and one test's config leaked into the next.  That
+    mechanism is gone, so only ``Saver._batch_timestamp`` remains — and it goes
+    when the batch timestamp becomes instance-scoped.
+    """
+    from handlers.saver import Saver
+
+    Saver._batch_timestamp = None
+    yield
+    Saver._batch_timestamp = None

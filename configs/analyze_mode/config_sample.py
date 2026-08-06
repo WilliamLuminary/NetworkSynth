@@ -22,7 +22,6 @@ class SampleConfig(BaseConfig):
     def initialize(cls):
         super().initialize()
         cls.NETWORKS_FUNC = cls._load_networks_dict
-        cls._inject_dependencies()
 
     @staticmethod
     def _load_networks_dict(

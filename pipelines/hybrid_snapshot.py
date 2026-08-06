@@ -15,7 +15,7 @@ from typing import Dict, List, Tuple
 
 import networkit as nk
 
-from configs import BaseConfig, SynthParams
+from configs import SynthParams
 from configs.enums import DatasetId
 from graphs import GraphGenerator
 from graphs._graph_node import GraphNode
@@ -43,10 +43,12 @@ def run_phase2_with_snapshots(
     whiteboard_h: float,
     max_rounds: int,
     snapshot_dir: str,
+    config,
+    params: SynthParams,
     snapshot_round_interval: int = 1,
 ):
     """Phase 2 with snapshot capture — mirrors hybrid.run_phase2."""
-    frame_w, frame_h = BaseConfig.SYNTHETIC_FRAME_SIZE
+    frame_w, frame_h = config.SYNTHETIC_FRAME_SIZE
     margin_x = frame_w
     margin_y = frame_h
     global_frame = (
@@ -93,13 +95,11 @@ def run_phase2_with_snapshots(
 
     os.makedirs(snapshot_dir, exist_ok=True)
 
-    plot_executor = ThreadPoolExecutor(
-        max_workers=BaseConfig.get_snapshot_plot_workers()
-    )
+    plot_executor = ThreadPoolExecutor(max_workers=config.get_snapshot_plot_workers())
     pending: List[Future] = []
 
     # Read here in the parent: the plot pool runs in child processes.
-    max_px = getattr(BaseConfig, "RENDER_MAX_PX", None)
+    max_px = getattr(config, "RENDER_MAX_PX", None)
 
     def on_snapshot(positions, edges, frame, idx):
         future = plot_executor.submit(
@@ -119,7 +119,7 @@ def run_phase2_with_snapshots(
 
     # TODO: built here rather than passed from the
     # parent, so this path is still fork-dependent.
-    GraphNode.initialize(attributes, SynthParams.from_config(BaseConfig))
+    GraphNode.initialize(attributes, params)
     graph = GraphGenerator.assemble_and_continue(
         tile_data_list,
         global_frame,
@@ -143,42 +143,48 @@ def run_phase2_with_snapshots(
 
 def run_hybrid_snapshot_for_dataset(
     dataset_id: DatasetId,
+    config,
+    run_paths,
     snapshot_round_interval: int = 1,
 ):
     """Run the hybrid pipeline for one dataset with Phase 2 snapshots."""
     from analysis.error_checker import create_error_checker
 
     logger.info(f"=== Hybrid snapshot pipeline for dataset: {dataset_id} ===")
-    _apply_dataset_factors(dataset_id)
-    logger.info(BaseConfig())
+    base_params = _apply_dataset_factors(
+        dataset_id, config, SynthParams.from_config(config)
+    )
+    logger.info(config())
 
-    data_agent = RunAgent(dataset_id=dataset_id)
+    data_agent = RunAgent(config, run_paths=run_paths, dataset_id=dataset_id)
     data_agent.prepare_data()
     attributes = data_agent.attributes
     mapper = data_agent.mapper
 
-    error_checker = create_error_checker(BaseConfig)
+    error_checker = create_error_checker(config)
     error_checker.compute_reference(data_agent.get_original_network())
 
-    scale_rows, scale_cols = BaseConfig.TARGET_SCALE
-    max_rounds = BaseConfig.PHASE2_MAX_ROUNDS
-    min_dist_factor = getattr(BaseConfig, "MIN_CENTER_DISTANCE_FACTOR", 1.5)
+    scale_rows, scale_cols = config.TARGET_SCALE
+    max_rounds = config.PHASE2_MAX_ROUNDS
+    min_dist_factor = getattr(config, "MIN_CENTER_DISTANCE_FACTOR", 1.5)
 
-    img_h, img_w = BaseConfig.IMAGE_SIZE
+    img_h, img_w = config.IMAGE_SIZE
     whiteboard_w = scale_cols * img_w
     whiteboard_h = scale_rows * img_h
     min_distance = min_dist_factor * max(img_w, img_h)
 
-    max_centers = getattr(BaseConfig, "NUM_CENTERS", 0)
+    max_centers = getattr(config, "NUM_CENTERS", 0)
 
     centers = generate_random_centers(
         whiteboard_w, whiteboard_h, min_distance, max_centers=max_centers
     )
-    frames = compute_center_frames(centers)
+    frames = compute_center_frames(centers, config)
 
     # --- Phase 1 (reused from hybrid.py) ---
     t0 = time.time()
-    tile_results = run_phase1(attributes, mapper, error_checker, frames)
+    tile_results = run_phase1(
+        attributes, mapper, error_checker, frames, config, base_params
+    )
     logger.info(f"Phase 1 elapsed: {time.time() - t0:.1f}s")
 
     if not tile_results:
@@ -200,6 +206,8 @@ def run_hybrid_snapshot_for_dataset(
         whiteboard_h,
         max_rounds,
         snapshot_dir,
+        config,
+        base_params,
         snapshot_round_interval,
     )
     logger.info(f"Phase 2 elapsed: {time.time() - t1:.1f}s")

@@ -5,96 +5,43 @@ import os
 import sys
 from typing import Any, Optional
 
-from configs import (
-    BaseConfig,
-    DatasetId,
-    Mode,
-)
 from configs.base_config import tagged
 
 logger = logging.getLogger(__name__)
 
 
 class Saver:
-    base_output_dir = None
-    mode = None
+    """Writes one dataset's outputs into one directory.
 
-    def __new__(cls, *args, **kwargs):
-        if BaseConfig.DISABLE_SAVING:
+    Holds only ``(config, out_dir)``.  Where the run writes is decided by
+    :func:`~handlers.run_paths.create_run_paths` and passed in as a value, so
+    nothing here is global and many runs can coexist.
+    """
+
+    def __new__(cls, config, *args, **kwargs):
+        if config.DISABLE_SAVING:
             logger.info(
                 f"Saving is disabled. No Saver will be instantiated. "
-                f"{BaseConfig.DISABLE_SAVING_NOTE}"
+                f"{config.DISABLE_SAVING_NOTE}"
             )
             return None
         return super().__new__(cls)
 
-    def __init__(
-        self,
-        dataset_id: Optional[DatasetId] = None,
-        *,
-        output_dir: str = None,
-    ):
+    def __init__(self, config, out_dir: str):
         """
-        Initialize the Saver object.
-
-        :param dataset_id: DatasetId identifying the dataset
-        :param output_dir: Direct output directory path (for analysis mode)
-
-        Preconditions:
-            - Saving must be enabled (Config.DISABLE_SAVING must be False)
-            - Saver.initialize() must be called before creating an instance
+        :param config: The active config, supplying the save specs
+        :param out_dir: The directory this saver writes into
 
         Postconditions:
-            - The directory for the dataset is created.
+            - ``out_dir`` exists.
         """
-        assert not BaseConfig.DISABLE_SAVING, "Saving is disabled."
-        if output_dir:
-            assert (
-                not self.base_output_dir
-            ), "Output directory has been set. Don't call Saver.initialize()."
-            self.output_dir = output_dir
-            self.mode = Mode.ANA
-        else:
-            assert (
-                self.base_output_dir
-            ), "Base output directory is not initialized.\nCall Saver.initialize() first."
-
-            if dataset_id is None:
-                raise ValueError("dataset_id must be provided")
-
-            self.output_dir = os.path.join(self.base_output_dir, dataset_id.path)
-            self.mode = Mode.GEN
-
+        assert not config.DISABLE_SAVING, "Saving is disabled."
+        self._config = config
+        self.output_dir = out_dir
         _ensure_directory(self.output_dir, exist_ok=True)
-        self._save_func = BaseConfig.save
-
-    @classmethod
-    def initialize(cls, result_dir: str = None) -> None:
-        """
-        Create only one base output directory for all the results.
-        :return: None
-        """
-        if BaseConfig.DISABLE_SAVING:
-            logger.info(f"Saving is disabled. {BaseConfig.DISABLE_SAVING_NOTE}.")
-            return
-
-        if result_dir:
-            cls.mode = Mode.ANA
-            cls.base_output_dir = os.path.join(BaseConfig.BASE_OUTPUT_PATH, result_dir)
-        else:
-            cls.mode = Mode.GEN
-            cls.base_output_dir = os.path.join(
-                BaseConfig.BASE_OUTPUT_PATH,
-                f"{BaseConfig.OUTPUT_DENOTE}_results_{_time_id()}_{BaseConfig.RUN_ID}",
-            )
-            _ensure_directory(cls.base_output_dir)
-            logger.info(
-                f"Base Output directory: {cls.base_output_dir}", extra=tagged("IO")
-            )
-            latest_link_path = os.path.join(
-                BaseConfig.BASE_OUTPUT_PATH, "latest_result"
-            )
-            _update_soft_link(latest_link_path, cls.base_output_dir)
+        # Bound to the real config class, so `save_<identifier>` overrides
+        # resolve through the normal MRO with no injection required.
+        self._save_func = config.save
 
     _batch_timestamp: Optional[str] = None
 
@@ -126,8 +73,8 @@ class Saver:
             logger.warning("Content is None.")
             return
 
-        if BaseConfig.DISABLE_SAVING:
-            logger.warning(f"{BaseConfig.DISABLE_SAVING_NOTE} Saving is disabled.")
+        if self._config.DISABLE_SAVING:
+            logger.warning(f"{self._config.DISABLE_SAVING_NOTE} Saving is disabled.")
             return
 
         specs = self._save_func(identifier)

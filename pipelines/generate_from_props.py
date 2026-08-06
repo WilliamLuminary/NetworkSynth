@@ -5,10 +5,11 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 import logging
 
-from configs import AttrConfig, BaseConfig, SynthParams
+from configs import AttrConfig, SynthParams
+from configs.base_config import tagged
 from graphs import GraphGenerator
 from handlers import AttributesCalculator, RunAgent
-from utils import trim_graph
+from utils import apply_seed, trim_graph
 
 AttrConfig.initialize()
 # Config.disable_saving("Preview")
@@ -24,13 +25,13 @@ def _should_exit(exit_event) -> bool:
     return False
 
 
-def generate_synthetic_network(exit_event, attributes: AttributesCalculator):
+def generate_synthetic_network(
+    exit_event, attributes: AttributesCalculator, params: SynthParams
+):
     if _should_exit(exit_event):
         return None
 
-    # TODO: params are built here, inside the worker,
-    # so this path is still fork-dependent.
-    params = SynthParams.from_config(BaseConfig)
+    apply_seed(params.seed)
     generator = GraphGenerator(attributes, params)
     for attempt in range(params.max_attempts):
         try:
@@ -52,25 +53,29 @@ def generate_synthetic_network(exit_event, attributes: AttributesCalculator):
     return None
 
 
-def generate_with_multiprocessing(data_agent: RunAgent):
+def generate_with_multiprocessing(data_agent: RunAgent, config):
     num_network, num_figures = (
-        BaseConfig.SYNTHETIC_NETWORK_NUMBER,
-        BaseConfig.SYNTHETIC_GRAPH_NUMBER,
+        config.SYNTHETIC_NETWORK_NUMBER,
+        config.SYNTHETIC_GRAPH_NUMBER,
     )
     futures = []
     from multiprocessing import Manager
 
     exit_event = Manager().Event()
-    max_workers = BaseConfig.get_max_workers(num_network)
+    max_workers = config.get_max_workers(num_network)
     try:
         from concurrent.futures import ProcessPoolExecutor, as_completed
 
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            base_params = SynthParams.from_config(config)
             futures = [
                 executor.submit(
-                    generate_synthetic_network, exit_event, data_agent.attributes
+                    generate_synthetic_network,
+                    exit_event,
+                    data_agent.attributes,
+                    base_params.for_worker(i),
                 )
-                for _ in range(num_network)
+                for i in range(num_network)
             ]
             next_log = 0
             for idx, future in enumerate(as_completed(futures), start=1):
@@ -81,7 +86,10 @@ def generate_with_multiprocessing(data_agent: RunAgent):
                 if (progress := round(idx / num_network * 100, 2)) >= (
                     next_log := next_log + 10
                 ):
-                    logger.info(f"({progress}%) Synthetic graph generated.")
+                    logger.info(
+                        f"({progress}%) Synthetic graph generated.",
+                        extra=tagged("PROGRESS", percent=progress),
+                    )
 
                 if (num_figures := num_figures - 1) >= 0:
                     data_agent.save("synthetic_graph", content=synthetic_graph)
@@ -102,19 +110,23 @@ def generate_with_multiprocessing(data_agent: RunAgent):
     data_agent.save_synthetic_outputs("")
 
 
-def run():
-    logger.info(BaseConfig())
-    data_agent = RunAgent(attr_path=BaseConfig.ATTRIBUTES_DICT_DATA_PATH)
+def run(config):
+    logger.info(config())
+    data_agent = RunAgent(config, attr_path=config.ATTRIBUTES_DICT_DATA_PATH)
     data_agent.prepare_data()
 
-    generate_with_multiprocessing(data_agent)
+    generate_with_multiprocessing(data_agent, config)
 
 
-def main():
+def main(config_cls=AttrConfig):
+    config_cls.initialize()
     try:
-        run()
+        run(config_cls)
     except KeyboardInterrupt:
         logger.critical("MAIN PROCESS: Forcing immediate shutdown!")
+        # Re-raised so the entry point can exit non-zero: a cancelled
+        # run must not look like a completed one to a caller.
+        raise
 
 
 if __name__ == "__main__":

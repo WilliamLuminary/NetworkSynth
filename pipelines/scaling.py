@@ -5,14 +5,12 @@ Scaling pipeline — multi-root synchronized BFS for large networks.
 
 import logging
 
-from configs import BaseConfig, SynthParams
+from configs import SynthParams
 from configs.scaling_mode import ScalingConfig
 from graphs import GraphGenerator
 from graphs.synth_graph import SynthGraph
-from handlers import RunAgent, Saver
-from utils import render_network, trim_graph
-
-ScalingConfig.initialize()
+from handlers import RunAgent, Saver, attach_run_log, create_run_paths
+from utils import apply_seed, render_network, trim_graph
 
 logger = logging.getLogger(__name__)
 
@@ -20,23 +18,25 @@ logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------ #
 # Main pipeline for one dataset
 # ------------------------------------------------------------------ #
-def run_scaling_for_dataset(dataset_id):
+def run_scaling_for_dataset(dataset_id, config, run_paths):
     """Run the full scaling pipeline for a single dataset."""
     logger.info(f"=== Scaling pipeline for dataset: {dataset_id} ===")
-    logger.info(BaseConfig())
+    logger.info(config())
 
     # 1. Load original network → compute structural attributes
-    data_agent = RunAgent(dataset_id=dataset_id)
+    data_agent = RunAgent(config, run_paths=run_paths, dataset_id=dataset_id)
     data_agent.prepare_data()
     attributes = data_agent.attributes
 
     # 2. Generate scaled network
-    generator = GraphGenerator(attributes, SynthParams.from_config(BaseConfig))
+    params = SynthParams.from_config(config)
+    apply_seed(params.seed)
+    generator = GraphGenerator(attributes, params)
     scaled_graph = generator.generate_scaled_network(
-        scale_rows=BaseConfig.SCALE_ROWS,
-        scale_cols=BaseConfig.SCALE_COLS,
-        max_rounds=BaseConfig.MAX_GENERATION_ROUNDS,
-        root_spacing_factor=BaseConfig.ROOT_SPACING_FACTOR,
+        scale_rows=config.SCALE_ROWS,
+        scale_cols=config.SCALE_COLS,
+        max_rounds=config.MAX_GENERATION_ROUNDS,
+        root_spacing_factor=config.ROOT_SPACING_FACTOR,
     )
 
     # 3. Trim to match average degree
@@ -47,11 +47,13 @@ def run_scaling_for_dataset(dataset_id):
 
     # 5. Save network data + plot
     data_agent.add_synthetic_graph(scaled_graph)
-    prefix = f"scaled_{BaseConfig.SCALE_ROWS}x{BaseConfig.SCALE_COLS}"
+    prefix = f"scaled_{config.SCALE_ROWS}x{config.SCALE_COLS}"
 
     Saver.begin_batch()
     data_agent.saver.save(scaled_graph, "synthetic_export", f"{prefix}_")
-    scaled_img = plot_scaled_network(scaled_graph)
+    scaled_img = plot_scaled_network(
+        scaled_graph, max_px=getattr(config, "RENDER_MAX_PX", None)
+    )
     data_agent.saver.save(scaled_img, "synthetic_graph", f"{prefix}_")
     Saver.end_batch()
 
@@ -65,26 +67,36 @@ def run_scaling_for_dataset(dataset_id):
 # ------------------------------------------------------------------ #
 # Efficient plotting for large networks
 # ------------------------------------------------------------------ #
-def plot_scaled_network(graph: SynthGraph, margin_frac: float = 0.02, dpi: int = None):
+def plot_scaled_network(
+    graph: SynthGraph,
+    margin_frac: float = 0.02,
+    dpi: int = None,
+    max_px: int | None = None,
+):
     """Render a scaled network to a PIL Image (CV2-backed, memory-safe)."""
     return render_network(
         graph,
         margin_frac=margin_frac,
         dpi=dpi,
-        max_px=getattr(BaseConfig, "RENDER_MAX_PX", None),
+        max_px=max_px,
     )
 
 
 # ------------------------------------------------------------------ #
 # Entry point
 # ------------------------------------------------------------------ #
-def main():
+def main(config_cls=ScalingConfig):
+    config_cls.initialize()
     try:
-        Saver.initialize()
-        for dataset_id in BaseConfig.get_datasets():
-            run_scaling_for_dataset(dataset_id)
+        run_paths = create_run_paths(config_cls)
+        attach_run_log(run_paths.root, config_cls.RUN_ID)
+        for dataset_id in config_cls.get_datasets():
+            run_scaling_for_dataset(dataset_id, config_cls, run_paths)
     except KeyboardInterrupt:
         logger.critical("MAIN PROCESS: Forcing immediate shutdown!")
+        # Re-raised so the entry point can exit non-zero: a cancelled
+        # run must not look like a completed one to a caller.
+        raise
 
 
 if __name__ == "__main__":

@@ -2,8 +2,6 @@ from typing import Optional, Tuple
 
 from numpy import ndarray
 
-from .base_config import BaseConfig
-
 
 def _find_file_with_pattern(
     directory_path, pattern, details="", must_exist=True
@@ -37,9 +35,13 @@ def _find_file_with_pattern(
         return None
 
 
-def _resize_cv2_image(image: ndarray, target_size: Tuple[int, int] = None) -> ndarray:
-    """Resize image to target size or FRAME_SIZE if not specified."""
-    target_size = target_size or BaseConfig.FRAME_SIZE
+def _resize_cv2_image(image: ndarray, target_size: Tuple[int, int]) -> ndarray:
+    """Resize *image* so its longest side matches *target_size*.
+
+    The size is required: reading it from ``BaseConfig`` only worked while
+    configs published their values there, and silently used the wrong frame for
+    any config that had not.
+    """
     height, width = image.shape[:2]
     scaling_factor = max(target_size) / max(height, width)
     new_height, new_width = round(height * scaling_factor), round(

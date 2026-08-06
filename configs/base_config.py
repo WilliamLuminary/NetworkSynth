@@ -13,8 +13,14 @@ logger = logging.getLogger(__name__)
 class _JsonFormatter(logging.Formatter):
     """Emit each log record as a single JSON line.
 
-    Recognised ``extra`` keys (``tag``, ``dataset``) are promoted to
-    top-level fields so they can be filtered with ``jq``.
+    Recognised ``extra`` keys (``tag``, ``dataset``, ``percent``) are promoted
+    to top-level fields so they can be filtered with ``jq``.
+
+    ``percent`` is a machine-readable completion figure, present on progress
+    records.  It exists so a caller tailing this file can drive a progress bar
+    without parsing percentages out of the message text — see
+    ``INTEGRATION_PLAN.md``.  Emit it with
+    ``logger.info(msg, extra=tagged("PROGRESS", percent=pct))``.
 
     Each entry includes a ``run_id`` so concurrent runs appending to the
     same file can be distinguished: ``jq 'select(.run_id == "abc123")'``.
@@ -32,7 +38,7 @@ class _JsonFormatter(logging.Formatter):
             "logger": record.name,
             "message": record.getMessage(),
         }
-        for key in ("tag", "dataset"):
+        for key in ("tag", "dataset", "percent"):
             value = getattr(record, key, None)
             if value is not None:
                 entry[key] = value
@@ -145,7 +151,18 @@ class BaseConfig:
 
     @classmethod
     def initialize(cls):
-        cls._setup_logger(details=cls.__name__)
+        """Establish this run's identity.  Logging is set up by the entry point.
+
+        ``RUN_ID`` is generated here rather than as a side effect of logging
+        setup, because it names the run's output directory (see
+        ``handlers.run_paths``) and is needed whether or not anything logs.
+        """
+        from handlers.run_logging import configure_console
+
+        if not cls.RUN_ID:
+            cls.RUN_ID = uuid.uuid4().hex[:8]
+        configure_console()
+
         module_parts = cls.__module__.split(".")
         mode = next((p for p in module_parts if p.endswith("_mode")), None)
         cls.OUTPUT_DENOTE = f"{mode}_{cls.__name__}" if mode else cls.__name__
@@ -154,9 +171,10 @@ class BaseConfig:
     def save(cls, identifier: str):
         """Return the save specs for *identifier*.
 
-        Checks for a ``save_<identifier>`` classmethod first (mode
-        overrides injected by ``_inject_dependencies``), then falls
-        back to ``DEFAULT_SAVE_SPECS`` in ``file_definitions``.
+        Checks for a ``save_<identifier>`` classmethod on *cls* first, which
+        resolves a mode's override through the normal MRO, then falls back to
+        ``DEFAULT_SAVE_SPECS`` in ``file_definitions``.  Call this on the active
+        config, not on ``BaseConfig``.
 
         Each spec is a tuple::
 
@@ -173,31 +191,6 @@ class BaseConfig:
         return specs
 
     @classmethod
-    def _inject_dependencies(cls):
-        for name in dir(cls):
-            if name.startswith("__"):
-                continue
-            if name.isupper() or name.startswith("save_"):
-                value = getattr(cls, name)
-                setattr(BaseConfig, name, value)
-
-    @classmethod
-    def set_node_factor(cls, factor: float):
-        cls.CLOSED_NODES_FACTOR = factor
-        logging.info(
-            f"CLOSED_NODES_FACTOR has been overwritten! Current value: {factor}",
-            extra=tagged("CONFIG"),
-        )
-
-    @classmethod
-    def set_edge_factor(cls, factor: float):
-        cls.CLOSED_EDGES_FACTOR = factor
-        logging.info(
-            f"CLOSED_EDGES_FACTOR has been overwritten! Current value; {factor}",
-            extra=tagged("CONFIG"),
-        )
-
-    @classmethod
     def enable_saving(cls, reason: str = ""):
         BaseConfig.DISABLE_SAVING = False
         BaseConfig.DISABLE_SAVING_NOTE = reason
@@ -207,51 +200,7 @@ class BaseConfig:
         BaseConfig.DISABLE_SAVING = True
         BaseConfig.DISABLE_SAVING_NOTE = reason
 
-    @classmethod
-    def update_synthetic_frame_size(cls, frame_size: Tuple[int, int]):
-        cls.SYNTHETIC_FRAME_SIZE = frame_size
-        logging.info(
-            f"SYNTHETIC_FRAME_SIZE has been overwritten! Current value: {frame_size}",
-            extra=tagged("CONFIG"),
-        )
-
-    _logger_initialized = False
     RUN_ID: str = ""
-
-    @classmethod
-    def _setup_logger(cls, log_level=None, details=None):
-        if BaseConfig._logger_initialized:
-            return
-        log_level = log_level or logging.INFO
-        details = details or ""
-
-        BaseConfig.RUN_ID = uuid.uuid4().hex[:8]
-
-        _logger = logging.getLogger()
-        _logger.setLevel(log_level)
-
-        # Console: human-readable plain text
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(log_level)
-        # noinspection SpellCheckingInspection
-        console_formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
-        console_handler.setFormatter(console_formatter)
-
-        # File: JSON lines (one JSON object per line, queryable with jq)
-        logs_dir = os.path.join(BaseConfig.BASE_OUTPUT_PATH, "logs")
-        os.makedirs(logs_dir, exist_ok=True)
-        file_handler = logging.FileHandler(
-            os.path.join(logs_dir, f"project_{details}.jsonl"),
-            mode="a",
-        )
-        file_handler.setLevel(log_level)
-        file_handler.setFormatter(_JsonFormatter(run_id=BaseConfig.RUN_ID))
-
-        _logger.addHandler(console_handler)
-        _logger.addHandler(file_handler)
-        BaseConfig._logger_initialized = True
 
     def __str__(self):
         def is_method_like(attr_value):

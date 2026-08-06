@@ -18,33 +18,6 @@ logger = logging.getLogger(__name__)
 SAMPLE_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "input", "samples")
 
 
-@pytest.fixture(autouse=True)
-def _reset_singletons():
-    """Reset Saver and BaseConfig class-level state between tests."""
-    from configs.base_config import BaseConfig
-    from handlers.saver import Saver
-
-    snapshot = {}
-    for name in dir(BaseConfig):
-        if name.startswith("__"):
-            continue
-        if name.isupper() or name.startswith("save_"):
-            snapshot[name] = getattr(BaseConfig, name)
-
-    Saver.base_output_dir = None
-    Saver.mode = None
-    Saver._batch_timestamp = None
-    yield
-    Saver.base_output_dir = None
-    Saver.mode = None
-    Saver._batch_timestamp = None
-    for name in list(vars(BaseConfig)):
-        if name.startswith("save_") and name not in snapshot:
-            delattr(BaseConfig, name)
-    for name, value in snapshot.items():
-        setattr(BaseConfig, name, value)
-
-
 # ------------------------------------------------------------------ #
 # Generate mode
 # ------------------------------------------------------------------ #
@@ -61,12 +34,11 @@ class TestGenerateMode:
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
         SampleConfig.initialize()
 
-        from configs import BaseConfig
-        from handlers import RunAgent, Saver
+        from handlers import RunAgent, create_run_paths
 
-        Saver.initialize()
-        dataset_id = BaseConfig.get_datasets()[0]
-        agent = RunAgent(dataset_id=dataset_id)
+        run_paths = create_run_paths(SampleConfig)
+        dataset_id = SampleConfig.get_datasets()[0]
+        agent = RunAgent(SampleConfig, run_paths=run_paths, dataset_id=dataset_id)
         agent.prepare_data()
 
         agent.save("original_network")
@@ -91,18 +63,18 @@ class TestGenerateMode:
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
         SampleConfig.initialize()
 
-        from configs import BaseConfig, SynthParams
+        from configs import SynthParams
         from graphs import GraphGenerator
-        from handlers import RunAgent, Saver
+        from handlers import RunAgent, create_run_paths
         from utils import trim_graph
 
-        Saver.initialize()
-        dataset_id = BaseConfig.get_datasets()[0]
-        agent = RunAgent(dataset_id=dataset_id)
+        run_paths = create_run_paths(SampleConfig)
+        dataset_id = SampleConfig.get_datasets()[0]
+        agent = RunAgent(SampleConfig, run_paths=run_paths, dataset_id=dataset_id)
         agent.prepare_data()
 
         generator = GraphGenerator(
-            agent.attributes, SynthParams.from_config(BaseConfig)
+            agent.attributes, SynthParams.from_config(SampleConfig)
         )
         synth = generator.generate_network()
         synth = trim_graph(synth, agent.attributes.average_degree)
@@ -142,16 +114,16 @@ class TestFromPropsMode:
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
         SampleConfig.initialize()
 
-        from configs import BaseConfig, SynthParams
+        from configs import SynthParams
         from graphs import GraphGenerator
         from handlers import RunAgent
         from utils import trim_graph
 
-        agent = RunAgent(attr_path=BaseConfig.ATTRIBUTES_DICT_DATA_PATH)
+        agent = RunAgent(SampleConfig, attr_path=SampleConfig.ATTRIBUTES_DICT_DATA_PATH)
         agent.prepare_data()
 
         generator = GraphGenerator(
-            agent.attributes, SynthParams.from_config(BaseConfig)
+            agent.attributes, SynthParams.from_config(SampleConfig)
         )
         synth = generator.generate_network()
         synth = trim_graph(synth, agent.attributes.average_degree)
@@ -178,29 +150,29 @@ class TestMosaicMode:
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
         SampleConfig.initialize()
 
-        from configs import BaseConfig, SynthParams
+        from configs import SynthParams
         from graphs import GraphGenerator
         from graphs.mosaic_stitcher import MosaicStitcher
-        from handlers import RunAgent, Saver
+        from handlers import RunAgent, Saver, create_run_paths
         from utils import trim_graph
 
-        Saver.initialize()
-        dataset_id = BaseConfig.get_datasets()[0]
-        agent = RunAgent(dataset_id=dataset_id)
+        run_paths = create_run_paths(SampleConfig)
+        dataset_id = SampleConfig.get_datasets()[0]
+        agent = RunAgent(SampleConfig, run_paths=run_paths, dataset_id=dataset_id)
         agent.prepare_data()
         attributes = agent.attributes
 
-        tile_w, tile_h = BaseConfig.TILE_FRAME_SIZE
-        overlap = BaseConfig.OVERLAP_MARGIN_FRACTION
+        tile_w, tile_h = SampleConfig.TILE_FRAME_SIZE
+        overlap = SampleConfig.OVERLAP_MARGIN_FRACTION
         tile_gen_frame = (
             round(tile_w + 2 * overlap * tile_w),
             round(tile_h + 2 * overlap * tile_h),
         )
 
         tile_graphs = {}
-        for r in range(BaseConfig.GRID_ROWS):
-            for c in range(BaseConfig.GRID_COLS):
-                gen = GraphGenerator(attributes, SynthParams.from_config(BaseConfig))
+        for r in range(SampleConfig.GRID_ROWS):
+            for c in range(SampleConfig.GRID_COLS):
+                gen = GraphGenerator(attributes, SynthParams.from_config(SampleConfig))
                 g = gen.generate_network(frame_range=tile_gen_frame)
                 g = trim_graph(g, attributes.average_degree)
                 positions = g.positions()
@@ -208,7 +180,7 @@ class TestMosaicMode:
                 positions[:, 1] += r * tile_h + tile_h / 2.0
                 tile_graphs[(r, c)] = g
 
-        merge_threshold = attributes.average_length * BaseConfig.CLOSED_NODES_FACTOR
+        merge_threshold = attributes.average_length * SampleConfig.CLOSED_NODES_FACTOR
         stitcher = MosaicStitcher(merge_threshold=merge_threshold)
         mosaic = stitcher.stitch(tile_graphs)
         agent.mapper.assign_weights(mosaic)
@@ -246,22 +218,22 @@ class TestScalingMode:
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
         SampleConfig.initialize()
 
-        from configs import BaseConfig, SynthParams
+        from configs import SynthParams
         from graphs import GraphGenerator
-        from handlers import RunAgent, Saver
+        from handlers import RunAgent, Saver, create_run_paths
         from utils import trim_graph
 
-        Saver.initialize()
-        dataset_id = BaseConfig.get_datasets()[0]
-        agent = RunAgent(dataset_id=dataset_id)
+        run_paths = create_run_paths(SampleConfig)
+        dataset_id = SampleConfig.get_datasets()[0]
+        agent = RunAgent(SampleConfig, run_paths=run_paths, dataset_id=dataset_id)
         agent.prepare_data()
 
-        gen = GraphGenerator(agent.attributes, SynthParams.from_config(BaseConfig))
+        gen = GraphGenerator(agent.attributes, SynthParams.from_config(SampleConfig))
         scaled = gen.generate_scaled_network(
-            scale_rows=BaseConfig.SCALE_ROWS,
-            scale_cols=BaseConfig.SCALE_COLS,
-            max_rounds=BaseConfig.MAX_GENERATION_ROUNDS,
-            root_spacing_factor=BaseConfig.ROOT_SPACING_FACTOR,
+            scale_rows=SampleConfig.SCALE_ROWS,
+            scale_cols=SampleConfig.SCALE_COLS,
+            max_rounds=SampleConfig.MAX_GENERATION_ROUNDS,
+            root_spacing_factor=SampleConfig.ROOT_SPACING_FACTOR,
         )
         scaled = trim_graph(scaled, agent.attributes.average_degree)
         agent.mapper.assign_weights(scaled)
@@ -301,17 +273,16 @@ class TestAnalyzeMode:
         SampleConfig.initialize()
 
         from analysis import MultifractalAnalyzer
-        from configs import BaseConfig
-        from handlers import RunAgent, Saver
+        from handlers import RunAgent, create_run_paths
 
-        Saver.initialize()
-        dataset_id = BaseConfig.get_datasets()[0]
-        agent = RunAgent(dataset_id=dataset_id)
+        run_paths = create_run_paths(SampleConfig)
+        dataset_id = SampleConfig.get_datasets()[0]
+        agent = RunAgent(SampleConfig, run_paths=run_paths, dataset_id=dataset_id)
         agent.prepare_data()
 
         original = agent.get_original_network()
         analyzer = MultifractalAnalyzer(
-            original, BaseConfig.MEASURE_WEIGHTED, BaseConfig.FULL_Q_BAND
+            original, SampleConfig.MEASURE_WEIGHTED, SampleConfig.FULL_Q_BAND
         )
         result = analyzer.analyze_graph()
 
@@ -339,12 +310,12 @@ class TestSnapshotMode:
         Snapshot1x1Config.BASE_OUTPUT_PATH = str(tmp_path)
         Snapshot1x1Config.initialize()
 
-        from configs import BaseConfig, SynthParams
-        from handlers import RunAgent, Saver
+        from configs import SynthParams
+        from handlers import RunAgent, create_run_paths
 
-        Saver.initialize()
-        dataset_id = BaseConfig.get_datasets()[0]
-        agent = RunAgent(dataset_id=dataset_id)
+        run_paths = create_run_paths(Snapshot1x1Config)
+        dataset_id = Snapshot1x1Config.get_datasets()[0]
+        agent = RunAgent(Snapshot1x1Config, run_paths=run_paths, dataset_id=dataset_id)
         agent.prepare_data()
 
         from graphs import GraphGenerator
@@ -353,7 +324,7 @@ class TestSnapshotMode:
         snapshot_dir = os.path.join(agent.saver.output_dir, "snapshots")
         os.makedirs(snapshot_dir, exist_ok=True)
 
-        style = getattr(BaseConfig, "PLOT_STYLE", {})
+        style = getattr(Snapshot1x1Config, "PLOT_STYLE", {})
         recorded_calls = []
 
         def on_snapshot(positions, edges, frame, step_idx):
@@ -371,11 +342,11 @@ class TestSnapshotMode:
             )
 
         generator = GraphGenerator(
-            agent.attributes, SynthParams.from_config(BaseConfig)
+            agent.attributes, SynthParams.from_config(Snapshot1x1Config)
         )
         synth = generator.generate_network_with_snapshots(
             snapshot_callback=on_snapshot,
-            snapshot_interval=BaseConfig.SNAPSHOT_INTERVAL,
+            snapshot_interval=Snapshot1x1Config.SNAPSHOT_INTERVAL,
         )
         synth = trim_graph(synth, agent.attributes.average_degree)
         agent.mapper.assign_weights(synth)
@@ -407,13 +378,12 @@ class TestSnapshotMode:
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
         SampleConfig.initialize()
 
-        from configs import BaseConfig
-        from handlers import RunAgent, Saver
+        from handlers import RunAgent, create_run_paths
         from utils import compute_network_metrics, metric_distance
 
-        Saver.initialize()
-        dataset_id = BaseConfig.get_datasets()[0]
-        agent = RunAgent(dataset_id=dataset_id)
+        run_paths = create_run_paths(SampleConfig)
+        dataset_id = SampleConfig.get_datasets()[0]
+        agent = RunAgent(SampleConfig, run_paths=run_paths, dataset_id=dataset_id)
         agent.prepare_data()
 
         original = agent.get_original_network()

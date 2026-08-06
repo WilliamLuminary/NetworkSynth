@@ -39,7 +39,6 @@ class ConfigTmp(BaseConfig):
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
-        cls._inject_dependencies()
 
     @staticmethod
     def load_original_network(dataset_id: DatasetId):
@@ -73,5 +72,5 @@ class ConfigTmp(BaseConfig):
             logger.warning("Failed to load image: %s", path)
             return None
         image = _trim_cv2_image(image)
-        image = _resize_cv2_image(image)
+        image = _resize_cv2_image(image, ConfigTmp.FRAME_SIZE)
         return image
