@@ -27,16 +27,23 @@ from typing import Tuple
 import wandb
 
 from analysis import MultifractalAnalyzer
-from configs import BaseConfig, DatasetId, SynthParams
+from configs import DatasetId, SynthParams
 from configs.generate_mode import GenConfigTmp as GenConfig
 from handlers import RunAgent, create_run_paths
 from pipelines.generate import compute_average_error, generate_synthetic_network
 
-GenConfig.initialize()
-BaseConfig.SYNTHETIC_NETWORK_NUMBER = 100
-BaseConfig.SYNTHETIC_GRAPH_NUMBER = 0
-BaseConfig.disable_saving("Sweeping Experiment")
-run_paths = create_run_paths(GenConfig)
+
+class SweepRunConfig(GenConfig):
+    """Throwaway networks: a sweep scores factor pairs, not outputs."""
+
+    SYNTHETIC_NETWORK_NUMBER = 100
+    SYNTHETIC_GRAPH_NUMBER = 0
+    DISABLE_SAVING = True
+    DISABLE_SAVING_NOTE = "Sweeping Experiment"
+
+
+SweepRunConfig.initialize()
+run_paths = create_run_paths(SweepRunConfig)
 
 EXPERIMENT_PROJECT_NAME = "hyperparam-tuning"
 EXPERIMENT_NAME = "mosaic-sample-sweep"
@@ -51,12 +58,12 @@ def generate_networks_multiprocess(
     data_agent: RunAgent, std_err_fea, trial_params
 ) -> Tuple[float, float]:
     """Return (average_error, success_rate)."""
-    num_network = BaseConfig.SYNTHETIC_NETWORK_NUMBER
+    num_network = SweepRunConfig.SYNTHETIC_NETWORK_NUMBER
     errors, futures = [], []
     from multiprocessing import Manager
 
     exit_event = Manager().Event()
-    max_workers = BaseConfig.get_max_workers(num_network)
+    max_workers = SweepRunConfig.get_max_workers(num_network)
     logger.info(
         f"Spawning pool with {max_workers} workers for {num_network} networks …"
     )
@@ -110,7 +117,7 @@ def run_with_params(data_agent, ef, nf, std_err_fea):
     global config, so pairs cannot interfere with each other.
     """
     trial_params = replace(
-        SynthParams.from_config(GenConfig),
+        SynthParams.from_config(SweepRunConfig),
         closed_nodes_factor=nf,
         closed_edges_factor=ef,
     )
@@ -121,12 +128,12 @@ def run_with_params(data_agent, ef, nf, std_err_fea):
 def run_for_dataset(dataset_id: DatasetId) -> None:
     """Process a single dataset identified by DatasetId."""
     logger.info(f"Processing dataset: {dataset_id}")
-    data_agent = RunAgent(GenConfig, run_paths=run_paths, dataset_id=dataset_id)
+    data_agent = RunAgent(SweepRunConfig, run_paths=run_paths, dataset_id=dataset_id)
     data_agent.prepare_data()
     std_err_fea = MultifractalAnalyzer(
         data_agent.get_original_network(),
-        BaseConfig.MEASURE_WEIGHTED,
-        BaseConfig.FULL_Q_BAND,
+        SweepRunConfig.MEASURE_WEIGHTED,
+        SweepRunConfig.FULL_Q_BAND,
     ).analyze_error_features()
 
     table = wandb.Table(columns=["node_factor", "edge_factor", "error", "success_rate"])
@@ -157,22 +164,24 @@ def run_for_dataset(dataset_id: DatasetId) -> None:
 
 def main():
     assert (
-        BaseConfig.SYNTHETIC_NETWORK_NUMBER != 0
+        SweepRunConfig.SYNTHETIC_NETWORK_NUMBER != 0
     ), "Sweeping experiments require synthetic networks."
 
-    max_workers = BaseConfig.get_max_workers(BaseConfig.SYNTHETIC_NETWORK_NUMBER)
+    max_workers = SweepRunConfig.get_max_workers(
+        SweepRunConfig.SYNTHETIC_NETWORK_NUMBER
+    )
     logger.info(
-        f"Using {max_workers} worker(s) for {BaseConfig.SYNTHETIC_NETWORK_NUMBER} networks per param pair"
+        f"Using {max_workers} worker(s) for {SweepRunConfig.SYNTHETIC_NETWORK_NUMBER} networks per param pair"
     )
 
     wandb.login()
     wandb.init(
         project=EXPERIMENT_PROJECT_NAME,
         name=EXPERIMENT_NAME,
-        dir=BaseConfig.PROJECT_ROOT,
+        dir=SweepRunConfig.PROJECT_ROOT,
     )
     try:
-        for dataset_id in BaseConfig.get_datasets():
+        for dataset_id in SweepRunConfig.get_datasets():
             run_for_dataset(dataset_id)
     except KeyboardInterrupt:
         logger.critical("MAIN PROCESS: Forcing immediate shutdown!")

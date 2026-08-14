@@ -21,7 +21,6 @@ from graphs.synth_graph import SynthGraph
 from handlers import (
     AttributesCalculator,
     RunAgent,
-    Saver,
     attach_run_log,
     create_run_paths,
 )
@@ -253,13 +252,13 @@ def run_mosaic_for_dataset(dataset_id, config, run_paths):
     # 6. Save network data + plot
     data_agent.add_synthetic_graph(mosaic_graph)
     prefix = f"mosaic_{config.GRID_ROWS}x{config.GRID_COLS}"
-    Saver.begin_batch()
+    data_agent.saver.begin_batch()
     data_agent.saver.save(mosaic_graph, "synthetic_export", f"{prefix}_")
     mosaic_img = plot_mosaic_network(
         mosaic_graph, max_px=getattr(config, "RENDER_MAX_PX", None)
     )
     data_agent.saver.save(mosaic_img, "synthetic_graph", f"{prefix}_")
-    Saver.end_batch()
+    data_agent.saver.end_batch()
 
     logger.info(
         f"Mosaic complete — "

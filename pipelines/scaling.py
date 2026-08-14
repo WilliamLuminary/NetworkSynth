@@ -9,7 +9,7 @@ from configs import SynthParams
 from configs.scaling_mode import ScalingConfig
 from graphs import GraphGenerator
 from graphs.synth_graph import SynthGraph
-from handlers import RunAgent, Saver, attach_run_log, create_run_paths
+from handlers import RunAgent, attach_run_log, create_run_paths
 from utils import apply_seed, render_network, trim_graph
 
 logger = logging.getLogger(__name__)
@@ -49,13 +49,13 @@ def run_scaling_for_dataset(dataset_id, config, run_paths):
     data_agent.add_synthetic_graph(scaled_graph)
     prefix = f"scaled_{config.SCALE_ROWS}x{config.SCALE_COLS}"
 
-    Saver.begin_batch()
+    data_agent.saver.begin_batch()
     data_agent.saver.save(scaled_graph, "synthetic_export", f"{prefix}_")
     scaled_img = plot_scaled_network(
         scaled_graph, max_px=getattr(config, "RENDER_MAX_PX", None)
     )
     data_agent.saver.save(scaled_img, "synthetic_graph", f"{prefix}_")
-    Saver.end_batch()
+    data_agent.saver.end_batch()
 
     logger.info(
         f"Scaling complete — "

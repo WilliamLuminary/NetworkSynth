@@ -298,3 +298,71 @@ class TestRepr:
         assert "nodes=3" in r
         assert "edges=2" in r
         assert "weighted=False" in r
+
+
+# ---------------------------------------------------------------------------
+# Weight validity
+# ---------------------------------------------------------------------------
+
+
+class TestWeightsMustBePositive:
+    """An edge with no width is not a measurable graph.
+
+    Analysis inverts weights into distances, so a zero becomes an infinite
+    distance that silently detaches the edge and only surfaces much later as a
+    NaN inside the curvature solver. Both paths a weight can enter through
+    reject it at the edge that carries it.
+    """
+
+    @staticmethod
+    def _matrix(values):
+        from scipy.sparse import coo_matrix
+
+        rows = [0, 1, 1, 2]
+        cols = [1, 0, 2, 1]
+        return coo_matrix((values, (rows, cols)), shape=(3, 3))
+
+    @staticmethod
+    def _positions():
+        return np.array([[0.0, 0.0], [1.0, 0.0], [2.0, 0.0]])
+
+    def test_set_weight_rejects_zero(self):
+        graph = SynthGraph.from_sparse_matrix(
+            self._positions(), self._matrix([1.5, 1.5, 2.0, 2.0])
+        )
+
+        with pytest.raises(AssertionError, match="non-positive weight"):
+            graph.set_weight(0, 1, 0.0)
+
+    def test_set_weight_rejects_negative(self):
+        graph = SynthGraph.from_sparse_matrix(
+            self._positions(), self._matrix([1.5, 1.5, 2.0, 2.0])
+        )
+
+        with pytest.raises(AssertionError, match="non-positive weight"):
+            graph.set_weight(0, 1, -1.0)
+
+    def test_set_weight_names_the_offending_edge(self):
+        """The Mapper writes one edge at a time; the message must localise it."""
+        graph = SynthGraph.from_sparse_matrix(
+            self._positions(), self._matrix([1.5, 1.5, 2.0, 2.0])
+        )
+
+        with pytest.raises(AssertionError, match=r"edge \(1, 2\)"):
+            graph.set_weight(1, 2, 0.0)
+
+    def test_set_weight_accepts_positive(self):
+        graph = SynthGraph.from_sparse_matrix(
+            self._positions(), self._matrix([1.5, 1.5, 2.0, 2.0])
+        )
+
+        graph.set_weight(0, 1, 2.5)
+
+        assert graph.weight(0, 1) == 2.5
+
+    def test_from_sparse_matrix_rejects_an_explicitly_stored_zero(self):
+        """Sparse formats can store a zero, so the bad state is representable."""
+        with pytest.raises(AssertionError, match="non-positive weight"):
+            SynthGraph.from_sparse_matrix(
+                self._positions(), self._matrix([1.5, 1.5, 0.0, 0.0])
+            )

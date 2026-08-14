@@ -31,7 +31,6 @@ def _init_config():
     cfg.initialize()
     cfg.SYNTHETIC_NETWORK_NUMBER = 100
     cfg.SYNTHETIC_GRAPH_NUMBER = 0
-    cfg.disable_saving("Sweeping Experiment")
     return cfg
 
 

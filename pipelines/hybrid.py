@@ -33,7 +33,6 @@ from handlers import (
     AttributesCalculator,
     Mapper,
     RunAgent,
-    Saver,
     attach_run_log,
     create_run_paths,
 )
@@ -678,18 +677,18 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
     mapper.assign_weights(hybrid_graph)
 
     # --- Save original/ ---
-    Saver.begin_batch()
+    data_agent.saver.begin_batch()
     data_agent.save("original_image")
     data_agent.save("original_network")
     data_agent.save("original_property")
     data_agent.save("original_graph")
-    Saver.end_batch()
+    data_agent.saver.end_batch()
 
     # --- Save synthetic/ ---
     data_agent.add_synthetic_graph(hybrid_graph)
     prefix = f"hybrid_{len(centers)}centers"
 
-    Saver.begin_batch()
+    data_agent.saver.begin_batch()
     data_agent.saver.save(hybrid_graph, "synthetic_export", f"{prefix}_")
 
     # --- Write reports before plotting (plotting is memory-intensive) ---
@@ -721,7 +720,7 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
     del hybrid_graph
     gc.collect()
     saver.save(img, "synthetic_graph", f"{prefix}_")
-    Saver.end_batch()
+    saver.end_batch()
     del img, saver
     gc.collect()
 

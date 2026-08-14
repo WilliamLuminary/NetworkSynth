@@ -12,7 +12,7 @@ from handlers import AttributesCalculator, RunAgent
 from utils import apply_seed, trim_graph
 
 AttrConfig.initialize()
-# Config.disable_saving("Preview")
+# Config.DISABLE_SAVING = True  # preview only
 
 logger = logging.getLogger(__name__)
 SIGINT_INFO = "SIGINT received. Terminating child process..."

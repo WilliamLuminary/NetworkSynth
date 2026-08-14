@@ -124,6 +124,9 @@ class BaseConfig:
     SELECT_BEST: int = 0  # 0 = disabled; N = keep N best networks by metric distance
 
     LOG_MEMORY: bool = False
+    # Declared per config, never toggled at runtime: a mutator here would set
+    # the flag on BaseConfig for every config in the process, and for every
+    # forked child with it.
     DISABLE_SAVING: bool = False
     DISABLE_SAVING_NOTE: str = ""
 
@@ -189,16 +192,6 @@ class BaseConfig:
         if specs is None:
             raise ValueError(f"No save spec for '{identifier}' in {cls.__name__}.")
         return specs
-
-    @classmethod
-    def enable_saving(cls, reason: str = ""):
-        BaseConfig.DISABLE_SAVING = False
-        BaseConfig.DISABLE_SAVING_NOTE = reason
-
-    @classmethod
-    def disable_saving(cls, reason: str = ""):
-        BaseConfig.DISABLE_SAVING = True
-        BaseConfig.DISABLE_SAVING_NOTE = reason
 
     RUN_ID: str = ""
 

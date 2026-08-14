@@ -35,23 +35,28 @@ class RunAgent:
         attribute modes are handed an existing directory instead.
         """
         self._config = config
+        if config.DISABLE_SAVING:
+            logger.info(
+                f"Saving is disabled. No Saver will be instantiated. "
+                f"{config.DISABLE_SAVING_NOTE}"
+            )
         if networks_path:
             self.mode = Mode.ANA
             self.data_loader = DataLoader(Mode.ANA, config, path=networks_path)
-            self.saver = Saver(config, networks_path)
+            self.saver = self._build_saver(config, networks_path)
             self.batch_processor = None
         elif dataset_id is not None:
             assert run_paths is not None, "GEN mode requires run_paths"
             self.mode = Mode.GEN
             self.data_loader = DataLoader(Mode.GEN, config, dataset_id=dataset_id)
-            self.saver = Saver(config, run_paths.for_dataset(dataset_id))
+            self.saver = self._build_saver(config, run_paths.for_dataset(dataset_id))
             self.attributes = None
             self.mapper = None
             self.batch_processor = None
         elif attr_path:
             self.mode = Mode.ATR
             self.data_loader = DataLoader(Mode.ATR, config, path=attr_path)
-            self.saver = Saver(config, attr_path)
+            self.saver = self._build_saver(config, attr_path)
             self.attributes = None
             self.mapper = None
             self.batch_processor = None
@@ -59,6 +64,17 @@ class RunAgent:
             raise ValueError(
                 "Invalid arguments: provide dataset_id, " "networks_path, or attr_path"
             )
+
+    @staticmethod
+    def _build_saver(config, out_dir: str) -> Optional[Saver]:
+        """A Saver, or ``None`` when this run does not save.
+
+        The decision lives here rather than inside ``Saver.__new__``, which used
+        to answer a constructor call with ``None``.
+        """
+        if config.DISABLE_SAVING:
+            return None
+        return Saver(config, out_dir)
 
     def prepare_data(self):
         if self.mode == Mode.GEN:
@@ -129,9 +145,9 @@ class RunAgent:
         self.save("synthetic_network", prefix)
         graphs = self.data_loader.get_synthetic_networks()
         for i, g in enumerate(graphs):
-            Saver.begin_batch()
+            self.saver.begin_batch()
             self.saver.save(g, "synthetic_export", f"{prefix}_n{i}_")
-            Saver.end_batch()
+            self.saver.end_batch()
 
     def save(
         self,

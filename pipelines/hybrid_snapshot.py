@@ -20,7 +20,7 @@ from configs.enums import DatasetId
 from graphs import GraphGenerator
 from graphs._graph_node import GraphNode
 from graphs.graph_generator import FrontierDescriptor
-from handlers import RunAgent, Saver
+from handlers import RunAgent
 from pipelines.hybrid import (
     _apply_dataset_factors,
     _report_text,
@@ -224,22 +224,22 @@ def run_hybrid_snapshot_for_dataset(
     mapper.assign_weights(hybrid_graph)
 
     # --- Save original/ outputs ---
-    Saver.begin_batch()
+    data_agent.saver.begin_batch()
     data_agent.save("original_image")
     data_agent.save("original_network")
     data_agent.save("original_property")
     data_agent.save("original_graph")
-    Saver.end_batch()
+    data_agent.saver.end_batch()
 
     # --- Save synthetic/ outputs ---
     data_agent.add_synthetic_graph(hybrid_graph)
     prefix = f"hybrid_snapshot_{len(centers)}centers"
 
-    Saver.begin_batch()
+    data_agent.saver.begin_batch()
     data_agent.saver.save(hybrid_graph, "synthetic_export", f"{prefix}_")
     img = plot_hybrid_network(hybrid_graph)
     data_agent.saver.save(img, "synthetic_graph", f"{prefix}_")
-    Saver.end_batch()
+    data_agent.saver.end_batch()
 
     # --- Write reports ---
     original_network = data_agent.get_original_network()

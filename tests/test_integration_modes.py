@@ -153,7 +153,7 @@ class TestMosaicMode:
         from configs import SynthParams
         from graphs import GraphGenerator
         from graphs.mosaic_stitcher import MosaicStitcher
-        from handlers import RunAgent, Saver, create_run_paths
+        from handlers import RunAgent, create_run_paths
         from utils import trim_graph
 
         run_paths = create_run_paths(SampleConfig)
@@ -188,9 +188,9 @@ class TestMosaicMode:
         assert mosaic.number_of_nodes() > 100
         assert mosaic.number_of_edges() > 100
 
-        Saver.begin_batch()
+        agent.saver.begin_batch()
         agent.saver.save(mosaic, "synthetic_export", "mosaic_2x2_")
-        Saver.end_batch()
+        agent.saver.end_batch()
 
         out = agent.saver.output_dir
         files = []
@@ -220,7 +220,7 @@ class TestScalingMode:
 
         from configs import SynthParams
         from graphs import GraphGenerator
-        from handlers import RunAgent, Saver, create_run_paths
+        from handlers import RunAgent, create_run_paths
         from utils import trim_graph
 
         run_paths = create_run_paths(SampleConfig)
@@ -241,9 +241,9 @@ class TestScalingMode:
         assert scaled.number_of_nodes() > 200
         assert scaled.number_of_edges() > 200
 
-        Saver.begin_batch()
+        agent.saver.begin_batch()
         agent.saver.save(scaled, "synthetic_export", "scaled_2x2_")
-        Saver.end_batch()
+        agent.saver.end_batch()
 
         out = agent.saver.output_dir
         files = []

@@ -16,7 +16,7 @@ genuinely differs:
    not declared here: each trial supplies them as ``SynthParams`` (see
    ``pipelines/sweep.py``).  Declaring a value would be misleading, since every
    trial overrides it.
-2. Saving is disabled and the per-trial network count is set at run time by
+2. Saving is disabled here; the per-trial network count is set at run time by
    ``pipelines/sweep.py``.
 3. Input data lives under ``samples/hybrid_mode``, not ``samples/generate_mode``.
 
@@ -51,6 +51,10 @@ class SampleConfig(GenerateSampleConfig):
     SYNTHETIC_FRAME_SIZE: Tuple[int, int] = (510, 510)
 
     MEASURE_WEIGHTED = True
+
+    # A sweep scores factor combinations; the networks themselves are throwaway.
+    DISABLE_SAVING = True
+    DISABLE_SAVING_NOTE = "Sweeping Experiment"
 
     # Sweep ranges, previously hardcoded as DEFAULT_NF_RANGE / DEFAULT_EF_RANGE
     # in pipelines/sweep.py.

@@ -242,10 +242,10 @@ class TestSaverPaths:
             ]
         )
         try:
-            Saver.begin_batch()
-            ts = Saver._batch_timestamp
+            saver.begin_batch()
+            ts = saver._batch_timestamp
             saver.save("graph", "synthetic_export", "b_")
-            Saver.end_batch()
+            saver.end_batch()
         finally:
             delattr(BaseConfig, "save_synthetic_export")
 
@@ -390,3 +390,74 @@ class TestEndToEnd:
         names = {f.name for f in csv_files}
         assert any("edgelist" in n for n in names)
         assert any("positions" in n for n in names)
+
+
+# ---------------------------------------------------------------------------
+# Disabled saving
+# ---------------------------------------------------------------------------
+
+
+class TestDisabledSaving:
+    """``DISABLE_SAVING`` is declared per config and decided in one place.
+
+    It used to be a global toggled by mutating ``BaseConfig``, which the Saver
+    answered by returning ``None`` from its constructor. Both are gone.
+    """
+
+    def test_a_saver_that_exists_always_writes(self, tmp_path):
+        """The flag no longer reaches inside Saver at all."""
+
+        class Disabled(BaseConfig):
+            DISABLE_SAVING = True
+
+        saver = Saver(Disabled, str(tmp_path))
+
+        assert isinstance(saver, Saver)
+
+    def test_run_agent_builds_no_saver_when_disabled(self, tmp_path):
+        from handlers.run_agent import RunAgent
+
+        class Disabled(BaseConfig):
+            DISABLE_SAVING = True
+            DISABLE_SAVING_NOTE = "test"
+
+        assert RunAgent._build_saver(Disabled, str(tmp_path)) is None
+
+    def test_run_agent_builds_a_saver_when_enabled(self, tmp_path):
+        from handlers.run_agent import RunAgent
+
+        built = RunAgent._build_saver(BaseConfig, str(tmp_path))
+
+        assert isinstance(built, Saver)
+
+    def test_the_flag_is_never_set_on_base_config(self):
+        """A per-config declaration must not leak to every other config."""
+
+        class Disabled(BaseConfig):
+            DISABLE_SAVING = True
+
+        assert Disabled.DISABLE_SAVING is True
+        assert BaseConfig.DISABLE_SAVING is False
+
+
+class TestBatchTimestampIsPerInstance:
+    def test_two_savers_do_not_share_a_batch(self, tmp_path):
+        """Class state meant one saver's batch silently became another's."""
+        first = Saver(BaseConfig, str(tmp_path / "one"))
+        second = Saver(BaseConfig, str(tmp_path / "two"))
+
+        first.begin_batch()
+
+        assert first._batch_timestamp is not None
+        assert second._batch_timestamp is None
+
+    def test_end_batch_clears_only_its_own(self, tmp_path):
+        first = Saver(BaseConfig, str(tmp_path / "one"))
+        second = Saver(BaseConfig, str(tmp_path / "two"))
+        first.begin_batch()
+        second.begin_batch()
+
+        first.end_batch()
+
+        assert first._batch_timestamp is None
+        assert second._batch_timestamp is not None

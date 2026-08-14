@@ -184,3 +184,136 @@ def test_diameter(load_unweighted_test_synth_graph):
 
     assert isinstance(diameter, (int, float))
     assert diameter > 0
+
+
+# ---------------------------------------------------------------------------
+# Eigenvector centrality and the APSP memo
+# ---------------------------------------------------------------------------
+
+
+def _adjacency(nk_graph):
+    from scipy.sparse import coo_matrix
+
+    n = nk_graph.numberOfNodes()
+    weighted = nk_graph.isWeighted()
+    rows, cols, values = [], [], []
+    for u, v in nk_graph.iterEdges():
+        w = nk_graph.weight(u, v) if weighted else 1.0
+        rows += [u, v]
+        cols += [v, u]
+        values += [w, w]
+    return coo_matrix((values, (rows, cols)), shape=(n, n)).tocsr()
+
+
+@pytest.mark.parametrize("weighted", [False, True])
+def test_eigenvector_centrality_solves_the_eigenproblem(
+    weighted, load_weighted_test_synth_graph, load_unweighted_test_synth_graph
+):
+    """Pinned by residual, not by agreement with networkit.
+
+    ``nk.centrality.EigenvectorCentrality`` is power iteration, and on the
+    weighted fixture it does not converge: 815s at ``tol=1e-12`` still left a
+    residual of 5.7e-02. Asserting against it would pin the wrong answer, so
+    assert the definition instead.
+    """
+    graph = (
+        load_weighted_test_synth_graph
+        if weighted
+        else (load_unweighted_test_synth_graph)
+    )
+    analyzer = MultifractalAnalyzer(graph, measure_weighted=weighted, full_q_band=False)
+
+    scores = np.asarray(analyzer._compute_eigenvector_centrality())
+    matrix = _adjacency(analyzer._get_analysis_graph())
+
+    assert len(scores) == matrix.shape[0]
+    assert np.isfinite(scores).all()
+    assert (scores >= 0).all(), "Perron-Frobenius: single-signed"
+    assert np.isclose(np.linalg.norm(scores), 1.0), "networkit's unit-L2 convention"
+
+    eigenvalue = float(scores @ (matrix @ scores))
+    residual = np.linalg.norm(matrix @ scores - eigenvalue * scores)
+    assert residual < 1e-10, f"not an eigenvector: residual {residual:.2e}"
+
+
+def test_all_pairs_shortest_paths_are_computed_once_per_graph(
+    load_unweighted_test_synth_graph,
+):
+    """A full analysis used to run APSP three times over the same distances."""
+    analyzer = MultifractalAnalyzer(
+        load_unweighted_test_synth_graph, measure_weighted=False, full_q_band=False
+    )
+    graph = analyzer._get_analysis_graph()
+
+    first = analyzer._get_distances(graph)
+
+    assert analyzer._get_distances(graph) is first, "recomputed instead of cached"
+
+
+def test_curvature_uses_the_analyzer_graph_not_its_own_copy(
+    load_unweighted_test_synth_graph,
+):
+    """Curvature built a private distance graph, duplicating the 1/w rule."""
+    analyzer = MultifractalAnalyzer(
+        load_unweighted_test_synth_graph, measure_weighted=False, full_q_band=False
+    )
+
+    ricci = analyzer._compute_ollivier_ricci_curvature()
+
+    assert len(analyzer._distances) == 1, "curvature ran a second APSP"
+    assert len(ricci) == load_unweighted_test_synth_graph.number_of_edges()
+
+
+# ---------------------------------------------------------------------------
+# Neighbour mass distribution (underflow)
+# ---------------------------------------------------------------------------
+
+
+class TestNeighbourMasses:
+    """The weighted curvature could not run at all before this.
+
+    Affinities are ``base ** -(d ** p)``. Real edge widths are around 0.03, so
+    the inverted distance reaches ~30 and ``e ** -(30 ** 2)`` is exactly 0 in
+    double precision. Once every neighbour underflowed, the normalisation
+    divided 0 by 0 and the NaN aborted the transport solver.
+    """
+
+    def test_matches_the_naive_formula_when_it_does_not_underflow(self):
+        from analysis.multifractal_analyzer import _neighbour_masses
+
+        distances = np.array([0.4, 0.9, 1.3])
+        naive_affinity = np.e ** (-(distances**2))
+        expected = 0.5 * naive_affinity / naive_affinity.sum()
+
+        masses = _neighbour_masses(distances, alpha=0.5, base=np.e, exp_power=2)
+
+        assert np.allclose(masses, expected, rtol=0, atol=1e-15)
+
+    def test_survives_distances_that_underflow(self):
+        from analysis.multifractal_analyzer import _neighbour_masses
+
+        distances = np.array([30.0, 40.0, 50.0])
+        assert (np.e ** (-(distances**2)) == 0).all(), "premise: these underflow"
+
+        masses = _neighbour_masses(distances, alpha=0.5, base=np.e, exp_power=2)
+
+        assert np.isfinite(masses).all()
+        assert np.isclose(masses.sum(), 0.5), "must still carry 1 - alpha"
+
+    def test_nearest_neighbour_takes_the_most_mass(self):
+        from analysis.multifractal_analyzer import _neighbour_masses
+
+        masses = _neighbour_masses(
+            np.array([30.0, 31.0, 32.0]), alpha=0.5, base=np.e, exp_power=2
+        )
+
+        assert masses[0] > masses[1] > masses[2]
+
+    def test_weighted_curvature_completes(self, load_weighted_test_synth_graph):
+        graph = load_weighted_test_synth_graph
+        analyzer = MultifractalAnalyzer(graph, measure_weighted=True, full_q_band=False)
+
+        ricci = analyzer._compute_ollivier_ricci_curvature()
+
+        assert len(ricci) == graph.number_of_edges()
+        assert np.isfinite(ricci).all()

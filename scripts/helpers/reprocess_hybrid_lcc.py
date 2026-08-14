@@ -43,8 +43,15 @@ OUT_POSITIONS = os.path.join(SYNTH_DIR, "hybrid_50x50_lcc_positions.csv")
 
 from configs.hybrid_mode import HybridConfig
 
-HybridConfig.initialize()
-HybridConfig.disable_saving("reprocessing only")
+
+class ReprocessConfig(HybridConfig):
+    """Only the mapper is wanted here; this script writes its own CSVs."""
+
+    DISABLE_SAVING = True
+    DISABLE_SAVING_NOTE = "reprocessing only"
+
+
+ReprocessConfig.initialize()
 
 from graphs.synth_graph import SynthGraph
 from handlers import RunAgent, create_run_paths
@@ -63,9 +70,9 @@ assert (
 
 graph = SynthGraph(nk_graph, positions)
 
-dataset_id = HybridConfig.get_datasets()[0]
-run_paths = create_run_paths(HybridConfig)
-data_agent = RunAgent(HybridConfig, run_paths=run_paths, dataset_id=dataset_id)
+dataset_id = ReprocessConfig.get_datasets()[0]
+run_paths = create_run_paths(ReprocessConfig)
+data_agent = RunAgent(ReprocessConfig, run_paths=run_paths, dataset_id=dataset_id)
 data_agent.prepare_data()
 mapper = data_agent.mapper
 

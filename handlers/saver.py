@@ -16,16 +16,11 @@ class Saver:
     Holds only ``(config, out_dir)``.  Where the run writes is decided by
     :func:`~handlers.run_paths.create_run_paths` and passed in as a value, so
     nothing here is global and many runs can coexist.
-    """
 
-    def __new__(cls, config, *args, **kwargs):
-        if config.DISABLE_SAVING:
-            logger.info(
-                f"Saving is disabled. No Saver will be instantiated. "
-                f"{config.DISABLE_SAVING_NOTE}"
-            )
-            return None
-        return super().__new__(cls)
+    A Saver that exists always writes.  Whether a run saves at all is decided
+    once, by :class:`~handlers.run_agent.RunAgent`, which simply does not build
+    one when ``DISABLE_SAVING`` is set.
+    """
 
     def __init__(self, config, out_dir: str):
         """
@@ -35,31 +30,27 @@ class Saver:
         Postconditions:
             - ``out_dir`` exists.
         """
-        assert not config.DISABLE_SAVING, "Saving is disabled."
         self._config = config
         self.output_dir = out_dir
         _ensure_directory(self.output_dir, exist_ok=True)
         # Bound to the real config class, so `save_<identifier>` overrides
         # resolve through the normal MRO with no injection required.
         self._save_func = config.save
+        self._batch_timestamp: Optional[str] = None
 
-    _batch_timestamp: Optional[str] = None
-
-    @classmethod
-    def begin_batch(cls) -> str:
+    def begin_batch(self) -> str:
         """Set a shared timestamp for a group of related saves.
 
         All ``save`` calls until ``end_batch`` will share this
         timestamp.  Returns the generated timestamp so callers can
         log it.
         """
-        cls._batch_timestamp = _time_id()
-        return cls._batch_timestamp
+        self._batch_timestamp = _time_id()
+        return self._batch_timestamp
 
-    @classmethod
-    def end_batch(cls) -> None:
+    def end_batch(self) -> None:
         """Clear the batch timestamp."""
-        cls._batch_timestamp = None
+        self._batch_timestamp = None
 
     def save(self, content: Any, identifier: str, prefix: str = "") -> None:
         """Save *content* according to the specs returned by the config.
@@ -71,10 +62,6 @@ class Saver:
         """
         if content is None:
             logger.warning("Content is None.")
-            return
-
-        if self._config.DISABLE_SAVING:
-            logger.warning(f"{self._config.DISABLE_SAVING_NOTE} Saving is disabled.")
             return
 
         specs = self._save_func(identifier)

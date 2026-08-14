@@ -6,6 +6,8 @@ Pillow~=12.1.1
 scipy~=1.15.3
 networkit~=11.0
 scikit-learn~=1.7.2
+# Exact optimal transport (ot.emd2) for Ollivier-Ricci curvature
+pot~=0.9.7
 
 # Experiment tracking
 wandb~=0.25.0
