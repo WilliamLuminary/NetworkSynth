@@ -185,7 +185,7 @@ Phase 0 is the bottleneck. Nothing technical blocks it.
 
 ## 6. What we are deliberately not doing
 
-- **No igraph port.** Keep networkit. It only mattered for an in-process merge. 
+- **No igraph port.** Keep networkit. It only mattered for an in-process merge.
 - **No shared core package, subtree, or vendoring.** Nothing to keep in sync beyond the file contract in section 2 — which is the whole point of the loose model. Version the contract so a future change fails loudly.
 - **No porting the pipelines.** Hybrid, mosaic, sweep, scaling, snapshot and analyze stay ours. The GUI exposes `generate` first; others can be added to the run-spec's `mode` field later.
 - **No carrying the meaning of edge weights.** See section 2.

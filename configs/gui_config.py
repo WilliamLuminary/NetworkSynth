@@ -14,6 +14,7 @@ specs handled by one interpreter cannot collide.
 
 from __future__ import annotations
 
+import copyreg
 import json
 import logging
 import os
@@ -46,7 +47,46 @@ class SpecError(ValueError):
     """The run-spec is missing something or says something we cannot honour."""
 
 
-class GuiConfig(BaseConfig):
+def _rebuild_from_spec(spec_path: str) -> type:
+    """Reconstruct a run config in another process by re-reading its spec."""
+    return GuiConfig.from_spec(spec_path)
+
+
+class _SpecConfigMeta(type):
+    """Marks a config built from a run-spec, so it can be pickled.
+
+    ``from_spec`` creates its config at run time, and pickle stores classes *by
+    name* — a spawned child re-imports this module and finds no such name.  So a
+    spec-built config travels as the path it came from and is rebuilt there.  The
+    spec being a file on disk is what makes that possible.
+
+    Without this, ``hybrid`` fails under a spawn start method: it hands the config
+    class to a subprocess, where every other mode passes an immutable
+    ``SynthParams`` instead.
+    """
+
+
+def _reduce_spec_config(cls):
+    """How to pickle a class whose metaclass is :class:`_SpecConfigMeta`.
+
+    Registered through ``copyreg`` rather than as ``__reduce__`` on the
+    metaclass: pickle checks the ``copyreg`` dispatch table *before* it notices a
+    custom metaclass, and once it does notice one it falls straight back to
+    saving the class by name, ignoring ``__reduce__`` entirely.
+
+    Returning a plain string tells pickle "resolve this by name", which is right
+    for ``GuiConfig`` itself — only its spec-built subclasses need rebuilding.
+    """
+    spec_path = cls.__dict__.get("SPEC_PATH")
+    if spec_path is None:
+        return cls.__qualname__
+    return (_rebuild_from_spec, (spec_path,))
+
+
+copyreg.pickle(_SpecConfigMeta, _reduce_spec_config)
+
+
+class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
     """Base for GUI runs.  Use :meth:`from_spec`; do not use this directly."""
 
     MODE: str = ""
@@ -80,7 +120,9 @@ class GuiConfig(BaseConfig):
             if not inputs.get(key):
                 raise SpecError(f"{spec_path}: inputs.{key} is required")
 
-        config = type("GuiRunConfig", (cls,), {})
+        # type(cls), not type: the subclass must keep the metaclass that makes
+        # it picklable.
+        config = type(cls)("GuiRunConfig", (cls,), {"SPEC_PATH": spec_path})
         config.MODE = spec["mode"]
         config.PATHS = inputs
         config.BASE_OUTPUT_PATH = spec["output_dir"]

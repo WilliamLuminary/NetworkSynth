@@ -32,7 +32,7 @@ from handlers import (
     create_run_paths,
     write_manifest,
 )
-from utils import apply_seed, save_bfs_snapshot, trim_graph
+from utils import apply_seed, save_bfs_snapshot, spawn_context, trim_graph
 
 logger = logging.getLogger(__name__)
 SIGINT_INFO = "SIGINT received. Terminating child process..."
@@ -115,6 +115,10 @@ def _generate_single_network(
     params: SynthParams,
 ):
     """Generate one network with error gating and retry loop."""
+    # See generate_synthetic_network: a forked child inherits an OpenMP runtime
+    # whose threads do not exist in it and spins instead of working.
+    nk.setNumberOfThreads(1)
+
     if exit_event.is_set():
         return None, float("inf")
 
@@ -168,6 +172,10 @@ def _generate_single_network_collecting_snapshots(
         Has no effect on abort behavior when a ``NullErrorChecker`` is in
         use (it never fails); callers pass 0 to skip the pre-check entirely.
     """
+    # See generate_synthetic_network: a forked child inherits an OpenMP runtime
+    # whose threads do not exist in it and spins instead of working.
+    nk.setNumberOfThreads(1)
+
     if exit_event.is_set():
         return None, float("inf"), []
 
@@ -257,9 +265,8 @@ def generate_with_multiprocessing(data_agent: RunAgent, config):
         return
 
     errors, futures = [], []
-    from multiprocessing import Manager
 
-    exit_event = Manager().Event()
+    exit_event = spawn_context().Manager().Event()
     error_checker = create_error_checker(config)
     if config.SYNTHETIC_NETWORK_NUMBER > 0:
         error_checker.compute_reference(data_agent.get_original_network())
@@ -274,7 +281,9 @@ def generate_with_multiprocessing(data_agent: RunAgent, config):
     try:
         from concurrent.futures import ProcessPoolExecutor, as_completed
 
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        with ProcessPoolExecutor(
+            max_workers=max_workers, mp_context=spawn_context()
+        ) as executor:
             futures = [
                 executor.submit(
                     generate_synthetic_network,
@@ -344,7 +353,9 @@ def generate_with_snapshots(data_agent: RunAgent, config):
     interval = config.SNAPSHOT_INTERVAL
     style = getattr(config, "PLOT_STYLE", {})
 
-    plot_pool = ProcessPoolExecutor(max_workers=config.get_snapshot_plot_workers())
+    plot_pool = ProcessPoolExecutor(
+        max_workers=config.get_snapshot_plot_workers(), mp_context=spawn_context()
+    )
     plot_futures = []
 
     def on_snapshot(positions, edges, frame, step_idx):

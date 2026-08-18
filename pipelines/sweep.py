@@ -5,11 +5,10 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from multiprocessing import Manager
 
 import networkit as nk
-import wandb
 
+import wandb
 from analysis.error_checker import ErrorChecker, create_error_checker
 
 # noinspection PyUnresolvedReferences
@@ -19,7 +18,7 @@ from graphs import GraphGenerator
 from graphs._graph_node import GraphNode
 from handlers import RunAgent, attach_run_log, create_run_paths
 from pipelines.generate import compute_average_error
-from utils import apply_seed, build_graph, trim_graph
+from utils import apply_seed, build_graph, spawn_context, trim_graph
 
 
 def _init_config():
@@ -104,7 +103,7 @@ def generate_networks(data_agent, error_checker: ErrorChecker, nf, ef, config):
     from dataclasses import replace
 
     num_network = config.SYNTHETIC_NETWORK_NUMBER
-    exit_event = Manager().Event()
+    exit_event = spawn_context().Manager().Event()
     max_workers = config.get_max_workers(num_network)
 
     # This trial's factors live in an immutable params object rather than being
@@ -118,7 +117,9 @@ def generate_networks(data_agent, error_checker: ErrorChecker, nf, ef, config):
     errors = []
     futures = []
     try:
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        with ProcessPoolExecutor(
+            max_workers=max_workers, mp_context=spawn_context()
+        ) as executor:
             futures = [
                 executor.submit(
                     _generate_with_factors,

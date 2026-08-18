@@ -28,7 +28,12 @@ from pipelines.generate import (
     _generate_single_network,
     _generate_single_network_collecting_snapshots,
 )
-from utils import compute_network_metrics, metric_distance, save_bfs_snapshot
+from utils import (
+    compute_network_metrics,
+    metric_distance,
+    save_bfs_snapshot,
+    spawn_context,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +51,10 @@ def _render_snapshots(snapshot_data, output_dir, style, plot_workers: int):
     if not snapshot_data:
         return
 
-    with ProcessPoolExecutor(max_workers=min(plot_workers, len(snapshot_data))) as pool:
+    with ProcessPoolExecutor(
+        max_workers=min(plot_workers, len(snapshot_data)),
+        mp_context=spawn_context(),
+    ) as pool:
         futs = [
             pool.submit(
                 save_bfs_snapshot,
@@ -176,9 +184,8 @@ def generate_and_select(data_agent: RunAgent, config):
     candidates_dir = os.path.join(data_agent.saver.output_dir, "candidates")
 
     graphs = []
-    from multiprocessing import Manager
 
-    exit_event = Manager().Event()
+    exit_event = spawn_context().Manager().Event()
     max_workers = config.get_max_workers(num_network)
     early_node_count = original_node_count if use_snapshots and not skip_mf else 0
     logger.info(
@@ -202,7 +209,9 @@ def generate_and_select(data_agent: RunAgent, config):
     try:
         from concurrent.futures import ProcessPoolExecutor, as_completed
 
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        with ProcessPoolExecutor(
+            max_workers=max_workers, mp_context=spawn_context()
+        ) as executor:
             future_to_idx = {}
             for i in range(num_network):
                 if use_snapshots:

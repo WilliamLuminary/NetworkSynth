@@ -24,8 +24,16 @@ ApplicationWindow {
                 Layout.fillWidth: true
             }
             Label {
-                text: controller.mode
+                text: "Mode"
                 opacity: 0.6
+            }
+            ComboBox {
+                id: modeBox
+                model: controller.modeLabels
+                currentIndex: controller.modes.indexOf(controller.mode)
+                onActivated: controller.selectMode(currentIndex)
+                enabled: !controller.running
+                Layout.preferredWidth: 170
             }
         }
     }

@@ -5,11 +5,13 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 import logging
 
+import networkit as nk
+
 from configs import AttrConfig, SynthParams
 from configs.base_config import tagged
 from graphs import GraphGenerator
 from handlers import AttributesCalculator, RunAgent
-from utils import apply_seed, trim_graph
+from utils import apply_seed, spawn_context, trim_graph
 
 AttrConfig.initialize()
 # Config.DISABLE_SAVING = True  # preview only
@@ -28,6 +30,10 @@ def _should_exit(exit_event) -> bool:
 def generate_synthetic_network(
     exit_event, attributes: AttributesCalculator, params: SynthParams
 ):
+    # See generate_synthetic_network: a forked child inherits an OpenMP runtime
+    # whose threads do not exist in it and spins instead of working.
+    nk.setNumberOfThreads(1)
+
     if _should_exit(exit_event):
         return None
 
@@ -59,14 +65,15 @@ def generate_with_multiprocessing(data_agent: RunAgent, config):
         config.SYNTHETIC_GRAPH_NUMBER,
     )
     futures = []
-    from multiprocessing import Manager
 
-    exit_event = Manager().Event()
+    exit_event = spawn_context().Manager().Event()
     max_workers = config.get_max_workers(num_network)
     try:
         from concurrent.futures import ProcessPoolExecutor, as_completed
 
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        with ProcessPoolExecutor(
+            max_workers=max_workers, mp_context=spawn_context()
+        ) as executor:
             base_params = SynthParams.from_config(config)
             futures = [
                 executor.submit(

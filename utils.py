@@ -654,3 +654,26 @@ def trim_graph(graph: SynthGraph, tar_avg_deg: float) -> SynthGraph:
         round_num += 1
 
     return graph
+
+
+def spawn_context():
+    """The multiprocessing context every pool and process should use.
+
+    ``spawn`` rather than the platform default. A forked child inherits the
+    parent's memory image, including an OpenMP runtime that believes it owns one
+    thread per core while the child has one; it then waits on locks held by
+    threads that do not exist, and on a many-core host a quality-gated run never
+    finished. Every pool worker also pins networkit to one thread, which fixes
+    that symptom — this removes the mechanism.
+
+    Passed per pool rather than set with ``set_start_method``, which is
+    process-global: a test importing an entry point must not reconfigure the
+    whole session, and tests that fork while production spawns is exactly how a
+    spawn-only bug (an unpicklable run-time config class) stayed hidden.
+
+    Safe because no pipeline depends on inherited state: parameters travel as an
+    immutable ``SynthParams`` and the output location as a ``RunPaths``.
+    """
+    import multiprocessing as mp
+
+    return mp.get_context("spawn")

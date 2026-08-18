@@ -30,17 +30,22 @@ from graphs._graph_node import GraphNode
 from graphs.graph_generator import FrontierDescriptor
 from graphs.synth_graph import SynthGraph
 from handlers import (
+    STATUS_CANCELLED,
+    STATUS_FAILED,
+    STATUS_OK,
     AttributesCalculator,
     Mapper,
     RunAgent,
     attach_run_log,
     create_run_paths,
+    write_manifest,
 )
 from utils import (
     apply_seed,
     build_graph,
     log_memory,
     save_hybrid_snapshot,
+    spawn_context,
     trim_graph,
 )
 
@@ -266,10 +271,8 @@ def run_phase1(
     """
     nk.setNumberOfThreads(1)
 
-    from multiprocessing import Manager
-
     num_centers = len(frames)
-    manager = Manager()
+    manager = spawn_context().Manager()
     exit_event = manager.Event()
     num_workers = config.get_max_workers(num_centers)
 
@@ -297,7 +300,7 @@ def run_phase1(
     tile_results: Dict[int, dict] = {}
     failed = []
 
-    executor = ProcessPoolExecutor(max_workers=num_workers)
+    executor = ProcessPoolExecutor(max_workers=num_workers, mp_context=spawn_context())
     interrupted = False
     try:
         futures = {executor.submit(_generate_tile_worker, a): a[0] for a in tile_args}
@@ -762,9 +765,7 @@ def _run_dataset_in_subprocess(dataset_id, config, run_paths):
     When the child exits, the OS reclaims *all* of its memory — no
     fragmentation carries over to the next dataset.
     """
-    import multiprocessing as mp
-
-    proc = mp.Process(
+    proc = spawn_context().Process(
         target=_subprocess_target,
         args=(dataset_id, config, run_paths),
         name=f"hybrid-{dataset_id}",
@@ -806,16 +807,29 @@ def main(config_cls=None):
         config_cls = HybridConfig
     config_cls.initialize()
 
+    # Built before the try so the finally below can always name the run, even if
+    # the very first dataset fails.
+    run_paths = create_run_paths(config_cls)
+    attach_run_log(run_paths.root, config_cls.RUN_ID)
+    status, error = STATUS_OK, None
     try:
-        run_paths = create_run_paths(config_cls)
-        attach_run_log(run_paths.root, config_cls.RUN_ID)
         for dataset_id in config_cls.get_datasets():
             _run_dataset_in_subprocess(dataset_id, config_cls, run_paths)
     except KeyboardInterrupt:
+        status = STATUS_CANCELLED
         logger.info("Shutdown complete.")
         # Re-raised so the entry point can exit non-zero: a cancelled
         # run must not look like a completed one to a caller.
         raise
+    except Exception as exc:
+        status = STATUS_FAILED
+        error = f"{type(exc).__name__}: {exc}"
+        raise
+    finally:
+        # Written even on cancel/failure: a caller must be able to tell
+        # "manifest says cancelled" from "no manifest, we died hard".
+        if not config_cls.DISABLE_SAVING:
+            write_manifest(run_paths, status=status, error=error)
 
 
 if __name__ == "__main__":

@@ -21,12 +21,16 @@ from graphs import GraphGenerator
 from graphs.mosaic_stitcher import MosaicStitcher
 from graphs.synth_graph import SynthGraph
 from handlers import (
+    STATUS_CANCELLED,
+    STATUS_FAILED,
+    STATUS_OK,
     AttributesCalculator,
     RunAgent,
     attach_run_log,
     create_run_paths,
+    write_manifest,
 )
-from utils import apply_seed, render_network, trim_graph
+from utils import apply_seed, render_network, spawn_context, trim_graph
 
 logger = logging.getLogger(__name__)
 SIGINT_INFO = "SIGINT received. Terminating child process…"
@@ -157,9 +161,8 @@ def generate_all_tiles(
     dict[(row, col), SynthGraph]
         Successfully generated tiles with global-coordinate positions.
     """
-    from multiprocessing import Manager
 
-    exit_event = Manager().Event()
+    exit_event = spawn_context().Manager().Event()
     num_tiles = len(tile_offsets)
     num_workers = config.get_max_workers(num_tiles)
 
@@ -184,7 +187,9 @@ def generate_all_tiles(
     failed_tiles = []
 
     try:
-        with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        with ProcessPoolExecutor(
+            max_workers=num_workers, mp_context=spawn_context()
+        ) as executor:
             futures = {
                 executor.submit(generate_single_tile, args): args[:2]
                 for args in tile_args
@@ -301,16 +306,29 @@ def plot_mosaic_network(
 # ------------------------------------------------------------------ #
 def main(config_cls=MosaicConfig):
     config_cls.initialize()
+    # Built before the try so the finally below can always name the run, even if
+    # the very first dataset fails.
+    run_paths = create_run_paths(config_cls)
+    attach_run_log(run_paths.root, config_cls.RUN_ID)
+    status, error = STATUS_OK, None
     try:
-        run_paths = create_run_paths(config_cls)
-        attach_run_log(run_paths.root, config_cls.RUN_ID)
         for dataset_id in config_cls.get_datasets():
             run_mosaic_for_dataset(dataset_id, config_cls, run_paths)
     except KeyboardInterrupt:
+        status = STATUS_CANCELLED
         logger.critical("MAIN PROCESS: Forcing immediate shutdown!")
         # Re-raised so the entry point can exit non-zero: a cancelled
         # run must not look like a completed one to a caller.
         raise
+    except Exception as exc:
+        status = STATUS_FAILED
+        error = f"{type(exc).__name__}: {exc}"
+        raise
+    finally:
+        # Written even on cancel/failure: a caller must be able to tell
+        # "manifest says cancelled" from "no manifest, we died hard".
+        if not config_cls.DISABLE_SAVING:
+            write_manifest(run_paths, status=status, error=error)
 
 
 if __name__ == "__main__":

@@ -39,6 +39,10 @@ EXIT_INTERRUPTED = 130
 #: needs its loader slots checked, not just a name.
 _MODES = {
     "generate": "pipelines.generate",
+    "generate_select": "pipelines.generate_select",
+    "mosaic": "pipelines.mosaic",
+    "scaling": "pipelines.scaling",
+    "hybrid": "pipelines.hybrid",
 }
 
 

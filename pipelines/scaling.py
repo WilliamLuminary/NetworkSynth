@@ -9,7 +9,15 @@ from configs import SynthParams
 from configs.scaling_mode import ScalingConfig
 from graphs import GraphGenerator
 from graphs.synth_graph import SynthGraph
-from handlers import RunAgent, attach_run_log, create_run_paths
+from handlers import (
+    STATUS_CANCELLED,
+    STATUS_FAILED,
+    STATUS_OK,
+    RunAgent,
+    attach_run_log,
+    create_run_paths,
+    write_manifest,
+)
 from utils import apply_seed, render_network, trim_graph
 
 logger = logging.getLogger(__name__)
@@ -87,16 +95,29 @@ def plot_scaled_network(
 # ------------------------------------------------------------------ #
 def main(config_cls=ScalingConfig):
     config_cls.initialize()
+    # Built before the try so the finally below can always name the run, even if
+    # the very first dataset fails.
+    run_paths = create_run_paths(config_cls)
+    attach_run_log(run_paths.root, config_cls.RUN_ID)
+    status, error = STATUS_OK, None
     try:
-        run_paths = create_run_paths(config_cls)
-        attach_run_log(run_paths.root, config_cls.RUN_ID)
         for dataset_id in config_cls.get_datasets():
             run_scaling_for_dataset(dataset_id, config_cls, run_paths)
     except KeyboardInterrupt:
+        status = STATUS_CANCELLED
         logger.critical("MAIN PROCESS: Forcing immediate shutdown!")
         # Re-raised so the entry point can exit non-zero: a cancelled
         # run must not look like a completed one to a caller.
         raise
+    except Exception as exc:
+        status = STATUS_FAILED
+        error = f"{type(exc).__name__}: {exc}"
+        raise
+    finally:
+        # Written even on cancel/failure: a caller must be able to tell
+        # "manifest says cancelled" from "no manifest, we died hard".
+        if not config_cls.DISABLE_SAVING:
+            write_manifest(run_paths, status=status, error=error)
 
 
 if __name__ == "__main__":

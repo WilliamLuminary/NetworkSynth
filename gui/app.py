@@ -86,6 +86,31 @@ class SynthesisController(QObject):
     def mode(self) -> str:
         return self._mode
 
+    @Property("QStringList", notify=changed)
+    def modes(self) -> list:
+        """Every mode the entry point can dispatch, in a stable order."""
+        return list(spec_builder.MODES)
+
+    @Property("QStringList", notify=changed)
+    def modeLabels(self) -> list:
+        return [spec_builder.MODES[name].label for name in spec_builder.MODES]
+
+    @Slot(int)
+    def selectMode(self, index: int) -> None:
+        """Switch mode and reload its fields.
+
+        Values are rebuilt from the new mode's defaults rather than carried over:
+        modes share names for the common fields but not for their own, and a
+        stale value from another mode would be written into the run-spec and
+        silently set on the config.
+        """
+        names = list(spec_builder.MODES)
+        if not 0 <= index < len(names) or names[index] == self._mode:
+            return
+        self._mode = names[index]
+        self._values = spec_builder.default_values(self._mode)
+        self._note_ready()
+
     @Property("QVariantList", notify=changed)
     def fields(self) -> list:
         return [f.as_dict() for f in spec_builder.MODES[self._mode].fields]

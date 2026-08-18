@@ -25,7 +25,6 @@ from itertools import product
 from typing import Tuple
 
 import wandb
-
 from analysis import MultifractalAnalyzer
 from configs import DatasetId, SynthParams
 from configs.generate_mode import GenConfigTmp as GenConfig
@@ -60,15 +59,17 @@ def generate_networks_multiprocess(
     """Return (average_error, success_rate)."""
     num_network = SweepRunConfig.SYNTHETIC_NETWORK_NUMBER
     errors, futures = [], []
-    from multiprocessing import Manager
+    from utils import spawn_context
 
-    exit_event = Manager().Event()
+    exit_event = spawn_context().Manager().Event()
     max_workers = SweepRunConfig.get_max_workers(num_network)
     logger.info(
         f"Spawning pool with {max_workers} workers for {num_network} networks …"
     )
     try:
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        with ProcessPoolExecutor(
+            max_workers=max_workers, mp_context=spawn_context()
+        ) as executor:
             futures = [
                 executor.submit(
                     generate_synthetic_network,
