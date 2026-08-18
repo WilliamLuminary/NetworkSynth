@@ -3,11 +3,13 @@
 Target: `structural-gt` v3.8.6 (`sgtlib`), branch `gen`.
 Model: **loose coupling.** A button in their GUI launches NetworkSynth as a
 separate process with its own environment. They never import our code.
-Status: the groundwork on our side is built and tested (seeding, result
-manifest, CSV reader, exit codes, structured progress, and a config refactor that
-makes the pipelines work under a `spawn` start method). Nothing has been written
-against StructuralGT itself, and the file contract in section 3 is not yet agreed
-with their maintainer. See section 5 for what is done and what is outstanding.
+Status: **everything on our side is built and tested** — seeding, result
+manifest, CSV reader, exit codes, structured progress, run logging, the config
+refactor that makes the pipelines work under a `spawn` start method, the
+`gui_run.py` entry point, and a working GUI of our own that drives it. Nothing
+has been written against StructuralGT itself, and **the file contract in section
+3 has not been agreed with their maintainer** — that conversation now gates the
+work. See section 5 for what is done and what genuinely remains.
 
 ---
 
@@ -20,7 +22,7 @@ the hard problems before they start:
 |---|---|
 | StructuralGT is on Python 3.14, networkit has no 3.14 wheels | **Gone.** We run in our own 3.12 environment. |
 | `BaseConfig` mutates class-level global state | **Fine.** Every run is a fresh process — and this has since been removed anyway. |
-| `BaseConfig._setup_logger()` hijacks the root logger | **Fine** for correctness, but the log lands in the wrong directory — see section 5. |
+| `BaseConfig._setup_logger()` hijacks the root logger | **Gone.** Logging moved to the entry points; `run.jsonl` is written inside the run directory. |
 | `pipelines/generate.py:12` sets `OMP_NUM_THREADS` at import | **Fine.** Our process. |
 | We spawn our own process pools; they own the Qt worker lifecycle | **Fine.** No contention. |
 | Need to vendor / subtree / publish a shared core package | **Not needed.** |
@@ -49,13 +51,16 @@ class GuiConfig(BaseConfig):
 
     @classmethod
     def from_spec(cls, spec_path):
-        spec = json.load(open(spec_path))
-        cls.MODE = spec["mode"]
+        """Returns a *fresh subclass*, so two specs in one process cannot collide."""
+        spec = _read_and_validate(spec_path)      # missing keys / bad contract raise
+        run = type("GuiRunConfig", (cls,), {})
+        run.MODE = spec["mode"]
         for key, value in spec["params"].items():
-            setattr(cls, key, value)          # FRAME_SIZE, factors, counts, SEED…
-        cls.DATASETS = [DatasetId(spec.get("run_name", "gui_run"))]
-        cls.BASE_OUTPUT_PATH = spec["output_dir"]
-        cls._paths = spec["inputs"]
+            setattr(run, key, value)          # FRAME_SIZE, factors, counts, SEED…
+        run.DATASETS = [DatasetId(spec.get("run_name", "gui_run"))]
+        run.BASE_OUTPUT_PATH = spec["output_dir"]
+        run._paths = spec["inputs"]
+        return run
 
     @classmethod
     def initialize(cls):
@@ -123,7 +128,6 @@ their side needs no new serialization code.
   "inputs":  {"edge_list": "...", "positions": "...", "image": null},
   "output_dir": "/path/to/run_output",
   "mode": "generate",
-  "weight_type": "LEN",
   "params": {
     "FRAME_SIZE": [1030, 730],
     "SYNTHETIC_FRAME_SIZE": [1030, 730],
@@ -142,12 +146,13 @@ their side needs no new serialization code.
 byte-identical network. Workers get `SEED + worker_index`, so candidates still
 differ from each other while the run as a whole repeats.
 
-**`weight_type` is not cosmetic.** Their `Weight` column comes from
-`nx_graph[s][e]['weight']`, whose meaning depends on their `weight_type` setting
-— diameter, area, length, angle, conductance or resistance. Ours comes from
-`Mapper.assign_weights` and is a different quantity. Reading their weights works
-mechanically, but the run-spec must record which quantity produced the file or a
-synthetic network gets generated against something nobody tracked.
+**Deliberately not carried: what the weight *means*.** An earlier draft of this
+plan proposed a `weight_type` field, because StructuralGT's `Weight` column can
+hold a diameter, area, length, angle, conductance or resistance depending on
+their setting. Dropped, because nothing on our side would act on it: the Mapper
+learns the empirical length↔weight relationship from the input and reproduces
+it, whatever the weight physically is. If that relationship ever changes shape,
+the fix is a new Mapper, not a metadata field.
 
 ### What we write back
 
@@ -200,11 +205,9 @@ Our JSON-lines log carries a numeric `percent` field on progress records
 (`{"tag": "PROGRESS", "percent": 66.67, …}`), so their controller can drive
 `ProgressData` by reading a field rather than parsing percentages out of prose.
 
-**Prerequisite:** the log currently lands in the repo's `data/output/logs/`
-rather than inside `output_dir`, because `base_config.py` hardcodes
-`BaseConfig.BASE_OUTPUT_PATH` for the logs directory. That must be fixed before
-their controller can tail it — the run-spec names an `output_dir` and the log has
-to be in it.
+**Done.** `handlers/run_logging.py` attaches the run log inside the run
+directory, so `run.jsonl` sits next to `manifest.json` at the path the run-spec
+named. Their controller tails that file.
 
 Because we hand back edge lists and positions in the same CSV shape they
 already read (`csv_to_graph`, `csv_to_numpy` in their `sgt_utils`), a generated
@@ -261,30 +264,38 @@ window.
 | Exit codes | 0 / 1 / 130; cancellation no longer reports success. |
 | Structured progress | numeric `percent` in the JSON log. |
 | Config refactor | no global mutable config state; the pipelines work under `spawn`, so a GUI on Windows or macOS can drive them at all. |
+| Logging | `handlers/run_logging.py`; `run.jsonl` lands inside the run directory, one handler per run. |
+| GUI entry path | `configs/gui_config.py` + `gui_run.py`: a hand-written `run_spec.json` produces a network and a manifest, no GUI involved. |
+| Our own GUI | `gui/` + `gui_app.py` (PySide6 + QML, matching their toolkit). Launches `gui_run.py` as a subprocess and tails `run.jsonl` — the same mechanism their controller will use, so it doubles as the reference implementation. |
+| Weighted analysis | previously crashed on every real input; now runs. See Appendix C.2. |
 
-**Outstanding, and a prerequisite for the GUI.**
+**Outstanding.** Items 1, 3 and 4 below are resolved and kept only as a record;
+the genuinely open items are 2, 5 and 6.
 
-1. **Logging is misplaced.** `BaseConfig._setup_logger()` attaches handlers to the
-   *root* logger and hardcodes `BaseConfig.BASE_OUTPUT_PATH` for the logs
-   directory, so a run told to write to `output_dir` still logs into the repo.
-   The plan has their controller tailing that file, so it has to land in the
-   directory the run-spec named. A `_logger_initialized` latch also means a
-   second run in one process gets no file handler at all. Logging is a process
-   concern — it belongs in the entry points.
+1. **Logging.** Resolved. Moved out of `BaseConfig` into `handlers/run_logging.py`;
+   the entry points call it, and `run.jsonl` is written inside the run directory.
 
 2. **Manifest for the remaining pipelines.** `generate` and `generate_select`
    write one; hybrid, hybrid_snapshot, mosaic, scaling and sweep do not yet.
    Only needed for whichever modes the GUI ends up exposing.
 
-3. **Zero-weight edges.** 80 of 2591 edges in
-   `tests/data/A_10kX_weighted_network.pkl` have weight exactly `0.0`.
-   Legitimate, or an artifact of `Mapper.assign_weights`? Unresolved, and it
-   interacts with `weight_type` in section 3.
+3. **Zero-weight edges.** Resolved — see Appendix C.2. They came from the
+   source pool the Mapper samples, a zero weight is now rejected outright, and
+   the file named here has been replaced by
+   `tests/data/A_10kX_weighted_network_positive.pkl`.
 
-4. **Redundant APSP** *(optional, performance).* In unweighted mode the analyzer
-   computes the same all-pairs matrix twice (`multifractal_analyzer.py`);
-   caching it roughly halves analysis cost. In weighted mode the two matrices
-   genuinely differ, so the saving does not apply there.
+4. **Redundant APSP.** Resolved — see Appendix C.1. Note the "roughly halves
+   analysis cost" claim here was wrong: measured properly it is worth about 1%.
+   The reason it was kept is that curvature no longer duplicates the distance-graph
+   construction.
+
+5. **`weight_type`.** Dropped from the contract — see section 3. It was never
+   implemented and nothing would have used it.
+
+6. **`read_graph_csv` has never seen a real StructuralGT export.** It is written
+   against their documented column shape and is tested against CSVs we generate
+   ourselves. One actual exported pair of files, run through it once, is the
+   cheapest possible de-risking of the whole file contract.
 
 ---
 
@@ -297,13 +308,14 @@ window.
 | 2 | Result manifest | manifest lists every produced file; paths resolve | **done** (generate, generate_select) |
 | 3 | CSV reader | reads their export format | **done** |
 | 4 | Exit codes + structured progress | 130 on cancel; numeric `percent` in the log | **done** |
-| 5 | Move logging to the entry points | log lands inside the run-spec's `output_dir` | todo — blocks 7 |
-| 6 | `configs/gui_config.py` + run-spec loader + `gui_run.py` | a hand-written `run_spec.json` produces a network from CSV inputs, no GUI involved | todo |
+| 5 | Move logging to the entry points | log lands inside the run-spec's `output_dir` | **done** |
+| 6 | `configs/gui_config.py` + run-spec loader + `gui_run.py` | a hand-written `run_spec.json` produces a network from CSV inputs, no GUI involved | **done** |
+| 6b | Our own GUI (`gui_app.py`) driving the same entry point | window runs a generation and follows its progress | **done**, unpolished |
 | 7 | Their `synthesis_controller.py` + subprocess launch, headless | controller runs us end to end, parses the manifest, reads progress | todo |
 | 8 | `SynthesisWindow.qml` + ribbon button + `[synthesis-settings]` ini section | click-through in the GUI; progress bar advances; Cancel terminates the child and yields `cancelled` | todo |
 | 9 | Results re-enter via `add_graph()` | a generated network opens as a new `sgt_obj` and their GT PDF works on it | todo |
 
-Phases 1–6 are entirely on our side. Phases 7–9 are theirs, and small.
+Phases 1–6 are entirely on our side and are **complete**. Phases 7–9 are theirs, and small. Phase 0 — agreeing the contract — has not happened and gates everything after it.
 
 **Note on phase 8:** a `Window`, not a widget — following their existing
 `ImageHistogramWindow.qml` pattern (a `Window { }` with `import Theme 1.0`,
@@ -372,7 +384,8 @@ Run before the loose-coupling decision, when an in-process port was on the
 table. **No longer actionable**, but it documents that a port is viable if the
 integration model ever changes.
 
-Measured on `tests/data/A_10kX_weighted_network.pkl` (n=1821, e=2591) and
+Measured on the then-current `A_10kX_weighted_network.pkl` (n=1821, e=2591; since
+replaced, see Appendix C.2) and
 synthetic sparse geometric graphs.
 
 **Correctness:** shortest paths identical (`maxdiff = 0.00e+00`), betweenness
@@ -397,129 +410,135 @@ closeness, 1.49x on APSP.
 library swap could not change which candidates pass or fail. Everything that
 differs is used for reporting only.
 
-## Appendix C: measured issues in `analysis/multifractal_analyzer.py` (notes only)
+## Appendix C: measured issues in `analysis/multifractal_analyzer.py`
 
-Found while benchmarking; **nothing here is implemented**. Recorded so the
-measurements are not lost. Each needs a yes before any code changes.
+Found while benchmarking. C.1 and C.3 are **implemented**; C.2 is a recorded decision, deliberately left crashing. Timings were re-taken on an idle machine after an earlier round was contaminated by a concurrent test run.
 
-### C.1 A full analysis runs APSP three times
+### C.1 A full analysis runs APSP three times — implemented, but for code reasons not speed
 
-`analyze_graph()` computes all-pairs shortest paths three separate times over
-the same distances:
+`analyze_graph()` computed all-pairs shortest paths three separate times over the same distances: `_compute_multifractal_taus` and `_compute_node_dimension` on the analysis graph, and `_ollivier_ricci_curvature` on a private copy it built itself. Now memoised per distinct graph: 3 runs becomes 1 (unweighted) or 2 (weighted, which genuinely uses two graphs).
 
-| caller | graph |
+**Correcting an earlier claim in this document.** It previously said this was worth 48.5s → 26.0s, a 1.9x speedup. That was wrong — those timings were taken while a test suite ran concurrently, so the difference was load, not the cache. Measured properly, one APSP costs **0.03s at 705 nodes, 0.14s at 1821 nodes, 0.16s weighted (Dijkstra) at 1821**. Removing two of three saves ~0.1s out of a ~32s analysis: **about 1%.** The real cost of `analyze_graph` is elsewhere — chiefly the per-edge Wasserstein LP in the curvature loop.
+
+Output is unchanged: every APSP-derived metric (`tau_list`, `dim_list`, `nfd_dist`, `ricci_dist`, `closeness_dist`, `diameter`) is bit-identical. `betweenness_dist` and `eigen_dist` move by ~1e-16, but they use no APSP and drift by the same amount when unmodified code is run twice — networkit's threaded nondeterminism.
+
+**The reason to keep it is single-source-of-truth, not performance.** `_ollivier_ricci_curvature` was duplicating the graph-construction logic that `_get_analysis_graph` and `_get_inverted_weight_graph` already own. That duplication is live: C.2 below is an open decision about exactly how `_get_inverted_weight_graph` should treat zero weights, and under the old code any such change would silently *not* apply to curvature, which built its own graph with its own copy of the `1/w` rule. Now there is one construction and one distance matrix.
+
+The saving does grow with graph size — APSP is O(V·E) — but so does the memory below, and faster.
+
+### C.2 Weighted analysis could not run — fixed, and the original diagnosis was wrong
+
+Weighted `analyze_graph()` aborted with `ValueError: Invalid input for linprog: b_eq must not contain values inf, nan, or None`.
+
+**The first diagnosis in this document blamed zero-weight edges. That was only the most extreme case of a general numeric problem, and fixing the zeros did not fix the crash.**
+
+Curvature spreads mass over neighbours in proportion to `base ** -(d ** exp_power)`, with `d = 1/w`. A double underflows to exactly `0.0` once `(1/w)**2 > ~745`, i.e. `w < 0.0366`. Real edge widths sit below that: the weighted fixture has median weight **0.0312**, with **1426 of 2506 edges** under the limit and **442 nodes where every neighbour underflows**. Those nodes normalise `0/0`, and the resulting NaN aborts the transport solver. Samples A–D have median weights of 0.028–0.048, so this affects real runs, not just fixtures.
+
+The convention `base=e, exp_power=2` is inherited from GraphRicciCurvature, which assumes distances near 1. Inverted widths here are ~30, and `e ** -900` is zero.
+
+Fixed in `_neighbour_masses` by computing the normalised affinities as a shifted softmax — subtracting the largest exponent before exponentiating. Numerator and denominator scale by the same constant, so it cancels exactly: the same number, kept inside the representable range. Nothing is clamped, floored or defaulted. Verified to match the naive expression to 1e-15 where that expression does not underflow.
+
+Weighted `analyze_graph()` now completes in 8.0s with zero NaNs, producing 2506 curvature values in [-0.95, 1.00].
+
+**Separately**, a zero weight is now rejected outright. `SynthGraph.set_weight` and `SynthGraph.from_sparse_matrix` assert `w > 0`, naming the offending edge — an edge that exists but has no width is not a measurable graph. The Mapper samples weights from the source network with replacement, so a zero in the input is reproduced verbatim; the assert catches it at the edge that carries it rather than eight steps later.
+
+That assert made the test fixture invalid: `A_10kX_weighted_network.pkl` held 80 zero-weight edges, which the Mapper duplicated into every graph it built. Replaced by `A_10kX_weighted_network_positive.pkl` — the same graph with those edges dropped and the largest connected component kept, 1816 of 1821 nodes, all weights positive.
+
+Samples A–D encode "no width" as `1e-10` rather than `0`. That is a valid positive weight, the input data is kept as-is, and the code is required only to process it without failing — which it does. Verified end to end on all four samples: load, `Mapper`, and `analyze_graph` in both weighted and unweighted mode all complete with **zero NaNs**, and the generate round trip (`Mapper.assign_weights` sampling those values back into a fresh graph, then analysing it) also completes cleanly.
+
+Worth recording, since it is invisible from the outside: those edges invert to a distance of 1e10 against a typical 21–36, so no shortest path routes through them. Dropping them would disconnect samples C and D (26 and 3 nodes) and take 36 more off B, so structurally they are load-bearing while metrically they are not — `is_connected()` reports `True` for C and D while distance-based metrics behave as if those nodes were detached. Sample B is already disconnected regardless.
+
+### C.3 Eigenvector centrality was slow and imprecise — replaced
+
+Profiling `analyze_graph()` on the 705-node fixture put **31.5s of 35.0s (90%) in `_compute_eigenvector_centrality`**. Everything else, curvature's 1052 `linprog` calls included, came to under 4s. The APSP redundancy in C.1 was never the bottleneck.
+
+The cost came from `nk.centrality.EigenvectorCentrality(nk_graph, tol=1e-9)` — the "tighten the eigenvac" change. Tightening the tolerance was not buying accuracy, because networkit's implementation is power iteration and these graphs have a small spectral gap:
+
+| tol | time | max relative diff vs 1e-12 |
+| --- | --- | --- |
+| 1e-12 | 34.0s | — |
+| 1e-9 | 22.4s | 2.5% |
+| 1e-8 | 19.1s | 8.3% |
+| 1e-6 | 8.8s | 85% |
+
+Replaced with `scipy.sparse.linalg.eigsh(A, k=1, which="LA")` (Lanczos) in `_principal_eigenvector`, unit-L2-normalised and made non-negative to match networkit's convention. scipy was already a dependency.
+
+Timings: **0.024s vs 39.77s** unweighted (705 nodes), **0.012s vs 815.29s** weighted (1821 nodes).
+
+**It is a speed fix, not a correctness fix — an earlier version of this note claimed otherwise and was wrong.** The two methods disagree by 1.13e-02 on the weighted fixture, and by residual `eigsh` is the accurate one (1.53e-15 against networkit's 5.73e-02 — networkit does not converge even at `tol=1e-12` after 815s):
+
+```
+eigsh (new code)        lambda=1.6231681994   residual=1.53e-15
+networkit tol=1e-12     lambda=1.6221584027   residual=5.73e-02
+```
+
+But that error does not reach the reported numbers. Measured against the old `tol=1e-9` setting: `avg_eigen` moves **0.111%** unweighted and **0.198%** weighted, the top-100 nodes are identical in both, and Spearman rank correlation is 0.99999 unweighted. The weighted rank correlation over all nodes looks alarming at 0.356, but 1730 of that graph's 1821 nodes score below 1e-12 — numerically zero, so their ordering is noise. Restricted to the 91 nodes with meaningful scores, Spearman is **0.9999**.
+
+So no previously saved result is invalidated. The justification for the change is 0.005s versus 27.5s for the same answers.
+
+The regression test asserts the residual directly rather than agreement with networkit — pinning against a non-converged reference would pin the wrong answer.
+
+Note the same weighted fixture has a smallest eigenvector score of `6.4e-21`, the near-detached cluster behind the C.2 crash. A tiny spectral gap is what makes power iteration crawl *and* the eigenvector ill-conditioned, so C.2 and C.3 are two symptoms of one structural quirk in that data.
+
+### C.4 Where the time goes now (idle-machine audit)
+
+After C.1 and C.3, `analyze_graph()` on the 705-node fixture is **2.473s, down from 35.0s — 14x**. The full test suite went from 205s to 98s as a side effect.
+
+| component | time | share |
+| --- | --- | --- |
+| curvature (per-edge `linprog`) | 1.707s | 69% |
+| multifractal taus | 0.279s | 11% |
+| centralities | 0.124s | 5% |
+| node dimension | 0.110s | 4% |
+| betweenness | 0.042s | 2% |
+| eigenvector (`eigsh`) | 0.005s | 0.2% |
+| diameter | 0.004s | 0.2% |
+
+**The remaining candidate is the transport solver.** `_wasserstein_lp` calls `scipy.optimize.linprog(method="highs")` once per edge, and that is now 69% of the analysis. POT's `ot.emd2` is a C network-simplex solver for exactly this problem and would plausibly bring `analyze_graph` near 1s. It needs a new dependency and has not been measured yet. GraphRicciCurvature is the reference implementation of the surrounding algorithm but is networkx-based, which is why this codebase has its own networkit-native version — the solver, though, did not need writing.
+
+**Two candidates measured and rejected.** Vectorising `Mapper._compute_edge_metrics`'s per-edge `scipy.spatial.distance.euclidean` is a genuine 16x ratio but only **9ms → 1ms** on 2591 edges, once per network — not worth changing working code. `_compute_node_dimension`'s per-node `linregress` plus `sorted`/`Counter` is O(V² log V) of interpreter work, but costs 0.110s here; it only becomes interesting if graph sizes grow several-fold.
+
+**What a user actually waits on is none of the above.** `ErrorChecker.check()` builds a fresh analyzer per candidate and calls `analyze_error_features()`, which runs one APSP and the taus — **no curvature, no eigenvector**. Measured at 0.159s (705 nodes, unweighted) and 0.877s (1821, weighted) per candidate. At 100 networks with up to 10 attempts each that is minutes of real waiting, and both components are already efficient. Generation time is governed by attempt counts and worker parallelism, not by micro-optimising these functions.
+
+## Appendix F: forked workers spun forever on a many-core host — fixed
+
+A `generate` run with the multifractal quality gate — the **default** — never finished. Not slowly: it never finished. Without the gate the same run took 2.5s.
+
+networkit defaults to one thread per core, and this host has 128. The parent computes the error-checker reference, which starts that many OpenMP threads, then forks the worker pool. A forked child inherits an OpenMP runtime whose threads do not exist in it, and spins at 200% CPU instead of working. It is not a deadlock — an early note called it one and was wrong; the child burns CPU indefinitely.
+
+Measured on `sample_A`, one network, one attempt:
+
+| | result |
 | --- | --- |
-| `_compute_multifractal_taus` (~line 284) | analysis graph |
-| `_compute_node_dimension` (~line 370) | analysis graph (unweighted) / inverted (weighted) |
-| `_ollivier_ricci_curvature` (~line 104) | builds its own copy of the same graph |
+| fork, no pin | never finished (>40 min; a minimal repro was still spinning after 4 min) |
+| fork, `nk.setNumberOfThreads(1)` in the child | **0.3s** |
+| spawn | 4.3s |
 
-Measured on the unweighted 705-node fixture: **3 APSP runs, 48.5s**.
+Fixed by pinning the worker to one thread — exactly what `pipelines/hybrid.py` already did at lines 175 and 267. Hybrid had been fixed long ago; `generate`, `mosaic` and `sweep` never were. `generate_from_props` submits the same worker as `generate`, so it is covered too. `scaling` has no process pool. The plot pools render images and never touch networkit.
 
-Collapsing them to one memoised call per distinct graph measured **26.0s — a
-1.9x speedup** on `analyze_graph()`. Verified output-preserving: every
-APSP-derived metric (`tau_list`, `dim_list`, `nfd_dist`, `ricci_dist`,
-`closeness_dist`, `diameter`) was bit-identical. `betweenness_dist` and
-`eigen_dist` differed at ~1e-16, but a control run of *unmodified* code against
-itself differs by the same amount in the same two metrics — that is networkit's
-threaded nondeterminism, not the cache.
+After the fix, all four settings complete in about three seconds: gate off 2.4s, gate on 3.0s, weighted 2.9s, weighted with plotting 2.9s.
 
-Cost, and why it is not a several-line change: the first two call sites are a
-~12-line memo, but the third is a module-level function that constructs its own
-distance graph. Reusing the cache there means changing its signature to accept
-`(dist_graph, dist_matrix)`. Two thirds of the win (3 runs → 2) is available
-from the small change alone.
+Why it survived: severity scales with core count, so on a 4-core laptop it looks like ordinary sluggishness rather than a hang, and the test suite's pipeline tests use small graphs with the gate mostly off. `tests/test_worker_threads.py` now pins the behaviour for all four workers, and was checked to fail when the pin is removed.
 
-Memory: the memo holds a V×V float matrix per distinct graph, ~8 MB for
-V=1000, ~800 MB for V=10000. Worth a size guard if scaling mode goes large.
+Worth considering separately: `spawn` would make this class of bug impossible, and the config refactor already made the pipelines spawn-safe. That is a behaviour change on its own merits, not bundled here.
 
-### C.2 Weighted analysis crashes on zero-weight edges
+## Appendix D: `Saver` class state — resolved
 
-Reproduced on the weighted fixture (1821 nodes, 2591 edges, **80 of them
-zero-weight**):
+The three stages below are **implemented**. Recorded because the root cause is worth remembering: `DISABLE_SAVING` was an ambient global, and both oddities in `Saver` were its shape, not independent design choices.
 
-```
-ValueError: Invalid input for linprog: b_eq must not contain values inf, nan, or None
-  analysis/multifractal_analyzer.py:150  _wasserstein_lp
-```
+`cfg.disable_saving()` did not touch `cfg` — it set `BaseConfig.DISABLE_SAVING = True` for every config in the process, and for every forked child with it. Because no call site passed the flag, "saving is off" had to be visible everywhere, so it was encoded in the *existence of the object*: `Saver.__new__` returned `None` and `if not self.saver` became the disabled-check. That left no instance to call `begin_batch()` on, which forced the batch timestamp to be class state.
 
-Chain: `1/w` maps a zero weight to `float("inf")` (lines 95 and 226) → the
-affinity `base ** (-inf**2)` underflows to 0 → when every neighbour of a node
-arrives via such an edge, `w_u.sum()` is 0 → `0/0` produces NaN → the solver
-rejects the problem.
+1. **`DISABLE_SAVING` is now a declared config attribute.** `enable_saving` / `disable_saving` are deleted — the last global class mutation in the codebase. Sweep declares `DISABLE_SAVING = True` on its own config; `scripts/helpers/reprocess_hybrid_lcc.py` and `scripts/runners/run_sweep.py` each declare a local subclass instead of mutating `BaseConfig`.
+2. **`Saver.__new__` is deleted**, along with the `DISABLE_SAVING` assert and the early-return inside `save()`. A Saver that exists always writes. `RunAgent._build_saver` makes the decision in one visible place.
+3. **The batch timestamp is instance state** and `begin_batch` / `end_batch` are instance methods, across 7 production and 3 test call sites. `tests/conftest.py::_reset_singletons` is gone — there is no class state left to reset.
 
-The infinities also reach the distance matrix itself: **18,160 of 3,316,041
-pairs are unreachable**, because a ~5-node cluster attaches to the rest of the
-graph only through zero-weight edges. No node is isolated on its own — every
-node touching a zero edge also has a finite edge. So the `1/w → inf` mapping
-manufactures disconnection in a graph that is topologically connected, which
-silently corrupts closeness, betweenness and node dimension in weighted mode
-even where it does not crash.
+Two things this surfaced. `run_sweep.py` read `BaseConfig.X` in ten places and only worked *because* of the mutation; it now reads its own config class. And `pipelines/hybrid.py` deletes `data_agent` before plotting to free memory, so its final `end_batch()` has to go through the local `saver` — flake8's `F821` caught that, not the test suite.
 
-Origin is upstream, not in the analyzer: `handlers/mapper.py:96` samples weights
-from the *source* network's empirical distribution, so zeros in the input data
-are reproduced faithfully. A zero weight is a zero-width wire.
-
-Decision deferred by design. Per the current stance the run **should crash**
-rather than paper over bad input; the open question is only whether the raw
-scipy `ValueError` is a good enough report, or whether the crash should name the
-offending edges. Any numeric treatment (flooring the weight, uniform fallback)
-would silently alter the physics and is explicitly rejected for now.
-
-Coverage gap worth noting on its own: no test exercises weighted analysis on
-this fixture, which is why a hard crash on a supported code path went unnoticed.
-
-## Appendix D: the last of `Saver`'s class state (notes only)
-
-Stage 1 is done — `Saver` holds `(config, out_dir)` and the run directory
-arrives as a `RunPaths` value. Two pieces remain, and they are **coupled**, so
-neither is the small independent fix it looks like.
-
-### D.1 `__new__` returns `None` when saving is disabled
-
-```python
-def __new__(cls, config, *args, **kwargs):
-    if config.DISABLE_SAVING:
-        return None          # constructor yields None
-    return super().__new__(cls)
-```
-
-A constructor that returns `None` is a footgun, but it is at least *explicit*:
-callers must write `if saver:`. The originally planned fix was a Null Object
-whose `save()` does nothing — which removes the guard by making a disabled save
-silently succeed. Under the current fail-loud stance that is the wrong
-direction, so this needs a decision, not an implementation.
-
-The fail-fast alternative worth considering instead: do not construct a `Saver`
-at all when saving is disabled, and let the pipeline skip the save path
-explicitly rather than routing through an object that discards its input.
-
-### D.2 The batch timestamp is class state
-
-`Saver._batch_timestamp` is a class attribute driven by the `begin_batch` /
-`end_batch` classmethods — the last mutable class state in the codebase, and the
-only reason `tests/conftest.py::_reset_singletons` still exists.
-
-Instance-scoping it is mechanically small: all 11 call sites already have an
-instance in scope (`data_agent.saver`, `self.saver`), so
-`Saver.begin_batch()` becomes `data_agent.saver.begin_batch()`.
-
-**Why it is blocked on D.1:** a classmethod works when no instance exists, which
-is exactly the `DISABLE_SAVING` case. Turn it into an instance method and all 11
-sites raise `AttributeError` on `None` under disabled saving, unless every one
-of them grows a guard. So D.1 must be settled first.
-
-Call sites, for whenever this is picked up: `pipelines/hybrid.py` (681, 692),
-`pipelines/hybrid_snapshot.py` (227, 238), `pipelines/mosaic.py` (256),
-`pipelines/scaling.py` (52), `handlers/run_agent.py` (132), plus
-`tests/test_save_infrastructure.py` (245) and `tests/test_integration_modes.py`
-(191, 244).
+Still true, and deliberately not changed: `RunAgent.saver` is `None` when saving is disabled, so the call sites that reach through it (`data_agent.saver.save(...)` in mosaic, scaling, hybrid, hybrid_snapshot, generate_select) still raise `AttributeError` under `DISABLE_SAVING`. That was already the case before this work — no live path exercises them with saving off. Removing the `None` entirely means treating "do not save" as a destination rather than a mode: a dry run writes to a throwaway directory and the flag disappears. That trade costs real I/O during sweeps, which is what the flag exists to avoid, so it stays open.
 
 ## Appendix E: mypy measurement (notes only)
 
-mypy 2.3.0, run once for measurement against `configs graphs handlers pipelines
-analysis gui run.py gui_run.py gui_app.py` with `--ignore-missing-imports`.
-Nothing was committed: no config file, no `.pre-commit-config.yaml` entry, no
-fixes.
+mypy 2.3.0, run once for measurement against `configs graphs handlers pipelines analysis gui run.py gui_run.py gui_app.py` with `--ignore-missing-imports`. Nothing was committed: no config file, no `.pre-commit-config.yaml` entry, no fixes.
 
 **110 errors.** Almost none are bugs:
 
@@ -530,18 +549,10 @@ fixes.
 | `arg-type` | 20 | `str \| None` config paths reaching `open`/`np.load`. **Inherent to the design**: paths are deliberately `None` until a config supplies them, so mypy wants a narrowing assert at every use. |
 | other | 25 | `var-annotated`, `index`, `union-attr`, `no-redef`, small counts. |
 
-Worst files: `utils.py` (24), `graphs/_graph_node.py` (18), `run.py` (15),
-`configs/enums.py` (9).
+Worst files: `utils.py` (24), `graphs/_graph_node.py` (18), `run.py` (15), `configs/enums.py` (9).
 
-**Recommendation: do not adopt now.** The signal-to-noise is poor, and the
-largest real category argues *against* the type checker rather than for it —
-the fail-fast config design intentionally leaves attributes unset until a config
-provides them, and mypy reads exactly that as an error. Adoption would mean an
-implicit-Optional sweep plus narrowing asserts across the config surface, for no
-demonstrated bug caught.
+**Recommendation: do not adopt now.** The signal-to-noise is poor, and the largest real category argues *against* the type checker rather than for it — the fail-fast config design intentionally leaves attributes unset until a config provides them, and mypy reads exactly that as an error. Adoption would mean an implicit-Optional sweep plus narrowing asserts across the config surface, for no demonstrated bug caught.
 
-`black` / `isort` / `flake8` already run in `.pre-commit-config.yaml` and pass;
-flake8 has caught real breakage in this codebase before. That gate is enough.
+`black` / `isort` / `flake8` already run in `.pre-commit-config.yaml` and pass; flake8 has caught real breakage in this codebase before. That gate is enough.
 
-mypy was installed into `.venv` for this measurement and is not in
-`requirements.txt`. Remove with `.venv/bin/pip uninstall mypy` if unwanted.
+mypy was installed into `.venv` for this measurement and is not in `requirements.txt`. Remove with `.venv/bin/pip uninstall mypy` if unwanted.

@@ -14,6 +14,7 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 import logging
 from typing import List
 
+import networkit as nk
 import numpy as np
 
 from analysis.error_checker import ErrorChecker, create_error_checker
@@ -72,6 +73,12 @@ def generate_synthetic_network(
     mapper: Mapper,
     params: SynthParams,
 ):
+    # networkit defaults to one thread per core, and a forked child inherits an
+    # OpenMP runtime whose threads do not exist in it — the child then spins
+    # instead of working.  Pinning matches what hybrid's tile worker already
+    # does; without it a quality-gated run never finishes on a many-core host.
+    nk.setNumberOfThreads(1)
+
     if _should_exit(exit_event):
         return None, float("inf")
 

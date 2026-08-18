@@ -12,6 +12,8 @@ import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Dict, Tuple
 
+import networkit as nk
+
 from configs import SynthParams
 from configs.base_config import tagged
 from configs.mosaic_mode import MosaicConfig
@@ -60,6 +62,11 @@ def generate_single_tile(args):
         offset_y,
         params,
     ) = args
+
+    # networkit defaults to one thread per core, and a forked child inherits an
+    # OpenMP runtime whose threads do not exist in it — the child then spins
+    # instead of working.  Matches hybrid's tile worker.
+    nk.setNumberOfThreads(1)
 
     if exit_event.is_set():
         return (row, col), None

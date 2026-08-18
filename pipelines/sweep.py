@@ -7,6 +7,7 @@ import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from multiprocessing import Manager
 
+import networkit as nk
 import wandb
 
 from analysis.error_checker import ErrorChecker, create_error_checker
@@ -55,6 +56,11 @@ def _generate_with_factors(
     *params* already carries this trial's node/edge factors, derived in the
     parent - no global mutation, and nothing read from inherited class state.
     """
+    # networkit defaults to one thread per core, and a forked child inherits an
+    # OpenMP runtime whose threads do not exist in it — the child then spins
+    # instead of working.  Matches hybrid's tile worker.
+    nk.setNumberOfThreads(1)
+
     if exit_event.is_set():
         return None, float("inf")
 
