@@ -4,7 +4,7 @@ Target: `structural-gt` v3.8.6 (`sgtlib`), branch `gen`.
 
 Model: **loose coupling.** A button in their GUI opens NetworkSynth as a separate process with its own environment. They never import our code.
 
-Status: **everything on our side is built, tested, and verified end to end on real sample data.** What remains is a conversation with their maintainer about the contract in section 2, the work on their side in section 3, and the open items in section 4. Completed work has been removed from this document; git history holds the record.
+Status: **everything on our side is built and verified end to end on real sample data.** Every pipeline has been run for real, not just tested: the five modes the GUI offers each complete as a subprocess with the quality gate on and write a manifest, and `sweep` completes through its wandb agent. Worker processes use `spawn` everywhere, so nothing depends on the parent process surviving. What remains is a conversation with their maintainer about the contract in section 2, the work on their side in section 3, and the two open items in section 4. Completed work is not recorded here; git history holds it.
 
 ---
 
@@ -68,7 +68,7 @@ The directory convention already exists implicitly, because it is what we *write
 
 ### What we write back
 
-`handlers/manifest.py` writes `manifest.json` at the run root, so their GUI never parses our directory names:
+Every mode writes `manifest.json` at the run root, so their GUI never parses our directory names. It is written from a `finally`, so a run that fails or is cancelled still produces one saying so:
 
 ```json
 {
@@ -88,7 +88,7 @@ The directory convention already exists implicitly, because it is what we *write
 ```
 
 - `status` is `ok`, `failed` (with an `error` string) or `cancelled`. **`cancelled` is deliberately distinct from `failed`** — a GUI must not show an error because the user pressed Cancel.
-- Written from a `finally`, so a *missing* manifest means the process died hard rather than being ambiguous with a failed run.
+- A *missing* manifest therefore means the process died hard, which is unambiguous rather than looking like a failed run.
 - `snapshots` is separate from `previews`: the former is an animation sequence, the latter a final render.
 - Paths are relative to `run_root` with forward slashes on every platform.
 - `manifest_version` and the run-spec's `contract` exist so a future shape change fails loudly instead of being misread.
@@ -155,17 +155,21 @@ The form should be **per-mode, not per-config-file**: configs within a mode diff
 
 ## 4. Open on our side
 
-1. **Directory input is not built.** `gui/spec_builder.py` takes one explicit pair of paths. Supporting a directory means scanning it, grouping files by prefix, and turning each prefix into a dataset — which `DATASETS` already models. Two decisions come with it: what happens when a file is missing its partner (name the orphan and stop, to match the fail-fast stance elsewhere), and whether a directory of N datasets is one run producing N outputs or N runs. `RunPaths` and the manifest already support per-dataset subdirectories, so one run is the cheaper fit. This also changes `inputs` in the run-spec, so `contract` bumps to 2.
+1. **Three of the eight pipelines are not reachable from the GUI, because they take different input.** The window offers `generate`, `generate_select`, `mosaic`, `scaling` and `hybrid` — all of which read an edge-list plus a positions CSV, which is why one fixed input form serves them. The others do not fit it:
 
-2. **`read_graph_csv` has never seen a real StructuralGT export.** It is written against their documented column shape and tested only against CSVs we generate. One actual exported pair of files, run through it once, is the cheapest possible de-risking of the whole contract.
+   | mode | input it needs |
+   | --- | --- |
+   | `from_props` | a directory holding a `*_property.pkl` |
+   | `analyze` | a directory holding `synthetic/` and `original/` |
+   | `sweep` | a CSV pair, plus wandb credentials |
 
-3. **Manifest covers `generate` and `generate_select` only.** `hybrid`, `hybrid_snapshot`, `mosaic`, `scaling` and `sweep` do not write one. Needed only for whichever modes the GUI ends up exposing, and the plan is to expose `generate` first.
+   So the work is not another row in a table — the window's **input section has to vary by mode**: a file pair for some, a directory for others. That means input descriptions alongside the parameter fields, per-mode validation (a directory containing a property pickle is a different check from two files existing), and an `inputs` shape in the run-spec that depends on the mode, which bumps `contract` to 2.
 
-4. **`spawn` versus `fork`.** Forked workers inherit an OpenMP runtime whose threads do not exist in them and spin instead of working; the fix applied was to pin each worker to one networkit thread, which `tests/test_worker_threads.py` now guards. Switching the start method to `spawn` would make that whole class of bug impossible, and the config refactor already made the pipelines spawn-safe. It is a behaviour change worth deciding on its own merits.
+   The same change delivers **directory input** for the modes that already work — scanning a directory, grouping files by prefix, and turning each prefix into a dataset, which `DATASETS` already models. Two decisions come with that: what happens when a file is missing its partner (name the orphan and stop, matching the fail-fast stance elsewhere), and whether a directory of N datasets is one run producing N outputs or N runs. `RunPaths` and the manifest already support per-dataset subdirectories, so one run is the cheaper fit.
 
-5. **Only `generate` has been verified by a real run.** `hybrid`, `mosaic`, `scaling` and `sweep` are exercised by the test suite but have not been run end to end on real data since the refactor. Given that a default-configuration hang survived a passing suite once, one real run each is worth the time before trusting them.
+   `sweep` is deliberately excluded regardless. It hands control to wandb's agent to drive its own parameter search, so "Run" would mean "start a sweep and let wandb take over" — a different interaction from every other mode — and it needs credentials a GUI has no way to prompt for. It stays a CLI tool.
 
-6. **Our GUI is unpolished.** It runs a generation and follows its progress, but has known rough edges from local use.
+2. **Our GUI is unpolished.** It selects a mode, runs a generation and follows its progress, but has rough edges from local use that have not been worked through.
 
 ---
 
@@ -174,12 +178,11 @@ The form should be **per-mode, not per-config-file**: configs within a mode diff
 | Phase | Work | Verify | Owner |
 |---|---|---|---|
 | 0 | Agree the file contract and the integration depth (section 3) | written contract; no code | **their maintainer** — gates everything below |
-| 1 | One real StructuralGT export through `read_graph_csv` | it loads, or the contract changes | ours, ~30 min |
-| 2 | Directory input, if wanted | a directory of N datasets produces N outputs in one run | ours |
-| 3 | Their launcher — thin or deep per phase 0 | click opens our window, or their controller runs us end to end | theirs |
-| 4 | Results re-enter via `add_graph()` | a generated network opens as a new `sgt_obj` and their GT PDF works on it | theirs |
+| 1 | Per-mode input shapes: directory input, and `from_props` / `analyze` in the window | a directory of N datasets produces N outputs in one run; every `run.py` mode except `sweep` is reachable from the GUI | ours |
+| 2 | Their launcher — thin or deep per phase 0 | click opens our window, or their controller runs us end to end | theirs |
+| 3 | Results re-enter via `add_graph()` | a generated network opens as a new `sgt_obj` and their GT PDF works on it | theirs |
 
-Phase 0 is the bottleneck. Nothing technical blocks it.
+Phase 0 is the bottleneck. Nothing technical blocks it, and phase 1 is worth settling first because it changes the contract phase 0 would agree.
 
 ---
 
@@ -187,7 +190,8 @@ Phase 0 is the bottleneck. Nothing technical blocks it.
 
 - **No igraph port.** Keep networkit. It only mattered for an in-process merge.
 - **No shared core package, subtree, or vendoring.** Nothing to keep in sync beyond the file contract in section 2 — which is the whole point of the loose model. Version the contract so a future change fails loudly.
-- **No porting the pipelines.** Hybrid, mosaic, sweep, scaling, snapshot and analyze stay ours. The GUI exposes `generate` first; others can be added to the run-spec's `mode` field later.
+- **No porting the pipelines.** They stay ours; the GUI selects among them by name in the run-spec's `mode` field.
+- **No `sweep` in the GUI.** See section 4.
 - **No carrying the meaning of edge weights.** See section 2.
 
 ---
