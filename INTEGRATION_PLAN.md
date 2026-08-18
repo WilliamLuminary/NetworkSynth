@@ -4,7 +4,7 @@ Target: `structural-gt` v3.8.6 (`sgtlib`), branch `gen`.
 
 Model: **loose coupling.** A button in their GUI opens NetworkSynth as a separate process with its own environment. They never import our code.
 
-Status: **everything on our side is built, tested, and verified end to end on real sample data.** What remains is a conversation with their maintainer about the contract in section 3, the work on their side in section 4, and two open design questions in section 5. Completed work has been removed from this document; git history holds the record.
+Status: **everything on our side is built, tested, and verified end to end on real sample data.** What remains is a conversation with their maintainer about the contract in section 2, the work on their side in section 3, and the open items in section 4. Completed work has been removed from this document; git history holds the record.
 
 ---
 
@@ -19,37 +19,22 @@ Deciding on a separate process rather than an in-process library removes most of
 | `pipelines/generate.py` sets `OMP_NUM_THREADS` at import | **Fine.** Our process. |
 | Need to vendor / subtree / publish a shared core package | **Not needed.** |
 | Need an in-process `nx.Graph` ↔ `SynthGraph` adapter | **Not needed.** Handoff is files. |
-| networkit vs igraph port (~2–3 days) | **Not needed. Keep networkit.** See Appendix B. |
+| networkit vs igraph port (~2–3 days) | **Not needed. Keep networkit.** |
 
 What is left is small: a file contract between the two, a launcher on their side, and a way to report progress back.
 
 ---
 
-## 2. How the bridge works on our side
+## 2. The file contract
 
-Our configs are classes that already expose function slots meant to be overridden (`ORIGINAL_NETWORK_FUNC`, `ORIGINAL_IMAGE_FUNC`, `NETWORKS_FUNC`, `ATTRIBUTES_DICT_FUNC`). A GUI-driven run is just another config that overrides the loaders.
-
-`configs/gui_config.py` sits at the `configs/` root rather than inside a `*_mode` package: it is not a mode, it is mode-*parameterised*, resolved at run time. `GuiConfig.from_spec(path)` validates a JSON run-spec and returns a **fresh subclass**, so two specs in one process cannot collide. `gui_run.py` is a dedicated entry point, which keeps `run.py` and the pipelines untouched.
-
-Two details that will bite anyone extending this:
-
-- `configs/_loader.py` globs `config_*.py` and returns only the **first** config class per module, so a single file holding several mode classes will not auto-register them all. The GUI entry point uses explicit dispatch instead.
-- `BaseConfig.initialize()` derives `OUTPUT_DENOTE` from a module path segment ending in `_mode`. A config at the `configs/` root has none, so `GuiConfig` sets it explicitly.
-
-There is no global mutable config state. Values reach worker processes as an immutable `SynthParams`, and the run's output location as a `RunPaths` value, so the pipelines work under a `spawn` start method — a GUI on Windows or macOS can drive them at all.
-
----
-
-## 3. The file contract
-
-**Inputs are chosen by the user, not handed over by StructuralGT.** StructuralGT decides its own export format and location; we let the user pick what to load. This is the correction that matters most in this document — an earlier draft had their exporter writing files for us to consume, which is not the model.
+**Inputs are chosen by the user, not handed over by StructuralGT.** StructuralGT decides its own export format and location; we let the user pick what to load.
 
 Two input shapes:
 
 | Shape | Files | Status |
 |---|---|---|
 | An explicit pair | an edge-list CSV and a positions CSV, named directly | **built** |
-| A directory | every dataset in it, by naming convention | **not built** — see section 5 |
+| A directory | every dataset in it, by naming convention | **not built** — see section 4 |
 
 `graphs/csv_io.py` is deliberately tolerant about columns, so either origin works: it accepts StructuralGT's `Source,Target` (plus `Weight,Length,Width,Angle` when weighted) and our own `source_index,target_index,edge_weight`, with `x,y` for positions.
 
@@ -79,7 +64,7 @@ The directory convention already exists implicitly, because it is what we *write
 
 `SEED` matters: with it set, running twice with the same settings produces a byte-identical network. Workers get `SEED + worker_index`, so candidates still differ from each other while the run as a whole repeats.
 
-**Deliberately not carried: what the weight *means*.** An earlier draft proposed a `weight_type` field, because StructuralGT's `Weight` column can hold a diameter, area, length, angle, conductance or resistance depending on their setting. Dropped, because nothing on our side would act on it: the Mapper learns the empirical length↔weight relationship from the input and reproduces it, whatever the weight physically is. If that relationship ever changes shape, the fix is a new Mapper, not a metadata field.
+**No field records what the weight means.** StructuralGT's `Weight` column can hold a diameter, area, length, angle, conductance or resistance depending on their setting, and we carry none of that: the Mapper learns the empirical length↔weight relationship from the input and reproduces it, whatever the weight physically is.
 
 ### What we write back
 
@@ -127,9 +112,9 @@ Our JSON-lines log carries a numeric `percent` field on progress records (`{"tag
 
 ---
 
-## 4. Their side: how deep to integrate
+## 3. Their side: how deep to integrate
 
-There are two depths, and this is the main thing to settle with their maintainer. The input model in section 3 makes the thin option genuinely viable, which was not obvious before.
+There are two depths, and this is the main thing to settle with their maintainer. The input model in section 2 makes the thin option genuinely viable.
 
 **Thin — the button just opens our window.** The user picks input files in our GUI; our window writes its own run-spec and launches `gui_run.py`. Their side needs a ribbon button, an ini entry naming our interpreter and repo, and nothing else. No exporting, no spec writing, no progress plumbing, no manifest parsing. Results return whenever the user loads them through their existing `add_graph()` path.
 
@@ -168,7 +153,7 @@ The form should be **per-mode, not per-config-file**: configs within a mode diff
 
 ---
 
-## 5. Open on our side
+## 4. Open on our side
 
 1. **Directory input is not built.** `gui/spec_builder.py` takes one explicit pair of paths. Supporting a directory means scanning it, grouping files by prefix, and turning each prefix into a dataset — which `DATASETS` already models. Two decisions come with it: what happens when a file is missing its partner (name the orphan and stop, to match the fail-fast stance elsewhere), and whether a directory of N datasets is one run producing N outputs or N runs. `RunPaths` and the manifest already support per-dataset subdirectories, so one run is the cheaper fit. This also changes `inputs` in the run-spec, so `contract` bumps to 2.
 
@@ -184,11 +169,11 @@ The form should be **per-mode, not per-config-file**: configs within a mode diff
 
 ---
 
-## 6. Sequencing
+## 5. Sequencing
 
 | Phase | Work | Verify | Owner |
 |---|---|---|---|
-| 0 | Agree the file contract and the integration depth (section 4) | written contract; no code | **their maintainer** — gates everything below |
+| 0 | Agree the file contract and the integration depth (section 3) | written contract; no code | **their maintainer** — gates everything below |
 | 1 | One real StructuralGT export through `read_graph_csv` | it loads, or the contract changes | ours, ~30 min |
 | 2 | Directory input, if wanted | a directory of N datasets produces N outputs in one run | ours |
 | 3 | Their launcher — thin or deep per phase 0 | click opens our window, or their controller runs us end to end | theirs |
@@ -198,12 +183,12 @@ Phase 0 is the bottleneck. Nothing technical blocks it.
 
 ---
 
-## 7. What we are deliberately not doing
+## 6. What we are deliberately not doing
 
-- **No igraph port.** Keep networkit. It only mattered for an in-process merge. See Appendix B.
-- **No shared core package, subtree, or vendoring.** Nothing to keep in sync beyond the file contract in section 3 — which is the whole point of the loose model. Version the contract so a future change fails loudly.
+- **No igraph port.** Keep networkit. It only mattered for an in-process merge. 
+- **No shared core package, subtree, or vendoring.** Nothing to keep in sync beyond the file contract in section 2 — which is the whole point of the loose model. Version the contract so a future change fails loudly.
 - **No porting the pipelines.** Hybrid, mosaic, sweep, scaling, snapshot and analyze stay ours. The GUI exposes `generate` first; others can be added to the run-spec's `mode` field later.
-- **No carrying the meaning of edge weights.** See section 3.
+- **No carrying the meaning of edge weights.** See section 2.
 
 ---
 
@@ -219,19 +204,3 @@ Checked 2026-07-31.
 - Historical lag behind a new CPython: cp312 arrived ~4 months after Python 3.12; cp313 ~5 months after Python 3.13. We are now ~10 months past 3.14.
 
 **Important nuance:** `pip install networkit` **does work** on Python 3.14 — it builds from the sdist. Only `uv` fails, which is what #1409 is really about. So this is a source build, not a wall. That is acceptable for a developer machine and unacceptable for a bundled end-user installer — which is another reason the loose model is the right call.
-
----
-
-## Appendix B: igraph vs networkit benchmark (kept for reference)
-
-Run before the loose-coupling decision, when an in-process port was on the table. **No longer actionable**, but it documents that a port is viable if the integration model ever changes.
-
-Measured on a 1821-node, 2591-edge weighted sample and synthetic sparse geometric graphs.
-
-**Correctness:** shortest paths identical (`maxdiff = 0.00e+00`), betweenness identical (`corr = 1.000000`), clustering identical, components identical, unweighted diameter identical. Two genuine differences: networkit's weighted diameter returns an int and floors it (4.7 → 4, 0.3 → 0 — igraph is correct), and the two libraries define closeness differently for graphs in separate pieces (never arises, since `build_graph` always returns the largest component).
-
-**Speed, networkit at 1 thread** (what all pipelines use, via `OMP_NUM_THREADS=1` and `nk.setNumberOfThreads(1)` in every pool worker): igraph was 1.3x faster on APSP at n=1821, 2.7–3.3x faster on betweenness, tied elsewhere, and 105x slower on exact diameter (avoidable — derive it from the APSP matrix).
-
-**Speed, networkit at 16 threads** (only hybrid's phase 2 and `hybrid_snapshot`): igraph 3.0x slower on betweenness, 15.7x on closeness, 1.49x on APSP.
-
-**Key finding:** the quality gate (`analyze_error_features`) depends only on `alpha_0` and `width`, both derived from APSP — which matched exactly. So a library swap could not change which candidates pass or fail. Everything that differs is used for reporting only.
