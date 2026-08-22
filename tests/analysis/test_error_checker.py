@@ -10,6 +10,7 @@ start method, silently changing the quality gate.
 
 import pickle
 
+import numpy as np
 import pytest
 
 from analysis.error_checker import (
@@ -18,6 +19,7 @@ from analysis.error_checker import (
     create_error_checker,
 )
 from configs import BaseConfig
+from graphs.synth_graph import SynthGraph
 
 pytestmark = pytest.mark.unit
 
@@ -129,3 +131,115 @@ class TestAnalyzerHonoursExplicitSettings:
         )
 
         assert analyzer.weighted is False
+
+
+# ---------------------------------------------------------------------------
+# Length + angle gate
+# ---------------------------------------------------------------------------
+
+
+class TestLengthAngleErrorChecker:
+    """A second gate, added to prove the registry is a real extension point.
+
+    Adding it required one class and one `_CHECKERS` entry — no pipeline,
+    config or GUI change — which is the property these tests pin.
+    """
+
+    @staticmethod
+    def _lattice(side=8, spacing=10.0, seed=1):
+        import networkit as nk
+
+        rng = np.random.default_rng(seed)
+        coords = [(x * spacing, y * spacing) for y in range(side) for x in range(side)]
+        positions = np.asarray(coords, dtype=float)
+        positions += rng.normal(0, spacing * 0.02, size=positions.shape)
+        graph = nk.Graph(len(coords), weighted=False)
+        for y in range(side):
+            for x in range(side):
+                here = y * side + x
+                if x + 1 < side:
+                    graph.addEdge(here, here + 1)
+                if y + 1 < side:
+                    graph.addEdge(here, here + side)
+        return SynthGraph(graph, positions)
+
+    def _checker(self, tolerance=0.15):
+        from analysis.error_checker import LengthAngleErrorChecker
+
+        return LengthAngleErrorChecker(tolerance)
+
+    def test_it_is_reachable_through_the_registry(self):
+        """The whole point: a config name is all a pipeline needs."""
+        from analysis.error_checker import LengthAngleErrorChecker, create_error_checker
+        from configs import BaseConfig
+
+        class Config(BaseConfig):
+            ERROR_CHECKER = "length_angle"
+            ERROR_TOLERANCE = 0.2
+
+        checker = create_error_checker(Config)
+
+        assert isinstance(checker, LengthAngleErrorChecker)
+        assert checker.tolerance == 0.2
+
+    def test_check_before_reference_raises(self):
+        """Silently comparing against nothing would be worse than stopping."""
+        with pytest.raises(RuntimeError, match="compute_reference"):
+            self._checker().check(self._lattice())
+
+    def test_an_identical_graph_scores_zero(self):
+        graph = self._lattice()
+        checker = self._checker()
+        checker.compute_reference(graph)
+
+        passed, error = checker.check(graph)
+
+        assert passed
+        assert error == pytest.approx(0.0, abs=1e-12)
+
+    def test_it_measures_only_length_and_angle(self):
+        """Node count and degree must not influence the verdict.
+
+        A lattice twice the size has the same edge length and the same angles,
+        so a gate that looked at size would reject it.
+        """
+        checker = self._checker(tolerance=0.05)
+        checker.compute_reference(self._lattice(side=6))
+
+        passed, error = checker.check(self._lattice(side=12))
+
+        assert set(checker._reference) == {"avg_length", "avg_angle"}
+        assert passed, f"size should not matter, error was {error}"
+
+    def test_different_geometry_fails(self):
+        """Same topology, edges ten times longer."""
+        checker = self._checker(tolerance=0.15)
+        checker.compute_reference(self._lattice(spacing=10.0))
+
+        passed, error = checker.check(self._lattice(spacing=100.0))
+
+        assert not passed
+        assert error > 0.15
+
+    def test_tolerance_decides_the_boundary(self):
+        checker_tight = self._checker(tolerance=0.001)
+        checker_loose = self._checker(tolerance=10.0)
+        reference = self._lattice(spacing=10.0)
+        candidate = self._lattice(spacing=12.0)
+        for checker in (checker_tight, checker_loose):
+            checker.compute_reference(reference)
+
+        assert not checker_tight.check(candidate)[0]
+        assert checker_loose.check(candidate)[0]
+
+    def test_it_survives_pickling(self):
+        """Checkers are built in the parent and sent to spawned workers."""
+        import pickle
+
+        checker = self._checker()
+        checker.compute_reference(self._lattice())
+
+        restored = pickle.loads(pickle.dumps(checker))
+
+        assert restored._reference == checker._reference
+        assert restored.check(self._lattice())[0]
