@@ -59,8 +59,7 @@ def _read_manifest(tmp_path, name):
 
 
 @pytest.mark.parametrize("module_path,runner", PIPELINES)
-def test_a_completed_run_writes_a_manifest(module_path, runner, tmp_path,
-                                           monkeypatch):
+def test_a_completed_run_writes_a_manifest(module_path, runner, tmp_path, monkeypatch):
     import importlib
 
     module = importlib.import_module(module_path)
@@ -72,8 +71,9 @@ def test_a_completed_run_writes_a_manifest(module_path, runner, tmp_path,
 
 
 @pytest.mark.parametrize("module_path,runner", PIPELINES)
-def test_a_failed_run_writes_a_manifest_saying_so(module_path, runner, tmp_path,
-                                                  monkeypatch):
+def test_a_failed_run_writes_a_manifest_saying_so(
+    module_path, runner, tmp_path, monkeypatch
+):
     """A failure must be reported, not left as a missing file."""
     import importlib
 
@@ -93,8 +93,9 @@ def test_a_failed_run_writes_a_manifest_saying_so(module_path, runner, tmp_path,
 
 
 @pytest.mark.parametrize("module_path,runner", PIPELINES)
-def test_a_cancelled_run_is_distinct_from_a_failed_one(module_path, runner,
-                                                       tmp_path, monkeypatch):
+def test_a_cancelled_run_is_distinct_from_a_failed_one(
+    module_path, runner, tmp_path, monkeypatch
+):
     """A GUI must not show an error because the user pressed Cancel."""
     import importlib
 

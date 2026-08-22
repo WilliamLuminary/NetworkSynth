@@ -35,9 +35,7 @@ def _small_graph(side=8, spacing=10.0, seed=3):
     edges, which is both realistic and what makes a tiny test viable.
     """
     rng = np.random.default_rng(seed)
-    coords = [
-        (x * spacing, y * spacing) for y in range(side) for x in range(side)
-    ]
+    coords = [(x * spacing, y * spacing) for y in range(side) for x in range(side)]
     positions = np.asarray(coords, dtype=float)
     positions += rng.normal(0, spacing * 0.05, size=positions.shape)  # slight jitter
 
@@ -94,7 +92,9 @@ class TestGenerateFromProps:
         # Attr mode hands the *input* directory to RunAgent as its output dir,
         # so results land beside the attributes rather than under BASE_OUTPUT_PATH.
         produced = list(attr_dir.rglob("*.csv"))
-        assert produced, f"no output written; attr dir holds {list(attr_dir.rglob('*'))}"
+        assert (
+            produced
+        ), f"no output written; attr dir holds {list(attr_dir.rglob('*'))}"
 
     def test_the_loader_finds_the_property_pickle(self, attr_dir):
         """It scans for a name containing 'property' or 'attribute'."""

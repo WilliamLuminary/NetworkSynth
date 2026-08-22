@@ -17,6 +17,10 @@ from configs.gui_config import GuiConfig, SpecError
 
 pytestmark = pytest.mark.unit
 
+#: Derived, never restated: a mode list written out by hand goes stale the moment
+#: one is wired or unwired, and then the tests quietly stop covering it.
+_MODE_NAMES = set(gui_run._MODES)
+
 
 def _spec(tmp_path, **overrides):
     spec = {
@@ -229,9 +233,7 @@ class TestModeSelection:
 
         assert set(MODES) == set(gui_run._MODES)
 
-    @pytest.mark.parametrize(
-        "mode", ["generate", "generate_select", "mosaic", "scaling", "hybrid"]
-    )
+    @pytest.mark.parametrize("mode", sorted(_MODE_NAMES))
     def test_every_mode_builds_a_valid_spec(self, mode, tmp_path):
         from gui import spec_builder
 
@@ -252,26 +254,25 @@ class TestModeSelection:
         assert spec["mode"] == mode
         assert json.loads(json.dumps(spec)), "spec must survive JSON"
 
-    @pytest.mark.parametrize("mode", ["mosaic", "scaling", "hybrid"])
+    #: Attributes each mode's pipeline reads that BaseConfig does not define.
+    _MODE_EXTRAS = {
+        "scaling": [
+            "SCALE_ROWS",
+            "SCALE_COLS",
+            "ROOT_SPACING_FACTOR",
+            "MAX_GENERATION_ROUNDS",
+        ],
+        "hybrid": ["TARGET_SCALE", "PHASE2_MAX_ROUNDS"],
+    }
+
+    @pytest.mark.parametrize("mode", sorted(_MODE_EXTRAS))
     def test_mode_specific_params_reach_the_config(self, mode, tmp_path):
         """These are read as plain attributes, so a missing one crashes mid-run."""
         from gui import spec_builder
 
-        required = {
-            "mosaic": [
-                "GRID_ROWS",
-                "GRID_COLS",
-                "TILE_FRAME_SIZE",
-                "OVERLAP_MARGIN_FRACTION",
-            ],
-            "scaling": [
-                "SCALE_ROWS",
-                "SCALE_COLS",
-                "ROOT_SPACING_FACTOR",
-                "MAX_GENERATION_ROUNDS",
-            ],
-            "hybrid": ["TARGET_SCALE", "PHASE2_MAX_ROUNDS"],
-        }[mode]
+        if mode not in _MODE_NAMES:
+            pytest.skip(f"{mode} is not currently offered by the GUI")
+        required = self._MODE_EXTRAS[mode]
 
         values = spec_builder.default_values(mode)
         spec = spec_builder.build_spec(mode, "e.csv", "p.csv", str(tmp_path), values)

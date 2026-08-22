@@ -130,104 +130,6 @@ def _common_fields() -> List[Field]:
     ]
 
 
-def _select_fields() -> List[Field]:
-    return [
-        Field(
-            "SELECT_BEST",
-            "Keep best N networks",
-            0,
-            kind="integer",
-            minimum=0,
-            maximum=500,
-            step=1,
-            help="0 keeps every network; N keeps the N closest to the original.",
-        ),
-        Field(
-            "SNAPSHOT_INTERVAL",
-            "Snapshot every N nodes",
-            0,
-            kind="integer",
-            minimum=0,
-            maximum=10000,
-            step=10,
-            help="0 disables growth snapshots.",
-        ),
-    ]
-
-
-def _mosaic_fields() -> List[Field]:
-    return [
-        Field(
-            "GRID_ROWS", "Grid rows", 2, kind="integer", minimum=1, maximum=100, step=1
-        ),
-        Field(
-            "GRID_COLS",
-            "Grid columns",
-            2,
-            kind="integer",
-            minimum=1,
-            maximum=100,
-            step=1,
-        ),
-        Field(
-            "TILE_FRAME_SIZE",
-            "Tile frame (w × h)",
-            (510, 510),
-            kind="size",
-            help="Area each tile grows into before tiles are stitched together.",
-        ),
-        Field(
-            "OVERLAP_MARGIN_FRACTION",
-            "Tile overlap",
-            0.15,
-            minimum=0.0,
-            maximum=0.9,
-            step=0.05,
-            help="Fraction of a tile that overlaps its neighbour.",
-        ),
-    ]
-
-
-def _scaling_fields() -> List[Field]:
-    return [
-        Field(
-            "SCALE_ROWS",
-            "Scale rows",
-            3,
-            kind="integer",
-            minimum=1,
-            maximum=200,
-            step=1,
-        ),
-        Field(
-            "SCALE_COLS",
-            "Scale columns",
-            3,
-            kind="integer",
-            minimum=1,
-            maximum=200,
-            step=1,
-        ),
-        Field(
-            "ROOT_SPACING_FACTOR",
-            "Root spacing",
-            1.0,
-            minimum=0.1,
-            maximum=5.0,
-            step=0.1,
-        ),
-        Field(
-            "MAX_GENERATION_ROUNDS",
-            "Max growth rounds",
-            500,
-            kind="integer",
-            minimum=1,
-            maximum=10000,
-            step=50,
-        ),
-    ]
-
-
 def _hybrid_fields() -> List[Field]:
     return [
         Field(
@@ -277,11 +179,6 @@ def _hybrid_fields() -> List[Field]:
 #: partway through a run rather than a rejected spec.
 MODES: Dict[str, ModeSpec] = {
     "generate": ModeSpec("generate", "Generate", _common_fields()),
-    "generate_select": ModeSpec(
-        "generate_select", "Generate + select", _common_fields() + _select_fields()
-    ),
-    "mosaic": ModeSpec("mosaic", "Mosaic", _common_fields() + _mosaic_fields()),
-    "scaling": ModeSpec("scaling", "Scaling", _common_fields() + _scaling_fields()),
     "hybrid": ModeSpec("hybrid", "Hybrid", _common_fields() + _hybrid_fields()),
 }
 
