@@ -1,18 +1,3 @@
-# src/configs/hybrid_mode/config_dickson.py
-"""
-Hybrid mode configuration for the Dickson gel networks.
-
-Data layout
------------
-data/input/dickson/
-├── gel{1,2,3,4}_NodePositions.csv   (x,y per node; row i == node id i)
-├── gel{1,2,3,4}_EdgeList.csv        (Source,Target,Weight,Length,Width,Angle)
-└── gel{1,2,3,4}.bmp                 (grayscale background)
-
-The graph is built weighted, using the ``Weight`` column of the edge list.
-``Source``/``Target`` are 0-based node ids that index directly into the
-positions array.
-"""
 import csv
 import logging
 import os
@@ -29,7 +14,6 @@ logger = logging.getLogger(__name__)
 
 
 class ConfigDickson(BaseConfig):
-    """Hybrid mode for the Dickson gel networks (weighted edges)."""
 
     LOG_MEMORY = True
 

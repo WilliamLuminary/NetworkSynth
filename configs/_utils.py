@@ -56,7 +56,6 @@ def _resize_cv2_image(image: ndarray, target_size: Tuple[int, int]) -> ndarray:
 def _trim_cv2_image(
     image: ndarray, trim: Tuple[int, int, int, int] = (0, 0, 0, 0)
 ) -> ndarray:
-    """Trim image edges. trim = (top, bottom, left, right)."""
     top, bottom, left, right = trim
     if not any([top, bottom, left, right]):
         return image
@@ -65,6 +64,5 @@ def _trim_cv2_image(
 
 
 def _transpose_network_pos(network) -> None:
-    """Swap x and y coordinates in the network's positions array."""
     pos = network.positions()
     pos[:, [0, 1]] = pos[:, [1, 0]]

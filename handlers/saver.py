@@ -1,5 +1,3 @@
-# src/handlers/saver.py
-
 import logging
 import os
 import sys
@@ -49,7 +47,6 @@ class Saver:
         return self._batch_timestamp
 
     def end_batch(self) -> None:
-        """Clear the batch timestamp."""
         self._batch_timestamp = None
 
     def save(self, content: Any, identifier: str, prefix: str = "") -> None:
@@ -85,7 +82,6 @@ class Saver:
 
 
 def _is_junction(path: str) -> bool:
-    """Check whether *path* is an NTFS directory junction (reparse point)."""
     try:
         import stat
 
@@ -100,7 +96,6 @@ _IS_WINDOWS = sys.platform == "win32"
 
 
 def _create_junction(link_path: str, target_path: str) -> None:
-    """Create an NTFS directory junction (no elevated privileges needed)."""
     try:
         import _winapi  # CPython C extension, available on all Windows builds
 
@@ -120,11 +115,6 @@ def _create_junction(link_path: str, target_path: str) -> None:
 
 
 def _update_soft_link(link_path: str, target_path: str) -> None:
-    """Point *link_path* at *target_path*.
-
-    Unix: symbolic link.  Windows: directory junction (avoids the need
-    for elevated privileges or Developer Mode).
-    """
     if os.path.islink(link_path):
         try:
             os.unlink(link_path)

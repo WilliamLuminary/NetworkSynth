@@ -1,13 +1,3 @@
-# tests/test_manifest.py
-"""
-Tests for the run manifest.
-
-A run writes into a timestamped directory whose name a caller cannot predict, by
-several different code paths (Saver, the snapshot plot pool, the multifractal
-figures).  ``manifest.json`` at the run root says what exists and how the run
-finished, so a GUI never has to parse our directory names.
-"""
-
 import json
 import os
 
@@ -108,7 +98,6 @@ class TestWriteManifest:
         assert data["error"] == "RuntimeError: nope"
 
     def test_cancelled_is_distinct_from_failed(self, tmp_path):
-        """A GUI must not show an error for a user pressing Cancel."""
         write_manifest(RunPaths(root=str(tmp_path)), status=STATUS_CANCELLED)
 
         assert read_manifest(str(tmp_path))["status"] == STATUS_CANCELLED

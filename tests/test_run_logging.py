@@ -1,17 +1,3 @@
-# tests/test_run_logging.py
-"""
-Logging is a process concern, and its file must land inside the run's own output
-directory.
-
-Two defects motivated this: ``BaseConfig._setup_logger()`` hardcoded
-``BaseConfig.BASE_OUTPUT_PATH`` for the logs directory (so a run told to write
-elsewhere still logged into the repository), and a ``_logger_initialized`` latch
-meant only the first config to initialize ever got a file handler.
-
-The integration plan has StructuralGT's controller tailing this file inside the
-``output_dir`` its run-spec named, so both mattered.
-"""
-
 import json
 import logging
 import os
@@ -50,7 +36,6 @@ class TestConsole:
         assert len(_our_handlers()) == 1
 
     def test_is_idempotent(self):
-        """A second call must not double-print every line."""
         configure_console()
         configure_console()
         configure_console()
@@ -67,7 +52,6 @@ class TestConsole:
 
 class TestRunLog:
     def test_writes_inside_the_run_directory(self, tmp_path):
-        """The defect: the log used to go to BaseConfig.BASE_OUTPUT_PATH."""
         path = attach_run_log(str(tmp_path), "abc123")
 
         assert path == os.path.join(str(tmp_path), "run.jsonl")
@@ -86,7 +70,6 @@ class TestRunLog:
         assert entries[-1]["run_id"] == "deadbeef"
 
     def test_second_run_gets_its_own_file(self, tmp_path):
-        """The latch defect: a second run used to get no file handler at all."""
         first = tmp_path / "run_one"
         second = tmp_path / "run_two"
         first.mkdir()
@@ -124,7 +107,6 @@ class TestRunLog:
         assert len(run_logs) == 1
 
     def test_skips_when_there_is_no_run_directory(self, tmp_path):
-        """Saving disabled: create_run_paths makes no directory, so make no log."""
         missing = str(tmp_path / "never_created")
 
         assert attach_run_log(missing, "x") is None
@@ -139,7 +121,6 @@ class TestRunLog:
 
 class TestConfigNoLongerOwnsLogging:
     def test_initialize_sets_run_id_without_a_file_handler(self, tmp_path):
-        """RUN_ID names the output directory, so it must not depend on logging."""
         from configs.generate_mode.config_sample import SampleConfig
 
         config = type("LogTestCfg", (SampleConfig,), {})

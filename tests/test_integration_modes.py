@@ -1,10 +1,3 @@
-"""
-Lightweight integration smoke tests for each pipeline mode.
-
-Uses sample data with minimal generation counts to verify the full
-pipeline path (config → load → generate → save) works end-to-end.
-"""
-
 import logging
 import os
 
@@ -25,7 +18,6 @@ SAMPLE_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "input", "sam
 
 class TestGenerateMode:
     def test_load_original_and_save(self, tmp_path):
-        """Load original data, compute attributes, save originals."""
         from configs.generate_mode.config_sample import SampleConfig
 
         SampleConfig.DATASETS = SampleConfig.DATASETS[:1]
@@ -54,7 +46,6 @@ class TestGenerateMode:
         logger.info(f"Generate (originals): {len(files)} files in {out}")
 
     def test_generate_one_network(self, tmp_path):
-        """Generate a single synthetic network and save it."""
         from configs.generate_mode.config_sample import SampleConfig
 
         SampleConfig.DATASETS = SampleConfig.DATASETS[:1]
@@ -106,7 +97,6 @@ class TestGenerateMode:
 
 class TestFromPropsMode:
     def test_generate_from_properties(self, tmp_path):
-        """Load pre-computed attributes and generate one network."""
         from configs.attr_generate_mode.config_sample import SampleConfig
 
         SampleConfig.SYNTHETIC_NETWORK_NUMBER = 1
@@ -142,7 +132,6 @@ class TestFromPropsMode:
 
 class TestMosaicMode:
     def test_mosaic_2x2(self, tmp_path):
-        """Generate a 2x2 mosaic and stitch it."""
         from configs.mosaic_mode.config_sample import SampleConfig
 
         SampleConfig.GRID_ROWS = 2
@@ -210,7 +199,6 @@ class TestMosaicMode:
 
 class TestScalingMode:
     def test_scaling_2x2(self, tmp_path):
-        """Generate a 2x2 scaled network via multi-root BFS."""
         from configs.scaling_mode.config_sample import SampleConfig
 
         SampleConfig.SCALE_ROWS = 2
@@ -263,7 +251,6 @@ class TestScalingMode:
 
 class TestAnalyzeMode:
     def test_analyze_graph(self, tmp_path):
-        """Run multifractal analysis on a generated graph."""
         from configs.generate_mode.config_sample import SampleConfig
 
         SampleConfig.DATASETS = SampleConfig.DATASETS[:1]
@@ -304,7 +291,6 @@ class TestAnalyzeMode:
 
 class TestSnapshotMode:
     def test_generate_with_snapshots(self, tmp_path):
-        """Generate a single network with BFS snapshots via Snapshot1x1Config."""
         from configs.generate_mode.config_snapshot_1x1 import Snapshot1x1Config
 
         Snapshot1x1Config.BASE_OUTPUT_PATH = str(tmp_path)
@@ -369,7 +355,6 @@ class TestSnapshotMode:
         )
 
     def test_compute_and_rank_metrics(self, tmp_path):
-        """Generate a network and compute quality metrics for ranking."""
         from configs.generate_mode.config_sample import SampleConfig
 
         SampleConfig.DATASETS = SampleConfig.DATASETS[:1]

@@ -1,5 +1,3 @@
-# src/graphs/graph_generator.py
-
 import logging
 import random as rng
 from collections import namedtuple

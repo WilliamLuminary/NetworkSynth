@@ -1,5 +1,3 @@
-# src/configs/generate_mode/config_tmp.py
-"""Temporary generation-mode config pointing at mosaic sample data."""
 import logging
 import os
 

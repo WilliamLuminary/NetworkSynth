@@ -1,14 +1,3 @@
-# scripts/runners/run_hybrid_snapshot.py
-"""
-Hybrid snapshot run: generate a hybrid network for sample_A and capture
-Phase 2 snapshots showing how tiles merge round by round.
-
-Usage (from project root):
-    python scripts/runners/run_hybrid_snapshot.py
-    python scripts/runners/run_hybrid_snapshot.py --scale 5    # 5x5 (faster)
-    python scripts/runners/run_hybrid_snapshot.py --scale 100  # 100x100 (full)
-    python scripts/runners/run_hybrid_snapshot.py --interval 5 # snapshot every 5 rounds
-"""
 import os
 import sys
 

@@ -1,5 +1,3 @@
-# tests/analysis/test_multifractal_analyzer.py
-
 import numpy as np
 import pytest
 
@@ -209,13 +207,6 @@ def _adjacency(nk_graph):
 def test_eigenvector_centrality_solves_the_eigenproblem(
     weighted, load_weighted_test_synth_graph, load_unweighted_test_synth_graph
 ):
-    """Pinned by residual, not by agreement with networkit.
-
-    ``nk.centrality.EigenvectorCentrality`` is power iteration, and on the
-    weighted fixture it does not converge: 815s at ``tol=1e-12`` still left a
-    residual of 5.7e-02. Asserting against it would pin the wrong answer, so
-    assert the definition instead.
-    """
     graph = (
         load_weighted_test_synth_graph
         if weighted
@@ -239,7 +230,6 @@ def test_eigenvector_centrality_solves_the_eigenproblem(
 def test_all_pairs_shortest_paths_are_computed_once_per_graph(
     load_unweighted_test_synth_graph,
 ):
-    """A full analysis used to run APSP three times over the same distances."""
     analyzer = MultifractalAnalyzer(
         load_unweighted_test_synth_graph, measure_weighted=False, full_q_band=False
     )
@@ -253,7 +243,6 @@ def test_all_pairs_shortest_paths_are_computed_once_per_graph(
 def test_curvature_uses_the_analyzer_graph_not_its_own_copy(
     load_unweighted_test_synth_graph,
 ):
-    """Curvature built a private distance graph, duplicating the 1/w rule."""
     analyzer = MultifractalAnalyzer(
         load_unweighted_test_synth_graph, measure_weighted=False, full_q_band=False
     )
@@ -270,13 +259,6 @@ def test_curvature_uses_the_analyzer_graph_not_its_own_copy(
 
 
 class TestNeighbourMasses:
-    """The weighted curvature could not run at all before this.
-
-    Affinities are ``base ** -(d ** p)``. Real edge widths are around 0.03, so
-    the inverted distance reaches ~30 and ``e ** -(30 ** 2)`` is exactly 0 in
-    double precision. Once every neighbour underflowed, the normalisation
-    divided 0 by 0 and the NaN aborted the transport solver.
-    """
 
     def test_matches_the_naive_formula_when_it_does_not_underflow(self):
         from analysis.multifractal_analyzer import _neighbour_masses

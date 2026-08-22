@@ -1,4 +1,3 @@
-# src/configs/enums.py
 import os
 from enum import Enum, auto
 from typing import Tuple
@@ -42,16 +41,13 @@ class DatasetId:
 
     @property
     def levels(self) -> Tuple[str, ...]:
-        """Get all levels as a tuple."""
         return self._levels
 
     @property
     def path(self) -> str:
-        """Get OS-appropriate path representation."""
         return os.path.join(*self._levels)
 
     def __str__(self) -> str:
-        """String representation using '/' separator."""
         return "/".join(self._levels)
 
     def __repr__(self) -> str:

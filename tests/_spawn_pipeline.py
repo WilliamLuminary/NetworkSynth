@@ -1,15 +1,3 @@
-# tests/_spawn_pipeline.py
-"""Run one pipeline under a 'spawn' start method.  Executed as a subprocess.
-
-Not named ``test_*`` on purpose: pytest must not collect it.  It is launched by
-``test_spawn_safety.py`` in a separate interpreter, because
-``set_start_method`` is process-global and would affect the whole test session.
-
-Under ``spawn`` — the default on macOS and Windows — a child re-imports every
-module fresh, so it sees an unmutated ``BaseConfig``.  Anything that still
-relied on inheriting the parent's class state fails here.
-"""
-
 import multiprocessing as mp
 import os
 import sys

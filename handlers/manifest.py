@@ -1,21 +1,3 @@
-# src/handlers/manifest.py
-"""A machine-readable index of what a run produced.
-
-Output lands in a timestamped directory whose name a caller cannot predict
-(``<denote>_results_<ts>_<runid>``), and files are written by several different
-paths — ``Saver``, the snapshot plot pool, the multifractal figures.  A GUI
-launching us as a subprocess should not have to guess at directory names or
-extensions, so the run writes ``manifest.json`` at its root saying what exists
-and how it finished.
-
-The manifest is produced by walking the run root rather than by having each
-writer register itself: that way it also captures files written by the plot
-pool, which ``Saver`` never sees.
-
-``manifest_version`` exists so a future change to this shape fails loudly on the
-consumer side instead of being misread.  See ``INTEGRATION_PLAN.md``.
-"""
-
 from __future__ import annotations
 
 import json
@@ -61,11 +43,6 @@ def _classify(relative_path: str) -> str:
 
 
 def collect_outputs(root: str) -> Dict[str, List[str]]:
-    """Group every file under *root* into buckets, keyed by relative path.
-
-    Paths use forward slashes regardless of platform so a consumer reading the
-    JSON does not have to normalise them.
-    """
     buckets: Dict[str, List[str]] = {}
     for dirpath, _, filenames in os.walk(root):
         for name in filenames:
@@ -87,12 +64,6 @@ def write_manifest(
     error: Optional[str] = None,
     metrics: Optional[dict] = None,
 ) -> str:
-    """Write ``manifest.json`` at the run root and return its path.
-
-    Called in a ``finally`` so a cancelled or failed run still leaves a
-    manifest — a caller needs to distinguish "no manifest, we died hard" from
-    "manifest says cancelled".
-    """
     root = run_paths.root
     outputs = collect_outputs(root)
     payload = {
@@ -116,6 +87,5 @@ def write_manifest(
 
 
 def read_manifest(root: str) -> dict:
-    """Read a run's manifest.  Convenience for tests and for a consumer."""
     with open(os.path.join(root, MANIFEST_NAME)) as handle:
         return json.load(handle)

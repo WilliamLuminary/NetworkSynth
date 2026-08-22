@@ -1,19 +1,3 @@
-# tests/test_synth_graph.py
-"""
-Unit tests for the SynthGraph class in graphs/synth_graph.py.
-
-Covers:
-  - Core properties (number_of_nodes, number_of_edges, is_weighted)
-  - Position access (positions, position, set_position)
-  - Degree helpers (degree, degrees, degree_sequence, weighted_degree)
-  - Edge/weight helpers (weight, set_weight, has_edge, remove_edge)
-  - Iteration (nodes, neighbors, edges, edges_with_weights)
-  - Structural queries (is_connected, largest_connected_component, subgraph, copy)
-  - Weight conversions (make_weighted, make_unweighted)
-  - Factory methods (from_sparse_matrix, from_edge_list)
-  - __repr__
-"""
-
 import networkit as nk
 import numpy as np
 import pytest
@@ -28,7 +12,6 @@ from graphs.synth_graph import SynthGraph
 
 
 def _make_chain_graph(n: int = 5, weighted: bool = False) -> SynthGraph:
-    """Create a simple chain graph: 0-1-2-..-(n-1)."""
     g = nk.Graph(n, weighted=weighted)
     for i in range(n - 1):
         if weighted:
@@ -40,7 +23,6 @@ def _make_chain_graph(n: int = 5, weighted: bool = False) -> SynthGraph:
 
 
 def _make_disconnected_graph() -> SynthGraph:
-    """Create a graph with two components: {0-1-2} and {3-4}."""
     g = nk.Graph(5, weighted=False)
     g.addEdge(0, 1)
     g.addEdge(1, 2)
@@ -306,13 +288,6 @@ class TestRepr:
 
 
 class TestWeightsMustBePositive:
-    """An edge with no width is not a measurable graph.
-
-    Analysis inverts weights into distances, so a zero becomes an infinite
-    distance that silently detaches the edge and only surfaces much later as a
-    NaN inside the curvature solver. Both paths a weight can enter through
-    reject it at the edge that carries it.
-    """
 
     @staticmethod
     def _matrix(values):
@@ -343,7 +318,6 @@ class TestWeightsMustBePositive:
             graph.set_weight(0, 1, -1.0)
 
     def test_set_weight_names_the_offending_edge(self):
-        """The Mapper writes one edge at a time; the message must localise it."""
         graph = SynthGraph.from_sparse_matrix(
             self._positions(), self._matrix([1.5, 1.5, 2.0, 2.0])
         )
@@ -361,7 +335,6 @@ class TestWeightsMustBePositive:
         assert graph.weight(0, 1) == 2.5
 
     def test_from_sparse_matrix_rejects_an_explicitly_stored_zero(self):
-        """Sparse formats can store a zero, so the bad state is representable."""
         with pytest.raises(AssertionError, match="non-positive weight"):
             SynthGraph.from_sparse_matrix(
                 self._positions(), self._matrix([1.5, 1.5, 0.0, 0.0])

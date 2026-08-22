@@ -1,12 +1,3 @@
-# src/pipelines/hybrid_snapshot.py
-"""
-Hybrid snapshot pipeline — reuses Phase 1 from the standard hybrid
-pipeline, then runs Phase 2 with round-by-round snapshot capture.
-
-Does NOT modify or depend on any logic in ``hybrid.py`` beyond
-reusing its Phase 1 runner and helper functions.
-"""
-
 import logging
 import os
 import time
@@ -47,7 +38,6 @@ def run_phase2_with_snapshots(
     params: SynthParams,
     snapshot_round_interval: int = 1,
 ):
-    """Phase 2 with snapshot capture — mirrors hybrid.run_phase2."""
     frame_w, frame_h = config.SYNTHETIC_FRAME_SIZE
     margin_x = frame_w
     margin_y = frame_h
@@ -147,7 +137,6 @@ def run_hybrid_snapshot_for_dataset(
     run_paths,
     snapshot_round_interval: int = 1,
 ):
-    """Run the hybrid pipeline for one dataset with Phase 2 snapshots."""
     from analysis.error_checker import create_error_checker
 
     logger.info(f"=== Hybrid snapshot pipeline for dataset: {dataset_id} ===")

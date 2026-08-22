@@ -1,15 +1,3 @@
-# tests/test_save_infrastructure.py
-"""
-Tests for the config-driven save infrastructure.
-
-Covers:
-  - BaseConfig.save() dispatcher
-  - Declarative save_* spec methods
-  - Mode config overrides and _inject_dependencies
-  - Saver path construction, prefix handling, batch timestamps
-  - Content-aware serializers (save_network_csv, save_network_nkbin)
-  - Low-level serializers (save_pickle, save_csv)
-"""
 import csv
 import os
 import pickle
@@ -45,7 +33,6 @@ from handlers.saver import Saver  # noqa: E402
 
 
 class FakeGraph:
-    """Minimal stand-in for SynthGraph with edges, weights, positions."""
 
     def __init__(self, n_nodes=4):
         self._n = n_nodes
@@ -126,14 +113,6 @@ class TestSpecs:
 
 
 class TestModeOverrides:
-    """A config's ``save_*`` overrides resolve on that config itself.
-
-    These used to call ``_inject_dependencies()`` and then read the specs off
-    ``BaseConfig``.  No injection is needed: ``save()`` looks up
-    ``save_<identifier>`` with ``getattr(cls, ...)``, so asking the real config
-    resolves its override through the normal MRO — and asking a *different*
-    config is unaffected, which is the point.
-    """
 
     def test_mosaic_synthetic_graph_has_png(self):
         from configs.mosaic_mode.config_sample import SampleConfig as MosaicConfig
@@ -157,7 +136,6 @@ class TestModeOverrides:
         assert specs[0][1] == "test_detail"
 
     def test_override_does_not_leak_to_other_configs(self):
-        """The regression injection caused: one config changing another's specs."""
         from configs.mosaic_mode.config_sample import SampleConfig as MosaicConfig
 
         MosaicConfig.save("synthetic_graph")  # mosaic overrides this identifier
@@ -180,7 +158,6 @@ class TestModeOverrides:
 
 @pytest.fixture
 def saver_in_tmpdir(tmp_path):
-    """Create a Saver-like object without the full init ceremony."""
     saver = object.__new__(Saver)
     saver.output_dir = str(tmp_path)
     saver._save_func = BaseConfig.save
@@ -258,7 +235,6 @@ class TestSaverPaths:
         saver.save(None, "original_image")  # should not raise
 
     def test_prefix_normalization_in_run_agent(self):
-        """RunAgent normalises prefix to end with '_'."""
         prefix = "test"
         normalised = (
             f"{prefix}_" if prefix and not prefix.endswith("_") else (prefix or "")
@@ -348,7 +324,6 @@ class TestSerializers:
 
 class TestEndToEnd:
     def test_pickle_save_via_saver(self, tmp_path):
-        """Full flow: Saver.save → config specs → save_pickle."""
         saver = object.__new__(Saver)
         saver.output_dir = str(tmp_path)
         saver._save_func = BaseConfig.save
@@ -365,7 +340,6 @@ class TestEndToEnd:
         assert loaded == data
 
     def test_csv_export_via_saver(self, tmp_path):
-        """Full flow: Saver.save → save_network_csv → two CSV files."""
         saver = object.__new__(Saver)
         saver.output_dir = str(tmp_path)
         saver._save_func = BaseConfig.save
@@ -398,14 +372,8 @@ class TestEndToEnd:
 
 
 class TestDisabledSaving:
-    """``DISABLE_SAVING`` is declared per config and decided in one place.
-
-    It used to be a global toggled by mutating ``BaseConfig``, which the Saver
-    answered by returning ``None`` from its constructor. Both are gone.
-    """
 
     def test_a_saver_that_exists_always_writes(self, tmp_path):
-        """The flag no longer reaches inside Saver at all."""
 
         class Disabled(BaseConfig):
             DISABLE_SAVING = True
@@ -431,7 +399,6 @@ class TestDisabledSaving:
         assert isinstance(built, Saver)
 
     def test_the_flag_is_never_set_on_base_config(self):
-        """A per-config declaration must not leak to every other config."""
 
         class Disabled(BaseConfig):
             DISABLE_SAVING = True
@@ -442,7 +409,6 @@ class TestDisabledSaving:
 
 class TestBatchTimestampIsPerInstance:
     def test_two_savers_do_not_share_a_batch(self, tmp_path):
-        """Class state meant one saver's batch silently became another's."""
         first = Saver(BaseConfig, str(tmp_path / "one"))
         second = Saver(BaseConfig, str(tmp_path / "two"))
 

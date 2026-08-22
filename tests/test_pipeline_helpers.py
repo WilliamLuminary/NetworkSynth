@@ -1,14 +1,3 @@
-# tests/test_pipeline_helpers.py
-"""
-Unit tests for pure helper functions in the pipeline modules.
-
-Covers:
-  - generate.compute_average_error()          → outlier removal & mean
-  - generate_select._fmt_metrics()            → metric formatting
-  - generate_select._save_metric_report()     → CSV report output
-  - hybrid.generate_random_centers()          → Poisson-disk center placement
-"""
-
 import csv
 import os
 

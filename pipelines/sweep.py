@@ -1,4 +1,3 @@
-# src/pipelines/sweep.py
 import os
 
 os.environ.setdefault("OMP_NUM_THREADS", "1")
@@ -99,7 +98,6 @@ def _generate_with_factors(
 
 
 def generate_networks(data_agent, error_checker: ErrorChecker, nf, ef, config):
-    """Generate networks with the given factors. Return (avg_error, success_rate)."""
     from dataclasses import replace
 
     num_network = config.SYNTHETIC_NETWORK_NUMBER
@@ -162,7 +160,6 @@ def generate_networks(data_agent, error_checker: ErrorChecker, nf, ef, config):
 def run_for_dataset(
     dataset_id: DatasetId, node_factors, edge_factors, config, run_paths
 ) -> None:
-    """Create a wandb sweep for a single dataset and run all trials."""
     logger.info(f"Processing dataset: {dataset_id}")
     logger.info(
         f"  nf: {node_factors[0]}-{node_factors[-1]} ({len(node_factors)} values)"

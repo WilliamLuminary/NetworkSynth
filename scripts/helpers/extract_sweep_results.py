@@ -1,18 +1,7 @@
-"""Fetch sweep results from remote wandb and analyze error vs success rate.
-
-Usage:
-    python scripts/helpers/extract_sweep_results.py ta7fgh0c
-    python scripts/helpers/extract_sweep_results.py ta7fgh0c --entity my_team
-    python scripts/helpers/extract_sweep_results.py ta7fgh0c --save results.json
-    python scripts/helpers/extract_sweep_results.py ou9bat52 --near-one 0.4
-    python scripts/helpers/extract_sweep_results.py ou9bat52 --near-one 0.4 --save sweep_ou9bat52.json
-"""
-
 import json
 
 
 def _near_one_filter(data, max_distance=0.5):
-    """Keep runs where node_factor and edge_factor are within max_distance of 1.0."""
     return [
         (nf, ef, err, sr)
         for nf, ef, err, sr in data

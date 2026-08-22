@@ -1,9 +1,3 @@
-# src/pipelines/mosaic.py
-"""
-Mosaic pipeline — generates a grid of small tile networks and stitches
-them into one large network.
-"""
-
 import os
 
 os.environ.setdefault("OMP_NUM_THREADS", "1")
@@ -233,7 +227,6 @@ def generate_all_tiles(
 # Main pipeline for one dataset
 # ------------------------------------------------------------------ #
 def run_mosaic_for_dataset(dataset_id, config, run_paths):
-    """Run the full mosaic pipeline for a single dataset."""
     logger.info(f"=== Mosaic pipeline for dataset: {dataset_id} ===")
     logger.info(config())
 
@@ -288,10 +281,6 @@ def plot_mosaic_network(
     dpi: int = None,
     max_px: int | None = None,
 ):
-    """Render a mosaic network to a PIL Image (CV2-backed, memory-safe).
-
-    Includes a black border rectangle around the bounding box.
-    """
     return render_network(
         graph,
         margin_frac=margin_frac,

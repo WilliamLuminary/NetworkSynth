@@ -1,12 +1,3 @@
-# src/pipelines/generate.py
-"""
-Core network generation pipeline.
-
-Provides building blocks for generating synthetic networks with
-multifractal error gating, optional BFS snapshot collection, and
-parallel batch generation.  Higher-level orchestration (e.g. ranked
-selection of the best candidates) lives in ``generate_select.py``.
-"""
 import os
 
 os.environ.setdefault("OMP_NUM_THREADS", "1")
@@ -39,12 +30,6 @@ SIGINT_INFO = "SIGINT received. Terminating child process..."
 
 
 def _build_temp_graph(positions, edges):
-    """Build a lightweight SynthGraph from raw BFS callback data.
-
-    Both *positions* and *edges* are already snapshot-time copies
-    (positions is a new list, edges is a ``set()`` copy made inside
-    ``_bfs_network``), so no shared-reference issues arise.
-    """
     from graphs.synth_graph import SynthGraph
 
     pos_arr = np.array(positions)
@@ -114,7 +99,6 @@ def _generate_single_network(
     mapper: Mapper,
     params: SynthParams,
 ):
-    """Generate one network with error gating and retry loop."""
     # See generate_synthetic_network: a forked child inherits an OpenMP runtime
     # whose threads do not exist in it and spins instead of working.
     nk.setNumberOfThreads(1)
@@ -398,7 +382,6 @@ def generate_with_snapshots(data_agent: RunAgent, config):
 
 
 def run_for_dataset(dataset_id: DatasetId, config, run_paths):
-    """Process a single dataset identified by DatasetId."""
     logger.info(f"Processing dataset: {dataset_id}")
     logger.info(config())
     data_agent = RunAgent(config, run_paths=run_paths, dataset_id=dataset_id)

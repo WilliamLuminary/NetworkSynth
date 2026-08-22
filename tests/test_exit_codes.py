@@ -1,21 +1,3 @@
-# tests/test_exit_codes.py
-"""
-A cancelled run must not look like a completed one.
-
-Every pipeline's ``main()`` used to catch ``KeyboardInterrupt``, log, and return
-normally — so the process exited 0 and any caller (notably a GUI launching us as
-a subprocess) read cancellation as success.  Same failure shape as a config
-default: failure that looks like success.
-
-The contract is split in two:
-
-* pipelines log their shutdown and **re-raise**;
-* the entry point turns that into exit code 130.
-
-The split matters because ``fire`` swallows ``SystemExit`` and reports 2, so a
-pipeline cannot set the exit code itself.
-"""
-
 import subprocess
 import sys
 
@@ -36,7 +18,6 @@ PIPELINES = [
 
 @pytest.mark.parametrize("module_name", PIPELINES)
 def test_pipeline_main_reraises_interruption(module_name, monkeypatch):
-    """main() must propagate KeyboardInterrupt rather than swallow it."""
     import importlib
 
     module = importlib.import_module(f"pipelines.{module_name}")
@@ -59,7 +40,6 @@ def test_pipeline_main_reraises_interruption(module_name, monkeypatch):
 
 
 def test_entry_point_maps_interruption_to_130(monkeypatch):
-    """run.main() must exit 130, not 0 and not fire's 2."""
     import run
 
     def interrupted(*args, **kwargs):
@@ -74,7 +54,6 @@ def test_entry_point_maps_interruption_to_130(monkeypatch):
 
 
 def test_entry_point_leaves_success_alone(monkeypatch):
-    """A normal run must still exit cleanly."""
     import run
 
     monkeypatch.setattr(run.fire, "Fire", lambda *a, **k: None)
@@ -84,7 +63,6 @@ def test_entry_point_leaves_success_alone(monkeypatch):
 
 @pytest.mark.slow
 def test_real_sigint_exits_130():
-    """End-to-end: a real SIGINT to `python run.py` yields 130, not 0."""
     import os
     import signal
     import time

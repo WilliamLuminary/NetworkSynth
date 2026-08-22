@@ -1,13 +1,3 @@
-# tests/test_seeding.py
-"""
-Reproducibility tests for seeded generation.
-
-Generation draws from both ``random`` and ``np.random``, across
-``_graph_node``, ``graph_generator`` and ``mapper``.  ``apply_seed`` seeds both;
-``SynthParams.for_worker`` gives each worker a distinct but deterministic seed
-so candidates differ from each other while the run as a whole repeats.
-"""
-
 import pytest
 
 from configs import SynthParams
@@ -43,7 +33,6 @@ class TestApplySeed:
         assert first == second
 
     def test_none_is_a_no_op(self):
-        """apply_seed(None) must not reset the RNG, only skip seeding."""
         import random
 
         apply_seed(5)
@@ -57,7 +46,6 @@ class TestApplySeed:
         assert (first, second) == expected
 
     def test_accepts_large_seeds(self):
-        """np.random rejects seeds >= 2**32; apply_seed must fold them."""
         apply_seed(2**40 + 7)
 
 
@@ -86,7 +74,6 @@ class TestForWorker:
         assert derived.max_attempts == BASE["max_attempts"]
 
     def test_returns_a_new_object(self):
-        """Params are frozen; deriving must not mutate the original."""
         params = _params(300)
 
         params.for_worker(9)
@@ -96,7 +83,6 @@ class TestForWorker:
 
 @pytest.mark.integration
 class TestGenerationIsReproducible:
-    """The guarantee that matters: same seed in, same network out."""
 
     @staticmethod
     def _generate(seed, attrs):
@@ -133,7 +119,6 @@ class TestGenerationIsReproducible:
         assert self._fingerprint(a) != self._fingerprint(b)
 
     def test_worker_seeds_produce_distinct_candidates(self, attrs):
-        """Derived seeds must still yield *different* candidates."""
         base = _params(777)
         prints = {
             self._fingerprint(self._generate(base.for_worker(i).seed, attrs))

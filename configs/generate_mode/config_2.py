@@ -1,4 +1,3 @@
-# src/configs/generate_mode/config_2.py
 import logging
 import os
 import re
@@ -20,7 +19,6 @@ logger = logging.getLogger(__name__)
 
 
 def _generate_new_datasets() -> List[DatasetId]:
-    """Generate DatasetId list for new dataset format: 004, 008, 011, etc."""
     set_names = ["004", "008", "011", "014", "017", "020", "023", "026", "029", "032"]
     return [DatasetId(s) for s in set_names]
 
@@ -55,7 +53,6 @@ class Config2(BaseConfig):
 
     @staticmethod
     def load_original_network(dataset_id: DatasetId):
-        """Load original network. dataset_id has single level: [set_name]"""
         positions = _load_positions(dataset_id)
         mat = _load_sparse_matrix(dataset_id)
         from utils import build_graph
@@ -66,7 +63,6 @@ class Config2(BaseConfig):
 
     @staticmethod
     def load_original_image(dataset_id: DatasetId):
-        """Load original image. dataset_id has single level: [set_name]"""
         image = _load_raw_image(dataset_id)
         image = _trim_cv2_image(image)
         image = _resize_cv2_image(image, Config2.FRAME_SIZE)
@@ -74,7 +70,6 @@ class Config2(BaseConfig):
 
 
 def _load_positions(dataset_id: DatasetId) -> np.ndarray:
-    """Load node positions. dataset_id[0] = set_name"""
     set_name = dataset_id[0]
     directory_path = Config2.POSITION_DATA_DIR
     # noinspection SpellCheckingInspection
@@ -89,7 +84,6 @@ def _load_positions(dataset_id: DatasetId) -> np.ndarray:
 
 
 def _load_sparse_matrix(dataset_id: DatasetId):
-    """Load sparse matrix. dataset_id[0] = set_name"""
     set_name = dataset_id[0]
     directory_path = Config2.ADJ_MATRIX_DATA_DIR
     file_path = _find_file_with_pattern(
@@ -118,7 +112,6 @@ def _load_sparse_matrix(dataset_id: DatasetId):
 
 
 def _load_raw_image(dataset_id: DatasetId):
-    """Load raw image. dataset_id[0] = set_name"""
     set_name = dataset_id[0]
     directory_path = Config2.IMAGES_DIR
 

@@ -1,11 +1,3 @@
-# src/configs/scaling_mode/config_sample.py
-"""
-Scaling mode sample configuration.
-
-Reuses the mosaic sample input data for convenience.
-A small 3×3 grid is used by default for quick smoke-testing;
-set SCALE_ROWS / SCALE_COLS to 100 for the full-size run.
-"""
 import logging
 import os
 from typing import Tuple
@@ -25,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 
 class SampleConfig(BaseConfig):
-    """Scaling mode sample — multi-root synchronized BFS."""
 
     DATASETS = [DatasetId("sample_1")]
 

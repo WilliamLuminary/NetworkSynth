@@ -1,18 +1,3 @@
-# scripts/run_scaling_100x100.py
-"""
-Production run: generate a 100x100 scaled network via multi-root BFS.
-
-This uses the "scaling" pipeline (``pipelines.scaling``) approach —
-a single-process synchronized BFS with 100x100 = 10,000 root nodes
-sharing the same spatial grids.  Components merge naturally as
-branches from different roots encounter each other.
-
-Logs are written to ``data/output/logs/scaling_100x100.log`` for
-real-time monitoring via ``tail -f``.
-
-Usage (from project root):
-    python scripts/run_scaling_100x100.py
-"""
 import logging
 import os
 import sys

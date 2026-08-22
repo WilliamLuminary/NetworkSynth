@@ -1,4 +1,3 @@
-# src/handlers/run_agent.py
 import inspect
 import logging
 from typing import Optional
@@ -141,7 +140,6 @@ class RunAgent:
         return self.data_loader.get_original_network()
 
     def save_synthetic_outputs(self, prefix: str):
-        """Save synthetic networks (collection pkl + per-graph exports)."""
         self.save("synthetic_network", prefix)
         graphs = self.data_loader.get_synthetic_networks()
         for i, g in enumerate(graphs):
@@ -156,10 +154,6 @@ class RunAgent:
         *,
         content=None,
     ):
-        """Save content identified by *identifier* (a plain string).
-
-        If *content* is not provided, loads it from internal state.
-        """
         is_plot = isinstance(FILE_CONFIGURATIONS.get(identifier), PlotConfig)
         if not self.saver and not is_plot:
             return
@@ -273,11 +267,6 @@ def plot_network(
     synthetic_frame_size=None,
     **kwargs,
 ):
-    """Render a graph to an ndarray image.
-
-    Uses matplotlib's OO API exclusively -- no pyplot globals --
-    so it is safe to call from any thread or process.
-    """
     from matplotlib.figure import Figure
     from matplotlib.patches import Rectangle
 

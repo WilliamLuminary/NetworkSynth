@@ -1,4 +1,3 @@
-# src/analysis/multifractal_analyzer.py
 import logging
 import math
 from collections import Counter
@@ -213,7 +212,6 @@ class MultifractalAnalyzer:
     # ---- helpers ----
 
     def _get_nk_graph(self) -> nk.Graph:
-        """Return the underlying networkit graph."""
         return self.graph.nk
 
     def _get_analysis_graph(self) -> nk.Graph:
@@ -249,7 +247,6 @@ class MultifractalAnalyzer:
         return self._distances[key]
 
     def _get_inverted_weight_graph(self) -> nk.Graph:
-        """Lazily build and cache a graph with inverted edge weights (1/w)."""
         if self._inv_graph is None:
             g = self.graph.nk
             n = g.numberOfNodes()
@@ -262,7 +259,6 @@ class MultifractalAnalyzer:
 
     @staticmethod
     def _weighted_clustering(nk_graph: nk.Graph) -> List[float]:
-        """Weighted clustering matching ``nx.clustering(G, weight=...)``."""
         n = nk_graph.numberOfNodes()
         max_w = 0.0
         for u, v, w in nk_graph.iterEdgesWeights():
@@ -484,7 +480,6 @@ class MultifractalAnalyzer:
         )
 
     def _compute_assortativity(self) -> float:
-        """Degree-degree Pearson correlation coefficient (manual computation)."""
         from scipy.stats import pearsonr
 
         x, y = [], []
@@ -523,7 +518,6 @@ class MultifractalAnalyzer:
             return [float("nan")] * nk_graph.numberOfNodes()
 
     def _compute_diameter(self) -> float:
-        """Unweighted hop diameter (matches nx.diameter behaviour)."""
         if self.graph.is_connected():
             nk_graph = self._get_nk_graph()
         else:

@@ -1,17 +1,3 @@
-# src/configs/gui_config.py
-"""Config for a GUI-driven run, built from a JSON run-spec.
-
-Lives at the ``configs/`` root rather than in a ``*_mode`` package because it is
-not a mode: it is mode-*parameterised*, resolved from the spec at run time.
-
-The spec is written by whoever launches us — StructuralGT's controller, or a
-person testing by hand — and names the input files, the output directory, the
-mode, and the generation parameters.  See ``INTEGRATION_PLAN.md`` section 3.
-
-``from_spec`` returns a fresh subclass rather than mutating this class, so two
-specs handled by one interpreter cannot collide.
-"""
-
 from __future__ import annotations
 
 import copyreg
@@ -44,11 +30,10 @@ _REQUIRED_KEYS = ("mode", "output_dir", "inputs", "params")
 
 
 class SpecError(ValueError):
-    """The run-spec is missing something or says something we cannot honour."""
+    pass
 
 
 def _rebuild_from_spec(spec_path: str) -> type:
-    """Reconstruct a run config in another process by re-reading its spec."""
     return GuiConfig.from_spec(spec_path)
 
 
@@ -87,7 +72,6 @@ copyreg.pickle(_SpecConfigMeta, _reduce_spec_config)
 
 
 class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
-    """Base for GUI runs.  Use :meth:`from_spec`; do not use this directly."""
 
     MODE: str = ""
     #: Input file paths from the spec.
@@ -95,7 +79,6 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
 
     @classmethod
     def from_spec(cls, spec_path: str) -> type:
-        """Build a run config from *spec_path*.  Returns a new subclass."""
         if not os.path.exists(spec_path):
             raise SpecError(f"run-spec not found: {spec_path}")
         try:
@@ -151,14 +134,12 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
 
     @classmethod
     def load_original_network(cls, dataset_id: DatasetId):
-        """Read the graph StructuralGT exported."""
         from graphs import read_graph_csv
 
         return read_graph_csv(cls.PATHS["edge_list"], cls.PATHS["positions"])
 
     @classmethod
     def load_original_image(cls, dataset_id: DatasetId):
-        """Optional background image; absent is normal."""
         path = cls.PATHS.get("image")
         if not path:
             return None

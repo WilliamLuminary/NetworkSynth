@@ -1,17 +1,3 @@
-# src/configs/mosaic_mode/config_1.py
-"""
-Mosaic mode configuration 1 — old_input dataset format (A 20kX).
-
-Generates a GRID_ROWS × GRID_COLS grid of tile networks, then
-stitches them into one large network by merging close nodes in
-the overlap regions between adjacent tiles.
-
-Data paths
-----------
-positions  : .npy  from  old_input/position/
-adjacency  : .npz  from  old_input/sparse_matrices/
-images     : .tif  from  old_input/Original Graphs/<set>/
-"""
 import logging
 import os
 import re
@@ -33,7 +19,6 @@ logger = logging.getLogger(__name__)
 
 
 class Config1(BaseConfig):
-    """Mosaic mode using old_input data (Series A, 20kX by default)."""
 
     # --- Dataset ---
     DATASETS = [DatasetId("A", "20kX")]

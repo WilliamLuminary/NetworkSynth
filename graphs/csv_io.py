@@ -1,23 +1,3 @@
-# src/graphs/csv_io.py
-"""Read a graph from an edge-list CSV plus a node-positions CSV.
-
-This is the input half of the StructuralGT file contract: they already know how
-to write these two files via their existing ``export_edge_list`` and
-``export_node_positions`` options, so nothing new is needed on their side.
-
-Two header conventions are accepted, since both appear in practice:
-
-* StructuralGT — ``Source,Target`` (plus ``Weight,Length,Width,Angle`` when
-  weighted), and ``x,y`` for positions.
-* NetworkSynth's own :func:`configs.file_definitions.save_network_csv` —
-  ``source_index,target_index,edge_weight`` and ``x,y``.
-
-Node indices are row numbers into the positions file.  That alignment is an
-assumption about the writer, not something the files state, so it is validated
-rather than trusted: an out-of-range index raises instead of producing a graph
-with silently wrong geometry.
-"""
-
 from __future__ import annotations
 
 import csv
@@ -62,7 +42,6 @@ def _read_rows(path: str) -> Tuple[List[str], List[List[str]]]:
 
 
 def read_positions_csv(path: str) -> np.ndarray:
-    """Read an ``(N, 2)`` position array from a CSV with ``x`` and ``y`` columns."""
     header, rows = _read_rows(path)
     xi = _column(header, _X_NAMES, path)
     yi = _column(header, _Y_NAMES, path)
@@ -75,7 +54,6 @@ def read_positions_csv(path: str) -> np.ndarray:
 
 
 def read_edge_list_csv(path: str) -> Tuple[np.ndarray, Optional[np.ndarray]]:
-    """Read an ``(E, 2)`` edge array and, when present, an ``(E,)`` weight array."""
     header, rows = _read_rows(path)
     si = _column(header, _SOURCE_NAMES, path)
     ti = _column(header, _TARGET_NAMES, path)

@@ -1,22 +1,3 @@
-# run.py
-"""
-Unified entry point for all NetworkSynth pipelines.
-
-Usage
------
-    python run.py generate                          Standard generation (default config)
-    python run.py generate --config Snapshot1x1     Single network + BFS snapshots
-    python run.py generate_select --config Snapshot3x3   Generate 20, rank, pick top 3
-    python run.py from_props                        Generate from pre-computed attributes
-    python run.py mosaic                            Mosaic: parallel tiles + stitch
-    python run.py scaling                           Scaling: multi-root synchronized BFS
-    python run.py hybrid                            Hybrid: seed tiles + frontier continuation
-    python run.py hybrid --config snapshot          Hybrid config variant
-    python run.py hybrid --dataset A                Single dataset
-    python run.py sweep                             Hyperparameter sweep (wandb)
-    python run.py sweep --config A --nf_range '(2.1,3.0)' --ef_range '(2.1,3.0)'
-    python run.py analyze                           Multifractal analysis on existing results
-"""
 import logging
 import sys
 

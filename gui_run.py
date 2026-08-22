@@ -1,26 +1,3 @@
-# gui_run.py
-"""Entry point for a GUI-driven run.
-
-Separate from ``run.py`` so the GUI path resolves its mode from a JSON run-spec
-rather than through CLI flags, and so neither entry point constrains the other.
-
-Usage
------
-    python gui_run.py path/to/run_spec.json
-    NETWORKSYNTH_RUN_SPEC=path/to/run_spec.json python gui_run.py
-
-Exit codes (the caller's contract — see ``INTEGRATION_PLAN.md``):
-
-    0    completed
-    1    failed
-    2    the run-spec itself was unusable
-    130  cancelled (SIGINT)
-
-Everything else the caller needs — ``manifest.json`` describing the outputs, and
-``run.jsonl`` carrying progress records — is written into the spec's
-``output_dir`` by the pipeline itself.
-"""
-
 import logging
 import os
 import sys

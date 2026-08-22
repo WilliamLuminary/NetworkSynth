@@ -1,29 +1,3 @@
-# tests/test_pipeline_smoke.py
-"""
-Smoke tests that actually execute the pipeline entry points.
-
-Why these exist
----------------
-``test_integration_modes.py`` contains no reference to ``pipelines.*`` — it
-reimplements each flow from building blocks (``GraphGenerator``,
-``MosaicStitcher``, …).  So the pipeline functions themselves were never
-executed by any test, which is how seven ``undefined name 'config'`` errors in
-``mosaic.py`` survived a fully green suite.
-
-These tests call the real entry points.  They assert almost nothing about
-output quality — the point is that the code *runs* and threads its config
-correctly.  Behavioural coverage belongs elsewhere.
-
-Keeping them cheap
-------------------
-- ``ERROR_CHECKER = "none"`` skips the multifractal quality gate, which is by
-  far the most expensive step (all-pairs shortest paths per candidate).
-- Minimal grids (1x2 tiles, 2 roots, 2 centers) and ``MAX_ATTEMPTS = 2``.
-- ``SYNTHETIC_NETWORK_NUMBER`` kept at 0 or 1.
-- The BFS needs >100 nodes to succeed, so frames cannot shrink much below the
-  sample configs' 510px.
-"""
-
 import os
 
 import pytest
@@ -39,15 +13,6 @@ def _outputs(saver_dir: str) -> list:
 
 
 def _tune(base, tmp_path, **overrides):
-    """Return a throwaway subclass pointed at tmp_path and made cheap.
-
-    A fresh subclass per test matters: config values live on the *class*, so
-    tuning the shared SampleConfig would leak parameters into later tests.
-    (This originally also caught ``_apply_dataset_factors`` mutating global
-    config via ``set_node_factor``; that mutator is gone now — it returns a new
-    params object instead — but the isolation is still worth keeping while
-    ``_inject_dependencies`` publishes onto BaseConfig.)
-    """
     config = type(f"Smoke{base.__name__}", (base,), {})
     config.BASE_OUTPUT_PATH = str(tmp_path)
     config.ERROR_CHECKER = "none"
@@ -68,7 +33,6 @@ def _tune(base, tmp_path, **overrides):
 
 class TestMosaicPipeline:
     def test_run_mosaic_for_dataset(self, tmp_path):
-        """Exercises compute_tile_layout + generate_all_tiles + stitching."""
         from configs.mosaic_mode.config_sample import SampleConfig
         from handlers import create_run_paths
         from pipelines.mosaic import run_mosaic_for_dataset
@@ -81,7 +45,6 @@ class TestMosaicPipeline:
         assert _outputs(str(tmp_path)), "mosaic produced no output files"
 
     def test_compute_tile_layout_uses_its_config(self, tmp_path):
-        """The regression that flake8 caught: config must reach this function."""
         from configs.mosaic_mode.config_sample import SampleConfig
         from pipelines.mosaic import compute_tile_layout
 
@@ -139,11 +102,6 @@ class TestHybridPipeline:
         )
 
     def test_run_hybrid_for_dataset(self, tmp_path):
-        """Runs phase 1 (worker pool) and phase 2 in-process.
-
-        Deliberately calls run_hybrid_for_dataset rather than main(), to avoid
-        the fork-a-subprocess-per-dataset wrapper.
-        """
         from handlers import create_run_paths
         from pipelines.hybrid import run_hybrid_for_dataset
 
@@ -165,7 +123,6 @@ class TestHybridPipeline:
         assert all(f == tuple(config.TILE_FRAME_SIZE) for f in frames)
 
     def test_apply_dataset_factors_returns_params_without_mutating(self, tmp_path):
-        """Per-dataset factors must ride in the returned params, not in config."""
         from configs import SynthParams
         from pipelines.hybrid import _apply_dataset_factors
 
@@ -232,8 +189,6 @@ class TestHybridSnapshotPipeline:
 
 class TestSweepPipeline:
     def test_generate_networks_threads_trial_params(self, tmp_path, monkeypatch):
-        """The part of sweep that changed: per-trial params instead of global
-        mutation.  wandb is never touched — run_for_dataset owns that."""
         from analysis.error_checker import NullErrorChecker
         from configs.sweep_mode.config_sample import SampleConfig as SweepConfig
         from handlers import RunAgent, create_run_paths

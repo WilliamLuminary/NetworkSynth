@@ -1,14 +1,3 @@
-"""Diagnostic: measure MF error at 1×1 (partial) and full 3×3 scale.
-
-Generates a few networks with no MF gating, then retroactively checks
-what their MF errors would have been — both for the early check (~916
-nodes) and the full-size check.  Reports timing for each stage.
-
-Usage:
-    cd NetworkSynth
-    PYTHONPATH=src .venv/bin/python3 scripts/helpers/diagnose_mf_error.py
-"""
-
 import logging
 import sys
 import time

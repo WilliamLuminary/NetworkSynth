@@ -1,11 +1,3 @@
-# src/analysis/error_checker.py
-"""
-Pluggable error-checking abstraction for network generation pipelines.
-
-Provides a common interface so that different quality-gate strategies
-(multifractal, topological, etc.) can be swapped without touching the
-generation loop.
-"""
 from __future__ import annotations
 
 import logging
@@ -30,7 +22,7 @@ class ErrorChecker(ABC):
 
     @abstractmethod
     def compute_reference(self, graph: SynthGraph) -> None:
-        """Compute and store reference features from the original network."""
+        pass
 
     @abstractmethod
     def check(self, graph: SynthGraph) -> Tuple[bool, float]:
@@ -47,7 +39,6 @@ class ErrorChecker(ABC):
 
 
 class NullErrorChecker(ErrorChecker):
-    """No-op checker — every candidate passes with zero error."""
 
     def compute_reference(self, graph: SynthGraph) -> None:
         pass

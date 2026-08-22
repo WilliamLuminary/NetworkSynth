@@ -1,12 +1,3 @@
-# tests/test_gui_run.py
-"""
-The GUI entry path: a JSON run-spec in, a generated network plus manifest out.
-
-This is what StructuralGT's controller drives. It never imports our code — it
-writes a spec, launches ``gui_run.py``, reads the exit code, tails ``run.jsonl``
-and reads ``manifest.json``. These tests exercise that same surface.
-"""
-
 import json
 import os
 
@@ -50,7 +41,6 @@ class TestSpecLoading:
         assert [str(d) for d in config.DATASETS] == ["test_run"]
 
     def test_json_arrays_become_tuples(self, tmp_path):
-        """Pipelines unpack these as tuples; JSON only has arrays."""
         config = GuiConfig.from_spec(_spec(tmp_path))
 
         assert config.FRAME_SIZE == (512, 512)
@@ -62,7 +52,6 @@ class TestSpecLoading:
         assert config.SEED == 7
 
     def test_returns_a_fresh_subclass_each_time(self, tmp_path):
-        """Two specs in one process must not collide."""
         first = GuiConfig.from_spec(_spec(tmp_path, run_name="one"))
         second_dir = tmp_path / "second"
         second_dir.mkdir()
@@ -81,7 +70,6 @@ class TestSpecLoading:
 
 
 class TestSpecIsValidated:
-    """A bad spec must be rejected clearly, not half-understood."""
 
     def test_missing_file(self, tmp_path):
         with pytest.raises(SpecError, match="not found"):
@@ -119,7 +107,6 @@ class TestSpecIsValidated:
 
 
 class TestEntryPointExitCodes:
-    """The caller reads these to tell success from cancel from breakage."""
 
     def test_bad_spec_exits_2(self, tmp_path):
         assert gui_run.main(["gui_run.py", str(tmp_path / "nope.json")]) == 2
@@ -130,11 +117,6 @@ class TestEntryPointExitCodes:
         assert gui_run.main(["gui_run.py"]) == 2
 
     def test_unsupported_mode_exits_2(self, tmp_path):
-        """Better a clear rejection than a confusing failure mid-run.
-
-        Uses a name that will never be a mode. This once used "hybrid", which
-        then became supported and turned the test into a false alarm.
-        """
         assert gui_run.main(["gui_run.py", _spec(tmp_path, mode="not_a_mode")]) == 2
 
     def test_reads_the_spec_from_the_environment(self, tmp_path, monkeypatch):
@@ -175,7 +157,6 @@ class TestFullRun:
     def test_spec_in_network_and_manifest_out(
         self, tmp_path, load_unweighted_test_synth_graph
     ):
-        """The whole contract: their CSVs in, our outputs discoverable."""
         from configs.file_definitions import save_network_csv
 
         save_network_csv(load_unweighted_test_synth_graph, str(tmp_path / "net.csv"))
@@ -222,11 +203,6 @@ class TestFullRun:
 
 
 class TestModeSelection:
-    """The GUI offers a mode per pipeline, so the two tables must agree.
-
-    A mode offered in the window but absent from the dispatch table fails at
-    click time; the reverse is a pipeline nobody can reach.
-    """
 
     def test_offered_modes_match_dispatchable_modes(self):
         from gui.spec_builder import MODES
@@ -267,7 +243,6 @@ class TestModeSelection:
 
     @pytest.mark.parametrize("mode", sorted(_MODE_EXTRAS))
     def test_mode_specific_params_reach_the_config(self, mode, tmp_path):
-        """These are read as plain attributes, so a missing one crashes mid-run."""
         from gui import spec_builder
 
         if mode not in _MODE_NAMES:
@@ -285,7 +260,6 @@ class TestModeSelection:
             assert hasattr(config, name), f"{mode} needs {name}"
 
     def test_size_params_become_tuples(self, tmp_path):
-        """Pipelines unpack these; JSON only has arrays."""
         from gui import spec_builder
 
         values = spec_builder.default_values("hybrid")
@@ -302,14 +276,6 @@ class TestModeSelection:
 
 
 class TestSpecConfigCrossesProcesses:
-    """A spec-built config must survive being pickled.
-
-    ``from_spec`` returns a class created at run time, and pickle stores classes
-    by name — a spawned child re-imports ``configs.gui_config`` and finds no such
-    name. Under ``fork`` this never showed, because the child inherited the class
-    object in memory. Under ``spawn`` ``hybrid`` failed outright: it hands the
-    config class to a subprocess, where every other mode passes a ``SynthParams``.
-    """
 
     def test_a_spec_built_config_survives_pickling(self, tmp_path):
         import pickle
@@ -324,7 +290,6 @@ class TestSpecConfigCrossesProcesses:
         assert [str(d) for d in restored.DATASETS] == [str(d) for d in config.DATASETS]
 
     def test_tuple_params_stay_tuples_after_a_round_trip(self, tmp_path):
-        """Pipelines unpack these; a list would fail deep inside a worker."""
         import pickle
 
         config = GuiConfig.from_spec(_spec(tmp_path))
@@ -335,13 +300,11 @@ class TestSpecConfigCrossesProcesses:
         assert restored.FRAME_SIZE == config.FRAME_SIZE
 
     def test_the_base_class_still_pickles_by_name(self, tmp_path):
-        """Only spec-built subclasses need rebuilding."""
         import pickle
 
         assert pickle.loads(pickle.dumps(GuiConfig)) is GuiConfig
 
     def test_the_loader_paths_survive(self, tmp_path):
-        """A worker that cannot find its inputs is the failure this prevents."""
         import pickle
 
         config = GuiConfig.from_spec(_spec(tmp_path))

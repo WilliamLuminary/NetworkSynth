@@ -1,12 +1,3 @@
-# tests/test_csv_io.py
-"""
-Tests for the CSV graph reader — the input half of the StructuralGT contract.
-
-They export ``Source,Target`` and ``x,y``; we also write our own
-``source_index,target_index,edge_weight``.  Both must load, and a mismatched
-pair must fail loudly rather than produce a graph with wrong geometry.
-"""
-
 import pytest
 
 from graphs.csv_io import read_edge_list_csv, read_graph_csv, read_positions_csv
@@ -51,7 +42,6 @@ class TestStructuralGTFormat:
         assert graph.weight(1, 2) == pytest.approx(3.5)
 
     def test_extra_columns_are_ignored(self, tmp_path):
-        """Length/Width/Angle must not break the read."""
         graph = read_graph_csv(
             _write(tmp_path / "e.csv", SGT_EDGES_WEIGHTED),
             _write(tmp_path / "p.csv", POSITIONS),
@@ -78,7 +68,6 @@ class TestOurOwnFormat:
     def test_round_trips_save_network_csv(
         self, tmp_path, load_unweighted_test_synth_graph
     ):
-        """Our writer's output must load back."""
         from configs.file_definitions import save_network_csv
 
         original = load_unweighted_test_synth_graph
@@ -108,7 +97,6 @@ class TestOurOwnFormat:
 
 
 class TestFailsLoudly:
-    """A mismatched pair must raise, not produce a wrong graph."""
 
     def test_edge_index_beyond_positions(self, tmp_path):
         with pytest.raises(ValueError, match="only 2 rows"):
@@ -157,7 +145,6 @@ class TestFailsLoudly:
 
 class TestEdgeCases:
     def test_no_edges_is_allowed(self, tmp_path):
-        """An isolated-node graph is valid input."""
         graph = read_graph_csv(
             _write(tmp_path / "e.csv", [["Source", "Target"]]),
             _write(tmp_path / "p.csv", POSITIONS),
@@ -167,7 +154,6 @@ class TestEdgeCases:
         assert graph.number_of_edges() == 0
 
     def test_float_indices_are_accepted(self, tmp_path):
-        """pandas writes ints as 0.0 when a column has NaNs elsewhere."""
         graph = read_graph_csv(
             _write(tmp_path / "e.csv", [["Source", "Target"], ["0.0", "1.0"]]),
             _write(tmp_path / "p.csv", POSITIONS),

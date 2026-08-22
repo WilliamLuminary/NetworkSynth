@@ -1,17 +1,3 @@
-# scripts/run_sweep.py
-"""
-Hyperparameter sweep over (CLOSED_NODES_FACTOR, CLOSED_EDGES_FACTOR).
-
-Generates 100 synthetic networks per (nf, ef) pair using multiprocessing,
-computes the average multifractal error and success rate, and logs all
-results to Weights & Biases (wandb) including a heatmap artifact.
-
-Grid searched: nf and ef each from 0.4 to 2.0 in steps of 0.1
-               → 17 × 17 = 289 parameter pairs.
-
-Usage (from project root):
-    python scripts/run_sweep.py
-"""
 import os
 
 os.environ.setdefault("OMP_NUM_THREADS", "1")
@@ -33,7 +19,6 @@ from pipelines.generate import compute_average_error, generate_synthetic_network
 
 
 class SweepRunConfig(GenConfig):
-    """Throwaway networks: a sweep scores factor pairs, not outputs."""
 
     SYNTHETIC_NETWORK_NUMBER = 100
     SYNTHETIC_GRAPH_NUMBER = 0
@@ -56,7 +41,6 @@ SIGINT_INFO = "SIGINT received. Terminating child process..."
 def generate_networks_multiprocess(
     data_agent: RunAgent, std_err_fea, trial_params
 ) -> Tuple[float, float]:
-    """Return (average_error, success_rate)."""
     num_network = SweepRunConfig.SYNTHETIC_NETWORK_NUMBER
     errors, futures = [], []
     from utils import spawn_context
@@ -127,7 +111,6 @@ def run_with_params(data_agent, ef, nf, std_err_fea):
 
 
 def run_for_dataset(dataset_id: DatasetId) -> None:
-    """Process a single dataset identified by DatasetId."""
     logger.info(f"Processing dataset: {dataset_id}")
     data_agent = RunAgent(SweepRunConfig, run_paths=run_paths, dataset_id=dataset_id)
     data_agent.prepare_data()

@@ -1,8 +1,3 @@
-# src/pipelines/scaling.py
-"""
-Scaling pipeline — multi-root synchronized BFS for large networks.
-"""
-
 import logging
 
 from configs import SynthParams
@@ -27,7 +22,6 @@ logger = logging.getLogger(__name__)
 # Main pipeline for one dataset
 # ------------------------------------------------------------------ #
 def run_scaling_for_dataset(dataset_id, config, run_paths):
-    """Run the full scaling pipeline for a single dataset."""
     logger.info(f"=== Scaling pipeline for dataset: {dataset_id} ===")
     logger.info(config())
 
@@ -81,7 +75,6 @@ def plot_scaled_network(
     dpi: int = None,
     max_px: int | None = None,
 ):
-    """Render a scaled network to a PIL Image (CV2-backed, memory-safe)."""
     return render_network(
         graph,
         margin_frac=margin_frac,

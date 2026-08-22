@@ -1,15 +1,3 @@
-"""Plot the original network for a hybrid-mode sample.
-
-Loads sample data (positions, adjacency matrix, optional background image)
-using the same logic as the hybrid pipeline, then renders it with the
-same plotting scheme used for the original graph in generate mode.
-
-Usage:
-    python scripts/helpers/plot_hybrid_original.py
-    python scripts/helpers/plot_hybrid_original.py --sample B
-    python scripts/helpers/plot_hybrid_original.py --sample A --output my_plot.png --no_background
-"""
-
 import logging
 import os
 import sys
@@ -26,7 +14,6 @@ BASE_INPUT_PATH = os.path.join(
 
 
 def load_sample_network(sample: str):
-    """Load sample network from .npy files (hybrid mode Sample A/B/C/D)."""
     set_name = f"sample_{sample}"
 
     pos_path = os.path.join(BASE_INPUT_PATH, f"{set_name}_pos.npy")
@@ -56,7 +43,6 @@ def load_sample_network(sample: str):
 
 
 def load_sample_image(sample: str):
-    """Load and resize the background image for the sample."""
     set_name = f"sample_{sample}"
     img_path = os.path.join(BASE_INPUT_PATH, f"{set_name}_image.tif")
     if not os.path.isfile(img_path):
@@ -76,10 +62,6 @@ def load_sample_image(sample: str):
 
 
 def plot_original_graph(graph, background=None, title=None):
-    """Render the network using the generate-mode original_graph scheme.
-
-    Red edges, blue nodes, optional greyscale background, no axes.
-    """
     from matplotlib.figure import Figure
 
     frame_size = (510, 510)

@@ -1,14 +1,3 @@
-# scripts/reprocess_hybrid_lcc.py
-"""
-Post-process the existing hybrid 50x50 LCC output.
-
-Loads the LCC graph from .nkbin + .npy, assigns edge weights via the
-original-network Mapper, and re-saves as consistent CSV files
-(edgelist with weights, positions as CSV instead of .npy).
-
-Usage (from project root):
-    python scripts/reprocess_hybrid_lcc.py
-"""
 import csv
 import logging
 import os
@@ -45,7 +34,6 @@ from configs.hybrid_mode import HybridConfig
 
 
 class ReprocessConfig(HybridConfig):
-    """Only the mapper is wanted here; this script writes its own CSVs."""
 
     DISABLE_SAVING = True
     DISABLE_SAVING_NOTE = "reprocessing only"

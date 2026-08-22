@@ -1,18 +1,3 @@
-# tests/test_worker_threads.py
-"""Pool workers must pin networkit to a single thread.
-
-networkit defaults to one thread per core. A worker forked from a parent that
-has already run networkit inherits an OpenMP runtime whose threads do not exist
-in the child; the child then spins instead of working. On a 128-core host that
-turned a three-second generate run into one that never finished, and it is
-silent — no error, no warning, just a process burning CPU forever.
-
-`pipelines/hybrid.py` pinned its tile worker long ago. `generate`, `mosaic` and
-`sweep` did not, and these tests exist so that gap cannot reopen. Each worker
-pins before its first early return, so a worker called with an already-set exit
-event still proves the pin ran.
-"""
-
 import threading
 
 import networkit as nk
@@ -25,7 +10,6 @@ pytestmark = pytest.mark.unit
 
 @pytest.fixture
 def restore_thread_count():
-    """The pin is global to networkit, so put it back for other tests."""
     original = nk.getMaxNumberOfThreads()
     yield
     nk.setNumberOfThreads(original)
@@ -79,7 +63,6 @@ def test_mosaic_worker_pins_networkit(restore_thread_count, stopped_event):
 
 
 def test_generate_select_workers_pin_networkit(restore_thread_count, stopped_event):
-    """generate_select has its own pool over two workers defined in generate.py."""
     from pipelines.generate import (
         _generate_single_network,
         _generate_single_network_collecting_snapshots,
@@ -97,7 +80,6 @@ def test_generate_select_workers_pin_networkit(restore_thread_count, stopped_eve
 
 
 def test_generate_from_props_worker_pins_networkit(restore_thread_count, stopped_event):
-    """It defines its own worker rather than reusing generate's."""
     from pipelines.generate_from_props import generate_synthetic_network
 
     nk.setNumberOfThreads(4)
@@ -108,12 +90,6 @@ def test_generate_from_props_worker_pins_networkit(restore_thread_count, stopped
 
 
 def test_every_pool_worker_is_covered_here():
-    """A pool worker that pins nothing is the bug that hung a default run.
-
-    Checks the source of every function submitted to a ProcessPoolExecutor,
-    excluding the plot pools, whose workers render images and never touch
-    networkit.
-    """
     import inspect
 
     import pipelines.generate as gen
@@ -140,7 +116,6 @@ def test_every_pool_worker_is_covered_here():
 
 
 def test_hybrid_tile_worker_still_pins_networkit(restore_thread_count):
-    """Hybrid was already correct; this guards against it being undone."""
     import inspect
 
     from pipelines.hybrid import _generate_tile_worker

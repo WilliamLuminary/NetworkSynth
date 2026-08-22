@@ -1,14 +1,3 @@
-# scripts/run_generate_top2.py
-"""
-Generate networks for the top-2 hyperparameter settings from a sweep.
-
-Takes the two best (CLOSED_NODES_FACTOR, CLOSED_EDGES_FACTOR) pairs
-found via ``pipelines.sweep`` and generates 2 synthetic networks (with
-plots) for each, using GenConfigTmp.
-
-Usage (from project root):
-    python scripts/run_generate_top2.py
-"""
 import os
 
 os.environ.setdefault("OMP_NUM_THREADS", "1")

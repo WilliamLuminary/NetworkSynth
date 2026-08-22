@@ -1,4 +1,3 @@
-# src/utils.py
 from __future__ import annotations
 
 import functools
@@ -125,9 +124,6 @@ def _from_edge_list(positions: np.ndarray, edge_list: np.ndarray) -> SynthGraph:
 
 
 def largest_connected_component(graph: SynthGraph) -> SynthGraph:
-    """
-    Keep only the largest connected component of the graph.
-    """
     return graph.largest_connected_component()
 
 
@@ -148,12 +144,6 @@ def timer(func):
 
 
 def finalize_plot(fig, show: bool = False):
-    """Finalise a matplotlib Figure for saving.
-
-    Returns the *Figure* itself so callers can persist it as SVG (or any
-    other vector format) without rasterisation.  When *show* is True the
-    figure is temporarily rasterised for an interactive OpenCV preview.
-    """
     fig.tight_layout(pad=0)
 
     if show:
@@ -184,10 +174,6 @@ _DPI_BOOST = 300  # extra DPI headroom for CV2-based rendering
 
 
 def recommend_dpi(num_nodes: int) -> int:
-    """Pick a standard DPI based on network size (matplotlib paths).
-
-    Returns one of 150, 300, 600, 900, 1200, or 1800.
-    """
     for threshold, dpi in _DPI_TIERS:
         if num_nodes < threshold:
             return dpi
@@ -409,7 +395,6 @@ def compute_network_metrics(graph: SynthGraph) -> dict:
 
 
 def metric_distance(metrics: dict, ref_metrics: dict) -> float:
-    """Normalised mean relative error across all metrics."""
     total = 0.0
     for key in ref_metrics:
         ref = ref_metrics[key]
@@ -504,12 +489,6 @@ def save_hybrid_snapshot(
     max_px: int | None = None,
     **_kwargs,
 ) -> None:
-    """Render a snapshot of a large hybrid network and save as PNG.
-
-    Uses the CV2 renderer for consistency with ``render_network`` and
-    to avoid OOM on large intermediate snapshots.  Uses fixed *frame*
-    limits so all snapshots are aligned for animation.
-    """
     import os
 
     import cv2

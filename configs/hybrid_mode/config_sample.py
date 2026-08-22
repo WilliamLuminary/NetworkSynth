@@ -1,25 +1,3 @@
-# src/configs/hybrid_mode/config_sample.py
-"""
-Hybrid mode sample configuration.
-
-Phase 1: Generate seed tiles independently in parallel, each covering
-          ~1×1 SYNTHETIC_FRAME_SIZE.  Quality-checked via multifractal
-          error against the original network.
-
-Phase 2: Assemble all seed tiles on a shared whiteboard and continue
-          BFS from frontier nodes to fill gaps and merge into a single
-          connected network.
-
-Result: a network whose whiteboard spans TARGET_SCALE times the
-        original frame in each dimension.
-
-Data layout
------------
-samples/hybrid_mode/
-├── sample_{A,B,C,D}_pos.npy     (N×2 positions)
-├── sample_{A,B,C,D}_mat.npy     (scipy sparse adjacency)
-└── sample_{A,B,C,D}_image.tif   (grayscale background)
-"""
 import logging
 import os
 from typing import Dict, Tuple
@@ -39,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 
 class SampleConfig(BaseConfig):
-    """Hybrid mode sample — parallel seed tiles + frontier continuation."""
 
     LOG_MEMORY = True
 

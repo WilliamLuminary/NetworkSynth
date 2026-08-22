@@ -1,13 +1,3 @@
-# tests/analysis/test_error_checker.py
-"""
-Unit tests for the error-checker settings handoff (analysis/error_checker.py).
-
-``MultifractalErrorChecker`` is built in the parent process and pickled to
-workers, so it must carry ``measure_weighted`` / ``full_q_band`` with it.  A
-worker that instead read ``BaseConfig`` would get defaults under a ``spawn``
-start method, silently changing the quality gate.
-"""
-
 import pickle
 
 import numpy as np
@@ -46,7 +36,6 @@ def base_config_values():
 
 class TestSettingsCapture:
     def test_settings_are_required(self):
-        """No defaults: an under-specified checker must fail immediately."""
         with pytest.raises(TypeError):
             MultifractalErrorChecker(0.15)
 
@@ -58,7 +47,6 @@ class TestSettingsCapture:
         assert checker.full_q_band is True
 
     def test_settings_survive_a_pickle_round_trip(self):
-        """This is how the checker reaches a worker under spawn."""
         checker = MultifractalErrorChecker(0.3, measure_weighted=True, full_q_band=True)
 
         revived = pickle.loads(pickle.dumps(checker))
@@ -95,7 +83,6 @@ class TestCreateErrorChecker:
 
 
 class TestAnalyzerHonoursExplicitSettings:
-    """Explicit arguments must beat BaseConfig — that is the spawn guarantee."""
 
     def test_full_q_band_argument_wins(
         self, base_config_values, load_unweighted_test_synth_graph
@@ -115,7 +102,6 @@ class TestAnalyzerHonoursExplicitSettings:
         )
 
     def test_settings_are_required(self, load_unweighted_test_synth_graph):
-        """No BaseConfig fallback: omitting them must fail immediately."""
         from analysis.multifractal_analyzer import MultifractalAnalyzer
 
         with pytest.raises(TypeError):
@@ -139,11 +125,6 @@ class TestAnalyzerHonoursExplicitSettings:
 
 
 class TestLengthAngleErrorChecker:
-    """A second gate, added to prove the registry is a real extension point.
-
-    Adding it required one class and one `_CHECKERS` entry — no pipeline,
-    config or GUI change — which is the property these tests pin.
-    """
 
     @staticmethod
     def _lattice(side=8, spacing=10.0, seed=1):
@@ -169,7 +150,6 @@ class TestLengthAngleErrorChecker:
         return LengthAngleErrorChecker(tolerance)
 
     def test_it_is_reachable_through_the_registry(self):
-        """The whole point: a config name is all a pipeline needs."""
         from analysis.error_checker import LengthAngleErrorChecker, create_error_checker
         from configs import BaseConfig
 
@@ -183,7 +163,6 @@ class TestLengthAngleErrorChecker:
         assert checker.tolerance == 0.2
 
     def test_check_before_reference_raises(self):
-        """Silently comparing against nothing would be worse than stopping."""
         with pytest.raises(RuntimeError, match="compute_reference"):
             self._checker().check(self._lattice())
 
@@ -198,11 +177,6 @@ class TestLengthAngleErrorChecker:
         assert error == pytest.approx(0.0, abs=1e-12)
 
     def test_it_measures_only_length_and_angle(self):
-        """Node count and degree must not influence the verdict.
-
-        A lattice twice the size has the same edge length and the same angles,
-        so a gate that looked at size would reject it.
-        """
         checker = self._checker(tolerance=0.05)
         checker.compute_reference(self._lattice(side=6))
 
@@ -212,7 +186,6 @@ class TestLengthAngleErrorChecker:
         assert passed, f"size should not matter, error was {error}"
 
     def test_different_geometry_fails(self):
-        """Same topology, edges ten times longer."""
         checker = self._checker(tolerance=0.15)
         checker.compute_reference(self._lattice(spacing=10.0))
 
@@ -233,7 +206,6 @@ class TestLengthAngleErrorChecker:
         assert checker_loose.check(candidate)[0]
 
     def test_it_survives_pickling(self):
-        """Checkers are built in the parent and sent to spawned workers."""
         import pickle
 
         checker = self._checker()

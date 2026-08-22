@@ -1,13 +1,3 @@
-# src/pipelines/generate_select.py
-"""
-Generate-and-select pipeline — generate N candidate networks, rank by
-5 metrics against the original, and keep the top K.
-
-Reuses the core generation workers from ``generate.py``.  When
-``SNAPSHOT_INTERVAL > 0``, raw BFS snapshot data is collected in
-memory during generation (zero rendering cost).  Only the winning
-candidates get their snapshots rendered to PNGs after ranking.
-"""
 import csv
 import logging
 import os
@@ -44,7 +34,6 @@ logger = logging.getLogger(__name__)
 
 
 def _render_snapshots(snapshot_data, output_dir, style, plot_workers: int):
-    """Render collected snapshot data to PNGs using a process pool."""
     from concurrent.futures import ProcessPoolExecutor
 
     os.makedirs(output_dir, exist_ok=True)
@@ -315,7 +304,6 @@ def generate_and_select(data_agent: RunAgent, config):
 
 
 def run_for_dataset(dataset_id: DatasetId, config, run_paths):
-    """Process a single dataset: prepare data, then generate-and-select."""
     logger.info(f"Processing dataset: {dataset_id}")
     logger.info(config())
     data_agent = RunAgent(config, run_paths=run_paths, dataset_id=dataset_id)

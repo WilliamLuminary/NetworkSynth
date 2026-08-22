@@ -1,14 +1,3 @@
-# tests/test_synth_params.py
-"""
-Unit tests for SynthParams (configs/params.py).
-
-The point of SynthParams is that worker processes receive their parameters
-explicitly instead of inheriting a mutated ``BaseConfig`` — which only reaches
-children under a ``fork`` start method.  These tests pin that guarantee by
-giving BaseConfig deliberately wrong values and asserting the passed-in params
-win.
-"""
-
 import pytest
 
 from configs import BaseConfig, SynthParams
@@ -18,7 +7,6 @@ pytestmark = pytest.mark.unit
 
 @pytest.fixture
 def base_config_values():
-    """Set known BaseConfig values, restoring whatever was there before."""
     saved = {
         name: getattr(BaseConfig, name, None)
         for name in (
@@ -77,7 +65,6 @@ class TestImmutability:
             params.max_attempts = 99
 
     def test_survives_a_pickle_round_trip(self):
-        """Workers receive params by pickle under a spawn start method."""
         import pickle
 
         params = SynthParams((128, 256), 1.5, 0.5, max_attempts=3, seed=42)
@@ -86,7 +73,6 @@ class TestImmutability:
 
 
 class TestParamsWinOverBaseConfig:
-    """The spawn-safety guarantee: passed-in params must be authoritative."""
 
     def test_graph_node_uses_params_not_base_config(self, base_config_values):
         from graphs._graph_node import GraphNode
@@ -130,7 +116,6 @@ class TestParamsWinOverBaseConfig:
         assert generator._params.synthetic_frame_size == (999, 777)
 
     def test_generator_requires_params(self):
-        """Omitting params must fail immediately, not silently fall back."""
         from graphs.graph_generator import GraphGenerator
 
         class Attrs:
@@ -146,7 +131,6 @@ class TestParamsWinOverBaseConfig:
 
 
 class TestNoDefaults:
-    """A misconfigured run must crash rather than proceed on a fallback."""
 
     def test_every_field_is_required(self):
         with pytest.raises(TypeError):

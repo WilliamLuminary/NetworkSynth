@@ -1,23 +1,3 @@
-# src/handlers/run_logging.py
-"""Logging setup, as a process concern rather than a config one.
-
-``BaseConfig._setup_logger()`` used to do this, which produced two defects:
-
-* The JSON log went to ``BaseConfig.BASE_OUTPUT_PATH/logs/`` regardless of where
-  the active config was writing, so a run told to output somewhere else still
-  logged into the repository.  That breaks the integration plan, where the
-  run-spec names an ``output_dir`` and StructuralGT's controller tails the log
-  inside it.
-* A ``_logger_initialized`` latch meant the *first* config to initialize named
-  the log file and any later run in the same process got no file handler at all.
-
-Split here into two steps, because they are known at different times:
-
-* :func:`configure_console` — immediately, so early failures are visible.
-* :func:`attach_run_log` — once the run's output directory exists, since that is
-  where its log belongs.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -93,7 +73,6 @@ def attach_run_log(
 
 
 def reset_logging() -> None:
-    """Remove the handlers we installed.  For tests."""
     root = logging.getLogger()
     for flag in (_CONSOLE_FLAG, _RUN_LOG_FLAG):
         handler = _existing(flag)

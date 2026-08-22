@@ -1,13 +1,3 @@
-# src/gui/app.py
-"""The synthesis window: a form that launches a run and follows its progress.
-
-Deliberately does **not** call the pipelines in-process.  It writes a run-spec,
-starts ``gui_run.py`` as a subprocess, and tails the run's ``run.jsonl`` for
-progress records.  That is exactly the mechanism StructuralGT's controller will
-use, so this window doubles as its reference implementation — and it means a
-crash or a cancel cannot take the UI down with it.
-"""
-
 from __future__ import annotations
 
 import json
@@ -44,14 +34,12 @@ _EXIT_MEANING = {
 
 
 def _local_path(value: str) -> str:
-    """QML file dialogs hand back file:// URLs; everything else is already a path."""
     if value.startswith("file://"):
         return QUrl(value).toLocalFile()
     return value
 
 
 class SynthesisController(QObject):
-    """Bridges the QML form to a ``gui_run.py`` subprocess."""
 
     changed = Signal()
     logChanged = Signal()
@@ -88,7 +76,6 @@ class SynthesisController(QObject):
 
     @Property("QStringList", notify=changed)
     def modes(self) -> list:
-        """Every mode the entry point can dispatch, in a stable order."""
         return list(spec_builder.MODES)
 
     @Property("QStringList", notify=changed)

@@ -1,15 +1,3 @@
-"""Plot a saved NetworKit network using the production rendering code.
-
-Reads a .nkbin file (with companion _positions.npy), wraps it in a
-SynthGraph, and calls the same plot function used by the hybrid pipeline.
-
-Usage:
-    python scripts/helpers/plot_network.py network.nkbin
-    python scripts/helpers/plot_network.py network.nkbin --output out.webp
-    python scripts/helpers/plot_network.py network.nkbin --fmt png
-    python scripts/helpers/plot_network.py network.nkbin --dpi 600
-"""
-
 import os
 import sys
 

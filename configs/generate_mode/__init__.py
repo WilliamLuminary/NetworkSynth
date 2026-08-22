@@ -1,11 +1,3 @@
-"""
-Generate mode configurations - dynamically loads all config_*.py files.
-
-Naming convention:
-    config_sample.py (SampleConfig) -> GenConfig
-    config_xxx.py (ConfigXxx) -> GenConfigXxx
-"""
-
 from pathlib import Path
 
 from .._loader import get_all_config_names, load_configs_from_directory

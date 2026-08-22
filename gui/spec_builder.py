@@ -1,16 +1,3 @@
-# src/gui/spec_builder.py
-"""Field definitions and run-spec construction, independent of any toolkit.
-
-The window is a form; this is what the form is *made of*.  Keeping it separate
-means the interesting logic — which fields a mode has, their ranges, defaults
-and validation — is testable without a display, and a different front end (or
-StructuralGT's own controller) can reuse it.
-
-Field metadata deliberately mirrors StructuralGT's option-dict shape
-(``id``/``label``/``value``/``minimum``/``maximum``/``step``), so their QML can
-bind to the same descriptions if they ever want to render this form themselves.
-"""
-
 from __future__ import annotations
 
 import json
@@ -23,7 +10,6 @@ from configs.gui_config import SPEC_CONTRACT_VERSION
 
 @dataclass(frozen=True)
 class Field:
-    """One editable parameter."""
 
     id: str
     label: str
@@ -40,7 +26,6 @@ class Field:
 
 @dataclass
 class ModeSpec:
-    """The fields one mode exposes."""
 
     name: str
     label: str
@@ -192,7 +177,6 @@ def default_values(mode: str) -> Dict[str, Any]:
 def validate(
     mode: str, edge_list: str, positions: str, output_dir: str, values: Dict[str, Any]
 ) -> List[str]:
-    """Return human-readable problems.  Empty list means good to run."""
     problems: List[str] = []
 
     if mode not in MODES:
@@ -239,7 +223,6 @@ def build_spec(
     image: Optional[str] = None,
     run_name: str = "gui_run",
 ) -> Dict[str, Any]:
-    """Assemble the run-spec that ``gui_run.py`` consumes."""
     params = dict(values)
 
     # A seed of 0 means "do not seed": SEED=None is how the pipelines say that,

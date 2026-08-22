@@ -1,4 +1,3 @@
-# src/configs/base_config.py
 import json
 import logging
 import os
@@ -73,7 +72,6 @@ class BaseConfig:
 
     @classmethod
     def get_datasets(cls) -> List[DatasetId]:
-        """Get all datasets to process."""
         if cls.DATASETS is None:
             raise ValueError("DATASETS must be defined in the config")
         return cls.DATASETS
@@ -139,7 +137,6 @@ class BaseConfig:
 
     @classmethod
     def get_max_workers(cls, num_tasks: int = None) -> int:
-        """Return number of worker processes, capped by half the CPUs and MAX_WORKERS."""
         cpu_count = os.cpu_count() or 1
         max_workers = min(max(1, cpu_count // 2), cls.MAX_WORKERS)
         if num_tasks is not None:
@@ -148,7 +145,6 @@ class BaseConfig:
 
     @classmethod
     def get_snapshot_plot_workers(cls) -> int:
-        """Return number of snapshot plotting workers, capped by half the CPUs and SNAPSHOT_PLOT_WORKERS."""
         cpu_count = os.cpu_count() or 1
         return min(max(1, cpu_count // 2), cls.SNAPSHOT_PLOT_WORKERS)
 

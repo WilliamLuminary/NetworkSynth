@@ -1,15 +1,3 @@
-# tests/test_snapshot_utils.py
-"""
-Unit tests for snapshot-related utility functions introduced by
-the snapshot_mode feature.
-
-Covers:
-  - compute_network_metrics()  → 5 metric keys, value sanity
-  - metric_distance()          → symmetric, zero-for-identical
-  - save_bfs_snapshot()        → creates PNG file
-  - save_hybrid_snapshot()     → creates PNG file
-"""
-
 import os
 
 import networkit as nk
@@ -25,7 +13,6 @@ pytestmark = pytest.mark.unit
 
 
 def _make_synth_graph(n: int = 20, avg_edges: int = 3):
-    """Build a small connected SynthGraph for testing."""
     from graphs.synth_graph import SynthGraph
 
     positions = np.random.RandomState(42).rand(n, 2) * 100.0
@@ -105,7 +92,6 @@ class TestMetricDistance:
         assert metric_distance(syn, ref) > 0
 
     def test_handles_zero_ref(self):
-        """When a reference metric is 0, falls back to abs(syn)."""
         from utils import metric_distance
 
         ref = {"a": 0.0, "b": 10.0}
@@ -174,7 +160,6 @@ class TestSaveHybridSnapshot:
         assert os.path.getsize(expected) > 0
 
     def test_empty_graph(self, tmp_path):
-        """Snapshot of an empty network should still produce a file."""
         from utils import save_hybrid_snapshot
 
         save_hybrid_snapshot(

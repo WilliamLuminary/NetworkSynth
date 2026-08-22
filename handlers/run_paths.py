@@ -1,17 +1,3 @@
-# src/handlers/run_paths.py
-"""Where a run writes its output.
-
-``Saver`` used to answer this with a class attribute set by an ``initialize()``
-classmethod.  That made the answer global: two runs could not coexist in one
-process, a forked child inherited the parent's directory by accident rather than
-by design, and tests had to reset the class attribute between cases.
-
-A run's output location is just path arithmetic, so it is a *value* here.
-``RunPaths`` is frozen and picklable, which means many runs are simply many
-values, and passing one to a worker process works the same way on ``fork`` and
-``spawn``.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -25,12 +11,10 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class RunPaths:
-    """The output root for one run, plus per-dataset resolution."""
 
     root: str
 
     def for_dataset(self, dataset_id) -> str:
-        """Directory for *dataset_id* inside this run's root."""
         return os.path.join(self.root, dataset_id.path)
 
 

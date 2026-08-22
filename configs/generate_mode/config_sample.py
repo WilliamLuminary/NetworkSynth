@@ -1,4 +1,3 @@
-# src/configs/generate_mode/config_sample.py
 import logging
 import os
 from typing import List
@@ -14,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 
 def _generate_sample_datasets() -> List[DatasetId]:
-    """Generate DatasetId list for sample datasets."""
     return [DatasetId("sample_1"), DatasetId("sample_2"), DatasetId("sample_3")]
 
 
@@ -72,7 +70,6 @@ class SampleConfig(BaseConfig):
 
     @classmethod
     def load_original_image(cls, dataset_id: DatasetId):
-        """Load original image. dataset_id has single level: [set_name]"""
         image = _load_raw_image(cls.IMAGES_DIR, dataset_id)
         if image is None:
             return None
@@ -82,7 +79,6 @@ class SampleConfig(BaseConfig):
 
 
 def _load_positions(directory: str, dataset_id: DatasetId) -> np.ndarray:
-    """Load node positions from *directory*. dataset_id[0] = set_name"""
     file_path = os.path.join(directory, f"{dataset_id[0]}_pos.npy")
 
     if not os.path.exists(file_path):
@@ -95,7 +91,6 @@ def _load_positions(directory: str, dataset_id: DatasetId) -> np.ndarray:
 
 
 def _load_sparse_matrix(directory: str, dataset_id: DatasetId):
-    """Load sparse matrix from *directory*. dataset_id[0] = set_name"""
     file_path = os.path.join(directory, f"{dataset_id[0]}_mat.npy")
 
     if not os.path.exists(file_path):
@@ -108,7 +103,6 @@ def _load_sparse_matrix(directory: str, dataset_id: DatasetId):
 
 
 def _load_raw_image(directory: str, dataset_id: DatasetId):
-    """Load raw image from *directory*. dataset_id[0] = set_name"""
     file_path = os.path.join(directory, f"{dataset_id[0]}_image.tif")
 
     if not os.path.exists(file_path):

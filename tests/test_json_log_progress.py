@@ -1,13 +1,3 @@
-# tests/test_json_log_progress.py
-"""
-The JSON log must carry a machine-readable ``percent`` field.
-
-StructuralGT's controller is meant to tail this file and forward each line as a
-``ProgressData``, which wants a numeric percent.  Percentages used to live only
-inside the message text — ``"(50.0%) Synthetic graph generated."`` — which would
-have forced the caller to parse prose.  See ``INTEGRATION_PLAN.md``.
-"""
-
 import json
 import logging
 
@@ -19,7 +9,6 @@ pytestmark = pytest.mark.unit
 
 
 def _emit(message: str, extra: dict | None = None) -> dict:
-    """Format one record through the JSON formatter and return the parsed line."""
     record = logging.LogRecord(
         name="test.logger",
         level=logging.INFO,
@@ -42,7 +31,6 @@ class TestPercentField:
         assert entry["tag"] == "PROGRESS"
 
     def test_percent_is_numeric_not_a_string(self):
-        """A consumer must be able to use it without coercion."""
         entry = _emit("halfway", tagged("PROGRESS", percent=50.0))
 
         assert isinstance(entry["percent"], (int, float))
@@ -55,7 +43,6 @@ class TestPercentField:
         assert entry["tag"] == "IO"
 
     def test_zero_percent_is_still_emitted(self):
-        """0 is falsy; it must not be dropped."""
         entry = _emit("starting", tagged("PROGRESS", percent=0))
 
         assert entry["percent"] == 0
@@ -70,7 +57,6 @@ class TestPercentField:
         assert entry["dataset"] == "sample_A"
 
     def test_line_is_a_single_json_object(self):
-        """One record per line, so a tailing consumer can parse incrementally."""
         line = _JsonFormatter(run_id="r").format(
             logging.LogRecord(
                 "l", logging.INFO, __file__, 1, "multi\nline\nmessage", (), None
@@ -82,7 +68,6 @@ class TestPercentField:
 
 
 class TestPipelinesEmitIt:
-    """Every progress log site must attach the field, not just format it."""
 
     @pytest.mark.parametrize(
         "module_name",

@@ -43,11 +43,9 @@ def _load_synth_graph(path: str) -> SynthGraph:
 
 @pytest.fixture
 def load_weighted_test_synth_graph():
-    """Weighted SynthGraph fixture."""
     return _load_synth_graph(_WEIGHTED_PKL)
 
 
 @pytest.fixture
 def load_unweighted_test_synth_graph():
-    """Unweighted SynthGraph fixture."""
     return _load_synth_graph(_UNWEIGHTED_PKL)

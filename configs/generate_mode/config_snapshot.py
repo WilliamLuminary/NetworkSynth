@@ -1,10 +1,3 @@
-# src/configs/generate_mode/config_snapshot.py
-"""
-Generate-mode config for sample_A.
-
-Uses the hybrid-mode sample_A data with its tuned node/edge factors.
-Base class for Snapshot1x1Config / Snapshot3x3Config variants.
-"""
 import logging
 import os
 from typing import Tuple

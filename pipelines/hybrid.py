@@ -1,8 +1,3 @@
-# src/pipelines/hybrid.py
-"""
-Hybrid pipeline — parallel seed tiles (Phase 1) + frontier continuation (Phase 2).
-"""
-
 import gc
 import os
 
@@ -510,7 +505,6 @@ def run_phase2(
 
 
 def log_connectivity(graph: SynthGraph, label: str = ""):
-    """Log connected-component statistics."""
     cc = nk.components.ConnectedComponents(graph.nk)
     cc.run()
     sizes = sorted(cc.getComponentSizes().values(), reverse=True)
@@ -535,7 +529,6 @@ def plot_hybrid_network(
     dpi: int = None,
     max_px: int | None = None,
 ):
-    """Render a hybrid graph to a BGR ndarray (CV2-backed, memory-safe)."""
     from utils import render_network
 
     return render_network(
