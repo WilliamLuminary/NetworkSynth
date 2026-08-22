@@ -7,7 +7,6 @@ pytestmark = pytest.mark.unit
 
 PIPELINES = [
     "generate",
-    "generate_select",
     "generate_from_props",
     "mosaic",
     "scaling",

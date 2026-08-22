@@ -107,7 +107,7 @@ class LengthAngleErrorChecker(ErrorChecker):
     unlike the original — it is a geometry gate, not a substitute.
 
     Both figures come from ``utils.compute_network_metrics``, which is also what
-    ``generate_select`` ranks by, so the two agree by construction.  It computes
+    generate's selection path ranks by, so the two agree by construction.  It computes
     three metrics this gate ignores; that waste is deliberate, because
     duplicating the angle geometry to avoid it would be the worse trade.
     """

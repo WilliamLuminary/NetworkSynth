@@ -62,7 +62,7 @@ def test_mosaic_worker_pins_networkit(restore_thread_count, stopped_event):
     assert nk.getMaxNumberOfThreads() == 1
 
 
-def test_generate_select_workers_pin_networkit(restore_thread_count, stopped_event):
+def test_selection_path_workers_pin_networkit(restore_thread_count, stopped_event):
     from pipelines.generate import (
         _generate_single_network,
         _generate_single_network_collecting_snapshots,

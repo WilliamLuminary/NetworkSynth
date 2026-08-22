@@ -10,7 +10,6 @@ pytestmark = pytest.mark.unit
 #: (module path, the per-dataset function main() calls)
 PIPELINES = [
     ("pipelines.generate", "run_for_dataset"),
-    ("pipelines.generate_select", "run_for_dataset"),
     ("pipelines.mosaic", "run_mosaic_for_dataset"),
     ("pipelines.scaling", "run_scaling_for_dataset"),
     ("pipelines.hybrid", "_run_dataset_in_subprocess"),
