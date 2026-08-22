@@ -33,12 +33,15 @@ def _classify(relative_path: str) -> str:
     # to tell them apart.
     if "snapshots" in parts:
         return "snapshots"
+    # Before the image and pickle checks, or the analyse mode's own outputs get
+    # filed as previews and networks — a spectrum plot is not a render of a
+    # network, and its data pickle is not a network to load.
+    if "analysis" in lowered:
+        return "analysis"
     if lowered.endswith(_IMAGE_SUFFIXES):
         return "previews"
     if lowered.endswith(".nkbin") or lowered.endswith(".pkl"):
         return "networks"
-    if "analysis" in lowered:
-        return "analysis"
     return "other"
 
 

@@ -38,6 +38,7 @@ class TestClassification:
             "sample_1/snapshots/step_00001.png",
             "sample_1/original/net.nkbin",
             "sample_1/analysis_data.pkl",
+            "sample_1/spectra_analysis_figure.webp",
         )
 
         buckets = collect_outputs(root)
@@ -47,6 +48,10 @@ class TestClassification:
         assert "sample_1/snapshots/step_00001.png" in buckets["snapshots"]
         assert "sample_1/synthetic/graph.webp" in buckets["previews"]
         assert "sample_1/original/net.nkbin" in buckets["networks"]
+        # An analysis output is neither a network to load nor a render of one.
+        assert "sample_1/analysis_data.pkl" in buckets["analysis"]
+        assert "sample_1/spectra_analysis_figure.webp" in buckets["analysis"]
+        assert "sample_1/analysis_data.pkl" not in buckets.get("networks", [])
 
     def test_paths_use_forward_slashes(self, tmp_path):
         _touch(str(tmp_path), "a/b/net_edgelist.csv")

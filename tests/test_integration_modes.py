@@ -91,41 +91,6 @@ class TestGenerateMode:
 
 
 # ------------------------------------------------------------------ #
-# From-props mode
-# ------------------------------------------------------------------ #
-
-
-class TestFromPropsMode:
-    def test_generate_from_properties(self, tmp_path):
-        from configs.attr_generate_mode.config_sample import SampleConfig
-
-        SampleConfig.SYNTHETIC_NETWORK_NUMBER = 1
-        SampleConfig.SYNTHETIC_GRAPH_NUMBER = 1
-        SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
-        SampleConfig.initialize()
-
-        from configs import SynthParams
-        from graphs import GraphGenerator
-        from handlers import RunAgent
-        from utils import trim_graph
-
-        agent = RunAgent(SampleConfig, attr_path=SampleConfig.ATTRIBUTES_DICT_DATA_PATH)
-        agent.prepare_data()
-
-        generator = GraphGenerator(
-            agent.attributes, SynthParams.from_config(SampleConfig)
-        )
-        synth = generator.generate_network()
-        synth = trim_graph(synth, agent.attributes.average_degree)
-
-        assert synth.number_of_nodes() > 50
-        logger.info(
-            f"From-props: {synth.number_of_nodes()} nodes, "
-            f"{synth.number_of_edges()} edges"
-        )
-
-
-# ------------------------------------------------------------------ #
 # Mosaic mode
 # ------------------------------------------------------------------ #
 

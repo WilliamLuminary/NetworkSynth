@@ -13,9 +13,42 @@ pytestmark = pytest.mark.unit
 _MODE_NAMES = set(gui_run._MODES)
 
 
+def _inputs_for(mode, tmp_path, shape_index=0):
+    """The paths one of *mode*'s input shapes needs, created so they exist."""
+    from gui import spec_builder
+
+    shape = spec_builder.MODES[mode].input_shapes[shape_index]
+    made = {}
+    for spec_input in shape.inputs:
+        target = tmp_path / spec_input.id
+        if spec_input.kind == "dir":
+            target.mkdir(exist_ok=True)
+            # A datasets directory is only valid with a pair in it.
+            if spec_input.id == "datasets_dir":
+                (target / "one_edgelist.csv").write_text(
+                    "source_index,target_index\n0,1\n"
+                )
+                (target / "one_positions.csv").write_text("x,y\n0,0\n1,1\n")
+        else:
+            target.write_text("x\n")
+        made[spec_input.id] = str(target)
+    return made
+
+
+def _every_shape():
+    """(mode, shape index) for every input shape the GUI offers."""
+    from gui import spec_builder
+
+    return [
+        (mode, index)
+        for mode in sorted(_MODE_NAMES)
+        for index in range(len(spec_builder.MODES[mode].input_shapes))
+    ]
+
+
 def _spec(tmp_path, **overrides):
     spec = {
-        "contract": 1,
+        "contract": 2,
         "mode": "generate",
         "run_name": "test_run",
         "output_dir": str(tmp_path / "out"),
@@ -95,15 +128,116 @@ class TestSpecIsValidated:
         with pytest.raises(SpecError, match="contract version"):
             GuiConfig.from_spec(_spec(tmp_path, contract=99))
 
+    def test_unknown_mode_is_rejected(self, tmp_path):
+        with pytest.raises(SpecError, match="unknown mode"):
+            GuiConfig.from_spec(_spec(tmp_path, mode="not_a_mode"))
+
+    def test_a_mode_reading_a_directory_needs_that_directory(self, tmp_path):
+        spec = json.loads(open(_spec(tmp_path, mode="analyze")).read())
+        spec["inputs"] = {"edge_list": "e.csv", "positions": "p.csv"}
+        path = tmp_path / "bad.json"
+        path.write_text(json.dumps(spec))
+
+        with pytest.raises(SpecError, match="fills none of its input sets"):
+            GuiConfig.from_spec(str(path))
+
+    def test_filling_two_input_sets_is_rejected(self, tmp_path):
+        datasets = tmp_path / "many"
+        datasets.mkdir()
+        spec = json.loads(open(_spec(tmp_path)).read())
+        spec["inputs"]["datasets_dir"] = str(datasets)
+        path = tmp_path / "both.json"
+        path.write_text(json.dumps(spec))
+
+        with pytest.raises(SpecError, match="matches more than one"):
+            GuiConfig.from_spec(str(path))
+
+    def test_a_directory_mode_gets_its_loader_wired(self, tmp_path):
+        results = tmp_path / "results"
+        results.mkdir()
+        config = GuiConfig.from_spec(
+            _spec(
+                tmp_path,
+                mode="analyze",
+                inputs={"networks_dir": str(results)},
+            )
+        )
+        config.initialize()
+
+        assert config.NETWORKS_DATA_PATH == str(results)
+        assert config.NETWORKS_FUNC is not None
+        assert config.OUTPUT_DENOTE == "gui_analyze"
+
     @pytest.mark.parametrize("key", ["edge_list", "positions"])
-    def test_missing_input_path(self, tmp_path, key):
+    def test_half_a_pair_is_not_an_input_set(self, tmp_path, key):
         spec = json.loads(open(_spec(tmp_path)).read())
         spec["inputs"][key] = None
         path = tmp_path / "bad.json"
         path.write_text(json.dumps(spec))
 
-        with pytest.raises(SpecError, match=f"inputs.{key} is required"):
+        with pytest.raises(SpecError, match="fills none of its input sets"):
             GuiConfig.from_spec(str(path))
+
+
+class TestDirectoryInput:
+
+    def _pair(self, directory, name):
+        (directory / f"{name}_edgelist.csv").write_text(
+            "source_index,target_index\n0,1\n"
+        )
+        (directory / f"{name}_positions.csv").write_text("x,y\n0,0\n1,1\n")
+
+    def test_every_pair_becomes_a_dataset(self, tmp_path):
+        from configs.gui_config import discover_datasets
+
+        for name in ("gamma", "alpha", "beta"):
+            self._pair(tmp_path, name)
+
+        # Sorted, so a run's dataset order does not depend on the filesystem.
+        assert discover_datasets(str(tmp_path)) == ["alpha", "beta", "gamma"]
+
+    def test_an_edge_list_without_positions_stops_the_run(self, tmp_path):
+        from configs.gui_config import discover_datasets
+
+        self._pair(tmp_path, "alpha")
+        (tmp_path / "beta_edgelist.csv").write_text("source_index,target_index\n0,1\n")
+
+        with pytest.raises(SpecError, match="has no positions file"):
+            discover_datasets(str(tmp_path))
+
+    def test_a_directory_with_no_pairs_is_rejected(self, tmp_path):
+        from configs.gui_config import discover_datasets
+
+        (tmp_path / "notes.txt").write_text("nothing to load here")
+
+        with pytest.raises(SpecError, match="no '\\*_edgelist.csv' file found"):
+            discover_datasets(str(tmp_path))
+
+    def test_the_datasets_reach_the_config(self, tmp_path):
+        datasets = tmp_path / "many"
+        datasets.mkdir()
+        self._pair(datasets, "alpha")
+        self._pair(datasets, "beta")
+
+        config = GuiConfig.from_spec(
+            _spec(tmp_path, inputs={"datasets_dir": str(datasets)})
+        )
+
+        assert [str(d) for d in config.DATASETS] == ["alpha", "beta"]
+
+    def test_each_dataset_resolves_its_own_files(self, tmp_path):
+        datasets = tmp_path / "many"
+        datasets.mkdir()
+        self._pair(datasets, "alpha")
+        self._pair(datasets, "beta")
+
+        config = GuiConfig.from_spec(
+            _spec(tmp_path, inputs={"datasets_dir": str(datasets)})
+        )
+        edge_list, positions = config._network_paths(config.DATASETS[1])
+
+        assert edge_list.endswith("beta_edgelist.csv")
+        assert positions.endswith("beta_positions.csv")
 
 
 class TestEntryPointExitCodes:
@@ -162,7 +296,7 @@ class TestFullRun:
         save_network_csv(load_unweighted_test_synth_graph, str(tmp_path / "net.csv"))
 
         spec = {
-            "contract": 1,
+            "contract": 2,
             "mode": "generate",
             "run_name": "sample",
             "output_dir": str(tmp_path / "out"),
@@ -202,6 +336,115 @@ class TestFullRun:
         assert (root / "run.jsonl").exists(), "log must be inside the output dir"
 
 
+@pytest.mark.integration
+@pytest.mark.requires_fixture_data
+class TestDirectoryFullRun:
+    def test_one_run_produces_one_output_per_dataset(
+        self, tmp_path, load_unweighted_test_synth_graph
+    ):
+        from configs.file_definitions import save_network_csv
+
+        datasets = tmp_path / "inputs"
+        datasets.mkdir()
+        for name in ("alpha", "beta"):
+            save_network_csv(
+                load_unweighted_test_synth_graph, str(datasets / f"{name}.csv")
+            )
+
+        spec = {
+            "contract": 2,
+            "mode": "generate",
+            "run_name": "unused",
+            "output_dir": str(tmp_path / "out"),
+            "inputs": {"datasets_dir": str(datasets)},
+            "params": {
+                "FRAME_SIZE": [512, 512],
+                "SYNTHETIC_FRAME_SIZE": [512, 512],
+                "IMAGE_SIZE": [512, 512],
+                "CLOSED_NODES_FACTOR": 1.2,
+                "CLOSED_EDGES_FACTOR": 0.8,
+                "SYNTHETIC_NETWORK_NUMBER": 1,
+                "SYNTHETIC_GRAPH_NUMBER": 0,
+                "MAX_ATTEMPTS": 2,
+                "ERROR_CHECKER": "none",
+                "MEASURE_WEIGHTED": False,
+                "SEED": 13,
+            },
+        }
+        spec_path = tmp_path / "spec.json"
+        spec_path.write_text(json.dumps(spec))
+
+        assert gui_run.main(["gui_run.py", str(spec_path)]) == 0
+
+        out = tmp_path / "out"
+        roots = [d for d in os.listdir(out) if d.startswith("gui_generate_results_")]
+        assert len(roots) == 1, f"a directory is one run, got {roots}"
+        root = out / roots[0]
+
+        # One subdirectory per dataset, one manifest covering all of them.
+        assert sorted(d for d in os.listdir(root) if (root / d).is_dir()) == [
+            "alpha",
+            "beta",
+        ]
+        manifest = json.loads((root / "manifest.json").read_text())
+        assert manifest["status"] == "ok"
+        produced = manifest["outputs"]["edge_lists"]
+        assert any(p.startswith("alpha/") for p in produced), produced
+        assert any(p.startswith("beta/") for p in produced), produced
+
+
+@pytest.mark.integration
+class TestAnalyzeFullRun:
+    def test_a_results_directory_in_analysis_out(self, tmp_path):
+        """The mode has to work on a directory this codebase actually writes."""
+        import networkit as nk
+        import numpy as np
+
+        from configs.file_definitions import save_network_csv
+        from graphs.synth_graph import SynthGraph
+
+        side, spacing = 8, 10.0
+        graph = nk.Graph(side * side, weighted=False)
+        for y in range(side):
+            for x in range(side):
+                here = y * side + x
+                if x + 1 < side:
+                    graph.addEdge(here, here + 1)
+                if y + 1 < side:
+                    graph.addEdge(here, here + side)
+        positions = np.array(
+            [(x * spacing, y * spacing) for y in range(side) for x in range(side)],
+            dtype=float,
+        )
+        lattice = SynthGraph(graph, positions)
+
+        results = tmp_path / "results" / "dataset"
+        for kind in ("original", "synthetic"):
+            (results / kind).mkdir(parents=True)
+            save_network_csv(lattice, str(results / kind / f"{kind}_network.csv"))
+
+        spec = {
+            "contract": 2,
+            "mode": "analyze",
+            "run_name": "analysed",
+            "output_dir": str(tmp_path / "out"),
+            "inputs": {"networks_dir": str(tmp_path / "results")},
+            "params": {"MEASURE_WEIGHTED": False, "FULL_Q_BAND": False},
+        }
+        spec_path = tmp_path / "spec.json"
+        spec_path.write_text(json.dumps(spec))
+
+        assert gui_run.main(["gui_run.py", str(spec_path)]) == 0
+
+        out = tmp_path / "out"
+        roots = [d for d in os.listdir(out) if d.startswith("gui_analyze_results_")]
+        assert len(roots) == 1, f"expected one run dir, got {roots}"
+
+        manifest = json.loads((out / roots[0] / "manifest.json").read_text())
+        assert manifest["status"] == "ok"
+        assert manifest["outputs"].get("analysis"), manifest["outputs"]
+
+
 class TestModeSelection:
 
     def test_offered_modes_match_dispatchable_modes(self):
@@ -209,26 +452,57 @@ class TestModeSelection:
 
         assert set(MODES) == set(gui_run._MODES)
 
+    def test_the_form_asks_for_what_the_spec_requires(self):
+        from configs.gui_config import MODE_INPUTS
+        from gui.spec_builder import MODES
+
+        offered = {
+            name: tuple(shape.ids for shape in mode.input_shapes)
+            for name, mode in MODES.items()
+        }
+        required = {name: MODE_INPUTS[name] for name in MODES}
+
+        assert offered == required
+
     @pytest.mark.parametrize("mode", sorted(_MODE_NAMES))
     def test_every_mode_builds_a_valid_spec(self, mode, tmp_path):
         from gui import spec_builder
 
-        edge_list = tmp_path / "e.csv"
-        positions = tmp_path / "p.csv"
-        edge_list.write_text("source_index,target_index\n0,1\n")
-        positions.write_text("x,y\n0,0\n1,1\n")
-
+        inputs = _inputs_for(mode, tmp_path)
         values = spec_builder.default_values(mode)
-        problems = spec_builder.validate(
-            mode, str(edge_list), str(positions), str(tmp_path), values
-        )
+        problems = spec_builder.validate(mode, inputs, str(tmp_path), values)
         assert not problems, problems
 
-        spec = spec_builder.build_spec(
-            mode, str(edge_list), str(positions), str(tmp_path), values
-        )
+        spec = spec_builder.build_spec(mode, inputs, str(tmp_path), values)
         assert spec["mode"] == mode
         assert json.loads(json.dumps(spec)), "spec must survive JSON"
+
+    @pytest.mark.parametrize("mode", sorted(_MODE_NAMES))
+    def test_every_mode_rejects_a_missing_input(self, mode, tmp_path):
+        from gui import spec_builder
+
+        blank = {key: "" for key in spec_builder.default_inputs(mode)}
+
+        problems = spec_builder.validate(
+            mode, blank, str(tmp_path), spec_builder.default_values(mode)
+        )
+
+        assert problems, f"{mode} accepted an empty input set"
+
+    @pytest.mark.parametrize("mode", sorted(_MODE_NAMES))
+    def test_every_mode_spec_loads_back_into_a_config(self, mode, tmp_path):
+        from gui import spec_builder
+
+        inputs = _inputs_for(mode, tmp_path)
+        values = spec_builder.default_values(mode)
+        spec_path = tmp_path / "spec.json"
+        spec_path.write_text(
+            json.dumps(spec_builder.build_spec(mode, inputs, str(tmp_path), values))
+        )
+
+        config = GuiConfig.from_spec(str(spec_path))
+
+        assert config.MODE == mode
 
     #: Attributes each mode's pipeline reads that BaseConfig does not define.
     _MODE_EXTRAS = {
@@ -250,7 +524,9 @@ class TestModeSelection:
         required = self._MODE_EXTRAS[mode]
 
         values = spec_builder.default_values(mode)
-        spec = spec_builder.build_spec(mode, "e.csv", "p.csv", str(tmp_path), values)
+        spec = spec_builder.build_spec(
+            mode, _inputs_for(mode, tmp_path), str(tmp_path), values
+        )
         spec_path = tmp_path / "spec.json"
         spec_path.write_text(json.dumps(spec))
 
@@ -264,7 +540,7 @@ class TestModeSelection:
 
         values = spec_builder.default_values("hybrid")
         spec = spec_builder.build_spec(
-            "hybrid", "e.csv", "p.csv", str(tmp_path), values
+            "hybrid", _inputs_for("hybrid", tmp_path), str(tmp_path), values
         )
         spec_path = tmp_path / "spec.json"
         spec_path.write_text(json.dumps(spec))

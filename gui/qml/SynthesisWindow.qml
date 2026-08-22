@@ -38,22 +38,35 @@ ApplicationWindow {
         }
     }
 
+    // One dialog pair reused by every input row: which one opens, and which
+    // input receives the answer, is decided when Browse is clicked.
+    property string pendingInput: ""
+
     FileDialog {
-        id: edgeDialog
-        title: "Select edge-list CSV"
-        nameFilters: ["CSV files (*.csv)", "All files (*)"]
-        onAccepted: controller.setEdgeList(selectedFile)
+        id: fileDialog
+        onAccepted: controller.setInput(root.pendingInput, selectedFile)
     }
-    FileDialog {
-        id: positionsDialog
-        title: "Select positions CSV"
-        nameFilters: ["CSV files (*.csv)", "All files (*)"]
-        onAccepted: controller.setPositions(selectedFile)
+    FolderDialog {
+        id: dirDialog
+        onAccepted: controller.setInput(root.pendingInput, selectedFolder)
     }
     FolderDialog {
         id: outputDialog
         title: "Select output directory"
         onAccepted: controller.setOutputDir(selectedFolder)
+    }
+
+    function browseFor(spec) {
+        root.pendingInput = spec.id
+        if (spec.kind === "dir") {
+            dirDialog.title = "Select " + spec.label.toLowerCase()
+            dirDialog.open()
+        } else {
+            fileDialog.title = "Select " + spec.label.toLowerCase()
+            fileDialog.nameFilters = spec.filter
+                ? [spec.filter, "All files (*)"] : ["All files (*)"]
+            fileDialog.open()
+        }
     }
 
     ScrollView {
@@ -68,36 +81,64 @@ ApplicationWindow {
             GroupBox {
                 title: "Input"
                 Layout.fillWidth: true
-                GridLayout {
-                    columns: 3
+                ColumnLayout {
                     anchors.fill: parent
-                    columnSpacing: 8
+                    spacing: 6
 
-                    Label { text: "Edge list" }
-                    TextField {
+                    // Only where the mode offers a choice: analysis reads a
+                    // results directory and nothing else.
+                    RowLayout {
                         Layout.fillWidth: true
-                        text: controller.edgeList
-                        placeholderText: "…_edgelist.csv"
-                        onEditingFinished: controller.setEdgeList(text)
-                    }
-                    Button { text: "Browse…"; onClicked: edgeDialog.open() }
+                        spacing: 8
+                        visible: controller.inputShapes.length > 1
 
-                    Label { text: "Positions" }
-                    TextField {
-                        Layout.fillWidth: true
-                        text: controller.positions
-                        placeholderText: "…_positions.csv"
-                        onEditingFinished: controller.setPositions(text)
+                        Label { text: "Input"; Layout.preferredWidth: 90 }
+                        ComboBox {
+                            id: shapeBox
+                            Layout.fillWidth: true
+                            model: controller.inputShapes
+                            currentIndex: controller.inputShape
+                            onActivated: controller.selectInputShape(currentIndex)
+                            enabled: !controller.running
+                        }
                     }
-                    Button { text: "Browse…"; onClicked: positionsDialog.open() }
 
-                    Label { text: "Output dir" }
-                    TextField {
-                        Layout.fillWidth: true
-                        text: controller.outputDir
-                        onEditingFinished: controller.setOutputDir(text)
+                    Repeater {
+                        model: controller.inputs
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+
+                            Label {
+                                text: modelData.label
+                                Layout.preferredWidth: 90
+                            }
+                            TextField {
+                                Layout.fillWidth: true
+                                text: modelData.value
+                                placeholderText: modelData.placeholder
+                                onEditingFinished: controller.setInput(modelData.id, text)
+                            }
+                            Button {
+                                text: "Browse…"
+                                onClicked: root.browseFor(modelData)
+                            }
+                        }
                     }
-                    Button { text: "Browse…"; onClicked: outputDialog.open() }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        Label { text: "Output dir"; Layout.preferredWidth: 90 }
+                        TextField {
+                            Layout.fillWidth: true
+                            text: controller.outputDir
+                            onEditingFinished: controller.setOutputDir(text)
+                        }
+                        Button { text: "Browse…"; onClicked: outputDialog.open() }
+                    }
                 }
             }
 
@@ -153,6 +194,7 @@ ApplicationWindow {
 
                             RowLayout {
                                 visible: modelData.kind === "size"
+                                    || modelData.kind === "range"
                                 Layout.fillWidth: true
                                 TextField {
                                     Layout.preferredWidth: 90
@@ -160,19 +202,23 @@ ApplicationWindow {
                                     // evaluate, so guard the indexing: on a
                                     // scalar field this would be undefined.
                                     text: modelData.kind === "size"
+                                        || modelData.kind === "range"
                                         ? controller.valueOf(modelData.id)[0] : ""
-                                    validator: IntValidator { bottom: 1 }
+                                    validator: DoubleValidator { bottom: 0 }
                                     onEditingFinished: controller.setSize(modelData.id, 0, text)
                                 }
-                                Label { text: "×" }
+                                Label {
+                                    text: modelData.kind === "range" ? "→" : "×"
+                                }
                                 TextField {
                                     Layout.preferredWidth: 90
                                     // Bindings of invisible siblings still
                                     // evaluate, so guard the indexing: on a
                                     // scalar field this would be undefined.
                                     text: modelData.kind === "size"
+                                        || modelData.kind === "range"
                                         ? controller.valueOf(modelData.id)[1] : ""
-                                    validator: IntValidator { bottom: 1 }
+                                    validator: DoubleValidator { bottom: 0 }
                                     onEditingFinished: controller.setSize(modelData.id, 1, text)
                                 }
                                 Item { Layout.fillWidth: true }

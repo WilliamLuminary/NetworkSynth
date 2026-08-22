@@ -17,6 +17,8 @@ EXIT_INTERRUPTED = 130
 _MODES = {
     "generate": "pipelines.generate",
     "hybrid": "pipelines.hybrid",
+    "sweep": "pipelines.sweep",
+    "analyze": "pipelines.analyze",
 }
 
 

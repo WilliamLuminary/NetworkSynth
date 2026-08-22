@@ -13,7 +13,29 @@ PIPELINES = [
     ("pipelines.mosaic", "run_mosaic_for_dataset"),
     ("pipelines.scaling", "run_scaling_for_dataset"),
     ("pipelines.hybrid", "_run_dataset_in_subprocess"),
+    ("pipelines.sweep", "run_for_dataset"),
+    ("pipelines.analyze", "run_for_container"),
 ]
+
+
+class _NoWandb:
+    """Stands in for the wandb module so a sweep never reaches the network."""
+
+    def login(self, *args, **kwargs):
+        return True
+
+
+def _prepare(module, runner, replacement, monkeypatch):
+    """Patch the per-dataset call, plus whatever else main() would reach.
+
+    A sweep would otherwise try to authenticate, and analyse would find no
+    result directories to work through.
+    """
+    monkeypatch.setattr(module, runner, replacement)
+    if hasattr(module, "wandb"):
+        monkeypatch.setattr(module, "wandb", _NoWandb())
+    if hasattr(module, "find_pkl_containers"):
+        monkeypatch.setattr(module, "find_pkl_containers", lambda *a, **k: {"": "in"})
 
 
 def _config(tmp_path, name):
@@ -22,6 +44,7 @@ def _config(tmp_path, name):
     class Config(BaseConfig):
         BASE_OUTPUT_PATH = str(tmp_path / f"out_{name}")
         DATASETS = [DatasetId("ds")]
+        SYNTHETIC_NETWORK_NUMBER = 1  # a sweep refuses to run without any
 
     return Config
 
@@ -40,7 +63,7 @@ def test_a_completed_run_writes_a_manifest(module_path, runner, tmp_path, monkey
     import importlib
 
     module = importlib.import_module(module_path)
-    monkeypatch.setattr(module, runner, lambda *a, **k: None)
+    _prepare(module, runner, lambda *a, **k: None, monkeypatch)
 
     module.main(config_cls=_config(tmp_path, module_path))
 
@@ -58,7 +81,7 @@ def test_a_failed_run_writes_a_manifest_saying_so(
     def explode(*args, **kwargs):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(module, runner, explode)
+    _prepare(module, runner, explode, monkeypatch)
 
     with pytest.raises(RuntimeError):
         module.main(config_cls=_config(tmp_path, module_path))
@@ -79,7 +102,7 @@ def test_a_cancelled_run_is_distinct_from_a_failed_one(
     def interrupt(*args, **kwargs):
         raise KeyboardInterrupt
 
-    monkeypatch.setattr(module, runner, interrupt)
+    _prepare(module, runner, interrupt, monkeypatch)
 
     with pytest.raises(KeyboardInterrupt):
         module.main(config_cls=_config(tmp_path, module_path))

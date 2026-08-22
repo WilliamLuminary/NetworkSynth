@@ -89,4 +89,3 @@ class AnalysisMode(Enum):
 class Mode(Enum):
     GEN = "generate_from_original_network"
     ANA = "multifractal_analyze"
-    ATR = "generate_from_attributes"

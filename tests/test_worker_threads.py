@@ -79,21 +79,10 @@ def test_selection_path_workers_pin_networkit(restore_thread_count, stopped_even
     assert nk.getMaxNumberOfThreads() == 1
 
 
-def test_generate_from_props_worker_pins_networkit(restore_thread_count, stopped_event):
-    from pipelines.generate_from_props import generate_synthetic_network
-
-    nk.setNumberOfThreads(4)
-
-    generate_synthetic_network(stopped_event, None, _params())
-
-    assert nk.getMaxNumberOfThreads() == 1
-
-
 def test_every_pool_worker_is_covered_here():
     import inspect
 
     import pipelines.generate as gen
-    import pipelines.generate_from_props as props
     import pipelines.hybrid as hyb
     import pipelines.mosaic as mos
     import pipelines.sweep as swp
@@ -102,7 +91,6 @@ def test_every_pool_worker_is_covered_here():
         gen.generate_synthetic_network,
         gen._generate_single_network,
         gen._generate_single_network_collecting_snapshots,
-        props.generate_synthetic_network,
         hyb._generate_tile_worker,
         mos.generate_single_tile,
         swp._generate_with_factors,

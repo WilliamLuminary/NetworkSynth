@@ -15,7 +15,15 @@ from configs import DatasetId, SynthParams
 from configs.base_config import tagged
 from graphs import GraphGenerator
 from graphs._graph_node import GraphNode
-from handlers import RunAgent, attach_run_log, create_run_paths
+from handlers import (
+    STATUS_CANCELLED,
+    STATUS_FAILED,
+    STATUS_OK,
+    RunAgent,
+    attach_run_log,
+    create_run_paths,
+    write_manifest,
+)
 from pipelines.generate import compute_average_error
 from utils import apply_seed, build_graph, spawn_context, trim_graph
 
@@ -202,30 +210,51 @@ def run_for_dataset(
     wandb.agent(sweep_id, function=trial)
 
 
-def main(nf_range=None, ef_range=None):
-    cfg = _init_config()
+def main(config_cls=None, nf_range=None, ef_range=None):
+    # A GUI run brings its own config, already carrying the trial count and the
+    # ranges from the run-spec; the CLI builds the sweep config here.
+    cfg = _init_config() if config_cls is None else config_cls
+    if config_cls is not None:
+        cfg.initialize()
 
-    # CLI argument wins, then the config's range, then the module default.
+    # Caller argument wins, then the config's range, then the module default.
     nf_lo, nf_hi = nf_range or getattr(cfg, "NF_RANGE", DEFAULT_NF_RANGE)
     ef_lo, ef_hi = ef_range or getattr(cfg, "EF_RANGE", DEFAULT_EF_RANGE)
     node_factors = _build_factors(nf_lo, nf_hi)
     edge_factors = _build_factors(ef_lo, ef_hi)
 
-    assert (
-        cfg.SYNTHETIC_NETWORK_NUMBER != 0
-    ), "Sweeping experiments require synthetic networks."
-
-    wandb.login()
+    run_paths = create_run_paths(cfg)
+    attach_run_log(run_paths.root, cfg.RUN_ID)
+    status, error = STATUS_OK, None
     try:
-        run_paths = create_run_paths(cfg)
-        attach_run_log(run_paths.root, cfg.RUN_ID)
+        assert (
+            cfg.SYNTHETIC_NETWORK_NUMBER != 0
+        ), "Sweeping experiments require synthetic networks."
+        # Inside the try: a missing API key is the most likely way a sweep
+        # fails, and a caller reading the manifest should see that as the
+        # reason rather than as a run that never started.
+        #
+        # WANDB_API_KEY is what wandb reads; WANDB_KEY is where this project's
+        # environment keeps it.  Both are named because a GUI run inherits the
+        # desktop environment, and failing on a key the machine already has is
+        # the least useful way to end a sweep.  With neither set, `key=None`
+        # behaves exactly like a bare login() and reports that.
+        wandb.login(key=os.environ.get("WANDB_API_KEY") or os.environ.get("WANDB_KEY"))
         for dataset_id in cfg.get_datasets():
             run_for_dataset(dataset_id, node_factors, edge_factors, cfg, run_paths)
     except KeyboardInterrupt:
+        status = STATUS_CANCELLED
         logger.critical("MAIN PROCESS: Forcing immediate shutdown!")
         # Re-raised so the entry point can exit non-zero: a cancelled
         # run must not look like a completed one to a caller.
         raise
+    except Exception as exc:
+        status = STATUS_FAILED
+        error = f"{type(exc).__name__}: {exc}"
+        raise
+    finally:
+        if not cfg.DISABLE_SAVING:
+            write_manifest(run_paths, status=status, error=error)
 
 
 if __name__ == "__main__":

@@ -1,14 +1,12 @@
 import os
 import pickle
-from dataclasses import asdict
 
 import networkit as nk
 import numpy as np
 import pytest
 
-from configs import BaseConfig
+from configs import BaseConfig, DatasetId
 from graphs.synth_graph import SynthGraph
-from handlers.attributes_calculator import AttributesCalculator
 
 pytestmark = pytest.mark.unit
 
@@ -28,60 +26,6 @@ def _small_graph(side=8, spacing=10.0, seed=3):
             if y + 1 < side:
                 graph.addEdge(here, here + side)
     return SynthGraph(graph, positions)
-
-
-# ---------------------------------------------------------------------------
-# generate_from_props — generates from an attributes dict, with no source graph
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def attr_dir(tmp_path):
-    attributes = AttributesCalculator().analyze(_small_graph())
-    directory = tmp_path / "attrs"
-    directory.mkdir()
-    with open(directory / "original_property.pkl", "wb") as handle:
-        pickle.dump(asdict(attributes), handle)
-    return directory
-
-
-class TestGenerateFromProps:
-    def test_generates_a_network_from_an_attributes_dict(self, attr_dir, tmp_path):
-        from configs.attr_generate_mode.config_sample import SampleConfig
-        from pipelines.generate_from_props import run
-
-        class TinyConfig(SampleConfig):
-            ATTRIBUTES_DICT_DATA_PATH = str(attr_dir)
-            BASE_OUTPUT_PATH = str(tmp_path / "out")
-            # GraphGenerator hard-requires more than 100 nodes, so the frame
-            # cannot shrink below roughly this without every attempt failing.
-            FRAME_SIZE = (200, 200)
-            SYNTHETIC_FRAME_SIZE = (200, 200)
-            IMAGE_SIZE = (200, 200)
-            SYNTHETIC_NETWORK_NUMBER = 1
-            SYNTHETIC_GRAPH_NUMBER = 0
-            MAX_ATTEMPTS = 5
-            ERROR_CHECKER = "none"
-            MEASURE_WEIGHTED = False
-            SEED = 5
-
-        TinyConfig.initialize()
-        run(TinyConfig)
-
-        # Attr mode hands the *input* directory to RunAgent as its output dir,
-        # so results land beside the attributes rather than under BASE_OUTPUT_PATH.
-        produced = list(attr_dir.rglob("*.csv"))
-        assert (
-            produced
-        ), f"no output written; attr dir holds {list(attr_dir.rglob('*'))}"
-
-    def test_the_loader_finds_the_property_pickle(self, attr_dir):
-        from configs.attr_generate_mode.config_sample import SampleConfig
-
-        loaded = SampleConfig._load_attr_dict(str(attr_dir))
-
-        assert loaded, "attributes dict came back empty"
-        assert "average_degree" in loaded
 
 
 # ---------------------------------------------------------------------------
@@ -122,6 +66,45 @@ class TestAnalyzeDiscovery:
         assert find_pkl_containers(str(tmp_path)) == {}
 
 
+class TestAnalyzeReadsEveryFormatWeWrite:
+    def test_reads_a_csv_pair_when_nothing_is_pickled(self, tmp_path):
+        from configs.analyze_mode.config_sample import _load_networks
+        from configs.file_definitions import save_network_csv
+
+        folder = tmp_path / "original"
+        folder.mkdir()
+        save_network_csv(_small_graph(), str(folder / "original_network.csv"))
+
+        loaded = _load_networks(str(folder))
+
+        assert len(loaded) == 1
+        assert loaded[0].number_of_nodes() == 64
+
+    def test_a_pickle_wins_over_the_csv_pair(self, tmp_path):
+        from configs.analyze_mode.config_sample import _load_networks
+        from configs.file_definitions import save_network_csv
+
+        folder = tmp_path / "synthetic"
+        folder.mkdir()
+        save_network_csv(_small_graph(), str(folder / "synthetic_network.csv"))
+        with open(folder / "synthetic_network.pkl", "wb") as handle:
+            pickle.dump([_small_graph(), _small_graph(seed=9)], handle)
+
+        # Both formats hold the same run; counting them twice would inflate
+        # every statistic the analysis reports.
+        assert len(_load_networks(str(folder))) == 2
+
+    def test_an_edge_list_without_its_positions_stops_the_run(self, tmp_path):
+        from configs.analyze_mode.config_sample import _load_networks
+
+        folder = tmp_path / "original"
+        folder.mkdir()
+        (folder / "orphan_edgelist.csv").write_text("source_index,target_index\n0,1\n")
+
+        with pytest.raises(AssertionError, match="no positions file"):
+            _load_networks(str(folder))
+
+
 class TestAnalyzeLoadsWhatItFinds:
     def test_run_agent_loads_the_discovered_networks(self, tmp_path):
         from configs.analyze_mode.config_sample import SampleConfig
@@ -141,7 +124,14 @@ class TestAnalyzeLoadsWhatItFinds:
             FULL_Q_BAND = False
 
         TinyConfig.initialize()
-        agent = RunAgent(TinyConfig, networks_path=str(container))
+        from handlers import create_run_paths
+
+        agent = RunAgent(
+            TinyConfig,
+            networks_path=str(container),
+            run_paths=create_run_paths(TinyConfig),
+            dataset_id=DatasetId("dataset"),
+        )
         agent.prepare_data()
 
         assert agent.batch_processor is not None

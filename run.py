@@ -35,12 +35,6 @@ class CLI:
 
         main(config_cls=config_cls)
 
-    def from_props(self):
-        """Generate from pre-computed structural attributes."""
-        from pipelines.generate_from_props import main
-
-        main()
-
     def mosaic(self):
         """Mosaic: parallel tiles + stitch."""
         from pipelines.mosaic import main

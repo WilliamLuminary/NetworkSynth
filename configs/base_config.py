@@ -101,7 +101,6 @@ class BaseConfig:
     BASE_INPUT_PATH = os.path.join(BASE_DATA_PATH, "input")
 
     NETWORKS_DATA_PATH = None
-    ATTRIBUTES_DICT_DATA_PATH = None
 
     MAX_ATTEMPTS = 10
     ERROR_CHECKER: str = (
@@ -131,7 +130,6 @@ class BaseConfig:
     BASE_OUTPUT_PATH = os.path.join(BASE_DATA_PATH, "output")
     ORIGINAL_NETWORK_FUNC = ORIGINAL_IMAGE_FUNC = load_idle
     NETWORKS_FUNC = load_idle
-    ATTRIBUTES_DICT_FUNC = load_idle
 
     MAX_WORKERS: int = 50
 

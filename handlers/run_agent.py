@@ -24,14 +24,14 @@ class RunAgent:
         run_paths=None,
         dataset_id: Optional[DatasetId] = None,
         networks_path: Optional[str] = None,
-        attr_path: Optional[str] = None,
     ):
         """*config* is the active config class; it is threaded down into the
         DataLoader and Saver rather than read from the global namespace.
 
         *run_paths* is a :class:`~handlers.run_paths.RunPaths` value saying
-        where this run writes.  Required in GEN mode; the analysis and
-        attribute modes are handed an existing directory instead.
+        where this run writes, and *dataset_id* names the subdirectory within
+        it.  Both modes need them: analysis reads *networks_path* but writes its
+        results into this run's own directory, like every other mode.
         """
         self._config = config
         if config.DISABLE_SAVING:
@@ -40,9 +40,11 @@ class RunAgent:
                 f"{config.DISABLE_SAVING_NOTE}"
             )
         if networks_path:
+            assert run_paths is not None, "ANA mode requires run_paths"
+            assert dataset_id is not None, "ANA mode requires dataset_id"
             self.mode = Mode.ANA
             self.data_loader = DataLoader(Mode.ANA, config, path=networks_path)
-            self.saver = self._build_saver(config, networks_path)
+            self.saver = self._build_saver(config, run_paths.for_dataset(dataset_id))
             self.batch_processor = None
         elif dataset_id is not None:
             assert run_paths is not None, "GEN mode requires run_paths"
@@ -52,17 +54,8 @@ class RunAgent:
             self.attributes = None
             self.mapper = None
             self.batch_processor = None
-        elif attr_path:
-            self.mode = Mode.ATR
-            self.data_loader = DataLoader(Mode.ATR, config, path=attr_path)
-            self.saver = self._build_saver(config, attr_path)
-            self.attributes = None
-            self.mapper = None
-            self.batch_processor = None
         else:
-            raise ValueError(
-                "Invalid arguments: provide dataset_id, " "networks_path, or attr_path"
-            )
+            raise ValueError("Invalid arguments: provide dataset_id or networks_path")
 
     @staticmethod
     def _build_saver(config, out_dir: str) -> Optional[Saver]:
@@ -100,12 +93,6 @@ class RunAgent:
                 measure_weighted=self._config.MEASURE_WEIGHTED,
                 full_q_band=self._config.FULL_Q_BAND,
             )
-
-        elif self.mode == Mode.ATR:
-            self.data_loader.load()
-            from .attributes_calculator import AttributesCalculator
-
-            self.attributes = AttributesCalculator(**self.data_loader.get_attr_dict())
 
     def multifractal_analysis_in_generate_mode(self):
         assert self.mode == Mode.GEN, "This method is only available in Generate mode."

@@ -13,7 +13,27 @@ logger = logging.getLogger(__name__)
 
 #: Bumped when the spec shape changes incompatibly.  A spec declaring a
 #: different version is rejected rather than half-understood.
-SPEC_CONTRACT_VERSION = 1
+SPEC_CONTRACT_VERSION = 2
+
+#: The input shapes each mode accepts, in order — a mode does not read one
+#: fixed thing: generation takes either a single network or a directory of them,
+#: analysis takes a directory of finished results.  A spec must satisfy one
+#: shape completely; a mode absent from here is rejected, because the
+#: alternative is a spec that looks valid until a loader is handed nothing.
+_PAIR_OR_DIRECTORY = (("edge_list", "positions"), ("datasets_dir",))
+MODE_INPUTS = {
+    "generate": _PAIR_OR_DIRECTORY,
+    "hybrid": _PAIR_OR_DIRECTORY,
+    "sweep": _PAIR_OR_DIRECTORY,
+    "analyze": (("networks_dir",),),
+}
+
+#: The naming convention a dataset directory follows.  It is not a new
+#: convention: it is what every mode already writes, so our own output re-enters
+#: as input with no conversion.
+_EDGE_SUFFIX = "_edgelist.csv"
+_POSITIONS_SUFFIX = "_positions.csv"
+_IMAGE_SUFFIX = "_image.tif"
 
 #: Params given as JSON arrays that the pipelines expect as tuples.
 _TUPLE_PARAMS = frozenset(
@@ -23,6 +43,8 @@ _TUPLE_PARAMS = frozenset(
         "SYNTHETIC_FRAME_SIZE",
         "TILE_FRAME_SIZE",
         "TARGET_SCALE",
+        "NF_RANGE",
+        "EF_RANGE",
     }
 )
 
@@ -71,6 +93,34 @@ def _reduce_spec_config(cls):
 copyreg.pickle(_SpecConfigMeta, _reduce_spec_config)
 
 
+def discover_datasets(directory: str) -> list:
+    """Every dataset in *directory*, by the convention above, sorted by name.
+
+    An edge list with no positions file beside it stops the run and names the
+    orphan: a directory silently processed minus one dataset is a wrong answer,
+    not a smaller one.
+    """
+    if not os.path.isdir(directory):
+        raise SpecError(f"not a directory: {directory}")
+
+    names = []
+    for entry in sorted(os.listdir(directory)):
+        if not entry.endswith(_EDGE_SUFFIX):
+            continue
+        name = entry[: -len(_EDGE_SUFFIX)]
+        partner = os.path.join(directory, f"{name}{_POSITIONS_SUFFIX}")
+        if not os.path.exists(partner):
+            raise SpecError(
+                f"{os.path.join(directory, entry)} has no positions file "
+                f"beside it ({partner})"
+            )
+        names.append(name)
+
+    if not names:
+        raise SpecError(f"no '*{_EDGE_SUFFIX}' file found in {directory}")
+    return names
+
+
 class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
 
     MODE: str = ""
@@ -98,18 +148,46 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
                 f"understands {SPEC_CONTRACT_VERSION}"
             )
 
+        mode = spec["mode"]
+        if mode not in MODE_INPUTS:
+            raise SpecError(
+                f"{spec_path}: unknown mode {mode!r}; "
+                f"this build understands: {sorted(MODE_INPUTS)}"
+            )
+
         inputs = spec["inputs"]
-        for key in ("edge_list", "positions"):
-            if not inputs.get(key):
-                raise SpecError(f"{spec_path}: inputs.{key} is required")
+        satisfied = [
+            shape
+            for shape in MODE_INPUTS[mode]
+            if all(inputs.get(key) for key in shape)
+        ]
+        if len(satisfied) != 1:
+            shapes = " or ".join(
+                "{" + ", ".join(shape) + "}" for shape in MODE_INPUTS[mode]
+            )
+            # Two satisfied shapes is as wrong as none: it does not say which
+            # input the run should read, and picking one silently would make a
+            # caller's mistake look like a working run.
+            problem = "matches more than one of" if satisfied else "fills none of"
+            raise SpecError(
+                f"{spec_path}: mode {mode!r} {problem} its input sets: {shapes}"
+            )
 
         # type(cls), not type: the subclass must keep the metaclass that makes
         # it picklable.
         config = type(cls)("GuiRunConfig", (cls,), {"SPEC_PATH": spec_path})
-        config.MODE = spec["mode"]
+        config.MODE = mode
         config.PATHS = inputs
         config.BASE_OUTPUT_PATH = spec["output_dir"]
-        config.DATASETS = [DatasetId(spec.get("run_name", "gui_run"))]
+        # A directory becomes one dataset per network in it, so a single run
+        # produces N outputs in N subdirectories — which RunPaths and the
+        # manifest already model.
+        if inputs.get("datasets_dir"):
+            config.DATASETS = [
+                DatasetId(name) for name in discover_datasets(inputs["datasets_dir"])
+            ]
+        else:
+            config.DATASETS = [DatasetId(spec.get("run_name", "gui_run"))]
 
         for key, value in spec["params"].items():
             if key in _TUPLE_PARAMS and isinstance(value, list):
@@ -131,16 +209,41 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
         cls.OUTPUT_DENOTE = f"gui_{cls.MODE}"
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
+        if cls.MODE == "analyze":
+            # Reuses the analyze mode's own loader rather than a second copy:
+            # what counts as a result directory is that mode's business.
+            from .analyze_mode.config_sample import SampleConfig as _Ana
+
+            cls.NETWORKS_DATA_PATH = cls.PATHS["networks_dir"]
+            cls.NETWORKS_FUNC = _Ana._load_networks_dict
 
     @classmethod
     def load_original_network(cls, dataset_id: DatasetId):
         from graphs import read_graph_csv
 
-        return read_graph_csv(cls.PATHS["edge_list"], cls.PATHS["positions"])
+        edge_list, positions = cls._network_paths(dataset_id)
+        return read_graph_csv(edge_list, positions)
+
+    @classmethod
+    def _network_paths(cls, dataset_id: DatasetId):
+        directory = cls.PATHS.get("datasets_dir")
+        if not directory:
+            return cls.PATHS["edge_list"], cls.PATHS["positions"]
+        return (
+            os.path.join(directory, f"{dataset_id}{_EDGE_SUFFIX}"),
+            os.path.join(directory, f"{dataset_id}{_POSITIONS_SUFFIX}"),
+        )
 
     @classmethod
     def load_original_image(cls, dataset_id: DatasetId):
-        path = cls.PATHS.get("image")
+        directory = cls.PATHS.get("datasets_dir")
+        if directory:
+            # Optional, and the only per-dataset file that is: a network is
+            # analysable without its image.
+            candidate = os.path.join(directory, f"{dataset_id}{_IMAGE_SUFFIX}")
+            path = candidate if os.path.exists(candidate) else None
+        else:
+            path = cls.PATHS.get("image")
         if not path:
             return None
         if not os.path.exists(path):

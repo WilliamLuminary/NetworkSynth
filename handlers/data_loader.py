@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -30,10 +30,6 @@ class DataLoader:
         elif mode == Mode.ANA:
             assert "path" in kwargs, "path is required."
             self._both_networks_path = kwargs["path"]
-        elif mode == Mode.ATR:
-            assert "path" in kwargs, "path is required."
-            self._attr_path = kwargs["path"]
-            self.__attr = None
 
         self.__mode = mode
 
@@ -42,9 +38,6 @@ class DataLoader:
 
     def get_original_network(self) -> Union[SynthGraph, List[SynthGraph]]:
         return self.__original_network
-
-    def get_attr_dict(self) -> Dict:
-        return self.__attr
 
     def get_synthetic_networks(self) -> List[SynthGraph]:
         return self.__synthetic_networks
@@ -62,9 +55,6 @@ class DataLoader:
                 self._load_both_networks()
             )
 
-        elif self.__mode == Mode.ATR:
-            self.__attr = self._load_attr()
-
     def _load_original_image(self):
         return self._config.ORIGINAL_IMAGE_FUNC(self._dataset_id)
 
@@ -73,6 +63,3 @@ class DataLoader:
 
     def _load_both_networks(self) -> Tuple[List[SynthGraph], List[SynthGraph]]:
         return self._config.NETWORKS_FUNC(self._both_networks_path)
-
-    def _load_attr(self) -> Dict:
-        return self._config.ATTRIBUTES_DICT_FUNC(self._attr_path)

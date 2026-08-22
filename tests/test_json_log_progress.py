@@ -71,7 +71,7 @@ class TestPipelinesEmitIt:
 
     @pytest.mark.parametrize(
         "module_name",
-        ["generate", "sweep", "generate_from_props", "mosaic", "hybrid"],
+        ["generate", "sweep", "mosaic", "hybrid"],
     )
     def test_progress_sites_pass_percent(self, module_name):
         import inspect

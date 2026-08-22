@@ -1,6 +1,5 @@
 from . import (
     analyze_mode,
-    attr_generate_mode,
     generate_mode,
     hybrid_mode,
     mosaic_mode,
@@ -32,7 +31,6 @@ from .params import SynthParams  # noqa: F401
 
 for _module in (
     analyze_mode,
-    attr_generate_mode,
     generate_mode,
     hybrid_mode,
     mosaic_mode,

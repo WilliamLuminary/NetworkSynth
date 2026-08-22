@@ -52,10 +52,10 @@ class SynthesisController(QObject):
         super().__init__(parent)
         self._mode = mode
         self._values: Dict[str, Any] = spec_builder.default_values(mode)
-        self._edge_list = ""
-        self._positions = ""
+        self._shape = 0
+        self._inputs: Dict[str, str] = spec_builder.default_inputs(mode)
         self._output_dir = os.path.join(_REPO_ROOT, "data", "output")
-        self._status = "Choose an edge list and positions file, then Run."
+        self._status = "Choose this mode's inputs, then Run."
         self._failed = False
         self._percent = 0.0
         self._log: List[str] = []
@@ -96,19 +96,50 @@ class SynthesisController(QObject):
             return
         self._mode = names[index]
         self._values = spec_builder.default_values(self._mode)
+        self._shape = 0
+        self._inputs = spec_builder.default_inputs(self._mode)
         self._note_ready()
 
     @Property("QVariantList", notify=changed)
     def fields(self) -> list:
         return [f.as_dict() for f in spec_builder.MODES[self._mode].fields]
 
-    @Property(str, notify=changed)
-    def edgeList(self) -> str:
-        return self._edge_list
+    @Property("QStringList", notify=changed)
+    def inputShapes(self) -> list:
+        return [shape.label for shape in spec_builder.MODES[self._mode].input_shapes]
 
-    @Property(str, notify=changed)
-    def positions(self) -> str:
-        return self._positions
+    @Property(int, notify=changed)
+    def inputShape(self) -> int:
+        return self._shape
+
+    @Slot(int)
+    def selectInputShape(self, index: int) -> None:
+        """Switch between a single network and a directory of them.
+
+        The keys change with the shape, so the values are rebuilt rather than
+        carried over: a path left behind from the other shape would be written
+        into the run-spec and reach a loader that never asked for it.
+        """
+        shapes = spec_builder.MODES[self._mode].input_shapes
+        if not 0 <= index < len(shapes) or index == self._shape:
+            return
+        self._shape = index
+        self._inputs = spec_builder.default_inputs(self._mode, index)
+        self._note_ready()
+
+    @Property("QVariantList", notify=changed)
+    def inputs(self) -> list:
+        """What this mode reads, with the paths chosen so far.
+
+        A list rather than fixed properties: analysis takes a directory of
+        finished results where generation takes a network's two CSVs, and a form
+        offering the wrong one is a run that fails after it starts.
+        """
+        shape = spec_builder.MODES[self._mode].input_shapes[self._shape]
+        return [
+            {**spec_input.as_dict(), "value": self._inputs.get(spec_input.id, "")}
+            for spec_input in shape.inputs
+        ]
 
     @Property(str, notify=changed)
     def outputDir(self) -> str:
@@ -147,21 +178,18 @@ class SynthesisController(QObject):
 
     @Slot(str, int, "QVariant")
     def setSize(self, key: str, index: int, value) -> None:
+        """One half of a two-part field: a frame size, or a swept range."""
         current = list(self._values.get(key) or (0, 0))
+        as_float = self._kind_of(key) == "range"
         try:
-            current[index] = int(float(value))
+            current[index] = float(value) if as_float else int(float(value))
         except (TypeError, ValueError):
             return
         self._values[key] = tuple(current)
 
-    @Slot(str)
-    def setEdgeList(self, value: str) -> None:
-        self._edge_list = _local_path(value)
-        self._note_ready()
-
-    @Slot(str)
-    def setPositions(self, value: str) -> None:
-        self._positions = _local_path(value)
+    @Slot(str, str)
+    def setInput(self, key: str, value: str) -> None:
+        self._inputs[key] = _local_path(value)
         self._note_ready()
 
     @Slot(str)
@@ -175,18 +203,14 @@ class SynthesisController(QObject):
             return
 
         problems = spec_builder.validate(
-            self._mode, self._edge_list, self._positions, self._output_dir, self._values
+            self._mode, self._inputs, self._output_dir, self._values
         )
         if problems:
             self._set_status("  •  ".join(problems), failed=True)
             return
 
         spec = spec_builder.build_spec(
-            self._mode,
-            self._edge_list,
-            self._positions,
-            self._output_dir,
-            self._values,
+            self._mode, self._inputs, self._output_dir, self._values
         )
         spec_path = os.path.join(
             tempfile.mkdtemp(prefix="networksynth_gui_"), "run_spec.json"
@@ -205,6 +229,10 @@ class SynthesisController(QObject):
             [sys.executable, _GUI_RUN, spec_path],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
+            # Closed, not inherited: a pipeline that asks for input (wandb
+            # prompting for an API key) would otherwise stall the run forever
+            # against a terminal the user is not looking at.
+            stdin=subprocess.DEVNULL,
             cwd=_REPO_ROOT,
         )
         self._poll.start()
@@ -223,6 +251,12 @@ class SynthesisController(QObject):
             pass
 
     # ---- internals ----
+
+    def _kind_of(self, key: str) -> str:
+        for spec_field in spec_builder.MODES[self._mode].fields:
+            if spec_field.id == key:
+                return spec_field.kind
+        return ""
 
     def _coerce(self, key: str, value):
         for spec_field in spec_builder.MODES[self._mode].fields:
@@ -320,7 +354,7 @@ class SynthesisController(QObject):
 
     def _note_ready(self) -> None:
         problems = spec_builder.validate(
-            self._mode, self._edge_list, self._positions, self._output_dir, self._values
+            self._mode, self._inputs, self._output_dir, self._values
         )
         self._set_status("Ready." if not problems else problems[0], failed=False)
 
