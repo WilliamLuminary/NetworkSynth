@@ -18,9 +18,6 @@ pytestmark = [pytest.mark.requires_fixture_data, pytest.mark.slow]
 
 
 def profile_mapper_time(mapper, graph, iterations=10):
-    """
-    :return Mean time, Standard deviation.
-    """
     times = []
     for _ in range(iterations):
         graph_copy = graph.copy()
@@ -32,9 +29,6 @@ def profile_mapper_time(mapper, graph, iterations=10):
 
 
 def compute_quality(mapper, graph):
-    """
-    :return: Mean Absolute Error (MAE), Pearson correlation.
-    """
     # noinspection PyProtectedMember
     original_lengths, original_weights = Mapper._compute_edge_metrics(graph)
     graph_copy = graph.copy()
@@ -50,7 +44,6 @@ def compute_quality(mapper, graph):
 
 @pytest.mark.manual
 def test_mapper(load_weighted_test_synth_graph, tmp_path):
-    """Visual comparison — generates plot files instead of showing interactively."""
     sample_graph = load_weighted_test_synth_graph
     mapper = Mapper(sample_graph)
 
@@ -78,7 +71,6 @@ def test_mapper(load_weighted_test_synth_graph, tmp_path):
 
 
 def test_mapper_performance(load_weighted_test_synth_graph):
-    """Measures runtime."""
     sample_graph = load_weighted_test_synth_graph
     mapper1 = Mapper(sample_graph)
 
@@ -89,7 +81,6 @@ def test_mapper_performance(load_weighted_test_synth_graph):
 
 
 def test_mapper_quality(load_weighted_test_synth_graph):
-    """Measures Mean absolute error and Pearson correlation."""
     sample_graph = load_weighted_test_synth_graph
     mapper1 = Mapper(sample_graph)
 

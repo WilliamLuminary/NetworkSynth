@@ -1,10 +1,3 @@
-# src/graphs/synth_graph.py
-"""
-SynthGraph: lightweight wrapper around a networkit graph with numpy positions.
-
-Replaces nx.Graph as the primary graph representation. NetworkX is only
-needed by ``from_networkx()`` for deserializing legacy pickle files.
-"""
 from __future__ import annotations
 
 from typing import Iterator, List, Set, Tuple
@@ -14,7 +7,6 @@ import numpy as np
 
 
 class SynthGraph:
-    """Undirected graph backed by networkit with spatial positions."""
 
     __slots__ = ("_graph", "_positions")
 
@@ -26,7 +18,6 @@ class SynthGraph:
 
     @property
     def nk(self) -> nk.Graph:
-        """Access the underlying networkit graph."""
         return self._graph
 
     def number_of_nodes(self) -> int:
@@ -41,11 +32,9 @@ class SynthGraph:
     # ---- position access ----
 
     def positions(self) -> np.ndarray:
-        """Return all positions as an (n, 2) array."""
         return self._positions
 
     def position(self, node: int) -> np.ndarray:
-        """Return position of a single node."""
         return self._positions[node]
 
     def set_position(self, node: int, pos) -> None:
@@ -57,11 +46,9 @@ class SynthGraph:
         return self._graph.degree(node)
 
     def degrees(self) -> List[Tuple[int, int]]:
-        """Return list of (node, degree) for all nodes."""
         return [(u, self._graph.degree(u)) for u in self._graph.iterNodes()]
 
     def degree_sequence(self) -> List[int]:
-        """Return flat list of degrees for all nodes."""
         return [self._graph.degree(u) for u in self._graph.iterNodes()]
 
     def weighted_degree(self, node: int) -> float:
@@ -73,6 +60,13 @@ class SynthGraph:
         return self._graph.weight(u, v)
 
     def set_weight(self, u: int, v: int, w: float) -> None:
+        # An edge that exists but carries no width is not a graph we can
+        # measure: analysis inverts weights into distances, so a zero becomes an
+        # infinite distance that detaches the edge and only surfaces much later,
+        # as a NaN inside the curvature solver.  The Mapper samples weights from
+        # the source network with replacement, so a zero in the input data is
+        # reproduced verbatim — catch it here, on the edge that carries it.
+        assert w > 0, f"edge ({u}, {v}) has non-positive weight {w!r}"
         self._graph.setWeight(u, v, w)
 
     def has_edge(self, u: int, v: int) -> bool:
@@ -103,7 +97,6 @@ class SynthGraph:
         return cc.numberOfComponents() == 1
 
     def largest_connected_component(self) -> SynthGraph:
-        """Return a new SynthGraph containing only the largest connected component."""
         n = self._graph.numberOfNodes()
         if n <= 1:
             return self.copy()
@@ -116,7 +109,6 @@ class SynthGraph:
         return self.subgraph(set(largest))
 
     def subgraph(self, node_set: Set[int]) -> SynthGraph:
-        """Return a new SynthGraph induced by *node_set* with reindexed nodes."""
         node_list = sorted(node_set)
         node_map = {old: new for new, old in enumerate(node_list)}
         n = len(node_list)
@@ -136,7 +128,6 @@ class SynthGraph:
         )
 
     def make_weighted(self) -> None:
-        """Convert this graph to weighted in-place (noop if already weighted)."""
         if self._graph.isWeighted():
             return
         n = self._graph.numberOfNodes()
@@ -146,7 +137,6 @@ class SynthGraph:
         self._graph = new_graph
 
     def make_unweighted(self) -> None:
-        """Convert this graph to unweighted in-place (noop if already unweighted)."""
         if not self._graph.isWeighted():
             return
         n = self._graph.numberOfNodes()
@@ -193,6 +183,9 @@ class SynthGraph:
         nk_graph = nk.Graph(n, weighted=True)
         for i, j, v in zip(coo.row, coo.col, coo.data):
             if i != j and not nk_graph.hasEdge(int(i), int(j)):
+                # A sparse matrix can store an explicit zero, so "an edge with
+                # no width" is representable here even though it is meaningless.
+                assert v > 0, f"edge ({i}, {j}) has non-positive weight {v!r}"
                 nk_graph.addEdge(int(i), int(j), float(v))
         pos = np.asarray(positions, dtype=np.float64)
         if pos.ndim == 1:
@@ -203,7 +196,6 @@ class SynthGraph:
 
     @classmethod
     def from_graph_nodes(cls, nodes: set, edges: set) -> SynthGraph:
-        """Build from GraphNode objects produced by the BFS generator."""
         position_map = {node.position: node for node in nodes}
         sorted_nodes = sorted(nodes, key=lambda x: x.id)
         n = len(sorted_nodes)
@@ -231,7 +223,6 @@ class SynthGraph:
 
     @classmethod
     def from_edge_list(cls, positions: np.ndarray, edge_list: np.ndarray) -> SynthGraph:
-        """Build from a positions array and an (E, 2) edge list."""
         pos = np.asarray(positions, dtype=np.float64)
         if pos.ndim == 1:
             pos = pos.reshape(-1, 2)

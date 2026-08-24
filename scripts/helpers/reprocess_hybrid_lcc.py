@@ -1,14 +1,3 @@
-# scripts/reprocess_hybrid_lcc.py
-"""
-Post-process the existing hybrid 50x50 LCC output.
-
-Loads the LCC graph from .nkbin + .npy, assigns edge weights via the
-original-network Mapper, and re-saves as consistent CSV files
-(edgelist with weights, positions as CSV instead of .npy).
-
-Usage (from project root):
-    python scripts/reprocess_hybrid_lcc.py
-"""
 import csv
 import logging
 import os
@@ -41,14 +30,19 @@ NPY_PATH = os.path.join(SYNTH_DIR, "hybrid_50x50_lcc_positions.npy")
 OUT_EDGELIST = os.path.join(SYNTH_DIR, "hybrid_50x50_lcc_edgelist.csv")
 OUT_POSITIONS = os.path.join(SYNTH_DIR, "hybrid_50x50_lcc_positions.csv")
 
-from configs import BaseConfig
 from configs.hybrid_mode import HybridConfig
 
-HybridConfig.initialize()
-BaseConfig.disable_saving("reprocessing only")
+
+class ReprocessConfig(HybridConfig):
+
+    DISABLE_SAVING = True
+    DISABLE_SAVING_NOTE = "reprocessing only"
+
+
+ReprocessConfig.initialize()
 
 from graphs.synth_graph import SynthGraph
-from handlers import RunAgent
+from handlers import RunAgent, create_run_paths
 
 logger.info(f"Loading graph from {NKBIN_PATH}")
 nk_graph = nk.readGraph(NKBIN_PATH, nk.Format.NetworkitBinary)
@@ -64,8 +58,9 @@ assert (
 
 graph = SynthGraph(nk_graph, positions)
 
-dataset_id = HybridConfig.get_datasets()[0]
-data_agent = RunAgent(dataset_id=dataset_id)
+dataset_id = ReprocessConfig.get_datasets()[0]
+run_paths = create_run_paths(ReprocessConfig)
+data_agent = RunAgent(ReprocessConfig, run_paths=run_paths, dataset_id=dataset_id)
 data_agent.prepare_data()
 mapper = data_agent.mapper
 

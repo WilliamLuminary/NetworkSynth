@@ -11,7 +11,14 @@ logger = logging.getLogger(__name__)
 
 
 class MultifractalProcessor:
-    def __init__(self, arg: Union[Dict, SynthGraph, List[Dict], List[SynthGraph]]):
+    def __init__(
+        self,
+        arg: Union[Dict, SynthGraph, List[Dict], List[SynthGraph]],
+        measure_weighted: bool,
+        full_q_band: bool,
+    ):
+        self._measure_weighted = measure_weighted
+        self._full_q_band = full_q_band
         self._graphs: Optional[List[SynthGraph]] = None
         self._analysis_results: Optional[List[Dict]] = None
         if isinstance(arg, SynthGraph):
@@ -38,7 +45,9 @@ class MultifractalProcessor:
         return [self._analyze_single_graph(i, G) for i, G in enumerate(self._graphs)]
 
     def _analyze_single_graph(self, idx: int, graph: SynthGraph) -> Dict:
-        analyzer = MultifractalAnalyzer(graph)
+        analyzer = MultifractalAnalyzer(
+            graph, self._measure_weighted, self._full_q_band
+        )
         result = analyzer.analyze_graph()
 
         return {

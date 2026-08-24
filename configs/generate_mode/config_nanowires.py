@@ -1,4 +1,3 @@
-# src/configs/generate_mode/config_nanowires.py
 import logging
 import os
 from typing import List, Tuple
@@ -14,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 
 def _generate_nanowires_datasets(count: int = 225) -> List[DatasetId]:
-    """Generate DatasetId list for nanowires: DatasetId("1-0") through DatasetId("1-224")."""
     return [DatasetId(f"1-{i}") for i in range(count)]
 
 
@@ -39,7 +37,6 @@ class ConfigNanowires(BaseConfig):
     MAX_ATTEMPTS = 10
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = False
-    FULL_ANALYSIS = False
 
     BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, _NANOWIRES_INPUT_DIR)
 
@@ -48,11 +45,9 @@ class ConfigNanowires(BaseConfig):
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
-        cls._inject_dependencies()
 
     @staticmethod
     def load_original_network(dataset_id: DatasetId):
-        """Load original network from position and edge list files."""
         positions = _load_positions(dataset_id)
         edge_list = _load_edge_list(dataset_id)
         from utils import build_graph
@@ -63,10 +58,6 @@ class ConfigNanowires(BaseConfig):
 
     @staticmethod
     def load_original_image(dataset_id: DatasetId):
-        """
-        Load and process the background image.
-        Add any image operations here (trim, resize, etc.) as needed.
-        """
         # For nanowires, dataset_id has single level: "1-0", "1-1", etc.
         directory = os.path.join(ConfigNanowires.BASE_INPUT_PATH, dataset_id[0])
 
@@ -87,7 +78,6 @@ class ConfigNanowires(BaseConfig):
 
 
 def _load_positions(dataset_id: DatasetId) -> np.ndarray:
-    """Load node positions from CSV file."""
     directory = os.path.join(ConfigNanowires.BASE_INPUT_PATH, dataset_id[0])
     file_path = os.path.join(directory, "nod_pos.csv")
 
@@ -99,7 +89,6 @@ def _load_positions(dataset_id: DatasetId) -> np.ndarray:
 
 
 def _load_edge_list(dataset_id: DatasetId) -> np.ndarray:
-    """Load edge list from CSV file."""
     directory = os.path.join(ConfigNanowires.BASE_INPUT_PATH, dataset_id[0])
     file_path = os.path.join(directory, "edls.csv")
 

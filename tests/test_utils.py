@@ -1,18 +1,3 @@
-# tests/test_utils.py
-"""
-Unit tests for utility functions in utils.py.
-
-Covers:
-  - calculate_frame()    → frame from graph or center position
-  - build_graph()        → factory: edge_list, adjacency_matrix, unknown type
-  - largest_connected_component() → delegates correctly
-  - recommend_dpi()      → DPI tier selection
-  - figure_to_ndarray()  → matplotlib → numpy conversion
-  - save_figure_as_webp()→ produces valid WebP file
-  - trim_graph()         → edge trimming / average degree reduction
-  - timer()              → decorator smoke test
-"""
-
 import os
 
 import networkit as nk
@@ -28,7 +13,6 @@ pytestmark = pytest.mark.unit
 
 
 def _make_graph(n: int = 20, extra_edges: int = 40) -> "SynthGraph":
-    """Build a small connected SynthGraph for testing."""
     from graphs.synth_graph import SynthGraph
 
     positions = np.random.RandomState(42).rand(n, 2) * 100.0

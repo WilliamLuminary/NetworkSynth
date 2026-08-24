@@ -1,5 +1,3 @@
-"""Dynamic config loader for *_mode directories."""
-
 import importlib
 import inspect
 import logging
@@ -11,7 +9,6 @@ logger = logging.getLogger(__name__)
 
 
 def _get_config_class_from_module(module) -> Optional[Type]:
-    """Find the first config class defined in the module."""
     for name, obj in inspect.getmembers(module, inspect.isclass):
         if obj.__module__ != module.__name__:
             continue
@@ -49,7 +46,6 @@ def load_configs_from_directory(
     package_name: str,
     mode_prefix: str,
 ) -> Dict[str, Type]:
-    """Dynamically load all config classes from config_*.py files."""
     configs = {}
     config_files = sorted(directory.glob("config_*.py"))
 

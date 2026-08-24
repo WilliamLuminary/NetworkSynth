@@ -1,10 +1,3 @@
-"""Convert a NetworkX pickle file to CSV (edge list + positions) and NetworKit binary.
-
-Usage:
-    python scripts/helpers/convert_pkl_network.py network.pkl
-    python scripts/helpers/convert_pkl_network.py network.pkl --output_dir out/
-"""
-
 import csv
 import os
 import pickle

@@ -9,3 +9,8 @@ markers = [
     "manual: interactive / visual tests not suited for CI",
 ]
 addopts = "-ra --strict-markers"
+
+[tool.isort]
+profile = "black"
+# The gitignored wandb/ run-output dir makes isort see wandb as first-party locally
+known_third_party = ["wandb"]

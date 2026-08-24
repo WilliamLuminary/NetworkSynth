@@ -1,4 +1,3 @@
-# src/configs/generate_mode/config_sample.py
 import logging
 import os
 from typing import List
@@ -14,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 
 def _generate_sample_datasets() -> List[DatasetId]:
-    """Generate DatasetId list for sample datasets."""
     return [DatasetId("sample_1"), DatasetId("sample_2"), DatasetId("sample_3")]
 
 
@@ -53,32 +51,35 @@ class SampleConfig(BaseConfig):
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
-        cls._inject_dependencies()
 
-    @staticmethod
-    def load_original_network(dataset_id: DatasetId):
-        """Load original network. dataset_id has single level: [set_name]"""
-        positions = _load_positions(dataset_id)
-        mat = _load_sparse_matrix(dataset_id)
+    @classmethod
+    def load_original_network(cls, dataset_id: DatasetId):
+        """Load original network. dataset_id has single level: [set_name]
+
+        A classmethod, not a static one, so a subclass reads *its own*
+        directories.  Referring to ``SampleConfig.POSITION_DATA_DIR`` by name
+        would silently send every subclass to this config's data.
+        """
+        positions = _load_positions(cls.POSITION_DATA_DIR, dataset_id)
+        mat = _load_sparse_matrix(cls.ADJ_MATRIX_DATA_DIR, dataset_id)
         from utils import build_graph
 
         original_network = build_graph(positions, mat)
         _transpose_network_pos(original_network)
         return original_network
 
-    @staticmethod
-    def load_original_image(dataset_id: DatasetId):
-        """Load original image. dataset_id has single level: [set_name]"""
-        image = _load_raw_image(dataset_id)
+    @classmethod
+    def load_original_image(cls, dataset_id: DatasetId):
+        image = _load_raw_image(cls.IMAGES_DIR, dataset_id)
+        if image is None:
+            return None
         image = _trim_cv2_image(image)
-        image = _resize_cv2_image(image)
+        image = _resize_cv2_image(image, cls.FRAME_SIZE)
         return image
 
 
-def _load_positions(dataset_id: DatasetId) -> np.ndarray:
-    """Load node positions. dataset_id[0] = set_name"""
-    set_name = dataset_id[0]
-    file_path = os.path.join(SampleConfig.POSITION_DATA_DIR, f"{set_name}_pos.npy")
+def _load_positions(directory: str, dataset_id: DatasetId) -> np.ndarray:
+    file_path = os.path.join(directory, f"{dataset_id[0]}_pos.npy")
 
     if not os.path.exists(file_path):
         msg = f"Positions file does not exist: {file_path}"
@@ -89,10 +90,8 @@ def _load_positions(dataset_id: DatasetId) -> np.ndarray:
     return np.load(file_path, allow_pickle=True)
 
 
-def _load_sparse_matrix(dataset_id: DatasetId):
-    """Load sparse matrix. dataset_id[0] = set_name"""
-    set_name = dataset_id[0]
-    file_path = os.path.join(SampleConfig.ADJ_MATRIX_DATA_DIR, f"{set_name}_mat.npy")
+def _load_sparse_matrix(directory: str, dataset_id: DatasetId):
+    file_path = os.path.join(directory, f"{dataset_id[0]}_mat.npy")
 
     if not os.path.exists(file_path):
         msg = f"Sparse matrix file does not exist: {file_path}"
@@ -103,10 +102,8 @@ def _load_sparse_matrix(dataset_id: DatasetId):
     return np.load(file_path, allow_pickle=True).item()
 
 
-def _load_raw_image(dataset_id: DatasetId):
-    """Load raw image. dataset_id[0] = set_name"""
-    set_name = dataset_id[0]
-    file_path = os.path.join(SampleConfig.IMAGES_DIR, f"{set_name}_image.tif")
+def _load_raw_image(directory: str, dataset_id: DatasetId):
+    file_path = os.path.join(directory, f"{dataset_id[0]}_image.tif")
 
     if not os.path.exists(file_path):
         logger.warning(f"No image found at {file_path}. Returning None.")

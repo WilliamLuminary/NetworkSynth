@@ -17,6 +17,15 @@ class Mapper:
     def __init__(self, graph: SynthGraph):
         if graph.is_weighted():
             lengths, weights = self._compute_edge_metrics(graph)
+            # Weights are drawn from this pool with replacement, so one bad
+            # value in the source reappears in every graph built from it — but
+            # only when the sampler happens to draw it, which makes the same
+            # input pass one run and fail the next.  Reject the pool instead.
+            bad = [w for w in weights if w <= 0]
+            assert not bad, (
+                f"source network has {len(bad)} edge(s) with non-positive "
+                f"weight (e.g. {bad[:3]}); it cannot be sampled from"
+            )
             self.avg_weights: Final = np.mean(weights)
             bins, dist = self._create_mapping_metrics(lengths, weights)
             self.length_bins: Final = bins

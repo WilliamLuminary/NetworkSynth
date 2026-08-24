@@ -1,19 +1,3 @@
-# tests/test_synth_graph.py
-"""
-Unit tests for the SynthGraph class in graphs/synth_graph.py.
-
-Covers:
-  - Core properties (number_of_nodes, number_of_edges, is_weighted)
-  - Position access (positions, position, set_position)
-  - Degree helpers (degree, degrees, degree_sequence, weighted_degree)
-  - Edge/weight helpers (weight, set_weight, has_edge, remove_edge)
-  - Iteration (nodes, neighbors, edges, edges_with_weights)
-  - Structural queries (is_connected, largest_connected_component, subgraph, copy)
-  - Weight conversions (make_weighted, make_unweighted)
-  - Factory methods (from_sparse_matrix, from_edge_list)
-  - __repr__
-"""
-
 import networkit as nk
 import numpy as np
 import pytest
@@ -28,7 +12,6 @@ from graphs.synth_graph import SynthGraph
 
 
 def _make_chain_graph(n: int = 5, weighted: bool = False) -> SynthGraph:
-    """Create a simple chain graph: 0-1-2-..-(n-1)."""
     g = nk.Graph(n, weighted=weighted)
     for i in range(n - 1):
         if weighted:
@@ -40,7 +23,6 @@ def _make_chain_graph(n: int = 5, weighted: bool = False) -> SynthGraph:
 
 
 def _make_disconnected_graph() -> SynthGraph:
-    """Create a graph with two components: {0-1-2} and {3-4}."""
     g = nk.Graph(5, weighted=False)
     g.addEdge(0, 1)
     g.addEdge(1, 2)
@@ -298,3 +280,62 @@ class TestRepr:
         assert "nodes=3" in r
         assert "edges=2" in r
         assert "weighted=False" in r
+
+
+# ---------------------------------------------------------------------------
+# Weight validity
+# ---------------------------------------------------------------------------
+
+
+class TestWeightsMustBePositive:
+
+    @staticmethod
+    def _matrix(values):
+        from scipy.sparse import coo_matrix
+
+        rows = [0, 1, 1, 2]
+        cols = [1, 0, 2, 1]
+        return coo_matrix((values, (rows, cols)), shape=(3, 3))
+
+    @staticmethod
+    def _positions():
+        return np.array([[0.0, 0.0], [1.0, 0.0], [2.0, 0.0]])
+
+    def test_set_weight_rejects_zero(self):
+        graph = SynthGraph.from_sparse_matrix(
+            self._positions(), self._matrix([1.5, 1.5, 2.0, 2.0])
+        )
+
+        with pytest.raises(AssertionError, match="non-positive weight"):
+            graph.set_weight(0, 1, 0.0)
+
+    def test_set_weight_rejects_negative(self):
+        graph = SynthGraph.from_sparse_matrix(
+            self._positions(), self._matrix([1.5, 1.5, 2.0, 2.0])
+        )
+
+        with pytest.raises(AssertionError, match="non-positive weight"):
+            graph.set_weight(0, 1, -1.0)
+
+    def test_set_weight_names_the_offending_edge(self):
+        graph = SynthGraph.from_sparse_matrix(
+            self._positions(), self._matrix([1.5, 1.5, 2.0, 2.0])
+        )
+
+        with pytest.raises(AssertionError, match=r"edge \(1, 2\)"):
+            graph.set_weight(1, 2, 0.0)
+
+    def test_set_weight_accepts_positive(self):
+        graph = SynthGraph.from_sparse_matrix(
+            self._positions(), self._matrix([1.5, 1.5, 2.0, 2.0])
+        )
+
+        graph.set_weight(0, 1, 2.5)
+
+        assert graph.weight(0, 1) == 2.5
+
+    def test_from_sparse_matrix_rejects_an_explicitly_stored_zero(self):
+        with pytest.raises(AssertionError, match="non-positive weight"):
+            SynthGraph.from_sparse_matrix(
+                self._positions(), self._matrix([1.5, 1.5, 0.0, 0.0])
+            )

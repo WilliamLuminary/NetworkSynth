@@ -1,17 +1,3 @@
-# src/configs/mosaic_mode/config_1.py
-"""
-Mosaic mode configuration 1 — old_input dataset format (A 20kX).
-
-Generates a GRID_ROWS × GRID_COLS grid of tile networks, then
-stitches them into one large network by merging close nodes in
-the overlap regions between adjacent tiles.
-
-Data paths
-----------
-positions  : .npy  from  old_input/position/
-adjacency  : .npz  from  old_input/sparse_matrices/
-images     : .tif  from  old_input/Original Graphs/<set>/
-"""
 import logging
 import os
 import re
@@ -33,7 +19,6 @@ logger = logging.getLogger(__name__)
 
 
 class Config1(BaseConfig):
-    """Mosaic mode using old_input data (Series A, 20kX by default)."""
 
     # --- Dataset ---
     DATASETS = [DatasetId("A", "20kX")]
@@ -60,7 +45,6 @@ class Config1(BaseConfig):
     MAX_ATTEMPTS = 10
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = True
-    FULL_ANALYSIS = False
 
     # --- Input paths (old_input format) ---
     BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, "old_input")
@@ -73,7 +57,6 @@ class Config1(BaseConfig):
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
-        cls._inject_dependencies()
 
     @classmethod
     def save_synthetic_graph(cls):
@@ -100,7 +83,7 @@ class Config1(BaseConfig):
         if image is None:
             return None
         image = _trim_cv2_image(image)
-        image = _resize_cv2_image(image)
+        image = _resize_cv2_image(image, Config1.FRAME_SIZE)
         return image
 
 

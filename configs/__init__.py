@@ -1,6 +1,5 @@
 from . import (
-    analyze_mode,
-    attr_generate_mode,
+    compare_mode,
     generate_mode,
     hybrid_mode,
     mosaic_mode,
@@ -28,10 +27,10 @@ from .file_definitions import (  # noqa: F401
     save_svg,
     save_webp,
 )
+from .params import SynthParams  # noqa: F401
 
 for _module in (
-    analyze_mode,
-    attr_generate_mode,
+    compare_mode,
     generate_mode,
     hybrid_mode,
     mosaic_mode,

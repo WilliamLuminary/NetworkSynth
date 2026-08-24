@@ -1,18 +1,3 @@
-# scripts/run_scaling_100x100.py
-"""
-Production run: generate a 100x100 scaled network via multi-root BFS.
-
-This uses the "scaling" pipeline (``pipelines.scaling``) approach —
-a single-process synchronized BFS with 100x100 = 10,000 root nodes
-sharing the same spatial grids.  Components merge naturally as
-branches from different roots encounter each other.
-
-Logs are written to ``data/output/logs/scaling_100x100.log`` for
-real-time monitoring via ``tail -f``.
-
-Usage (from project root):
-    python scripts/run_scaling_100x100.py
-"""
 import logging
 import os
 import sys
@@ -40,13 +25,15 @@ ScalingConfig.initialize()
 
 import networkit as nk
 
-from configs import BaseConfig, DataType
+from configs import DataType, SynthParams
 from graphs import GraphGenerator
-from handlers import RunAgent, Saver
+from handlers import RunAgent, create_run_paths
 from utils import trim_graph
 
-Saver.initialize()
-data_agent = RunAgent(dataset_id=BaseConfig.get_datasets()[0])
+run_paths = create_run_paths(ScalingConfig)
+data_agent = RunAgent(
+    ScalingConfig, run_paths=run_paths, dataset_id=ScalingConfig.get_datasets()[0]
+)
 data_agent.prepare_data()
 attributes = data_agent.attributes
 
@@ -54,7 +41,7 @@ logger.info(f"average_length: {attributes.average_length:.2f}")
 logger.info(f"average_degree: {attributes.average_degree:.2f}")
 
 t0 = time.time()
-generator = GraphGenerator(attributes)
+generator = GraphGenerator(attributes, SynthParams.from_config(ScalingConfig))
 scaled_graph = generator.generate_scaled_network(
     scale_rows=100,
     scale_cols=100,

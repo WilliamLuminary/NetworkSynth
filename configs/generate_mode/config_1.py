@@ -1,4 +1,3 @@
-# src/configs/generate_mode/config_1.py
 import logging
 import os
 import re
@@ -20,10 +19,6 @@ logger = logging.getLogger(__name__)
 
 
 def _generate_old_datasets() -> List[DatasetId]:
-    """
-    Generate DatasetId list for old dataset format.
-    Two levels: set_name (A, B, C, D) and resolution (10kX, 15kX, etc.)
-    """
     sets = ["A", "B", "C", "D"]
     resolutions = ["10kX", "15kX", "20kX", "30kX"]
     return [DatasetId(s, r) for s in sets for r in resolutions]
@@ -44,7 +39,6 @@ class Config1(BaseConfig):
     SYNTHETIC_NETWORK_NUMBER = 1
 
     MEASURE_WEIGHTED = True
-    FULL_ANALYSIS = False
 
     BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, "old_input")
     POSITION_DATA_DIR = os.path.join(BASE_INPUT_PATH, "position")
@@ -56,11 +50,9 @@ class Config1(BaseConfig):
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
-        cls._inject_dependencies()
 
     @staticmethod
     def load_original_network(dataset_id: DatasetId):
-        """Load original network. dataset_id has two levels: [set_name, resolution]"""
         positions = _load_positions(dataset_id)
         mat = _load_sparse_matrix(dataset_id)
         from utils import build_graph
@@ -71,15 +63,13 @@ class Config1(BaseConfig):
 
     @staticmethod
     def load_original_image(dataset_id: DatasetId):
-        """Load original image. dataset_id has two levels: [set_name, resolution]"""
         image = _load_raw_image(dataset_id)
         image = _trim_cv2_image(image)
-        image = _resize_cv2_image(image)
+        image = _resize_cv2_image(image, Config1.FRAME_SIZE)
         return image
 
 
 def _load_positions(dataset_id: DatasetId) -> np.ndarray:
-    """Load node positions. dataset_id[0] = set_name, dataset_id[1] = resolution"""
     set_name, resolution = dataset_id[0], dataset_id[1]
     directory_path = Config1.POSITION_DATA_DIR
     file_path = _find_file_with_pattern(
@@ -93,7 +83,6 @@ def _load_positions(dataset_id: DatasetId) -> np.ndarray:
 
 
 def _load_sparse_matrix(dataset_id: DatasetId):
-    """Load sparse matrix. dataset_id[0] = set_name, dataset_id[1] = resolution"""
     set_name, resolution = dataset_id[0], dataset_id[1]
     directory_path = Config1.ADJ_MATRIX_DATA_DIR
     file_path = _find_file_with_pattern(
@@ -125,7 +114,6 @@ def _load_sparse_matrix(dataset_id: DatasetId):
 
 
 def _load_raw_image(dataset_id: DatasetId):
-    """Load raw image. dataset_id[0] = set_name, dataset_id[1] = resolution"""
     set_name, resolution = dataset_id[0], dataset_id[1]
     directory_path = os.path.join(Config1.IMAGES_DIR, set_name)
     if set_name == "B":
