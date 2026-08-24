@@ -1,7 +1,7 @@
 import logging
 import os
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 _logger = logging.getLogger(__name__)
 
@@ -155,114 +155,52 @@ def save_network_nkbin(graph, filepath: str) -> None:
     save_networkit((graph.nk, graph.positions()), filepath)
 
 
-# ---------------------------------------------------------------------------
-# Plot / image display configuration (used by utils.plot_network,
-# NOT by Saver).  Kept for rendering parameters only.
-# ---------------------------------------------------------------------------
+# Rendering styles.  Nothing here concerns where a file is written.
 
 
-@dataclass
-class FileConfig:
-    relative_dir: str
-    detail: Optional[str] = None
+@dataclass(frozen=True)
+class RenderStyle:
+    """How one output is drawn.  Frozen, so a config cannot restyle another's."""
 
-
-@dataclass
-class ImageConfig(FileConfig):
-    alpha: Optional[float] = 0.6
-
-
-@dataclass
-class PlotConfig(FileConfig):
-    node_size: float = 6.0
-    line_width: float = 3.0
-    show_on_the_fly: bool = True
-    #: Opacity of a background image drawn behind the plot, when there is one.
+    #: Points, matplotlib's unit for markersize/linewidth.  The OpenCV
+    #: renderers convert to pixels at dpi.  None = thinnest possible.
+    node_size: Optional[float] = None
+    line_width: Optional[float] = None
+    #: Opacity of a background image, for outputs that have one.
     alpha: float = 0.6
+    #: None lets the renderer choose from the node count.
+    dpi: Optional[int] = None
+    #: Cap on the longest side in pixels.
+    max_px: Optional[int] = None
+    margin_frac: float = 0.02
+    border: bool = False
+    show_on_the_fly: bool = True
+
+
+# Per-output defaults live on BaseConfig as RENDER_* / SAVE_* attributes.
 
 
 ORIGINAL_DIR = "original"
 SYNTHETIC_DIR = "synthetic"
 INPLACE_DIR = ""
 
-# Default save specifications, keyed by identifier string.
-#
-# Usage:
-#   Pipeline code calls  saver.save(content, "<identifier>", prefix)
-#   which resolves to    BaseConfig.save("<identifier>")
-#   which returns the spec list defined here (unless a mode config
-#   overrides it — see below).
-#
-# Each spec is a tuple of 4 or 5 elements:
-#   (relative_dir, detail, extension, save_fn[, use_timestamp])
-#
-#   relative_dir   – subdirectory under the output root (e.g. "original")
-#   detail         – descriptive stem used in the filename
-#   extension      – file extension without the dot (e.g. "csv", "pkl")
-#   save_fn        – serialiser function with signature (content, filepath)
-#   use_timestamp  – optional; defaults to True.  Set to False for files
-#                    that should never carry a timestamp (e.g. analysis_data).
-#
-# To override from a mode config, define a classmethod on the config:
-#
-#   class MyConfig(BaseConfig):
-#       @classmethod
-#       def save_original_network(cls):
-#           return [("original", "original_network", "csv", save_network_csv)]
-#
-# The dispatcher checks for a save_<identifier> method first; if none
-# exists, it falls back to this dict.
-# Default formats: images -> webp, network exports -> csv.
-# The save_svg (vector image) and save_network_nkbin (.nkbin + companion
-# .npy positions) serializers remain available and can be re-enabled per
-# config by defining a save_<identifier>() classmethod.
-DEFAULT_SAVE_SPECS = {
-    "original_image": [("original", "original_image", "webp", save_webp)],
-    "original_network": [
-        ("original", "original_network", "csv", save_network_csv),
-    ],
-    "original_property": [("original", "original_property", "pkl", save_pickle)],
-    "original_report": [("original", "report", "txt", save_text, False)],
-    "original_graph": [("original", "original_graph", "webp", save_webp)],
-    "synthetic_graph": [("synthetic", "synthetic_graph", "webp", save_webp)],
-    "synthetic_report": [("synthetic", "report", "txt", save_text, False)],
-    "synthetic_network": [("synthetic", "synthetic_network", "pkl", save_pickle)],
-    "synthetic_export": [
-        ("synthetic", "synthetic_network", "csv", save_network_csv),
-    ],
-    "analysis_data": [("", "analysis_data", "pkl", save_pickle, False)],
-    "analysis_figure": [("", "analysis_figure", "webp", save_webp)],
-}
+# Save specs.
 
-FILE_CONFIGURATIONS = {
-    "original_image": ImageConfig(
-        relative_dir=ORIGINAL_DIR,
-        alpha=0.6,
-        detail="original_image",
-    ),
-    "original_graph": PlotConfig(
-        relative_dir=ORIGINAL_DIR,
-        node_size=6.0,
-        line_width=3.0,
-        detail="original_graph",
-    ),
-    "original_network": FileConfig(
-        relative_dir=ORIGINAL_DIR,
-        detail="original_network",
-    ),
-    "original_property": FileConfig(
-        relative_dir=ORIGINAL_DIR,
-        detail="original_property",
-    ),
-    "synthetic_graph": PlotConfig(
-        relative_dir=SYNTHETIC_DIR,
-        node_size=6.0,
-        line_width=3.0,
-        show_on_the_fly=False,
-        detail="synthetic_graph",
-    ),
-    "analysis_figure": PlotConfig(
-        relative_dir=INPLACE_DIR,
-        detail="analysis_figure",
-    ),
-}
+
+@dataclass(frozen=True)
+class SaveSpec:
+    """One file to write for an output.
+
+    Keyword-named so a spec reads as what it is::
+
+        SaveSpec(ORIGINAL_DIR, "report", "txt", save_text, use_timestamp=False)
+    """
+
+    #: Subdirectory under the run's output root ("" = the root).
+    relative_dir: str
+    detail: str
+    #: Without the dot.
+    extension: str
+    #: Called as save_fn(content, filepath).
+    save_fn: Callable[[Any, str], None]
+    use_timestamp: bool = True

@@ -11,13 +11,10 @@ logger = logging.getLogger(__name__)
 class Saver:
     """Writes one dataset's outputs into one directory.
 
-    Holds only ``(config, out_dir)``.  Where the run writes is decided by
-    :func:`~handlers.run_paths.create_run_paths` and passed in as a value, so
-    nothing here is global and many runs can coexist.
-
-    A Saver always writes.  Whether a run saves at all is decided once, by
-    :func:`build_saver`, which hands back a :class:`NullSaver` instead when
-    ``DISABLE_SAVING`` is set.
+    Where the run writes is passed in as a value, so nothing here is global and
+    many runs can coexist.  A Saver always writes: whether a run saves at all is
+    decided once by :func:`build_saver`, which returns a :class:`NullSaver`
+    instead when ``DISABLE_SAVING`` is set.
     """
 
     def __init__(self, config, out_dir: str):
@@ -30,9 +27,6 @@ class Saver:
         """
         self.output_dir = out_dir
         _ensure_directory(self.output_dir, exist_ok=True)
-        # The config is needed for this and nothing else, so only the bound
-        # method is kept: `save_<identifier>` overrides resolve through the
-        # normal MRO with no injection required.
         self._save_func = config.save
         self._batch_timestamp: Optional[str] = None
 
@@ -54,46 +48,35 @@ class Saver:
 
         :param content: The data to be saved.
         :param identifier: String identifier (e.g. ``"original_network"``).
-            Maps to ``save_<identifier>`` on the active config.
+            Resolves to ``SAVE_<IDENTIFIER>`` on the active config.
         :param prefix: Optional prefix for the generated file name.
         """
         if content is None:
             logger.warning("Content is None.")
             return
 
-        specs = self._save_func(identifier)
-        for spec in specs:
-            relative_dir, detail, extension, save_fn = spec[:4]
-            use_timestamp = spec[4] if len(spec) > 4 else True
-
-            if use_timestamp:
+        for spec in self._save_func(identifier):
+            if spec.use_timestamp:
                 file_id = self._batch_timestamp or _time_id()
-                detail_part = f"{prefix}{detail}_" if detail else prefix
+                detail_part = f"{prefix}{spec.detail}_" if spec.detail else prefix
             else:
                 file_id = ""
-                detail_part = f"{prefix}{detail}" if detail else prefix
+                detail_part = f"{prefix}{spec.detail}" if spec.detail else prefix
 
-            file_name = f"{detail_part}{file_id}.{extension}"
-            abs_path = os.path.join(self.output_dir, relative_dir, file_name)
+            file_name = f"{detail_part}{file_id}.{spec.extension}"
+            abs_path = os.path.join(self.output_dir, spec.relative_dir, file_name)
             _ensure_directory(os.path.dirname(abs_path), exist_ok=True)
 
-            save_fn(content, abs_path)
+            spec.save_fn(content, abs_path)
             logger.info(f"Saved file: {abs_path}", extra=tagged("IO"))
 
 
 class NullSaver(Saver):
     """A Saver that accepts everything and writes nothing.
 
-    ``DISABLE_SAVING`` used to yield ``None``, which every caller then had to
-    remember to check — and most did not: two dozen ``run.saver.save(...)``
-    calls across the pipelines would raise on a disabled run.  A no-op of the
-    same shape removes the question, the way ``NullErrorChecker`` does for the
-    quality gate.
-
-    ``output_dir`` is the one thing it keeps, because callers build
-    subdirectory paths from it.  Nothing else: a Saver's save function and batch
-    timestamp only matter to the methods below, and those do nothing here.
-    Nothing is created on disk.
+    ``DISABLE_SAVING`` used to yield ``None``, which every caller had to
+    remember to check.  Keeps ``output_dir`` only, because callers build
+    subdirectory paths from it; nothing is created on disk.
     """
 
     def __init__(self, out_dir: str):
@@ -106,8 +89,6 @@ class NullSaver(Saver):
         pass
 
     def save(self, content: Any, identifier: str, prefix: str = "") -> None:
-        # Debug, not info: a run with saving off is usually a sweep trial or a
-        # quick experiment, and one line per would-be file would bury the rest.
         logger.debug(f"Saving disabled — skipped {prefix}{identifier}")
 
 
@@ -120,8 +101,7 @@ def build_saver(config, out_dir: str) -> Saver:
     """
     if config.DISABLE_SAVING:
         logger.info(
-            f"Saving is disabled; nothing will be written. "
-            f"{config.DISABLE_SAVING_NOTE}"
+            f"Saving is disabled; nothing will be written. {config.DISABLE_SAVING_NOTE}"
         )
         return NullSaver(out_dir)
     return Saver(config, out_dir)

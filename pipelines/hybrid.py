@@ -430,9 +430,8 @@ def run_phase2(
 
     if take_snapshots:
         os.makedirs(snapshot_dir, exist_ok=True)
-        snapshot_style = dict(config.HYBRID_SNAPSHOT_STYLE)
-        # Read here in the parent: the plot pool runs in child processes.
-        snapshot_style.setdefault("max_px", config.RENDER_MAX_PX)
+        # Resolved here in the parent: the plot pool runs in child processes.
+        snapshot_style = config.render("hybrid_snapshot")
         plot_workers = config.get_snapshot_plot_workers()
         plot_executor = ThreadPoolExecutor(max_workers=plot_workers)
         logger.info(
@@ -457,7 +456,7 @@ def run_phase2(
                 frame,
                 idx,
                 snapshot_dir,
-                **snapshot_style,
+                snapshot_style,
             )
             pending.append(future)
             logger.info(
@@ -512,7 +511,7 @@ def log_connectivity(graph: SynthGraph, label: str = ""):
     n = graph.number_of_nodes()
     logger.info(
         f"{label} connectivity: {cc.numberOfComponents()} components, "
-        f"LCC={sizes[0]:,} ({sizes[0]/n*100:.2f}% of {n:,} nodes)",
+        f"LCC={sizes[0]:,} ({sizes[0] / n * 100:.2f}% of {n:,} nodes)",
         extra=tagged("STATS"),
     )
     if len(sizes) > 1:
@@ -675,7 +674,7 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
     gc.collect()
 
     log_memory(f"Before plotting ({dataset_id})", config.LOG_MEMORY)
-    img = render_network(hybrid_graph, max_px=config.RENDER_MAX_PX)
+    img = render_network(hybrid_graph, config.render("hybrid_graph"))
     del hybrid_graph
     gc.collect()
     saver.save(img, "synthetic_graph", f"{prefix}_")

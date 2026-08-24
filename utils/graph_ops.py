@@ -58,7 +58,7 @@ def build_graph(*args, arg_type: str = "adjacency_matrix") -> SynthGraph:
         return _from_edge_list(*args)
     else:
         raise TypeError(
-            f"Unsupported Type: {arg_type} " f"from function {build_graph.__name__}."
+            f"Unsupported Type: {arg_type} from function {build_graph.__name__}."
         )
 
 

@@ -1,10 +1,11 @@
 import logging
 import os
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import cv2
 import numpy as np
 
+from graphs.synth_graph import SynthGraph
 from utils import transpose_positions
 
 from ..base_config import BaseConfig
@@ -44,13 +45,13 @@ class ConfigNanowires(BaseConfig):
     BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, _NANOWIRES_INPUT_DIR)
 
     @classmethod
-    def initialize(cls):
+    def initialize(cls) -> None:
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
 
     @staticmethod
-    def load_original_network(dataset_id: DatasetId):
+    def load_original_network(dataset_id: DatasetId) -> SynthGraph:
         positions = _load_positions(dataset_id)
         edge_list = _load_edge_list(dataset_id)
         from utils import build_graph
@@ -60,7 +61,7 @@ class ConfigNanowires(BaseConfig):
         return original_network
 
     @staticmethod
-    def load_original_image(dataset_id: DatasetId):
+    def load_original_image(dataset_id: DatasetId) -> Optional[np.ndarray]:
         # For nanowires, dataset_id has single level: "1-0", "1-1", etc.
         directory = os.path.join(ConfigNanowires.BASE_INPUT_PATH, dataset_id[0])
 

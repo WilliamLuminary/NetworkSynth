@@ -10,7 +10,6 @@ logger = logging.getLogger(__name__)
 
 
 class SampleConfig(GenerateSampleConfig):
-
     MODE = "sweep"
 
     DATASETS = [

@@ -1,11 +1,13 @@
 import csv
 import logging
 import os
-from typing import Dict, Tuple
+from dataclasses import replace
+from typing import Dict, Optional, Tuple
 
 import cv2
 import numpy as np
 
+from graphs.synth_graph import SynthGraph
 from utils import resize_image, transpose_positions, trim_image
 
 from ..base_config import BaseConfig
@@ -15,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 
 class ConfigDickson(BaseConfig):
-
     MODE = "hybrid"
 
     LOG_MEMORY = True
@@ -70,14 +71,14 @@ class ConfigDickson(BaseConfig):
     # bounds the worst case for tiles that never pass.
     MAX_ATTEMPTS = 5
 
-    # Shrink the node markers in the original_graph render (dense gel
-    # networks look cleaner with smaller dots). Default elsewhere is 1.0.
-    ORIGINAL_GRAPH_NODE_SCALE = 0.5
+    # Dense gel networks read better with smaller dots.
+    RENDER_ORIGINAL_GRAPH = replace(BaseConfig.RENDER_ORIGINAL_GRAPH, node_size=3.0)
 
-    # Cap the synthetic-graph render size. At the 16383px WebP limit an 11M+
-    # node network produces a ~190-megapixel image that most viewers refuse
-    # to open; 8000px stays detailed but opens everywhere.
-    RENDER_MAX_PX = 8000
+    # At the 16383px WebP limit an 11M-node network is ~190MP, which most
+    # viewers refuse to open.
+    RENDER_HYBRID_GRAPH = replace(BaseConfig.RENDER_HYBRID_GRAPH, max_px=8000)
+    RENDER_HYBRID_SNAPSHOT = replace(BaseConfig.RENDER_HYBRID_SNAPSHOT, max_px=8000)
+
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = True
 
@@ -85,13 +86,13 @@ class ConfigDickson(BaseConfig):
     BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, "dickson")
 
     @classmethod
-    def initialize(cls):
+    def initialize(cls) -> None:
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
 
     @staticmethod
-    def load_original_network(dataset_id: DatasetId):
+    def load_original_network(dataset_id: DatasetId) -> SynthGraph:
         set_name = dataset_id[0]
         positions = _load_positions(set_name)
         mat = _load_weighted_matrix(set_name, len(positions))
@@ -103,7 +104,7 @@ class ConfigDickson(BaseConfig):
         return original_network
 
     @staticmethod
-    def load_original_image(dataset_id: DatasetId):
+    def load_original_image(dataset_id: DatasetId) -> Optional[np.ndarray]:
         image = _load_raw_image(dataset_id[0])
         if image is None:
             return None

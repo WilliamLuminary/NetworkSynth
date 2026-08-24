@@ -1,6 +1,9 @@
 import os
+from dataclasses import replace
 
 import pytest
+
+from configs import BaseConfig
 
 pytestmark = [pytest.mark.integration, pytest.mark.requires_fixture_data]
 
@@ -179,7 +182,8 @@ class TestHybridSnapshots:
             TILE_FRAME_SIZE=(510, 510),
             # Larger than the round count, so exactly the first snapshot fires.
             SNAPSHOT_INTERVAL=100,
-            HYBRID_SNAPSHOT_STYLE={"dpi": 72},
+            # Low dpi for speed.
+            RENDER_HYBRID_SNAPSHOT=replace(BaseConfig.RENDER_HYBRID_SNAPSHOT, dpi=72),
         )
         run_paths = create_run_paths(config)
 
