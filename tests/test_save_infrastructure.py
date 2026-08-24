@@ -34,11 +34,15 @@ from handlers.saver import Saver  # noqa: E402
 
 class FakeGraph:
 
-    def __init__(self, n_nodes=4):
+    def __init__(self, n_nodes=4, weighted=True):
         self._n = n_nodes
         self._positions = np.random.rand(n_nodes, 2)
         self._edges = [(0, 1), (1, 2), (2, 3)]
         self._weights = [1.0, 2.0, 3.0]
+        self._weighted = weighted
+
+    def is_weighted(self):
+        return self._weighted
 
     def edges(self):
         return self._edges
@@ -314,6 +318,22 @@ class TestSerializers:
             rows = list(reader)
         assert rows[0] == ["x", "y"]
         assert len(rows) == 1 + graph._n
+
+    def test_save_network_csv_omits_weight_column_when_unweighted(self, tmp_path):
+        """No weight column for an unweighted graph.
+
+        An unweighted networkit graph reports every weight as 1.0, so writing
+        the column anyway produced a file that read back as weighted.
+        """
+        graph = FakeGraph(n_nodes=4, weighted=False)
+        path = str(tmp_path / "network.csv")
+        save_network_csv(graph, path)
+
+        with open(str(tmp_path / "network_edgelist.csv")) as f:
+            rows = list(csv.reader(f))
+        assert rows[0] == ["source_index", "target_index"]
+        assert len(rows) == 1 + len(graph._edges)
+        assert all(len(r) == 2 for r in rows[1:])
 
 
 # ---------------------------------------------------------------------------
