@@ -324,11 +324,6 @@ def generate_with_multiprocessing(data_agent: RunAgent, config):
     prefix = f"len_{len(errors)}_err_{avg_err:.3f}"
     data_agent.save_synthetic_outputs(prefix)
 
-    if config.FULL_ANALYSIS:
-        data_agent.multifractal_analysis_in_generate_mode()
-        data_agent.save("analysis_data")
-        data_agent.save("analysis_figure")
-
 
 # ------------------------------------------------------------------ #
 # Single-network snapshot generation

@@ -81,7 +81,6 @@ class SampleConfig(BaseConfig):
     MAX_ATTEMPTS = 50
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = True
-    FULL_ANALYSIS = False
 
     # --- Input paths ---
     BASE_INPUT_PATH = os.path.join(

@@ -23,15 +23,16 @@ class RunAgent:
         *,
         run_paths=None,
         dataset_id: Optional[DatasetId] = None,
-        networks_path: Optional[str] = None,
+        original_path: Optional[str] = None,
+        synthetic_path: Optional[str] = None,
     ):
         """*config* is the active config class; it is threaded down into the
         DataLoader and Saver rather than read from the global namespace.
 
         *run_paths* is a :class:`~handlers.run_paths.RunPaths` value saying
         where this run writes, and *dataset_id* names the subdirectory within
-        it.  Both modes need them: analysis reads *networks_path* but writes its
-        results into this run's own directory, like every other mode.
+        it.  Both modes need them: analysis reads the two sets it is given but
+        writes into this run's own directory, like every other mode.
         """
         self._config = config
         if config.DISABLE_SAVING:
@@ -39,11 +40,20 @@ class RunAgent:
                 f"Saving is disabled. No Saver will be instantiated. "
                 f"{config.DISABLE_SAVING_NOTE}"
             )
-        if networks_path:
+        if original_path or synthetic_path:
+            assert original_path and synthetic_path, (
+                "analysis compares two sets: give both original_path and "
+                "synthetic_path"
+            )
             assert run_paths is not None, "ANA mode requires run_paths"
             assert dataset_id is not None, "ANA mode requires dataset_id"
             self.mode = Mode.ANA
-            self.data_loader = DataLoader(Mode.ANA, config, path=networks_path)
+            self.data_loader = DataLoader(
+                Mode.ANA,
+                config,
+                original_path=original_path,
+                synthetic_path=synthetic_path,
+            )
             self.saver = self._build_saver(config, run_paths.for_dataset(dataset_id))
             self.batch_processor = None
         elif dataset_id is not None:
@@ -55,7 +65,9 @@ class RunAgent:
             self.mapper = None
             self.batch_processor = None
         else:
-            raise ValueError("Invalid arguments: provide dataset_id or networks_path")
+            raise ValueError(
+                "Invalid arguments: provide dataset_id, or the two analysis paths"
+            )
 
     @staticmethod
     def _build_saver(config, out_dir: str) -> Optional[Saver]:
@@ -94,25 +106,8 @@ class RunAgent:
                 full_q_band=self._config.FULL_Q_BAND,
             )
 
-    def multifractal_analysis_in_generate_mode(self):
-        assert self.mode == Mode.GEN, "This method is only available in Generate mode."
-        original_networks = [self.data_loader.get_original_network()]
-        synthetic_networks = self.data_loader.get_synthetic_networks()
-        from analysis import MultifractalBatchProcessor
-
-        self.batch_processor = MultifractalBatchProcessor(
-            original_networks,
-            synthetic_networks,
-            measure_weighted=self._config.MEASURE_WEIGHTED,
-            full_q_band=self._config.FULL_Q_BAND,
-        )
-        self.multifractal_analysis()
-
     def multifractal_analysis(self):
-        assert self.mode in (
-            Mode.ANA,
-            Mode.GEN,
-        ), "This method is only available in Analyze or Generate mode."
+        assert self.mode == Mode.ANA, "Analysis is the analyse mode's job."
         assert self.batch_processor, "Batch processor is not initialized."
         self.batch_processor.process().plot()
 

@@ -739,13 +739,22 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
 # ------------------------------------------------------------------ #
 
 
-def _subprocess_target(dataset_id, config, run_paths):
+def _subprocess_target(dataset_id, config, run_paths, run_id):
     """Top-level target for child processes (must be picklable for spawn).
 
-    A config *class* pickles as a name reference only, so the child sees the
-    values authored in its module - not any parent mutations.  On fork that is
-    moot (state is inherited); this is a step toward spawn, not a fix for it.
+    The child sets the config up from scratch.  Nothing the parent did to the
+    class travels: a module-level config pickles as a name reference, and a
+    run-spec config is rebuilt from its spec — either way the loader functions
+    ``initialize()`` installs are absent, and calling the pipeline without them
+    fails on ``load_idle``.  Under ``fork`` this was invisible, because the
+    child inherited the initialised class instead of rebuilding it.
+
+    *run_id* comes from the parent so the child's log lines land in the same
+    ``run.jsonl``, under the same id, rather than in a run of their own.
     """
+    config.RUN_ID = run_id
+    config.initialize()
+    attach_run_log(run_paths.root, run_id)
     try:
         run_hybrid_for_dataset(dataset_id, config, run_paths)
     except KeyboardInterrupt:
@@ -760,7 +769,7 @@ def _run_dataset_in_subprocess(dataset_id, config, run_paths):
     """
     proc = spawn_context().Process(
         target=_subprocess_target,
-        args=(dataset_id, config, run_paths),
+        args=(dataset_id, config, run_paths, config.RUN_ID),
         name=f"hybrid-{dataset_id}",
     )
     proc.start()
@@ -784,6 +793,12 @@ def _run_dataset_in_subprocess(dataset_id, config, run_paths):
         logger.error(
             f"Dataset {dataset_id} subprocess exited with code {proc.exitcode}",
             extra=tagged("PIPELINE", dataset=str(dataset_id)),
+        )
+        # Raised, not only logged: main() decides the run's status from what
+        # reaches it, so a dataset that died in its child would otherwise be
+        # written up as a completed run that happens to have no output.
+        raise RuntimeError(
+            f"dataset {dataset_id} subprocess exited with code {proc.exitcode}"
         )
     else:
         logger.info(

@@ -45,7 +45,6 @@ class Config1(BaseConfig):
     MAX_ATTEMPTS = 10
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = True
-    FULL_ANALYSIS = False
 
     # --- Input paths (old_input format) ---
     BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, "old_input")

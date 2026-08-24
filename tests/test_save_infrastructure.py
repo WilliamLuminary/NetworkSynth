@@ -142,12 +142,12 @@ class TestModeOverrides:
 
         assert len(BaseConfig.save("synthetic_graph")) == 1
 
-    def test_analyze_mode_overrides(self):
-        from configs.analyze_mode.config_sample import SampleConfig as AnaConfig
+    def test_compare_mode_overrides(self):
+        from configs.compare_mode.config_sample import SampleConfig as CompareConfig
 
-        specs = AnaConfig.save("analysis_data")
+        specs = CompareConfig.save("analysis_data")
         assert specs[0][4] is False
-        specs = AnaConfig.save("analysis_figure")
+        specs = CompareConfig.save("analysis_figure")
         assert specs[0][2] == "webp"
 
 

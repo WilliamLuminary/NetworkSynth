@@ -93,11 +93,33 @@ class CLI:
 
         main(nf_range=nf_range, ef_range=ef_range)
 
-    def analyze(self):
-        """Multifractal analysis on existing results."""
-        from pipelines.analyze import main
+    def compare(self, original: str = None, synthetic: str = None):
+        """Compare two sets of networks and plot the result.
 
-        main()
+        Free-standing: it reads the two sets you name and nothing else.  To
+        compare a generate run against its input, point it at that run's
+        folders.
+
+        Args:
+            original: Directory holding the original network(s).
+            synthetic: Directory holding the synthetic networks.
+                       Omit both to use the config's own paths.
+        """
+        if bool(original) != bool(synthetic):
+            raise SystemExit(
+                "compare needs two sets: pass both --original and --synthetic, "
+                "or neither to use the config's paths."
+            )
+
+        from configs import CompareConfig
+
+        if original:
+            CompareConfig.ORIGINAL_NETWORKS_PATH = original
+            CompareConfig.SYNTHETIC_NETWORKS_PATH = synthetic
+
+        from pipelines.compare import main
+
+        main(CompareConfig)
 
 
 # SIGINT exit code. 128 + SIGINT(2), the conventional value for a process

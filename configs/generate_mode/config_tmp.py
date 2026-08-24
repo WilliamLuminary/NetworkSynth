@@ -27,7 +27,6 @@ class ConfigTmp(BaseConfig):
     ERROR_TOLERANCE = 0.15
 
     MEASURE_WEIGHTED = True
-    FULL_ANALYSIS = False
     FULL_Q_BAND = False
 
     BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, "samples", "mosaic_mode")

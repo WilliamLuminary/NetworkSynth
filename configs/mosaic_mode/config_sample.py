@@ -41,7 +41,6 @@ class SampleConfig(BaseConfig):
     MAX_ATTEMPTS = 10
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = True
-    FULL_ANALYSIS = False
 
     # --- Input paths (flat sample layout) ---
     BASE_INPUT_PATH = os.path.join(

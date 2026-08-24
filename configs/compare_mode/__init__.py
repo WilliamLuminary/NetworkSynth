@@ -5,7 +5,7 @@ from .._loader import get_all_config_names, load_configs_from_directory
 _configs = load_configs_from_directory(
     directory=Path(__file__).parent,
     package_name=__name__,
-    mode_prefix="Ana",
+    mode_prefix="Compare",
 )
 
 globals().update(_configs)

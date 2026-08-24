@@ -1,4 +1,3 @@
-import os
 import pickle
 
 import networkit as nk
@@ -33,42 +32,30 @@ def _small_graph(side=8, spacing=10.0, seed=3):
 # ---------------------------------------------------------------------------
 
 
-class TestAnalyzeDiscovery:
+class TestGenerationDoesNotAnalyse:
+    def test_a_generation_run_refuses_to_analyse(self, tmp_path):
+        """The two are separate modes: generation makes networks, nothing else."""
+        from configs import BaseConfig, DatasetId
+        from handlers import RunAgent, create_run_paths
 
-    def test_finds_a_directory_holding_synthetic_and_original(self, tmp_path):
-        from pipelines.analyze import find_pkl_containers
+        class TinyConfig(BaseConfig):
+            BASE_OUTPUT_PATH = str(tmp_path / "out")
+            DATASETS = [DatasetId("ds")]
 
-        container = tmp_path / "run_a" / "dataset"
-        (container / "synthetic").mkdir(parents=True)
-        (container / "original").mkdir(parents=True)
-
-        found = find_pkl_containers(str(tmp_path))
-
-        assert len(found) == 1
-        assert os.path.realpath(list(found.values())[0]) == os.path.realpath(
-            str(container)
+        TinyConfig.initialize()
+        agent = RunAgent(
+            TinyConfig,
+            run_paths=create_run_paths(TinyConfig),
+            dataset_id=DatasetId("ds"),
         )
 
-    def test_ignores_directories_without_network_subdirs(self, tmp_path):
-        from pipelines.analyze import find_pkl_containers
-
-        (tmp_path / "logs").mkdir()
-        (tmp_path / "figures").mkdir()
-
-        assert find_pkl_containers(str(tmp_path)) == {}
-
-    def test_skips_dot_and_dunder_directories(self, tmp_path):
-        from pipelines.analyze import find_pkl_containers
-
-        hidden = tmp_path / ".cache" / "dataset"
-        (hidden / "synthetic").mkdir(parents=True)
-
-        assert find_pkl_containers(str(tmp_path)) == {}
+        with pytest.raises(AssertionError, match="analyse mode's job"):
+            agent.multifractal_analysis()
 
 
 class TestAnalyzeReadsEveryFormatWeWrite:
     def test_reads_a_csv_pair_when_nothing_is_pickled(self, tmp_path):
-        from configs.analyze_mode.config_sample import _load_networks
+        from configs.compare_mode.config_sample import _load_networks
         from configs.file_definitions import save_network_csv
 
         folder = tmp_path / "original"
@@ -81,7 +68,7 @@ class TestAnalyzeReadsEveryFormatWeWrite:
         assert loaded[0].number_of_nodes() == 64
 
     def test_a_pickle_wins_over_the_csv_pair(self, tmp_path):
-        from configs.analyze_mode.config_sample import _load_networks
+        from configs.compare_mode.config_sample import _load_networks
         from configs.file_definitions import save_network_csv
 
         folder = tmp_path / "synthetic"
@@ -95,7 +82,7 @@ class TestAnalyzeReadsEveryFormatWeWrite:
         assert len(_load_networks(str(folder))) == 2
 
     def test_an_edge_list_without_its_positions_stops_the_run(self, tmp_path):
-        from configs.analyze_mode.config_sample import _load_networks
+        from configs.compare_mode.config_sample import _load_networks
 
         folder = tmp_path / "original"
         folder.mkdir()
@@ -105,37 +92,74 @@ class TestAnalyzeReadsEveryFormatWeWrite:
             _load_networks(str(folder))
 
 
-class TestAnalyzeLoadsWhatItFinds:
-    def test_run_agent_loads_the_discovered_networks(self, tmp_path):
-        from configs.analyze_mode.config_sample import SampleConfig
-        from handlers import RunAgent
-
-        container = tmp_path / "dataset"
-        for kind in ("synthetic", "original"):
-            (container / kind).mkdir(parents=True)
-        with open(container / "synthetic" / "synthetic_network.pkl", "wb") as handle:
-            pickle.dump([_small_graph(), _small_graph(seed=4)], handle)
-        with open(container / "original" / "original_network.pkl", "wb") as handle:
-            pickle.dump([_small_graph(seed=5)], handle)
+class TestAnalyzeLoadsTheTwoSetsItIsGiven:
+    def _config(self, tmp_path, original, synthetic):
+        from configs.compare_mode.config_sample import SampleConfig
 
         class TinyConfig(SampleConfig):
             BASE_OUTPUT_PATH = str(tmp_path / "out")
             MEASURE_WEIGHTED = False
             FULL_Q_BAND = False
+            ORIGINAL_NETWORKS_PATH = str(original)
+            SYNTHETIC_NETWORKS_PATH = str(synthetic)
 
         TinyConfig.initialize()
-        from handlers import create_run_paths
+        return TinyConfig
 
-        agent = RunAgent(
-            TinyConfig,
-            networks_path=str(container),
-            run_paths=create_run_paths(TinyConfig),
-            dataset_id=DatasetId("dataset"),
+    def _agent(self, config, tmp_path):
+        from handlers import RunAgent, create_run_paths
+
+        return RunAgent(
+            config,
+            run_paths=create_run_paths(config),
+            dataset_id=DatasetId("analysis"),
+            original_path=config.ORIGINAL_NETWORKS_PATH,
+            synthetic_path=config.SYNTHETIC_NETWORKS_PATH,
         )
+
+    def test_it_loads_both_sides(self, tmp_path):
+        original, synthetic = tmp_path / "orig", tmp_path / "synth"
+        original.mkdir()
+        synthetic.mkdir()
+        with open(original / "original_network.pkl", "wb") as handle:
+            pickle.dump([_small_graph(seed=5)], handle)
+        with open(synthetic / "synthetic_network.pkl", "wb") as handle:
+            pickle.dump([_small_graph(), _small_graph(seed=4)], handle)
+
+        agent = self._agent(self._config(tmp_path, original, synthetic), tmp_path)
         agent.prepare_data()
 
         assert agent.batch_processor is not None
         assert len(agent.data_loader.get_synthetic_networks()) == 2
+        assert len(agent.data_loader.get_original_network()) == 1
+
+    def test_the_two_sets_can_be_any_directories(self, tmp_path):
+        """Nothing about a results layout is assumed — the caller chooses."""
+        from configs.file_definitions import save_network_csv
+
+        left, right = tmp_path / "monday", tmp_path / "tuesday"
+        left.mkdir()
+        right.mkdir()
+        save_network_csv(_small_graph(), str(left / "a.csv"))
+        save_network_csv(_small_graph(seed=4), str(right / "b.csv"))
+
+        agent = self._agent(self._config(tmp_path, left, right), tmp_path)
+        agent.prepare_data()
+
+        assert len(agent.data_loader.get_original_network()) == 1
+        assert len(agent.data_loader.get_synthetic_networks()) == 1
+
+    def test_one_set_alone_is_refused(self, tmp_path):
+        from handlers import RunAgent, create_run_paths
+
+        config = self._config(tmp_path, tmp_path, tmp_path)
+        with pytest.raises(AssertionError, match="analysis compares two sets"):
+            RunAgent(
+                config,
+                run_paths=create_run_paths(config),
+                dataset_id=DatasetId("analysis"),
+                original_path=str(tmp_path),
+            )
 
 
 def test_base_config_is_untouched_by_these_runs():

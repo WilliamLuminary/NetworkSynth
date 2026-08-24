@@ -132,8 +132,17 @@ class TestSpecIsValidated:
         with pytest.raises(SpecError, match="unknown mode"):
             GuiConfig.from_spec(_spec(tmp_path, mode="not_a_mode"))
 
+    def test_analysis_needs_both_sets_not_one(self, tmp_path):
+        spec = json.loads(open(_spec(tmp_path, mode="compare")).read())
+        spec["inputs"] = {"original_dir": str(tmp_path)}
+        path = tmp_path / "half.json"
+        path.write_text(json.dumps(spec))
+
+        with pytest.raises(SpecError, match="fills none of its input sets"):
+            GuiConfig.from_spec(str(path))
+
     def test_a_mode_reading_a_directory_needs_that_directory(self, tmp_path):
-        spec = json.loads(open(_spec(tmp_path, mode="analyze")).read())
+        spec = json.loads(open(_spec(tmp_path, mode="compare")).read())
         spec["inputs"] = {"edge_list": "e.csv", "positions": "p.csv"}
         path = tmp_path / "bad.json"
         path.write_text(json.dumps(spec))
@@ -152,21 +161,26 @@ class TestSpecIsValidated:
         with pytest.raises(SpecError, match="matches more than one"):
             GuiConfig.from_spec(str(path))
 
-    def test_a_directory_mode_gets_its_loader_wired(self, tmp_path):
-        results = tmp_path / "results"
-        results.mkdir()
+    def test_the_compare_mode_gets_both_sets_and_its_loader(self, tmp_path):
+        original, synthetic = tmp_path / "orig", tmp_path / "synth"
+        original.mkdir()
+        synthetic.mkdir()
         config = GuiConfig.from_spec(
             _spec(
                 tmp_path,
-                mode="analyze",
-                inputs={"networks_dir": str(results)},
+                mode="compare",
+                inputs={
+                    "original_dir": str(original),
+                    "synthetic_dir": str(synthetic),
+                },
             )
         )
         config.initialize()
 
-        assert config.NETWORKS_DATA_PATH == str(results)
+        assert config.ORIGINAL_NETWORKS_PATH == str(original)
+        assert config.SYNTHETIC_NETWORKS_PATH == str(synthetic)
         assert config.NETWORKS_FUNC is not None
-        assert config.OUTPUT_DENOTE == "gui_analyze"
+        assert config.OUTPUT_DENOTE == "gui_compare"
 
     @pytest.mark.parametrize("key", ["edge_list", "positions"])
     def test_half_a_pair_is_not_an_input_set(self, tmp_path, key):
@@ -394,9 +408,9 @@ class TestDirectoryFullRun:
 
 
 @pytest.mark.integration
-class TestAnalyzeFullRun:
-    def test_a_results_directory_in_analysis_out(self, tmp_path):
-        """The mode has to work on a directory this codebase actually writes."""
+class TestCompareFullRun:
+    def test_two_chosen_sets_in_analysis_out(self, tmp_path):
+        """Analysis is free-standing: two directories in, plots out."""
         import networkit as nk
         import numpy as np
 
@@ -418,17 +432,22 @@ class TestAnalyzeFullRun:
         )
         lattice = SynthGraph(graph, positions)
 
-        results = tmp_path / "results" / "dataset"
-        for kind in ("original", "synthetic"):
-            (results / kind).mkdir(parents=True)
-            save_network_csv(lattice, str(results / kind / f"{kind}_network.csv"))
+        # Two plain directories, named by the caller — no results layout.
+        original, synthetic = tmp_path / "before", tmp_path / "after"
+        original.mkdir()
+        synthetic.mkdir()
+        save_network_csv(lattice, str(original / "original_network.csv"))
+        save_network_csv(lattice, str(synthetic / "synthetic_network.csv"))
 
         spec = {
             "contract": 2,
-            "mode": "analyze",
+            "mode": "compare",
             "run_name": "analysed",
             "output_dir": str(tmp_path / "out"),
-            "inputs": {"networks_dir": str(tmp_path / "results")},
+            "inputs": {
+                "original_dir": str(original),
+                "synthetic_dir": str(synthetic),
+            },
             "params": {"MEASURE_WEIGHTED": False, "FULL_Q_BAND": False},
         }
         spec_path = tmp_path / "spec.json"
@@ -437,7 +456,7 @@ class TestAnalyzeFullRun:
         assert gui_run.main(["gui_run.py", str(spec_path)]) == 0
 
         out = tmp_path / "out"
-        roots = [d for d in os.listdir(out) if d.startswith("gui_analyze_results_")]
+        roots = [d for d in os.listdir(out) if d.startswith("gui_compare_results_")]
         assert len(roots) == 1, f"expected one run dir, got {roots}"
 
         manifest = json.loads((out / roots[0] / "manifest.json").read_text())

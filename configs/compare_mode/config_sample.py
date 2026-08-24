@@ -3,37 +3,29 @@ from __future__ import annotations
 import logging
 import os
 import pickle
-from typing import TYPE_CHECKING, List, Tuple
+from typing import List
 
 from ..base_config import BaseConfig
-
-if TYPE_CHECKING:
-    from graphs.synth_graph import SynthGraph
+from ..enums import DatasetId
 
 logger = logging.getLogger(__name__)
 
 
 class SampleConfig(BaseConfig):
     MEASURE_WEIGHTED = False
-    NETWORKS_DATA_PATH = os.path.join(BaseConfig.BASE_OUTPUT_PATH, "results_multi")
+
+    #: One dataset per run: analysis compares the two sets below, and which two
+    #: they are is the point of the mode, not something to discover.
+    DATASETS = [DatasetId("analysis")]
+
+    _RESULTS = os.path.join(BaseConfig.BASE_OUTPUT_PATH, "latest_result", "sample_1")
+    ORIGINAL_NETWORKS_PATH = os.path.join(_RESULTS, "original")
+    SYNTHETIC_NETWORKS_PATH = os.path.join(_RESULTS, "synthetic")
 
     @classmethod
     def initialize(cls):
         super().initialize()
-        cls.NETWORKS_FUNC = cls._load_networks_dict
-
-    @staticmethod
-    def _load_networks_dict(
-        _both_networks_path,
-    ) -> Tuple[List[SynthGraph], List[SynthGraph]]:
-        original_network, synthetic_networks = None, None
-        for entry in os.listdir(_both_networks_path):
-            entry_path = os.path.join(_both_networks_path, entry)
-            if entry == "synthetic":
-                synthetic_networks = _load_networks(entry_path)
-            elif entry in ("origin", "original"):
-                original_network = _load_networks(entry_path)
-        return original_network, synthetic_networks
+        cls.NETWORKS_FUNC = staticmethod(_load_networks)
 
 
 def _load_networks(folder: str) -> list:

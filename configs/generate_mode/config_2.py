@@ -37,7 +37,6 @@ class Config2(BaseConfig):
     SYNTHETIC_NETWORK_NUMBER = 1
 
     MEASURE_WEIGHTED = False
-    FULL_ANALYSIS = False
     ERROR_TOLERANCE = 0.3
 
     BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, "new_input")

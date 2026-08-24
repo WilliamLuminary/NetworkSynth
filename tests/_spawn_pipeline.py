@@ -18,7 +18,6 @@ def main() -> int:
     config.BASE_OUTPUT_PATH = out_dir
     config.ERROR_CHECKER = "none"
     config.MAX_ATTEMPTS = 2
-    config.FULL_ANALYSIS = False
     config.LOG_MEMORY = False
     config.SEED = 4321
     config.SYNTHETIC_NETWORK_NUMBER = 2

@@ -37,7 +37,6 @@ class ConfigNanowires(BaseConfig):
     MAX_ATTEMPTS = 10
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = False
-    FULL_ANALYSIS = False
 
     BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, _NANOWIRES_INPUT_DIR)
 

@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Union
 
 import numpy as np
 
@@ -16,7 +16,8 @@ class DataLoader:
         """
         self._config = config
         self._dataset_id: Optional[DatasetId] = None
-        self._both_networks_path = None
+        self._original_path = None
+        self._synthetic_path = None
 
         self.__original_image = None
 
@@ -28,8 +29,12 @@ class DataLoader:
                 raise ValueError("dataset_id is required for GEN mode")
             self._dataset_id = kwargs["dataset_id"]
         elif mode == Mode.ANA:
-            assert "path" in kwargs, "path is required."
-            self._both_networks_path = kwargs["path"]
+            # Two independent paths, not one directory with an assumed layout:
+            # what to compare is the caller's choice.
+            for key in ("original_path", "synthetic_path"):
+                assert key in kwargs, f"{key} is required for ANA mode"
+            self._original_path = kwargs["original_path"]
+            self._synthetic_path = kwargs["synthetic_path"]
 
         self.__mode = mode
 
@@ -51,15 +56,11 @@ class DataLoader:
             self.__original_image = self._load_original_image()
 
         elif self.__mode == Mode.ANA:
-            self.__original_network, self.__synthetic_networks = (
-                self._load_both_networks()
-            )
+            self.__original_network = self._config.NETWORKS_FUNC(self._original_path)
+            self.__synthetic_networks = self._config.NETWORKS_FUNC(self._synthetic_path)
 
     def _load_original_image(self):
         return self._config.ORIGINAL_IMAGE_FUNC(self._dataset_id)
 
     def _load_original_network(self):
         return self._config.ORIGINAL_NETWORK_FUNC(self._dataset_id)
-
-    def _load_both_networks(self) -> Tuple[List[SynthGraph], List[SynthGraph]]:
-        return self._config.NETWORKS_FUNC(self._both_networks_path)

@@ -149,7 +149,6 @@ class TestManifestFromARealRun:
         config.SYNTHETIC_NETWORK_NUMBER = 1
         config.SYNTHETIC_GRAPH_NUMBER = 1
         config.SNAPSHOT_INTERVAL = 0
-        config.FULL_ANALYSIS = False
         config.DATASETS = SampleConfig.DATASETS[:1]
 
         main(config_cls=config)

@@ -89,7 +89,6 @@ class BaseConfig:
     CLOSED_EDGES_FACTOR: float
 
     MEASURE_WEIGHTED: bool
-    FULL_ANALYSIS: bool = False
     FULL_Q_BAND: bool = False
 
     SYNTHETIC_GRAPH_NUMBER: int = 0
@@ -100,7 +99,8 @@ class BaseConfig:
     BASE_DATA_PATH = os.path.join(PROJECT_ROOT, "data")
     BASE_INPUT_PATH = os.path.join(BASE_DATA_PATH, "input")
 
-    NETWORKS_DATA_PATH = None
+    ORIGINAL_NETWORKS_PATH = None
+    SYNTHETIC_NETWORKS_PATH = None
 
     MAX_ATTEMPTS = 10
     ERROR_CHECKER: str = (

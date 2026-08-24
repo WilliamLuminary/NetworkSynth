@@ -4,9 +4,9 @@ import pytest
 pytestmark = pytest.mark.requires_fixture_data
 
 from analysis.multifractal_analyzer import MultifractalAnalyzer
-from configs.analyze_mode.config_sample import SampleConfig as AnaConfig
+from configs.compare_mode.config_sample import SampleConfig as CompareConfig
 
-AnaConfig.initialize()
+CompareConfig.initialize()
 
 
 # ---------------------------------------------------------------------------
@@ -17,8 +17,8 @@ AnaConfig.initialize()
 def test_calculate_multifractal_taus(load_unweighted_test_synth_graph):
     analyzer = MultifractalAnalyzer(
         load_unweighted_test_synth_graph,
-        AnaConfig.MEASURE_WEIGHTED,
-        AnaConfig.FULL_Q_BAND,
+        CompareConfig.MEASURE_WEIGHTED,
+        CompareConfig.FULL_Q_BAND,
     )
     with analyzer.set_q(MultifractalAnalyzer.full_q):
         tau_list, zq_list = analyzer._compute_multifractal_taus()
@@ -32,8 +32,8 @@ def test_calculate_multifractal_taus(load_unweighted_test_synth_graph):
 def test_n_spectrum(load_unweighted_test_synth_graph):
     analyzer = MultifractalAnalyzer(
         load_unweighted_test_synth_graph,
-        AnaConfig.MEASURE_WEIGHTED,
-        AnaConfig.FULL_Q_BAND,
+        CompareConfig.MEASURE_WEIGHTED,
+        CompareConfig.FULL_Q_BAND,
     )
     with analyzer.set_q(MultifractalAnalyzer.full_q):
         tau_list, _ = analyzer._compute_multifractal_taus()
@@ -48,8 +48,8 @@ def test_n_spectrum(load_unweighted_test_synth_graph):
 def test_n_dimension(load_unweighted_test_synth_graph):
     analyzer = MultifractalAnalyzer(
         load_unweighted_test_synth_graph,
-        AnaConfig.MEASURE_WEIGHTED,
-        AnaConfig.FULL_Q_BAND,
+        CompareConfig.MEASURE_WEIGHTED,
+        CompareConfig.FULL_Q_BAND,
     )
     with analyzer.set_q(MultifractalAnalyzer.full_q):
         tau_list, _ = analyzer._compute_multifractal_taus()
@@ -71,7 +71,7 @@ def test_n_dimension(load_unweighted_test_synth_graph):
 def test_node_dimension(load_unweighted_test_synth_graph):
     synth_graph = load_unweighted_test_synth_graph
     analyzer = MultifractalAnalyzer(
-        synth_graph, AnaConfig.MEASURE_WEIGHTED, AnaConfig.FULL_Q_BAND
+        synth_graph, CompareConfig.MEASURE_WEIGHTED, CompareConfig.FULL_Q_BAND
     )
     node_dimension = analyzer._compute_node_dimension()
 
@@ -83,7 +83,7 @@ def test_node_dimension(load_unweighted_test_synth_graph):
 def test_centralities(load_unweighted_test_synth_graph):
     synth_graph = load_unweighted_test_synth_graph
     analyzer = MultifractalAnalyzer(
-        synth_graph, AnaConfig.MEASURE_WEIGHTED, AnaConfig.FULL_Q_BAND
+        synth_graph, CompareConfig.MEASURE_WEIGHTED, CompareConfig.FULL_Q_BAND
     )
     centralities = analyzer._compute_centralities()
 
@@ -103,8 +103,8 @@ def test_centralities(load_unweighted_test_synth_graph):
 def test_betweenness(load_unweighted_test_synth_graph):
     analyzer = MultifractalAnalyzer(
         load_unweighted_test_synth_graph,
-        AnaConfig.MEASURE_WEIGHTED,
-        AnaConfig.FULL_Q_BAND,
+        CompareConfig.MEASURE_WEIGHTED,
+        CompareConfig.FULL_Q_BAND,
     )
     betweenness = analyzer._compute_betweenness()
 
@@ -122,7 +122,7 @@ def test_betweenness(load_unweighted_test_synth_graph):
 def test_ricci_curvature(load_unweighted_test_synth_graph):
     synth_graph = load_unweighted_test_synth_graph
     analyzer = MultifractalAnalyzer(
-        synth_graph, AnaConfig.MEASURE_WEIGHTED, AnaConfig.FULL_Q_BAND
+        synth_graph, CompareConfig.MEASURE_WEIGHTED, CompareConfig.FULL_Q_BAND
     )
     ricci = analyzer._compute_ollivier_ricci_curvature()
 
@@ -139,8 +139,8 @@ def test_ricci_curvature(load_unweighted_test_synth_graph):
 def test_assortativity(load_unweighted_test_synth_graph):
     analyzer = MultifractalAnalyzer(
         load_unweighted_test_synth_graph,
-        AnaConfig.MEASURE_WEIGHTED,
-        AnaConfig.FULL_Q_BAND,
+        CompareConfig.MEASURE_WEIGHTED,
+        CompareConfig.FULL_Q_BAND,
     )
     assortativity = analyzer._compute_assortativity()
 
@@ -157,7 +157,7 @@ def test_assortativity(load_unweighted_test_synth_graph):
 def test_eigenvector_centrality(load_unweighted_test_synth_graph):
     synth_graph = load_unweighted_test_synth_graph
     analyzer = MultifractalAnalyzer(
-        synth_graph, AnaConfig.MEASURE_WEIGHTED, AnaConfig.FULL_Q_BAND
+        synth_graph, CompareConfig.MEASURE_WEIGHTED, CompareConfig.FULL_Q_BAND
     )
     eigenvector = analyzer._compute_eigenvector_centrality()
 
@@ -175,8 +175,8 @@ def test_eigenvector_centrality(load_unweighted_test_synth_graph):
 def test_diameter(load_unweighted_test_synth_graph):
     analyzer = MultifractalAnalyzer(
         load_unweighted_test_synth_graph,
-        AnaConfig.MEASURE_WEIGHTED,
-        AnaConfig.FULL_Q_BAND,
+        CompareConfig.MEASURE_WEIGHTED,
+        CompareConfig.FULL_Q_BAND,
     )
     diameter = analyzer._compute_diameter()
 

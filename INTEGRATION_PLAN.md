@@ -4,7 +4,7 @@ Target: `structural-gt` v3.8.6 (`sgtlib`), branch `gen`.
 
 NetworkSynth runs as a separate process in its own Python 3.12 environment; StructuralGT never imports our code, and the two talk through files. Appendix A is the constraint that forces this.
 
-**NetworkSynth is done.** `generate`, `hybrid`, `sweep` and `analyze` all run from our GUI as subprocesses, each writing a manifest, and every CLI mode runs for real on sample data. Worker processes use `spawn`, so nothing depends on the parent surviving. What is left is section 2 — the StructuralGT side — whenever we get to it.
+**NetworkSynth is done.** `generate`, `hybrid`, `sweep` and `compare` all run from our GUI as subprocesses, each writing a manifest, and every CLI mode runs for real on sample data. Worker processes use `spawn`, so nothing depends on the parent surviving. What is left is section 2 — the StructuralGT side — whenever we get to it.
 
 ---
 
@@ -20,7 +20,9 @@ Inputs are chosen by the user, not exported on our behalf, and what a mode reads
 |---|---|---|
 | `edge_list` + `positions` (+ optional `image`) | one network, named directly | `generate`, `hybrid`, `sweep` |
 | `datasets_dir` | every `{name}_edgelist.csv` + `{name}_positions.csv` pair in it, plus an optional `{name}_image.tif` | `generate`, `hybrid`, `sweep` |
-| `networks_dir` | a directory holding `synthetic/` and `original/`, in either format we write — a pickled batch or CSV pairs | `analyze` |
+| `original_dir` + `synthetic_dir` | two directories of networks to compare, in either format we write — a pickled batch or CSV pairs | `compare` |
+
+Comparison stands alone: `compare` reads the two sets of networks the caller names, and generation never analyses what it just made. So "generate then compare" is two runs — the second pointed at the first's `original/` and `synthetic/` folders, or at any other pair. Generation's own quality gate is a separate, cheaper thing: an `ErrorChecker` chosen by `ERROR_CHECKER`, measuring two scalars rather than a full spectrum.
 
 `graphs/csv_io.py` is deliberately tolerant about columns, so either origin works: StructuralGT's `Source,Target` (plus `Weight,Length,Width,Angle` when weighted) or our own `source_index,target_index,edge_weight`, with `x,y` for positions.
 
@@ -47,7 +49,7 @@ A `datasets_dir` becomes one dataset per pair in it, in name order, so one run w
 }
 ```
 
-`contract` is 2 because the input shape varies by mode. An `analyze` spec carries `"inputs": {"networks_dir": "..."}`, a directory run carries `"inputs": {"datasets_dir": "..."}`, and a `sweep` spec adds `NF_RANGE` and `EF_RANGE` to `params`.
+`contract` is 2 because the input shape varies by mode. A `compare` spec carries `"inputs": {"original_dir": "...", "synthetic_dir": "..."}`, a directory run carries `"inputs": {"datasets_dir": "..."}`, and a `sweep` spec adds `NF_RANGE` and `EF_RANGE` to `params`.
 
 With `SEED` set, the same settings reproduce the same networks byte for byte; workers get `SEED + worker_index`, so candidates still differ from each other while the run as a whole repeats.
 
@@ -76,7 +78,7 @@ Every mode writes `manifest.json` at the run root, from a `finally`, so a run th
 
 - `status` is `ok`, `failed` (with an `error` string) or `cancelled`. `cancelled` is deliberately distinct from `failed` — a GUI must not show an error because the user pressed Cancel.
 - A *missing* manifest means the process died hard, which is unambiguous rather than looking like a failed run.
-- `snapshots` is an animation sequence; `previews` is a final render; `analysis` is what the analyse mode produces, kept apart from both.
+- `snapshots` is an animation sequence; `previews` is a final render; `analysis` is what `compare` produces, kept apart from both.
 - Paths are relative to `run_root`, forward slashes on every platform.
 - `manifest_version` and the spec's `contract` exist so a future shape change fails loudly instead of being misread.
 

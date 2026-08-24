@@ -77,7 +77,6 @@ class ConfigDickson(BaseConfig):
     RENDER_MAX_PX = 8000
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = True
-    FULL_ANALYSIS = False
 
     # --- Input paths ---
     BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, "dickson")

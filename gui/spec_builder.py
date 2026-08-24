@@ -229,14 +229,20 @@ def _network_shapes() -> List[InputShape]:
 def _results_shapes() -> List[InputShape]:
     return [
         InputShape(
-            "A results directory",
+            "Two sets to compare",
             [
                 Input(
-                    "networks_dir",
-                    "Results dir",
+                    "original_dir",
+                    "Original",
                     kind="dir",
-                    placeholder="a directory holding synthetic/ and original/",
-                )
+                    placeholder="folder holding the original network",
+                ),
+                Input(
+                    "synthetic_dir",
+                    "Synthetic",
+                    kind="dir",
+                    placeholder="folder holding the synthetic networks",
+                ),
             ],
         )
     ]
@@ -315,7 +321,7 @@ MODES: Dict[str, ModeSpec] = {
         "hybrid", "Hybrid", _common_fields() + _hybrid_fields(), _network_shapes()
     ),
     "sweep": ModeSpec("sweep", "Sweep", _sweep_fields(), _network_shapes()),
-    "analyze": ModeSpec("analyze", "Analyze", _analysis_fields(), _results_shapes()),
+    "compare": ModeSpec("compare", "Compare", _analysis_fields(), _results_shapes()),
 }
 
 

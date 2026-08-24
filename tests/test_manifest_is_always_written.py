@@ -14,7 +14,7 @@ PIPELINES = [
     ("pipelines.scaling", "run_scaling_for_dataset"),
     ("pipelines.hybrid", "_run_dataset_in_subprocess"),
     ("pipelines.sweep", "run_for_dataset"),
-    ("pipelines.analyze", "run_for_container"),
+    ("pipelines.compare", "run_for_dataset"),
 ]
 
 
@@ -28,14 +28,11 @@ class _NoWandb:
 def _prepare(module, runner, replacement, monkeypatch):
     """Patch the per-dataset call, plus whatever else main() would reach.
 
-    A sweep would otherwise try to authenticate, and analyse would find no
-    result directories to work through.
+    A sweep would otherwise try to authenticate.
     """
     monkeypatch.setattr(module, runner, replacement)
     if hasattr(module, "wandb"):
         monkeypatch.setattr(module, "wandb", _NoWandb())
-    if hasattr(module, "find_pkl_containers"):
-        monkeypatch.setattr(module, "find_pkl_containers", lambda *a, **k: {"": "in"})
 
 
 def _config(tmp_path, name):

@@ -17,7 +17,6 @@ def _tune(base, tmp_path, **overrides):
     config.BASE_OUTPUT_PATH = str(tmp_path)
     config.ERROR_CHECKER = "none"
     config.MAX_ATTEMPTS = 2
-    config.FULL_ANALYSIS = False
     config.LOG_MEMORY = False
     config.SEED = 1234
     for key, value in overrides.items():

@@ -36,7 +36,6 @@ class SnapshotConfig(BaseConfig):
     MAX_ATTEMPTS = 50
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = True
-    FULL_ANALYSIS = False
 
     # Shared visual style for both BFS snapshots and final synthetic plots.
     # Adjust node_size / line_width when SYNTHETIC_FRAME_SIZE differs

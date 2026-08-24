@@ -11,7 +11,7 @@ PIPELINES = [
     "scaling",
     "sweep",
     "hybrid",
-    "analyze",
+    "compare",
 ]
 
 
@@ -27,7 +27,7 @@ def test_pipeline_main_reraises_interruption(module_name, monkeypatch):
     # Break at the *earliest* thing main() calls, so we interrupt before any
     # side effects (sweep reaches wandb.login() otherwise).
     patched = False
-    for target in ("_init_config", "create_run_paths", "find_pkl_containers", "run"):
+    for target in ("_init_config", "create_run_paths", "run"):
         if hasattr(module, target):
             monkeypatch.setattr(module, target, boom)
             patched = True
