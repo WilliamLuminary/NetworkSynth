@@ -1,11 +1,3 @@
-# src/configs/scaling_mode/config_sample.py
-"""
-Scaling mode sample configuration.
-
-Reuses the mosaic sample input data for convenience.
-A small 3×3 grid is used by default for quick smoke-testing;
-set SCALE_ROWS / SCALE_COLS to 100 for the full-size run.
-"""
 import logging
 import os
 from typing import Tuple
@@ -25,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 
 class SampleConfig(BaseConfig):
-    """Scaling mode sample — multi-root synchronized BFS."""
 
     DATASETS = [DatasetId("sample_1")]
 
@@ -49,7 +40,6 @@ class SampleConfig(BaseConfig):
     MAX_ATTEMPTS = 10
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = True
-    FULL_ANALYSIS = False
 
     # --- Input paths (reuse mosaic sample data) ---
     BASE_INPUT_PATH = os.path.join(
@@ -63,7 +53,6 @@ class SampleConfig(BaseConfig):
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
-        cls._inject_dependencies()
 
     @classmethod
     def save_synthetic_graph(cls):
@@ -92,7 +81,7 @@ class SampleConfig(BaseConfig):
         if image is None:
             return None
         image = _trim_cv2_image(image)
-        image = _resize_cv2_image(image)
+        image = _resize_cv2_image(image, SampleConfig.FRAME_SIZE)
         return image
 
 

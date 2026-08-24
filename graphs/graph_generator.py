@@ -1,5 +1,3 @@
-# src/graphs/graph_generator.py
-
 import logging
 import random as rng
 from collections import namedtuple
@@ -7,7 +5,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 from numpy import ndarray
 
-from configs import BaseConfig
+from configs import SynthParams
 from configs.base_config import tagged
 from utils import build_graph, calculate_frame
 
@@ -24,13 +22,14 @@ FrontierDescriptor = namedtuple(
 
 class GraphGenerator:
 
-    def __init__(self, attributes_calculator):
-        GraphNode.initialize(attributes_calculator)
+    def __init__(self, attributes_calculator, params: SynthParams):
+        self._params = params
+        GraphNode.initialize(attributes_calculator, self._params)
 
     def generate_network(
         self, frame_range: Optional[Tuple[int, int]] = None, regenerate_times: int = 100
     ):
-        frame_range = frame_range or BaseConfig.SYNTHETIC_FRAME_SIZE
+        frame_range = frame_range or self._params.synthetic_frame_size
 
         for _ in range(regenerate_times):
             nodes, edges = self._bfs_network(frame_range)
@@ -65,7 +64,7 @@ class GraphGenerator:
             Take a snapshot every time the network grows by this many
             nodes.
         """
-        frame_range = frame_range or BaseConfig.SYNTHETIC_FRAME_SIZE
+        frame_range = frame_range or self._params.synthetic_frame_size
 
         for _ in range(regenerate_times):
             nodes, edges = self._bfs_network(
@@ -103,7 +102,7 @@ class GraphGenerator:
         ``SYNTHETIC_FRAME_SIZE``.  Values < 1.0 make components overlap
         sooner, promoting cross-root merges.
         """
-        frame_w, frame_h = BaseConfig.SYNTHETIC_FRAME_SIZE
+        frame_w, frame_h = self._params.synthetic_frame_size
         spacing_w = frame_w * root_spacing_factor
         spacing_h = frame_h * root_spacing_factor
 
@@ -144,13 +143,11 @@ class GraphGenerator:
 
     @staticmethod
     def _bfs_network(
-        frame_range: Optional[Tuple[int, int]] = None,
+        frame_range: Tuple[int, int],
         *,
         snapshot_callback=None,
         snapshot_interval: int = 0,
     ) -> Tuple[set, set]:
-        frame_range = frame_range or BaseConfig.SYNTHETIC_FRAME_SIZE
-
         GraphNode.reset()
         root_node = GraphNode((0, 0))
         node_set, edge_set = {root_node}, set()
@@ -202,7 +199,7 @@ class GraphGenerator:
 
     @staticmethod
     def _bfs_network_with_frontier(
-        frame_range: Optional[Tuple[int, int]] = None,
+        frame_range: Tuple[int, int],
     ) -> Tuple[set, set, List, List[Tuple[float, float]], list]:
         """BFS that also captures frontier descriptors for Phase-2 continuation.
 
@@ -220,8 +217,6 @@ class GraphGenerator:
         all_edges : list[tuple]
             Every edge tuple (inner + boundary).
         """
-        frame_range = frame_range or BaseConfig.SYNTHETIC_FRAME_SIZE
-
         GraphNode.reset()
         root_node = GraphNode((0, 0))
         node_set, edge_set = {root_node}, set()

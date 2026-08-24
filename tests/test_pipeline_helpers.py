@@ -1,14 +1,3 @@
-# tests/test_pipeline_helpers.py
-"""
-Unit tests for pure helper functions in the pipeline modules.
-
-Covers:
-  - generate.compute_average_error()          → outlier removal & mean
-  - generate_select._fmt_metrics()            → metric formatting
-  - generate_select._save_metric_report()     → CSV report output
-  - hybrid.generate_random_centers()          → Poisson-disk center placement
-"""
-
 import csv
 import os
 
@@ -57,13 +46,13 @@ class TestComputeAverageError:
 
 
 # ---------------------------------------------------------------------------
-# _fmt_metrics  (pipelines/generate_select.py)
+# _fmt_metrics  (pipelines/generate.py)
 # ---------------------------------------------------------------------------
 
 
 class TestFmtMetrics:
     def test_formatting(self):
-        from pipelines.generate_select import _fmt_metrics
+        from pipelines.generate import _fmt_metrics
 
         m = {
             "node_count": 100,
@@ -81,13 +70,13 @@ class TestFmtMetrics:
 
 
 # ---------------------------------------------------------------------------
-# _save_metric_report  (pipelines/generate_select.py)
+# _save_metric_report  (pipelines/generate.py)
 # ---------------------------------------------------------------------------
 
 
 class TestSaveMetricReport:
     def test_creates_csv_with_header_and_rows(self, tmp_path):
-        from pipelines.generate_select import _save_metric_report
+        from pipelines.generate import _save_metric_report
 
         ref_metrics = {
             "node_count": 500,

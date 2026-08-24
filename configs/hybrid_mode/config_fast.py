@@ -1,23 +1,9 @@
-# src/configs/hybrid_mode/config_fast.py
-"""
-Hybrid mode fast configuration.
-
-Skips Phase 1 quality checking by setting ERROR_CHECKER to "none"
-(first valid tile is accepted) and uses a small SYNTHETIC_FRAME_SIZE
-so each seed tile is tiny.  Phase 2 then fills the full whiteboard
-(whose size is based on IMAGE_SIZE × TARGET_SCALE).
-
-Usage:
-    python run.py hybrid --config fast
-    python run.py hybrid --config fast --dataset A
-"""
 from typing import Tuple
 
 from .config_sample import SampleConfig
 
 
 class FastConfig(SampleConfig):
-    """Hybrid mode with Phase 1 quality check bypassed."""
 
     # Accept the first valid tile immediately — no error checking computed at all.
     ERROR_CHECKER = "none"

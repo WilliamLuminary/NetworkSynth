@@ -1,73 +1,51 @@
-# src/analysis/multifractal_analyzer.py
 import logging
 import math
 from collections import Counter
 from contextlib import contextmanager
 from dataclasses import astuple, dataclass
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import networkit as nk
 import numpy as np
+import ot
 from scipy import sparse as sp
-from scipy.optimize import linprog
+from scipy.sparse.linalg import eigsh
 from scipy.stats import linregress
 
-from configs import BaseConfig
 from graphs.synth_graph import SynthGraph
 
 logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Sparse transport-LP for Wasserstein distance
+# Wasserstein distance via optimal transport
 # ---------------------------------------------------------------------------
-
-_transport_cache: Dict[Tuple[int, int], sp.csc_matrix] = {}
-
-
-def _build_transport_constraints(n: int, m: int) -> sp.csc_matrix:
-    """Sparse equality-constraint matrix for the 1-Wasserstein LP.
-
-    Shape (n+m, n*m).  Rows 0..n-1 enforce row-sum = p[i],
-    rows n..n+m-1 enforce col-sum = q[j].
-    """
-    nm = n * m
-    row_r = np.repeat(np.arange(n), m)
-    col_r = np.arange(nm)
-    row_c = n + np.repeat(np.arange(m), n)
-    col_c = np.tile(np.arange(n), m) * m + np.repeat(np.arange(m), n)
-
-    data = np.ones(2 * nm)
-    rows = np.concatenate([row_r, row_c])
-    cols = np.concatenate([col_r, col_c])
-    return sp.csc_matrix((data, (rows, cols)), shape=(n + m, nm))
-
-
-def _get_transport_constraints(n: int, m: int) -> sp.csc_matrix:
-    key = (n, m)
-    mat = _transport_cache.get(key)
-    if mat is None:
-        mat = _build_transport_constraints(n, m)
-        _transport_cache[key] = mat
-    return mat
 
 
 def _wasserstein_lp(p: np.ndarray, q: np.ndarray, cost: np.ndarray) -> float:
-    """Exact 1-Wasserstein distance between discrete measures via sparse LP."""
-    n, m = len(p), len(q)
-    A_eq = _get_transport_constraints(n, m)
-    b_eq = np.concatenate([p, q])
-    res = linprog(cost.ravel(), A_eq=A_eq, b_eq=b_eq, bounds=(0, None), method="highs")
-    return res.fun if res.success else float("nan")
+    """Exact 1-Wasserstein distance between discrete measures.
+
+    ``ot.emd2`` is a network simplex in C.  This was a hand-built sparse LP fed
+    to ``scipy.optimize.linprog``; on the supports that arise here — 2x3 up to
+    6x6 — scipy's per-call setup dominated, and it measured 14.4x slower over
+    the 1052 problems one curvature run solves, for answers identical to 4e-16.
+    """
+    return ot.emd2(
+        np.ascontiguousarray(p, dtype=np.float64),
+        np.ascontiguousarray(q, dtype=np.float64),
+        np.ascontiguousarray(cost, dtype=np.float64),
+    )
 
 
 # ---------------------------------------------------------------------------
-# Native Ollivier-Ricci curvature (NetworKit + scipy, no networkx needed)
+# Native Ollivier-Ricci curvature (NetworKit + POT, no networkx needed)
 # ---------------------------------------------------------------------------
 
 
 def _ollivier_ricci_curvature(
     graph: SynthGraph,
+    dist_graph: nk.Graph,
+    dist_matrix: np.ndarray,
     alpha: float = 0.5,
     weighted: bool = False,
     base: float = math.e,
@@ -84,27 +62,14 @@ def _ollivier_ricci_curvature(
     uniformly otherwise), W₁ is the 1-Wasserstein distance under the
     shortest-path metric, and d(u,v) is the direct edge distance.
 
+    *dist_graph* and its *dist_matrix* come from the caller.  This used to build
+    an equivalent graph itself and run its own all-pairs shortest path, making
+    curvature the third full APSP of a single analysis.
+
     The default ``base`` / ``exp_power`` values match the convention used by
     the GraphRicciCurvature library.
     """
     nk_graph = graph.nk
-
-    if weighted:
-        n = nk_graph.numberOfNodes()
-        dist_graph = nk.Graph(n, weighted=True)
-        for u, v, w in nk_graph.iterEdgesWeights():
-            dist_graph.addEdge(u, v, 1.0 / w if w != 0 else float("inf"))
-    elif nk_graph.isWeighted():
-        n = nk_graph.numberOfNodes()
-        dist_graph = nk.Graph(n, weighted=False)
-        for u, v in nk_graph.iterEdges():
-            dist_graph.addEdge(u, v)
-    else:
-        dist_graph = nk_graph
-
-    apsp = nk.distance.APSP(dist_graph)
-    apsp.run()
-    dist_matrix = np.asarray(apsp.getDistances())
 
     nbrs = [list(nk_graph.iterNeighbors(u)) for u in range(nk_graph.numberOfNodes())]
 
@@ -116,13 +81,12 @@ def _ollivier_ricci_curvature(
         if nbrs_u:
             mu_u[0] = alpha
             if weighted:
-                w_u = np.array(
-                    [
-                        base ** (-(dist_graph.weight(u, nb) ** exp_power))
-                        for nb in nbrs_u
-                    ]
+                d_u = np.fromiter(
+                    (dist_graph.weight(u, nb) for nb in nbrs_u),
+                    dtype=np.float64,
+                    count=len(nbrs_u),
                 )
-                mu_u[1:] = (1.0 - alpha) * w_u / w_u.sum()
+                mu_u[1:] = _neighbour_masses(d_u, alpha, base, exp_power)
             else:
                 mu_u[1:] = (1.0 - alpha) / len(nbrs_u)
         else:
@@ -134,13 +98,12 @@ def _ollivier_ricci_curvature(
         if nbrs_v:
             mu_v[0] = alpha
             if weighted:
-                w_v = np.array(
-                    [
-                        base ** (-(dist_graph.weight(v, nb) ** exp_power))
-                        for nb in nbrs_v
-                    ]
+                d_v = np.fromiter(
+                    (dist_graph.weight(v, nb) for nb in nbrs_v),
+                    dtype=np.float64,
+                    count=len(nbrs_v),
                 )
-                mu_v[1:] = (1.0 - alpha) * w_v / w_v.sum()
+                mu_v[1:] = _neighbour_masses(d_v, alpha, base, exp_power)
             else:
                 mu_v[1:] = (1.0 - alpha) / len(nbrs_v)
         else:
@@ -157,6 +120,58 @@ def _ollivier_ricci_curvature(
     return curvatures
 
 
+def _neighbour_masses(
+    distances: np.ndarray, alpha: float, base: float, exp_power: float
+) -> np.ndarray:
+    """Spread ``1 - alpha`` over neighbours in proportion to ``base ** -d**p``.
+
+    Written as a shifted softmax rather than the literal expression, which
+    underflows on real data: edge widths are of the order 0.03, so the inverted
+    distance ``1/w`` reaches ~30, and ``e ** -(30**2)`` is exactly 0 in double
+    precision.  Once every neighbour of a node underflows the normalisation
+    divides 0 by 0, and the resulting NaN aborts the transport solver — which is
+    why weighted analysis could not complete at all.
+
+    Subtracting the largest exponent scales numerator and denominator by the
+    same constant, so it cancels exactly.  This is the same number, kept inside
+    the representable range; nothing is clamped or defaulted.
+    """
+    exponents = -(distances**exp_power) * math.log(base)
+    affinities = np.exp(exponents - exponents.max())
+    return (1.0 - alpha) * affinities / affinities.sum()
+
+
+def _principal_eigenvector(nk_graph: nk.Graph) -> List[float]:
+    """Eigenvector centrality: the principal eigenvector of the adjacency matrix.
+
+    Lanczos rather than power iteration.  ``nk.centrality.EigenvectorCentrality``
+    iterates, and on a graph with a small spectral gap it is both slow *and*
+    inaccurate: 22s at ``tol=1e-9`` for 705 nodes, and still 2.5% (max relative)
+    away from the ``tol=1e-12`` answer.  ``eigsh`` matches that answer to ~7e-6
+    in 0.01s, so tightening the tolerance stopped being a trade-off at all.
+
+    Returned unit-L2-normalised and non-negative, matching networkit's
+    convention.  Perron-Frobenius makes the principal eigenvector of a connected
+    graph single-signed, so whichever sign ``eigsh`` returns carries no meaning.
+    """
+    n = nk_graph.numberOfNodes()
+    weighted = nk_graph.isWeighted()
+
+    rows: List[int] = []
+    cols: List[int] = []
+    values: List[float] = []
+    for u, v in nk_graph.iterEdges():
+        w = nk_graph.weight(u, v) if weighted else 1.0
+        rows += [u, v]
+        cols += [v, u]
+        values += [w, w]
+
+    adjacency = sp.coo_matrix((values, (rows, cols)), shape=(n, n)).tocsr()
+    _, vectors = eigsh(adjacency.astype(np.float64), k=1, which="LA")
+    principal = np.abs(vectors[:, 0])
+    return (principal / np.linalg.norm(principal)).tolist()
+
+
 @dataclass
 class MultifractalErrorFeatures:
     holder_exponent: float
@@ -171,20 +186,32 @@ class MultifractalAnalyzer:
     small_q = _generate_range(300)
     full_q = _generate_range(2000)
 
-    def __init__(self, graph: SynthGraph):
+    def __init__(
+        self,
+        graph: SynthGraph,
+        measure_weighted: bool,
+        full_q_band: bool,
+    ):
+        """Analyze *graph*.
+
+        Both settings are required: a spawned child re-imports ``configs``
+        unmutated, so a ``BaseConfig`` fallback here would silently analyze
+        with the wrong q-band rather than fail.
+        """
         self.graph = graph
         self.f_digit = 0
         self.q_ = None
-        self.weighted = BaseConfig.MEASURE_WEIGHTED if graph.is_weighted() else False
-        if BaseConfig.MEASURE_WEIGHTED is not self.weighted:
+        self._full_q_band = full_q_band
+        self.weighted = measure_weighted if graph.is_weighted() else False
+        if measure_weighted is not self.weighted:
             logger.debug("Unweighted graph — falling back to unweighted analysis.")
         self._inv_graph: nk.Graph | None = None
         self._uw_graph: nk.Graph | None = None
+        self._distances: Dict[int, list] = {}
 
     # ---- helpers ----
 
     def _get_nk_graph(self) -> nk.Graph:
-        """Return the underlying networkit graph."""
         return self.graph.nk
 
     def _get_analysis_graph(self) -> nk.Graph:
@@ -205,8 +232,21 @@ class MultifractalAnalyzer:
             return self._uw_graph
         return g
 
+    def _get_distances(self, nk_graph: nk.Graph) -> list:
+        """All-pairs shortest paths for *nk_graph*, computed at most once.
+
+        A full ``analyze_graph`` asked for the same distances three times.  Both
+        graphs this is ever called with are cached attributes, so their identity
+        is stable for the analyzer's lifetime and safe to key on.
+        """
+        key = id(nk_graph)
+        if key not in self._distances:
+            apsp = nk.distance.APSP(nk_graph)
+            apsp.run()
+            self._distances[key] = apsp.getDistances()
+        return self._distances[key]
+
     def _get_inverted_weight_graph(self) -> nk.Graph:
-        """Lazily build and cache a graph with inverted edge weights (1/w)."""
         if self._inv_graph is None:
             g = self.graph.nk
             n = g.numberOfNodes()
@@ -219,7 +259,6 @@ class MultifractalAnalyzer:
 
     @staticmethod
     def _weighted_clustering(nk_graph: nk.Graph) -> List[float]:
-        """Weighted clustering matching ``nx.clustering(G, weight=...)``."""
         n = nk_graph.numberOfNodes()
         max_w = 0.0
         for u, v, w in nk_graph.iterEdgesWeights():
@@ -252,7 +291,7 @@ class MultifractalAnalyzer:
     # ---- public ----
 
     def analyze_error_features(self) -> MultifractalErrorFeatures:
-        q_band = self.full_q if BaseConfig.FULL_Q_BAND else self.small_q
+        q_band = self.full_q if self._full_q_band else self.small_q
         with self.set_q(q_band):
             tau_list, _ = self._compute_multifractal_taus()
             alpha_0, width, _, _ = self._compute_n_spectrum(tau_list)
@@ -269,10 +308,7 @@ class MultifractalAnalyzer:
 
     def _compute_multifractal_taus(self):
         nk_graph = self._get_analysis_graph()
-
-        apsp = nk.distance.APSP(nk_graph)
-        apsp.run()
-        all_distances = apsp.getDistances()
+        all_distances = self._get_distances(nk_graph)
 
         n_list = []
         r_g_all_set = set()
@@ -356,9 +392,7 @@ class MultifractalAnalyzer:
         else:
             nk_graph = self._get_analysis_graph()
 
-        apsp = nk.distance.APSP(nk_graph)
-        apsp.run()
-        all_distances = apsp.getDistances()
+        all_distances = self._get_distances(nk_graph)
 
         node_dimensions = {}
         for node in self.graph.nodes():
@@ -432,10 +466,20 @@ class MultifractalAnalyzer:
         return bt
 
     def _compute_ollivier_ricci_curvature(self) -> List[float]:
-        return _ollivier_ricci_curvature(self.graph, alpha=0.5, weighted=self.weighted)
+        dist_graph = (
+            self._get_inverted_weight_graph()
+            if self.weighted
+            else self._get_analysis_graph()
+        )
+        return _ollivier_ricci_curvature(
+            self.graph,
+            dist_graph,
+            np.asarray(self._get_distances(dist_graph)),
+            alpha=0.5,
+            weighted=self.weighted,
+        )
 
     def _compute_assortativity(self) -> float:
-        """Degree-degree Pearson correlation coefficient (manual computation)."""
         from scipy.stats import pearsonr
 
         x, y = [], []
@@ -469,14 +513,11 @@ class MultifractalAnalyzer:
                 nk_graph = uw
 
         try:
-            ec = nk.centrality.EigenvectorCentrality(nk_graph, tol=1e-6)
-            ec.run()
-            return ec.scores()
+            return _principal_eigenvector(nk_graph)
         except Exception:
             return [float("nan")] * nk_graph.numberOfNodes()
 
     def _compute_diameter(self) -> float:
-        """Unweighted hop diameter (matches nx.diameter behaviour)."""
         if self.graph.is_connected():
             nk_graph = self._get_nk_graph()
         else:
@@ -488,6 +529,11 @@ class MultifractalAnalyzer:
             for u, v in nk_graph.iterEdges():
                 uw.addEdge(u, v)
             nk_graph = uw
+
+        # nk.distance.Diameter returns an int, silently flooring weighted
+        # distances (4.7 -> 4, 0.3 -> 0).  Safe only because the graph above
+        # is unweighted, making the hop diameter integral by definition.
+        assert not nk_graph.isWeighted(), "hop diameter needs an unweighted graph"
 
         algo = (
             getattr(nk.distance.DiameterAlgo, "Exact", None)

@@ -1,27 +1,3 @@
-"""Re-plot hybrid snapshot PNGs from saved .npy data.
-
-Scans a snapshots directory for *_positions.npy / *_edges.npy pairs
-and renders any that are missing a corresponding .png (or all, with
-force=True).  Useful for re-plotting with different visual settings
-without re-running the full pipeline.
-
-Usage:
-    python scripts/helpers/plot_hybrid_snapshots.py <snapshots_dir>
-    python scripts/helpers/plot_hybrid_snapshots.py <snapshots_dir> --dpi 300
-    python scripts/helpers/plot_hybrid_snapshots.py <snapshots_dir> --force
-    python scripts/helpers/plot_hybrid_snapshots.py <snapshots_dir> --workers 8
-
-Examples:
-    # Re-plot missing PNGs from an existing run:
-    python scripts/helpers/plot_hybrid_snapshots.py \\
-        data/output/hybrid_mode_.../sample_A/snapshots
-
-    # Re-plot ALL with custom style:
-    python scripts/helpers/plot_hybrid_snapshots.py \\
-        data/output/hybrid_mode_.../sample_A/snapshots \\
-        --force --dpi 300 --node_size 0.05 --line_width 0.2
-"""
-
 import os
 import re
 import sys
@@ -32,7 +8,6 @@ from utils import save_hybrid_snapshot
 
 
 def find_snapshot_pairs(snapshot_dir):
-    """Return sorted list of (index, pos_path, edge_path) tuples."""
     pattern = re.compile(r"^snapshot_(\d+)_positions\.npy$")
     pairs = []
     for fname in os.listdir(snapshot_dir):

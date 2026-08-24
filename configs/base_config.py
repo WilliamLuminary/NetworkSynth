@@ -1,4 +1,3 @@
-# src/configs/base_config.py
 import json
 import logging
 import os
@@ -13,8 +12,14 @@ logger = logging.getLogger(__name__)
 class _JsonFormatter(logging.Formatter):
     """Emit each log record as a single JSON line.
 
-    Recognised ``extra`` keys (``tag``, ``dataset``) are promoted to
-    top-level fields so they can be filtered with ``jq``.
+    Recognised ``extra`` keys (``tag``, ``dataset``, ``percent``) are promoted
+    to top-level fields so they can be filtered with ``jq``.
+
+    ``percent`` is a machine-readable completion figure, present on progress
+    records.  It exists so a caller tailing this file can drive a progress bar
+    without parsing percentages out of the message text — see
+    ``INTEGRATION_PLAN.md``.  Emit it with
+    ``logger.info(msg, extra=tagged("PROGRESS", percent=pct))``.
 
     Each entry includes a ``run_id`` so concurrent runs appending to the
     same file can be distinguished: ``jq 'select(.run_id == "abc123")'``.
@@ -32,7 +37,7 @@ class _JsonFormatter(logging.Formatter):
             "logger": record.name,
             "message": record.getMessage(),
         }
-        for key in ("tag", "dataset"):
+        for key in ("tag", "dataset", "percent"):
             value = getattr(record, key, None)
             if value is not None:
                 entry[key] = value
@@ -67,7 +72,6 @@ class BaseConfig:
 
     @classmethod
     def get_datasets(cls) -> List[DatasetId]:
-        """Get all datasets to process."""
         if cls.DATASETS is None:
             raise ValueError("DATASETS must be defined in the config")
         return cls.DATASETS
@@ -85,7 +89,6 @@ class BaseConfig:
     CLOSED_EDGES_FACTOR: float
 
     MEASURE_WEIGHTED: bool
-    FULL_ANALYSIS: bool = False
     FULL_Q_BAND: bool = False
 
     SYNTHETIC_GRAPH_NUMBER: int = 0
@@ -96,8 +99,8 @@ class BaseConfig:
     BASE_DATA_PATH = os.path.join(PROJECT_ROOT, "data")
     BASE_INPUT_PATH = os.path.join(BASE_DATA_PATH, "input")
 
-    NETWORKS_DATA_PATH = None
-    ATTRIBUTES_DICT_DATA_PATH = None
+    ORIGINAL_NETWORKS_PATH = None
+    SYNTHETIC_NETWORKS_PATH = None
 
     MAX_ATTEMPTS = 10
     ERROR_CHECKER: str = (
@@ -106,24 +109,32 @@ class BaseConfig:
     ERROR_TOLERANCE = 0.15  # Generally should be 0.15
     MIN_TILE_NODES = 100
 
+    # Master seed for reproducible generation.  None = unseeded, i.e. a
+    # different network on every run (the historical behaviour).  When set,
+    # each worker is given a distinct derived seed (SEED + worker index) so
+    # candidates still differ from one another but the whole run repeats
+    # identically.
+    SEED: Optional[int] = None
+
     SNAPSHOT_INTERVAL: int = 0  # 0 = disabled; N = snapshot every N new nodes
     SNAPSHOT_PLOT_WORKERS: int = 20
     SELECT_BEST: int = 0  # 0 = disabled; N = keep N best networks by metric distance
 
     LOG_MEMORY: bool = False
+    # Declared per config, never toggled at runtime: a mutator here would set
+    # the flag on BaseConfig for every config in the process, and for every
+    # forked child with it.
     DISABLE_SAVING: bool = False
     DISABLE_SAVING_NOTE: str = ""
 
     BASE_OUTPUT_PATH = os.path.join(BASE_DATA_PATH, "output")
     ORIGINAL_NETWORK_FUNC = ORIGINAL_IMAGE_FUNC = load_idle
     NETWORKS_FUNC = load_idle
-    ATTRIBUTES_DICT_FUNC = load_idle
 
     MAX_WORKERS: int = 50
 
     @classmethod
     def get_max_workers(cls, num_tasks: int = None) -> int:
-        """Return number of worker processes, capped by half the CPUs and MAX_WORKERS."""
         cpu_count = os.cpu_count() or 1
         max_workers = min(max(1, cpu_count // 2), cls.MAX_WORKERS)
         if num_tasks is not None:
@@ -132,13 +143,23 @@ class BaseConfig:
 
     @classmethod
     def get_snapshot_plot_workers(cls) -> int:
-        """Return number of snapshot plotting workers, capped by half the CPUs and SNAPSHOT_PLOT_WORKERS."""
         cpu_count = os.cpu_count() or 1
         return min(max(1, cpu_count // 2), cls.SNAPSHOT_PLOT_WORKERS)
 
     @classmethod
     def initialize(cls):
-        cls._setup_logger(details=cls.__name__)
+        """Establish this run's identity.  Logging is set up by the entry point.
+
+        ``RUN_ID`` is generated here rather than as a side effect of logging
+        setup, because it names the run's output directory (see
+        ``handlers.run_paths``) and is needed whether or not anything logs.
+        """
+        from handlers.run_logging import configure_console
+
+        if not cls.RUN_ID:
+            cls.RUN_ID = uuid.uuid4().hex[:8]
+        configure_console()
+
         module_parts = cls.__module__.split(".")
         mode = next((p for p in module_parts if p.endswith("_mode")), None)
         cls.OUTPUT_DENOTE = f"{mode}_{cls.__name__}" if mode else cls.__name__
@@ -147,9 +168,10 @@ class BaseConfig:
     def save(cls, identifier: str):
         """Return the save specs for *identifier*.
 
-        Checks for a ``save_<identifier>`` classmethod first (mode
-        overrides injected by ``_inject_dependencies``), then falls
-        back to ``DEFAULT_SAVE_SPECS`` in ``file_definitions``.
+        Checks for a ``save_<identifier>`` classmethod on *cls* first, which
+        resolves a mode's override through the normal MRO, then falls back to
+        ``DEFAULT_SAVE_SPECS`` in ``file_definitions``.  Call this on the active
+        config, not on ``BaseConfig``.
 
         Each spec is a tuple::
 
@@ -165,86 +187,7 @@ class BaseConfig:
             raise ValueError(f"No save spec for '{identifier}' in {cls.__name__}.")
         return specs
 
-    @classmethod
-    def _inject_dependencies(cls):
-        for name in dir(cls):
-            if name.startswith("__"):
-                continue
-            if name.isupper() or name.startswith("save_"):
-                value = getattr(cls, name)
-                setattr(BaseConfig, name, value)
-
-    @classmethod
-    def set_node_factor(cls, factor: float):
-        cls.CLOSED_NODES_FACTOR = factor
-        logging.info(
-            f"CLOSED_NODES_FACTOR has been overwritten! Current value: {factor}",
-            extra=tagged("CONFIG"),
-        )
-
-    @classmethod
-    def set_edge_factor(cls, factor: float):
-        cls.CLOSED_EDGES_FACTOR = factor
-        logging.info(
-            f"CLOSED_EDGES_FACTOR has been overwritten! Current value; {factor}",
-            extra=tagged("CONFIG"),
-        )
-
-    @classmethod
-    def enable_saving(cls, reason: str = ""):
-        BaseConfig.DISABLE_SAVING = False
-        BaseConfig.DISABLE_SAVING_NOTE = reason
-
-    @classmethod
-    def disable_saving(cls, reason: str = ""):
-        BaseConfig.DISABLE_SAVING = True
-        BaseConfig.DISABLE_SAVING_NOTE = reason
-
-    @classmethod
-    def update_synthetic_frame_size(cls, frame_size: Tuple[int, int]):
-        cls.SYNTHETIC_FRAME_SIZE = frame_size
-        logging.info(
-            f"SYNTHETIC_FRAME_SIZE has been overwritten! Current value: {frame_size}",
-            extra=tagged("CONFIG"),
-        )
-
-    _logger_initialized = False
     RUN_ID: str = ""
-
-    @classmethod
-    def _setup_logger(cls, log_level=None, details=None):
-        if BaseConfig._logger_initialized:
-            return
-        log_level = log_level or logging.INFO
-        details = details or ""
-
-        BaseConfig.RUN_ID = uuid.uuid4().hex[:8]
-
-        _logger = logging.getLogger()
-        _logger.setLevel(log_level)
-
-        # Console: human-readable plain text
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(log_level)
-        # noinspection SpellCheckingInspection
-        console_formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
-        console_handler.setFormatter(console_formatter)
-
-        # File: JSON lines (one JSON object per line, queryable with jq)
-        logs_dir = os.path.join(BaseConfig.BASE_OUTPUT_PATH, "logs")
-        os.makedirs(logs_dir, exist_ok=True)
-        file_handler = logging.FileHandler(
-            os.path.join(logs_dir, f"project_{details}.jsonl"),
-            mode="a",
-        )
-        file_handler.setLevel(log_level)
-        file_handler.setFormatter(_JsonFormatter(run_id=BaseConfig.RUN_ID))
-
-        _logger.addHandler(console_handler)
-        _logger.addHandler(file_handler)
-        BaseConfig._logger_initialized = True
 
     def __str__(self):
         def is_method_like(attr_value):
