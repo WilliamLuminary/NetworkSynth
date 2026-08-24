@@ -1,41 +1,65 @@
-# src/configs/analyze_mode/config_sample.py
 from __future__ import annotations
 
 import logging
 import os
 import pickle
-from typing import TYPE_CHECKING, List, Tuple
+from typing import List
 
 from ..base_config import BaseConfig
-
-if TYPE_CHECKING:
-    from graphs.synth_graph import SynthGraph
+from ..enums import DatasetId
 
 logger = logging.getLogger(__name__)
 
 
 class SampleConfig(BaseConfig):
     MEASURE_WEIGHTED = False
-    NETWORKS_DATA_PATH = os.path.join(BaseConfig.BASE_OUTPUT_PATH, "results_multi")
+
+    #: One dataset per run: analysis compares the two sets below, and which two
+    #: they are is the point of the mode, not something to discover.
+    DATASETS = [DatasetId("analysis")]
+
+    _RESULTS = os.path.join(BaseConfig.BASE_OUTPUT_PATH, "latest_result", "sample_1")
+    ORIGINAL_NETWORKS_PATH = os.path.join(_RESULTS, "original")
+    SYNTHETIC_NETWORKS_PATH = os.path.join(_RESULTS, "synthetic")
 
     @classmethod
     def initialize(cls):
         super().initialize()
-        cls.NETWORKS_FUNC = cls._load_networks_dict
-        cls._inject_dependencies()
+        cls.NETWORKS_FUNC = staticmethod(_load_networks)
 
-    @staticmethod
-    def _load_networks_dict(
-        _both_networks_path,
-    ) -> Tuple[List[SynthGraph], List[SynthGraph]]:
-        original_network, synthetic_networks = None, None
-        for entry in os.listdir(_both_networks_path):
-            entry_path = os.path.join(_both_networks_path, entry)
-            if entry == "synthetic":
-                synthetic_networks = _load_network_pkl(entry_path)
-            elif entry in ("origin", "original"):
-                original_network = _load_network_pkl(entry_path)
-        return original_network, synthetic_networks
+
+def _load_networks(folder: str) -> list:
+    """Every network in *folder*, in whichever format it was written.
+
+    Pickles first, because one holds a whole batch, then the CSV pairs — the
+    original network is only ever written as CSV, so a results directory cannot
+    be read at all without both.  Either format goes through the same readers
+    the generate mode uses; nothing here parses a graph itself.
+    """
+    pickled = _load_network_pkl(folder)
+    if pickled:
+        return pickled
+    return _load_network_csv(folder)
+
+
+def _load_network_csv(folder: str) -> list:
+    from graphs import read_graph_csv
+
+    graphs = []
+    for name in sorted(os.listdir(folder)):
+        if not name.endswith("_edgelist.csv"):
+            continue
+        positions = os.path.join(
+            folder, name.replace("_edgelist.csv", "_positions.csv")
+        )
+        # Named and stopped rather than skipped: half a results directory
+        # analysed as if it were whole is a wrong answer, not a smaller one.
+        assert os.path.exists(positions), (
+            f"{os.path.join(folder, name)} has no positions file "
+            f"beside it ({positions})"
+        )
+        graphs.append(read_graph_csv(os.path.join(folder, name), positions))
+    return graphs
 
 
 def _load_network_pkl(folder: str) -> list:

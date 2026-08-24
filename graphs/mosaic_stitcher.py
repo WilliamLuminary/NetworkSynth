@@ -1,22 +1,3 @@
-# src/graphs/mosaic_stitcher.py
-"""
-Mosaic stitcher: combines multiple tile networks into one large network
-by merging close nodes at tile boundaries.
-
-The core merging logic mirrors GraphNode's node-merging behavior:
-  - Nodes from *different* tiles that are within ``merge_threshold``
-    distance are merged into a single node.
-  - Spatial hashing (grid cell size = merge_threshold) gives O(1)
-    average-case neighbour lookups, identical to GraphNode._spatial_hash.
-  - A Union-Find (disjoint-set) structure handles transitive merges
-    so that chains of close nodes collapse correctly.
-
-Typical usage:
-    merge_thr = avg_length * CLOSED_NODES_FACTOR
-    stitcher  = MosaicStitcher(merge_threshold=merge_thr)
-    big_graph = stitcher.stitch(tile_graphs)
-"""
-
 import logging
 from collections import defaultdict
 from typing import Dict, Set, Tuple
@@ -33,7 +14,6 @@ logger = logging.getLogger(__name__)
 # Union-Find (Disjoint Set) helper
 # ---------------------------------------------------------------------------
 class _UnionFind:
-    """Weighted quick-union with path compression."""
 
     __slots__ = ("parent", "rank")
 
@@ -66,7 +46,6 @@ class _UnionFind:
 # Stitcher
 # ---------------------------------------------------------------------------
 class MosaicStitcher:
-    """Stitch a grid of tile networks into a single large network."""
 
     def __init__(self, merge_threshold: float):
         self.merge_threshold = merge_threshold
@@ -144,10 +123,6 @@ class MosaicStitcher:
         graph: SynthGraph,
         node_tile_ids: np.ndarray,
     ) -> SynthGraph:
-        """
-        Find cross-tile node pairs closer than ``merge_threshold`` and
-        merge them with a Union-Find structure, then contract the graph.
-        """
         positions = graph.positions()
 
         # --- spatial hash ---
@@ -225,7 +200,6 @@ class MosaicStitcher:
         return SynthGraph(new_graph, new_positions)
 
     def _spatial_hash(self, position) -> Tuple[int, int]:
-        """Mirrors ``GraphNode._spatial_hash``."""
         return (
             int(position[0] // self.grid_size),
             int(position[1] // self.grid_size),

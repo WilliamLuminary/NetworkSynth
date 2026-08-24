@@ -1,4 +1,3 @@
-# src/graphs/_graph_node.py
 import itertools
 import math
 import random
@@ -7,7 +6,7 @@ from typing import Dict, List, Set, Tuple
 
 import numpy as np
 
-from configs import BaseConfig
+from configs import SynthParams
 
 
 class GraphNode:
@@ -35,24 +34,24 @@ class GraphNode:
     _closed_edges_factor: float
 
     @classmethod
-    def initialize(cls, attrs):
+    def initialize(cls, attrs, params: SynthParams):
         cls._degree_dist = attrs.degree_distribution
         cls._degree_trans_probs = attrs.degree_transition_probs
         cls._degree_angles = attrs.degree_angles
         cls._degree_lengths = attrs.degree_lengths
         cls._avg_length = attrs.average_length
 
-        cls._closed_nodes_thr = cls._avg_length * BaseConfig.CLOSED_NODES_FACTOR
-        cls._closed_edges_thr = cls._avg_length * BaseConfig.CLOSED_EDGES_FACTOR
+        cls._closed_nodes_thr = cls._avg_length * params.closed_nodes_factor
+        cls._closed_edges_thr = cls._avg_length * params.closed_edges_factor
         cls._closed_nodes_thr_sq = cls._closed_nodes_thr**2
         cls._closed_edges_thr_sq = cls._closed_edges_thr**2
         cls._grid_size = cls._avg_length
 
-        cls._node_search_radius = math.ceil(BaseConfig.CLOSED_NODES_FACTOR)
-        cls._edge_search_radius = math.ceil(BaseConfig.CLOSED_EDGES_FACTOR)
+        cls._node_search_radius = math.ceil(params.closed_nodes_factor)
+        cls._edge_search_radius = math.ceil(params.closed_edges_factor)
 
-        cls._closed_nodes_factor = BaseConfig.CLOSED_NODES_FACTOR
-        cls._closed_edges_factor = BaseConfig.CLOSED_EDGES_FACTOR
+        cls._closed_nodes_factor = params.closed_nodes_factor
+        cls._closed_edges_factor = params.closed_edges_factor
 
         cls.node_grid = defaultdict(set)
         cls.edge_grid = defaultdict(set)
@@ -91,12 +90,6 @@ class GraphNode:
 
     @classmethod
     def create_frontier_node(cls, position, degree, base_angle, clockwise, parent_node):
-        """Create a frontier node ready for ``generate_children()``.
-
-        Mimics a normal non-root node whose BFS expansion was paused:
-        ``children = [parent_node]`` so ``generate_children()`` will treat
-        it as unexpanded (``len(children) == 1``).
-        """
         node = object.__new__(cls)
         node.id = next(cls.id_counter)
         node.position = position
@@ -111,7 +104,6 @@ class GraphNode:
 
     @classmethod
     def register_edge(cls, edge):
-        """Add a pre-existing edge to ``edge_grid`` for avoidance checks."""
         keys = cls._edge_spatial_hash(*edge)
         for key in keys:
             cls.edge_grid[key].add(edge)
@@ -153,7 +145,6 @@ class GraphNode:
         return np.random.choice(degrees, p=probabilities)
 
     def _initialize_root_node(self) -> None:
-        """Initialize a root node by generating its first child."""
         length = random.choice(GraphNode._degree_lengths[self.degree])
         child_position = self._polar_to_cartesian([length], [self.base_angle])[0]
         child = GraphNode(child_position, parent=self, parent_angle=self.base_angle)
@@ -163,7 +154,6 @@ class GraphNode:
         self._add_edge_to_grid((self.position, child_position))
 
     def _add_child(self, child) -> None:
-        """Add a child to this node."""
         assert (
             len(self.children) < self.degree
         ), f"{self} cannot have more than {self.degree} children."
@@ -182,9 +172,6 @@ class GraphNode:
             GraphNode.edge_grid[key].add(edge)
 
     def generate_children(self) -> bool:
-        """
-        :return: Return true iff the node has generated children successfully, vice versa.
-        """
         if (
             len(self.children) > 1 or self.degree == 1
         ):  # Skip visited nodes or Endpoint has no other child

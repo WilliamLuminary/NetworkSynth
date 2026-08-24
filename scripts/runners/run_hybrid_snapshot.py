@@ -1,14 +1,3 @@
-# scripts/runners/run_hybrid_snapshot.py
-"""
-Hybrid snapshot run: generate a hybrid network for sample_A and capture
-Phase 2 snapshots showing how tiles merge round by round.
-
-Usage (from project root):
-    python scripts/runners/run_hybrid_snapshot.py
-    python scripts/runners/run_hybrid_snapshot.py --scale 5    # 5x5 (faster)
-    python scripts/runners/run_hybrid_snapshot.py --scale 100  # 100x100 (full)
-    python scripts/runners/run_hybrid_snapshot.py --interval 5 # snapshot every 5 rounds
-"""
 import os
 import sys
 
@@ -52,10 +41,9 @@ def main(scale: int = 10, interval: int = 1, config: str = "A"):
     logger.info(f"Hybrid snapshot run — sample_{config} @ {scale}x{scale}")
     logger.info("=" * 60)
 
-    from configs import BaseConfig
     from configs.enums import DatasetId
     from configs.hybrid_mode import HybridConfig
-    from handlers import Saver
+    from handlers import create_run_paths
     from pipelines.hybrid import run_hybrid_for_dataset
 
     HybridConfig.TARGET_SCALE = (scale, scale)
@@ -64,18 +52,18 @@ def main(scale: int = 10, interval: int = 1, config: str = "A"):
 
     dataset_id = DatasetId(f"sample_{config}")
 
-    logger.info(f"Target scale: {BaseConfig.TARGET_SCALE}")
-    logger.info(f"Frame: {BaseConfig.SYNTHETIC_FRAME_SIZE}")
-    logger.info(f"Phase 2 max rounds: {BaseConfig.PHASE2_MAX_ROUNDS}")
+    logger.info(f"Target scale: {HybridConfig.TARGET_SCALE}")
+    logger.info(f"Frame: {HybridConfig.SYNTHETIC_FRAME_SIZE}")
+    logger.info(f"Phase 2 max rounds: {HybridConfig.PHASE2_MAX_ROUNDS}")
     logger.info(f"Snapshot interval: every {interval} round(s)")
     logger.info(f"CPU count: {os.cpu_count()}")
-    logger.info(f"Max workers: {BaseConfig.get_max_workers()}")
+    logger.info(f"Max workers: {HybridConfig.get_max_workers()}")
 
     t_start = time.time()
 
     try:
-        Saver.initialize()
-        run_hybrid_for_dataset(dataset_id)
+        run_paths = create_run_paths(HybridConfig)
+        run_hybrid_for_dataset(dataset_id, HybridConfig, run_paths)
     except KeyboardInterrupt:
         logger.critical("Interrupted by user")
     except Exception:

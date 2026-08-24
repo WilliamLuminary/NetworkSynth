@@ -1,23 +1,9 @@
-# run.py
-"""
-Unified entry point for all NetworkSynth pipelines.
+import logging
+import sys
 
-Usage
------
-    python run.py generate                          Standard generation (default config)
-    python run.py generate --config Snapshot1x1     Single network + BFS snapshots
-    python run.py generate_select --config Snapshot3x3   Generate 20, rank, pick top 3
-    python run.py from_props                        Generate from pre-computed attributes
-    python run.py mosaic                            Mosaic: parallel tiles + stitch
-    python run.py scaling                           Scaling: multi-root synchronized BFS
-    python run.py hybrid                            Hybrid: seed tiles + frontier continuation
-    python run.py hybrid --config snapshot          Hybrid config variant
-    python run.py hybrid --dataset A                Single dataset
-    python run.py sweep                             Hyperparameter sweep (wandb)
-    python run.py sweep --config A --nf_range '(2.1,3.0)' --ef_range '(2.1,3.0)'
-    python run.py analyze                           Multifractal analysis on existing results
-"""
 import fire
+
+from handlers import configure_console
 
 
 class CLI:
@@ -25,6 +11,9 @@ class CLI:
 
     def generate(self, config: str = None):
         """Standard network generation (parallel, quality-checked).
+
+        Set SELECT_BEST > 0 in the config to generate many candidates, rank them
+        against the original, and keep only the best; 0 keeps every network.
 
         Args:
             config: Config variant name, e.g. 'Snapshot1x1', 'Snapshot3x3'.
@@ -45,35 +34,6 @@ class CLI:
         from pipelines.generate import main
 
         main(config_cls=config_cls)
-
-    def generate_select(self, config: str = None):
-        """Generate N candidates, rank by metrics, select top K.
-
-        Args:
-            config: Config variant name, e.g. 'Snapshot3x3'.
-                    Maps to GenConfig<Name>. Omit for default (Snapshot).
-        """
-        config_cls = None
-        if config:
-            import configs.generate_mode as gm
-
-            cls_name = f"GenConfig{config}"
-            config_cls = getattr(gm, cls_name, None)
-            if config_cls is None:
-                available = [n for n in dir(gm) if n.startswith("GenConfig")]
-                raise SystemExit(
-                    f"Unknown generate config '{config}'. " f"Available: {available}"
-                )
-
-        from pipelines.generate_select import main
-
-        main(config_cls=config_cls)
-
-    def from_props(self):
-        """Generate from pre-computed structural attributes."""
-        from pipelines.generate_from_props import main
-
-        main()
 
     def mosaic(self):
         """Mosaic: parallel tiles + stitch."""
@@ -120,24 +80,68 @@ class CLI:
 
         main(config_cls=config_cls)
 
-    def sweep(self, config: str = None, nf_range: tuple = None, ef_range: tuple = None):
-        """Hyperparameter sweep (wandb).
+    def sweep(self, nf_range: tuple = None, ef_range: tuple = None):
+        """Hyperparameter sweep (wandb) over every dataset in the sweep config.
 
         Args:
-            config: Single dataset letter (A/B/C/D). Omit to sweep all.
             nf_range: Node factor range as tuple, e.g. '(2.1, 3.0)'.
+                      Defaults to the config's NF_RANGE.
             ef_range: Edge factor range as tuple, e.g. '(2.1, 3.0)'.
+                      Defaults to the config's EF_RANGE.
         """
         from pipelines.sweep import main
 
-        main(config=config, nf_range=nf_range, ef_range=ef_range)
+        main(nf_range=nf_range, ef_range=ef_range)
 
-    def analyze(self):
-        """Multifractal analysis on existing results."""
-        from pipelines.analyze import main
+    def compare(self, original: str = None, synthetic: str = None):
+        """Compare two sets of networks and plot the result.
 
-        main()
+        Free-standing: it reads the two sets you name and nothing else.  To
+        compare a generate run against its input, point it at that run's
+        folders.
+
+        Args:
+            original: Directory holding the original network(s).
+            synthetic: Directory holding the synthetic networks.
+                       Omit both to use the config's own paths.
+        """
+        if bool(original) != bool(synthetic):
+            raise SystemExit(
+                "compare needs two sets: pass both --original and --synthetic, "
+                "or neither to use the config's paths."
+            )
+
+        from configs import CompareConfig
+
+        if original:
+            CompareConfig.ORIGINAL_NETWORKS_PATH = original
+            CompareConfig.SYNTHETIC_NETWORKS_PATH = synthetic
+
+        from pipelines.compare import main
+
+        main(CompareConfig)
+
+
+# SIGINT exit code. 128 + SIGINT(2), the conventional value for a process
+# terminated by Ctrl-C.  Note `fire` swallows SystemExit and reports 2, so the
+# handler must live out here rather than inside a pipeline.
+_EXIT_INTERRUPTED = 130
+
+
+def main() -> None:
+    """Run the CLI, mapping cancellation to a non-zero exit code.
+
+    Pipelines log their shutdown and re-raise; deciding the process exit status
+    is the entry point's job.  Without this a cancelled run exits 0 and any
+    caller — notably a GUI launching us as a subprocess — reads it as success.
+    """
+    configure_console()
+    try:
+        fire.Fire(CLI)
+    except KeyboardInterrupt:
+        logging.getLogger(__name__).critical("Interrupted — exiting.")
+        sys.exit(_EXIT_INTERRUPTED)
 
 
 if __name__ == "__main__":
-    fire.Fire(CLI)
+    main()

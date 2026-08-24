@@ -1,9 +1,3 @@
-# src/pipelines/mosaic.py
-"""
-Mosaic pipeline — generates a grid of small tile networks and stitches
-them into one large network.
-"""
-
 import os
 
 os.environ.setdefault("OMP_NUM_THREADS", "1")
@@ -12,15 +6,25 @@ import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Dict, Tuple
 
-from configs import BaseConfig
+import networkit as nk
+
+from configs import SynthParams
+from configs.base_config import tagged
 from configs.mosaic_mode import MosaicConfig
 from graphs import GraphGenerator
 from graphs.mosaic_stitcher import MosaicStitcher
 from graphs.synth_graph import SynthGraph
-from handlers import AttributesCalculator, RunAgent, Saver
-from utils import render_network, trim_graph
-
-MosaicConfig.initialize()
+from handlers import (
+    STATUS_CANCELLED,
+    STATUS_FAILED,
+    STATUS_OK,
+    AttributesCalculator,
+    RunAgent,
+    attach_run_log,
+    create_run_paths,
+    write_manifest,
+)
+from utils import apply_seed, render_network, spawn_context, trim_graph
 
 logger = logging.getLogger(__name__)
 SIGINT_INFO = "SIGINT received. Terminating child process…"
@@ -33,26 +37,41 @@ def generate_single_tile(args):
     """
     Generate one tile network.
 
-    Executed inside a worker process.  ``MosaicConfig.initialize()`` runs
-    at module-import time, so every worker has ``BaseConfig`` set up
-    correctly (CLOSED_NODES_FACTOR, CLOSED_EDGES_FACTOR, etc.).
+    Executed inside a worker process.  Params arrive in *args*, built by the
+    parent, so nothing here depends on inherited class state.
 
     Parameters
     ----------
     args : tuple
-        (row, col, exit_event, attributes, tile_gen_frame, offset_x, offset_y)
+        (row, col, exit_event, attributes, tile_gen_frame, offset_x, offset_y,
+         params)
 
     Returns
     -------
     ((row, col), SynthGraph | None)
     """
-    row, col, exit_event, attributes, tile_gen_frame, offset_x, offset_y = args
+    (
+        row,
+        col,
+        exit_event,
+        attributes,
+        tile_gen_frame,
+        offset_x,
+        offset_y,
+        params,
+    ) = args
+
+    # networkit defaults to one thread per core, and a forked child inherits an
+    # OpenMP runtime whose threads do not exist in it — the child then spins
+    # instead of working.  Matches hybrid's tile worker.
+    nk.setNumberOfThreads(1)
 
     if exit_event.is_set():
         return (row, col), None
 
     try:
-        generator = GraphGenerator(attributes)
+        apply_seed(params.seed)
+        generator = GraphGenerator(attributes, params)
         graph = generator.generate_network(frame_range=tile_gen_frame)
         graph = trim_graph(graph, attributes.average_degree)
 
@@ -70,7 +89,7 @@ def generate_single_tile(args):
 # ------------------------------------------------------------------ #
 # Tile layout
 # ------------------------------------------------------------------ #
-def compute_tile_layout():
+def compute_tile_layout(config):
     """
     Compute the generation frame and global offset for every tile.
 
@@ -86,15 +105,15 @@ def compute_tile_layout():
     tile_offsets : dict[(row, col), (offset_x, offset_y)]
         Centre offset for every tile in global coordinates.
     """
-    grid_rows = BaseConfig.GRID_ROWS
-    grid_cols = BaseConfig.GRID_COLS
-    tile_w, tile_h = BaseConfig.TILE_FRAME_SIZE
+    grid_rows = config.GRID_ROWS
+    grid_cols = config.GRID_COLS
+    tile_w, tile_h = config.TILE_FRAME_SIZE
 
     total_w = grid_cols * tile_w
     total_h = grid_rows * tile_h
 
-    overlap_x = BaseConfig.OVERLAP_MARGIN_FRACTION * tile_w
-    overlap_y = BaseConfig.OVERLAP_MARGIN_FRACTION * tile_h
+    overlap_x = config.OVERLAP_MARGIN_FRACTION * tile_w
+    overlap_y = config.OVERLAP_MARGIN_FRACTION * tile_h
 
     tile_gen_frame = (
         round(tile_w + 2 * overlap_x),
@@ -126,6 +145,7 @@ def generate_all_tiles(
     attributes: AttributesCalculator,
     tile_gen_frame: Tuple[int, int],
     tile_offsets: Dict[Tuple[int, int], Tuple[float, float]],
+    config,
 ) -> Dict[Tuple[int, int], SynthGraph]:
     """
     Generate every tile in parallel via ``ProcessPoolExecutor``.
@@ -135,24 +155,35 @@ def generate_all_tiles(
     dict[(row, col), SynthGraph]
         Successfully generated tiles with global-coordinate positions.
     """
-    from multiprocessing import Manager
 
-    exit_event = Manager().Event()
+    exit_event = spawn_context().Manager().Event()
     num_tiles = len(tile_offsets)
-    num_workers = BaseConfig.get_max_workers(num_tiles)
+    num_workers = config.get_max_workers(num_tiles)
 
     logger.info(f"Generating {num_tiles:,} tiles with {num_workers} workers …")
 
+    base_params = SynthParams.from_config(config)
     tile_args = [
-        (r, c, exit_event, attributes, tile_gen_frame, off_x, off_y)
-        for (r, c), (off_x, off_y) in tile_offsets.items()
+        (
+            r,
+            c,
+            exit_event,
+            attributes,
+            tile_gen_frame,
+            off_x,
+            off_y,
+            base_params.for_worker(i),
+        )
+        for i, ((r, c), (off_x, off_y)) in enumerate(tile_offsets.items())
     ]
 
     tile_graphs: Dict[Tuple[int, int], SynthGraph] = {}
     failed_tiles = []
 
     try:
-        with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        with ProcessPoolExecutor(
+            max_workers=num_workers, mp_context=spawn_context()
+        ) as executor:
             futures = {
                 executor.submit(generate_single_tile, args): args[:2]
                 for args in tile_args
@@ -166,7 +197,10 @@ def generate_all_tiles(
 
                 progress = round(completed / num_tiles * 100, 1)
                 if progress >= next_log_pct:
-                    logger.info(f"Progress: {progress}% ({completed:,}/{num_tiles:,})")
+                    logger.info(
+                        f"Progress: {progress}% ({completed:,}/{num_tiles:,})",
+                        extra=tagged("PROGRESS", percent=progress),
+                    )
                     next_log_pct += 10
 
                 if graph is not None:
@@ -192,27 +226,26 @@ def generate_all_tiles(
 # ------------------------------------------------------------------ #
 # Main pipeline for one dataset
 # ------------------------------------------------------------------ #
-def run_mosaic_for_dataset(dataset_id):
-    """Run the full mosaic pipeline for a single dataset."""
+def run_mosaic_for_dataset(dataset_id, config, run_paths):
     logger.info(f"=== Mosaic pipeline for dataset: {dataset_id} ===")
-    logger.info(BaseConfig())
+    logger.info(config())
 
     # 1. Load original network → compute structural attributes
-    data_agent = RunAgent(dataset_id=dataset_id)
+    data_agent = RunAgent(config, run_paths=run_paths, dataset_id=dataset_id)
     data_agent.prepare_data()
     attributes = data_agent.attributes
 
     # 2. Tile layout (positions + overlap)
-    tile_gen_frame, tile_offsets = compute_tile_layout()
+    tile_gen_frame, tile_offsets = compute_tile_layout(config)
 
     # 3. Generate tiles in parallel
-    tile_graphs = generate_all_tiles(attributes, tile_gen_frame, tile_offsets)
+    tile_graphs = generate_all_tiles(attributes, tile_gen_frame, tile_offsets, config)
     if not tile_graphs:
         logger.error("No tiles were generated. Aborting.")
         return
 
     # 4. Stitch — merge close nodes across tile boundaries
-    merge_threshold = attributes.average_length * BaseConfig.CLOSED_NODES_FACTOR
+    merge_threshold = attributes.average_length * config.CLOSED_NODES_FACTOR
     logger.info(f"Stitching with merge_threshold = {merge_threshold:.2f}")
 
     stitcher = MosaicStitcher(merge_threshold=merge_threshold)
@@ -223,12 +256,14 @@ def run_mosaic_for_dataset(dataset_id):
 
     # 6. Save network data + plot
     data_agent.add_synthetic_graph(mosaic_graph)
-    prefix = f"mosaic_{BaseConfig.GRID_ROWS}x{BaseConfig.GRID_COLS}"
-    Saver.begin_batch()
+    prefix = f"mosaic_{config.GRID_ROWS}x{config.GRID_COLS}"
+    data_agent.saver.begin_batch()
     data_agent.saver.save(mosaic_graph, "synthetic_export", f"{prefix}_")
-    mosaic_img = plot_mosaic_network(mosaic_graph)
+    mosaic_img = plot_mosaic_network(
+        mosaic_graph, max_px=getattr(config, "RENDER_MAX_PX", None)
+    )
     data_agent.saver.save(mosaic_img, "synthetic_graph", f"{prefix}_")
-    Saver.end_batch()
+    data_agent.saver.end_batch()
 
     logger.info(
         f"Mosaic complete — "
@@ -240,24 +275,49 @@ def run_mosaic_for_dataset(dataset_id):
 # ------------------------------------------------------------------ #
 # Mosaic-aware plotting
 # ------------------------------------------------------------------ #
-def plot_mosaic_network(graph: SynthGraph, margin_frac: float = 0.02, dpi: int = None):
-    """Render a mosaic network to a PIL Image (CV2-backed, memory-safe).
-
-    Includes a black border rectangle around the bounding box.
-    """
-    return render_network(graph, margin_frac=margin_frac, dpi=dpi, border=True)
+def plot_mosaic_network(
+    graph: SynthGraph,
+    margin_frac: float = 0.02,
+    dpi: int = None,
+    max_px: int | None = None,
+):
+    return render_network(
+        graph,
+        margin_frac=margin_frac,
+        dpi=dpi,
+        border=True,
+        max_px=max_px,
+    )
 
 
 # ------------------------------------------------------------------ #
 # Entry point
 # ------------------------------------------------------------------ #
-def main():
+def main(config_cls=MosaicConfig):
+    config_cls.initialize()
+    # Built before the try so the finally below can always name the run, even if
+    # the very first dataset fails.
+    run_paths = create_run_paths(config_cls)
+    attach_run_log(run_paths.root, config_cls.RUN_ID)
+    status, error = STATUS_OK, None
     try:
-        Saver.initialize()
-        for dataset_id in BaseConfig.get_datasets():
-            run_mosaic_for_dataset(dataset_id)
+        for dataset_id in config_cls.get_datasets():
+            run_mosaic_for_dataset(dataset_id, config_cls, run_paths)
     except KeyboardInterrupt:
+        status = STATUS_CANCELLED
         logger.critical("MAIN PROCESS: Forcing immediate shutdown!")
+        # Re-raised so the entry point can exit non-zero: a cancelled
+        # run must not look like a completed one to a caller.
+        raise
+    except Exception as exc:
+        status = STATUS_FAILED
+        error = f"{type(exc).__name__}: {exc}"
+        raise
+    finally:
+        # Written even on cancel/failure: a caller must be able to tell
+        # "manifest says cancelled" from "no manifest, we died hard".
+        if not config_cls.DISABLE_SAVING:
+            write_manifest(run_paths, status=status, error=error)
 
 
 if __name__ == "__main__":

@@ -1,10 +1,3 @@
-"""Load a synthetic graph from saved files.
-
-Two self-contained formats:
-  CSV pair:    edgelist.csv  + positions.csv  (human-readable)
-  Binary pair: .nkbin        + positions.npy  (compact, fast)
-"""
-
 import csv
 import os
 

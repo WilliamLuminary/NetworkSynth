@@ -1,4 +1,3 @@
-# src/configs/file_definitions.py
 import logging
 import os
 from dataclasses import dataclass
@@ -146,7 +145,6 @@ def save_network_csv(graph, filepath: str) -> None:
 
 
 def save_network_nkbin(graph, filepath: str) -> None:
-    """Extract networkit graph + positions and save in binary format."""
     save_networkit((graph.nk, graph.positions()), filepath)
 
 

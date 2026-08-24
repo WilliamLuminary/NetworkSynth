@@ -1,9 +1,3 @@
-# src/configs/generate_mode/config_snapshot_1x1.py
-"""
-1×1 BFS snapshot config for sample_A.
-
-Generates at original resolution (510×510) with snapshot every 10 nodes.
-"""
 from typing import Tuple
 
 from .config_snapshot import SnapshotConfig

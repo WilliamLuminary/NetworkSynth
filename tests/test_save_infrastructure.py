@@ -1,15 +1,3 @@
-# tests/test_save_infrastructure.py
-"""
-Tests for the config-driven save infrastructure.
-
-Covers:
-  - BaseConfig.save() dispatcher
-  - Declarative save_* spec methods
-  - Mode config overrides and _inject_dependencies
-  - Saver path construction, prefix handling, batch timestamps
-  - Content-aware serializers (save_network_csv, save_network_nkbin)
-  - Low-level serializers (save_pickle, save_csv)
-"""
 import csv
 import os
 import pickle
@@ -45,7 +33,6 @@ from handlers.saver import Saver  # noqa: E402
 
 
 class FakeGraph:
-    """Minimal stand-in for SynthGraph with edges, weights, positions."""
 
     def __init__(self, n_nodes=4):
         self._n = n_nodes
@@ -126,33 +113,17 @@ class TestSpecs:
 
 
 class TestModeOverrides:
-    @pytest.fixture(autouse=True)
-    def _restore_base_config(self):
-        """Snapshot BaseConfig before each test, restore after."""
-        snapshot = {}
-        for name in dir(BaseConfig):
-            if name.startswith("__"):
-                continue
-            if name.isupper() or name.startswith("save_"):
-                snapshot[name] = getattr(BaseConfig, name)
-        yield
-        for name in list(vars(BaseConfig)):
-            if name.startswith("save_") and name not in snapshot:
-                delattr(BaseConfig, name)
-        for name, value in snapshot.items():
-            setattr(BaseConfig, name, value)
 
     def test_mosaic_synthetic_graph_has_png(self):
         from configs.mosaic_mode.config_sample import SampleConfig as MosaicConfig
 
-        MosaicConfig._inject_dependencies()
-        specs = BaseConfig.save("synthetic_graph")
+        specs = MosaicConfig.save("synthetic_graph")
         exts = [s[2] for s in specs]
         assert "webp" in exts
         assert "png" in exts
         assert len(specs) == 2
 
-    def test_inject_dependencies_copies_save_methods(self):
+    def test_override_resolves_on_the_defining_config(self):
         class CustomConfig(BaseConfig):
             @classmethod
             def save_test_custom(cls):
@@ -160,18 +131,23 @@ class TestModeOverrides:
 
                 return [("custom_dir", "test_detail", "pkl", save_pickle)]
 
-        CustomConfig._inject_dependencies()
-        specs = BaseConfig.save("test_custom")
+        specs = CustomConfig.save("test_custom")
         assert specs[0][0] == "custom_dir"
         assert specs[0][1] == "test_detail"
 
-    def test_analyze_mode_overrides(self):
-        from configs.analyze_mode.config_sample import SampleConfig as AnaConfig
+    def test_override_does_not_leak_to_other_configs(self):
+        from configs.mosaic_mode.config_sample import SampleConfig as MosaicConfig
 
-        AnaConfig._inject_dependencies()
-        specs = BaseConfig.save("analysis_data")
+        MosaicConfig.save("synthetic_graph")  # mosaic overrides this identifier
+
+        assert len(BaseConfig.save("synthetic_graph")) == 1
+
+    def test_compare_mode_overrides(self):
+        from configs.compare_mode.config_sample import SampleConfig as CompareConfig
+
+        specs = CompareConfig.save("analysis_data")
         assert specs[0][4] is False
-        specs = BaseConfig.save("analysis_figure")
+        specs = CompareConfig.save("analysis_figure")
         assert specs[0][2] == "webp"
 
 
@@ -182,10 +158,10 @@ class TestModeOverrides:
 
 @pytest.fixture
 def saver_in_tmpdir(tmp_path):
-    """Create a Saver-like object without the full init ceremony."""
     saver = object.__new__(Saver)
     saver.output_dir = str(tmp_path)
     saver._save_func = BaseConfig.save
+    saver._config = BaseConfig
     saver._batch_timestamp = None
     return saver
 
@@ -243,10 +219,10 @@ class TestSaverPaths:
             ]
         )
         try:
-            Saver.begin_batch()
-            ts = Saver._batch_timestamp
+            saver.begin_batch()
+            ts = saver._batch_timestamp
             saver.save("graph", "synthetic_export", "b_")
-            Saver.end_batch()
+            saver.end_batch()
         finally:
             delattr(BaseConfig, "save_synthetic_export")
 
@@ -259,7 +235,6 @@ class TestSaverPaths:
         saver.save(None, "original_image")  # should not raise
 
     def test_prefix_normalization_in_run_agent(self):
-        """RunAgent normalises prefix to end with '_'."""
         prefix = "test"
         normalised = (
             f"{prefix}_" if prefix and not prefix.endswith("_") else (prefix or "")
@@ -349,10 +324,10 @@ class TestSerializers:
 
 class TestEndToEnd:
     def test_pickle_save_via_saver(self, tmp_path):
-        """Full flow: Saver.save → config specs → save_pickle."""
         saver = object.__new__(Saver)
         saver.output_dir = str(tmp_path)
         saver._save_func = BaseConfig.save
+        saver._config = BaseConfig
         saver._batch_timestamp = None
 
         data = {"hello": "world"}
@@ -365,10 +340,10 @@ class TestEndToEnd:
         assert loaded == data
 
     def test_csv_export_via_saver(self, tmp_path):
-        """Full flow: Saver.save → save_network_csv → two CSV files."""
         saver = object.__new__(Saver)
         saver.output_dir = str(tmp_path)
         saver._save_func = BaseConfig.save
+        saver._config = BaseConfig
         saver._batch_timestamp = "20250101_000000"
 
         graph = FakeGraph(n_nodes=5)
@@ -389,3 +364,66 @@ class TestEndToEnd:
         names = {f.name for f in csv_files}
         assert any("edgelist" in n for n in names)
         assert any("positions" in n for n in names)
+
+
+# ---------------------------------------------------------------------------
+# Disabled saving
+# ---------------------------------------------------------------------------
+
+
+class TestDisabledSaving:
+
+    def test_a_saver_that_exists_always_writes(self, tmp_path):
+
+        class Disabled(BaseConfig):
+            DISABLE_SAVING = True
+
+        saver = Saver(Disabled, str(tmp_path))
+
+        assert isinstance(saver, Saver)
+
+    def test_run_agent_builds_no_saver_when_disabled(self, tmp_path):
+        from handlers.run_agent import RunAgent
+
+        class Disabled(BaseConfig):
+            DISABLE_SAVING = True
+            DISABLE_SAVING_NOTE = "test"
+
+        assert RunAgent._build_saver(Disabled, str(tmp_path)) is None
+
+    def test_run_agent_builds_a_saver_when_enabled(self, tmp_path):
+        from handlers.run_agent import RunAgent
+
+        built = RunAgent._build_saver(BaseConfig, str(tmp_path))
+
+        assert isinstance(built, Saver)
+
+    def test_the_flag_is_never_set_on_base_config(self):
+
+        class Disabled(BaseConfig):
+            DISABLE_SAVING = True
+
+        assert Disabled.DISABLE_SAVING is True
+        assert BaseConfig.DISABLE_SAVING is False
+
+
+class TestBatchTimestampIsPerInstance:
+    def test_two_savers_do_not_share_a_batch(self, tmp_path):
+        first = Saver(BaseConfig, str(tmp_path / "one"))
+        second = Saver(BaseConfig, str(tmp_path / "two"))
+
+        first.begin_batch()
+
+        assert first._batch_timestamp is not None
+        assert second._batch_timestamp is None
+
+    def test_end_batch_clears_only_its_own(self, tmp_path):
+        first = Saver(BaseConfig, str(tmp_path / "one"))
+        second = Saver(BaseConfig, str(tmp_path / "two"))
+        first.begin_batch()
+        second.begin_batch()
+
+        first.end_batch()
+
+        assert first._batch_timestamp is None
+        assert second._batch_timestamp is not None

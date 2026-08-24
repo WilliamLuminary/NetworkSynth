@@ -1,0 +1,610 @@
+import json
+import os
+
+import pytest
+
+import gui_run
+from configs.gui_config import GuiConfig, SpecError
+
+pytestmark = pytest.mark.unit
+
+#: Derived, never restated: a mode list written out by hand goes stale the moment
+#: one is wired or unwired, and then the tests quietly stop covering it.
+_MODE_NAMES = set(gui_run._MODES)
+
+
+def _inputs_for(mode, tmp_path, shape_index=0):
+    """The paths one of *mode*'s input shapes needs, created so they exist."""
+    from gui import spec_builder
+
+    shape = spec_builder.MODES[mode].input_shapes[shape_index]
+    made = {}
+    for spec_input in shape.inputs:
+        target = tmp_path / spec_input.id
+        if spec_input.kind == "dir":
+            target.mkdir(exist_ok=True)
+            # A datasets directory is only valid with a pair in it.
+            if spec_input.id == "datasets_dir":
+                (target / "one_edgelist.csv").write_text(
+                    "source_index,target_index\n0,1\n"
+                )
+                (target / "one_positions.csv").write_text("x,y\n0,0\n1,1\n")
+        else:
+            target.write_text("x\n")
+        made[spec_input.id] = str(target)
+    return made
+
+
+def _every_shape():
+    """(mode, shape index) for every input shape the GUI offers."""
+    from gui import spec_builder
+
+    return [
+        (mode, index)
+        for mode in sorted(_MODE_NAMES)
+        for index in range(len(spec_builder.MODES[mode].input_shapes))
+    ]
+
+
+def _spec(tmp_path, **overrides):
+    spec = {
+        "contract": 2,
+        "mode": "generate",
+        "run_name": "test_run",
+        "output_dir": str(tmp_path / "out"),
+        "inputs": {
+            "edge_list": str(tmp_path / "e.csv"),
+            "positions": str(tmp_path / "p.csv"),
+            "image": None,
+        },
+        "params": {"FRAME_SIZE": [512, 512], "SEED": 7},
+    }
+    spec.update(overrides)
+    path = tmp_path / "spec.json"
+    path.write_text(json.dumps(spec))
+    return str(path)
+
+
+class TestSpecLoading:
+    def test_builds_a_config_from_a_spec(self, tmp_path):
+        config = GuiConfig.from_spec(_spec(tmp_path))
+
+        assert config.MODE == "generate"
+        assert config.BASE_OUTPUT_PATH == str(tmp_path / "out")
+        assert [str(d) for d in config.DATASETS] == ["test_run"]
+
+    def test_json_arrays_become_tuples(self, tmp_path):
+        config = GuiConfig.from_spec(_spec(tmp_path))
+
+        assert config.FRAME_SIZE == (512, 512)
+        assert isinstance(config.FRAME_SIZE, tuple)
+
+    def test_scalar_params_pass_through(self, tmp_path):
+        config = GuiConfig.from_spec(_spec(tmp_path))
+
+        assert config.SEED == 7
+
+    def test_returns_a_fresh_subclass_each_time(self, tmp_path):
+        first = GuiConfig.from_spec(_spec(tmp_path, run_name="one"))
+        second_dir = tmp_path / "second"
+        second_dir.mkdir()
+        second = GuiConfig.from_spec(_spec(second_dir, run_name="two"))
+
+        assert first is not second
+        assert first is not GuiConfig
+        assert [str(d) for d in first.DATASETS] == ["one"]
+        assert [str(d) for d in second.DATASETS] == ["two"]
+
+    def test_output_denote_names_the_mode(self, tmp_path):
+        config = GuiConfig.from_spec(_spec(tmp_path))
+        config.initialize()
+
+        assert config.OUTPUT_DENOTE == "gui_generate"
+
+
+class TestSpecIsValidated:
+
+    def test_missing_file(self, tmp_path):
+        with pytest.raises(SpecError, match="not found"):
+            GuiConfig.from_spec(str(tmp_path / "nope.json"))
+
+    def test_invalid_json(self, tmp_path):
+        path = tmp_path / "spec.json"
+        path.write_text("{not json")
+        with pytest.raises(SpecError, match="not valid JSON"):
+            GuiConfig.from_spec(str(path))
+
+    @pytest.mark.parametrize("key", ["mode", "output_dir", "inputs", "params"])
+    def test_missing_required_key(self, tmp_path, key):
+        spec = json.loads(open(_spec(tmp_path)).read())
+        del spec[key]
+        path = tmp_path / "bad.json"
+        path.write_text(json.dumps(spec))
+
+        with pytest.raises(SpecError, match="missing required key"):
+            GuiConfig.from_spec(str(path))
+
+    def test_wrong_contract_version(self, tmp_path):
+        with pytest.raises(SpecError, match="contract version"):
+            GuiConfig.from_spec(_spec(tmp_path, contract=99))
+
+    def test_unknown_mode_is_rejected(self, tmp_path):
+        with pytest.raises(SpecError, match="unknown mode"):
+            GuiConfig.from_spec(_spec(tmp_path, mode="not_a_mode"))
+
+    def test_analysis_needs_both_sets_not_one(self, tmp_path):
+        spec = json.loads(open(_spec(tmp_path, mode="compare")).read())
+        spec["inputs"] = {"original_dir": str(tmp_path)}
+        path = tmp_path / "half.json"
+        path.write_text(json.dumps(spec))
+
+        with pytest.raises(SpecError, match="fills none of its input sets"):
+            GuiConfig.from_spec(str(path))
+
+    def test_a_mode_reading_a_directory_needs_that_directory(self, tmp_path):
+        spec = json.loads(open(_spec(tmp_path, mode="compare")).read())
+        spec["inputs"] = {"edge_list": "e.csv", "positions": "p.csv"}
+        path = tmp_path / "bad.json"
+        path.write_text(json.dumps(spec))
+
+        with pytest.raises(SpecError, match="fills none of its input sets"):
+            GuiConfig.from_spec(str(path))
+
+    def test_filling_two_input_sets_is_rejected(self, tmp_path):
+        datasets = tmp_path / "many"
+        datasets.mkdir()
+        spec = json.loads(open(_spec(tmp_path)).read())
+        spec["inputs"]["datasets_dir"] = str(datasets)
+        path = tmp_path / "both.json"
+        path.write_text(json.dumps(spec))
+
+        with pytest.raises(SpecError, match="matches more than one"):
+            GuiConfig.from_spec(str(path))
+
+    def test_the_compare_mode_gets_both_sets_and_its_loader(self, tmp_path):
+        original, synthetic = tmp_path / "orig", tmp_path / "synth"
+        original.mkdir()
+        synthetic.mkdir()
+        config = GuiConfig.from_spec(
+            _spec(
+                tmp_path,
+                mode="compare",
+                inputs={
+                    "original_dir": str(original),
+                    "synthetic_dir": str(synthetic),
+                },
+            )
+        )
+        config.initialize()
+
+        assert config.ORIGINAL_NETWORKS_PATH == str(original)
+        assert config.SYNTHETIC_NETWORKS_PATH == str(synthetic)
+        assert config.NETWORKS_FUNC is not None
+        assert config.OUTPUT_DENOTE == "gui_compare"
+
+    @pytest.mark.parametrize("key", ["edge_list", "positions"])
+    def test_half_a_pair_is_not_an_input_set(self, tmp_path, key):
+        spec = json.loads(open(_spec(tmp_path)).read())
+        spec["inputs"][key] = None
+        path = tmp_path / "bad.json"
+        path.write_text(json.dumps(spec))
+
+        with pytest.raises(SpecError, match="fills none of its input sets"):
+            GuiConfig.from_spec(str(path))
+
+
+class TestDirectoryInput:
+
+    def _pair(self, directory, name):
+        (directory / f"{name}_edgelist.csv").write_text(
+            "source_index,target_index\n0,1\n"
+        )
+        (directory / f"{name}_positions.csv").write_text("x,y\n0,0\n1,1\n")
+
+    def test_every_pair_becomes_a_dataset(self, tmp_path):
+        from configs.gui_config import discover_datasets
+
+        for name in ("gamma", "alpha", "beta"):
+            self._pair(tmp_path, name)
+
+        # Sorted, so a run's dataset order does not depend on the filesystem.
+        assert discover_datasets(str(tmp_path)) == ["alpha", "beta", "gamma"]
+
+    def test_an_edge_list_without_positions_stops_the_run(self, tmp_path):
+        from configs.gui_config import discover_datasets
+
+        self._pair(tmp_path, "alpha")
+        (tmp_path / "beta_edgelist.csv").write_text("source_index,target_index\n0,1\n")
+
+        with pytest.raises(SpecError, match="has no positions file"):
+            discover_datasets(str(tmp_path))
+
+    def test_a_directory_with_no_pairs_is_rejected(self, tmp_path):
+        from configs.gui_config import discover_datasets
+
+        (tmp_path / "notes.txt").write_text("nothing to load here")
+
+        with pytest.raises(SpecError, match="no '\\*_edgelist.csv' file found"):
+            discover_datasets(str(tmp_path))
+
+    def test_the_datasets_reach_the_config(self, tmp_path):
+        datasets = tmp_path / "many"
+        datasets.mkdir()
+        self._pair(datasets, "alpha")
+        self._pair(datasets, "beta")
+
+        config = GuiConfig.from_spec(
+            _spec(tmp_path, inputs={"datasets_dir": str(datasets)})
+        )
+
+        assert [str(d) for d in config.DATASETS] == ["alpha", "beta"]
+
+    def test_each_dataset_resolves_its_own_files(self, tmp_path):
+        datasets = tmp_path / "many"
+        datasets.mkdir()
+        self._pair(datasets, "alpha")
+        self._pair(datasets, "beta")
+
+        config = GuiConfig.from_spec(
+            _spec(tmp_path, inputs={"datasets_dir": str(datasets)})
+        )
+        edge_list, positions = config._network_paths(config.DATASETS[1])
+
+        assert edge_list.endswith("beta_edgelist.csv")
+        assert positions.endswith("beta_positions.csv")
+
+
+class TestEntryPointExitCodes:
+
+    def test_bad_spec_exits_2(self, tmp_path):
+        assert gui_run.main(["gui_run.py", str(tmp_path / "nope.json")]) == 2
+
+    def test_no_spec_argument_exits_2(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("NETWORKSYNTH_RUN_SPEC", raising=False)
+
+        assert gui_run.main(["gui_run.py"]) == 2
+
+    def test_unsupported_mode_exits_2(self, tmp_path):
+        assert gui_run.main(["gui_run.py", _spec(tmp_path, mode="not_a_mode")]) == 2
+
+    def test_reads_the_spec_from_the_environment(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("NETWORKSYNTH_RUN_SPEC", _spec(tmp_path, mode="nope"))
+
+        # mode is rejected, which proves the env var was read at all
+        assert gui_run.main(["gui_run.py"]) == 2
+
+    def test_pipeline_failure_exits_1(self, tmp_path, monkeypatch):
+        import pipelines.generate as gen
+
+        monkeypatch.setattr(
+            gen, "main", lambda **k: (_ for _ in ()).throw(RuntimeError("boom"))
+        )
+
+        assert gui_run.main(["gui_run.py", _spec(tmp_path)]) == 1
+
+    def test_cancellation_exits_130(self, tmp_path, monkeypatch):
+        import pipelines.generate as gen
+
+        monkeypatch.setattr(
+            gen, "main", lambda **k: (_ for _ in ()).throw(KeyboardInterrupt)
+        )
+
+        assert gui_run.main(["gui_run.py", _spec(tmp_path)]) == 130
+
+    def test_success_exits_0(self, tmp_path, monkeypatch):
+        import pipelines.generate as gen
+
+        monkeypatch.setattr(gen, "main", lambda **k: None)
+
+        assert gui_run.main(["gui_run.py", _spec(tmp_path)]) == 0
+
+
+@pytest.mark.integration
+@pytest.mark.requires_fixture_data
+class TestFullRun:
+    def test_spec_in_network_and_manifest_out(
+        self, tmp_path, load_unweighted_test_synth_graph
+    ):
+        from configs.file_definitions import save_network_csv
+
+        save_network_csv(load_unweighted_test_synth_graph, str(tmp_path / "net.csv"))
+
+        spec = {
+            "contract": 2,
+            "mode": "generate",
+            "run_name": "sample",
+            "output_dir": str(tmp_path / "out"),
+            "inputs": {
+                "edge_list": str(tmp_path / "net_edgelist.csv"),
+                "positions": str(tmp_path / "net_positions.csv"),
+                "image": None,
+            },
+            "params": {
+                "FRAME_SIZE": [512, 512],
+                "SYNTHETIC_FRAME_SIZE": [512, 512],
+                "IMAGE_SIZE": [512, 512],
+                "CLOSED_NODES_FACTOR": 1.2,
+                "CLOSED_EDGES_FACTOR": 0.8,
+                "SYNTHETIC_NETWORK_NUMBER": 1,
+                "SYNTHETIC_GRAPH_NUMBER": 0,
+                "MAX_ATTEMPTS": 2,
+                "ERROR_CHECKER": "none",
+                "MEASURE_WEIGHTED": False,
+                "SEED": 11,
+            },
+        }
+        spec_path = tmp_path / "spec.json"
+        spec_path.write_text(json.dumps(spec))
+
+        assert gui_run.main(["gui_run.py", str(spec_path)]) == 0
+
+        out = tmp_path / "out"
+        roots = [d for d in os.listdir(out) if d.startswith("gui_generate_results_")]
+        assert len(roots) == 1, f"expected one run dir, got {roots}"
+        root = out / roots[0]
+
+        manifest = json.loads((root / "manifest.json").read_text())
+        assert manifest["status"] == "ok"
+        assert manifest["outputs"].get("edge_lists"), manifest["outputs"]
+
+        assert (root / "run.jsonl").exists(), "log must be inside the output dir"
+
+
+@pytest.mark.integration
+@pytest.mark.requires_fixture_data
+class TestDirectoryFullRun:
+    def test_one_run_produces_one_output_per_dataset(
+        self, tmp_path, load_unweighted_test_synth_graph
+    ):
+        from configs.file_definitions import save_network_csv
+
+        datasets = tmp_path / "inputs"
+        datasets.mkdir()
+        for name in ("alpha", "beta"):
+            save_network_csv(
+                load_unweighted_test_synth_graph, str(datasets / f"{name}.csv")
+            )
+
+        spec = {
+            "contract": 2,
+            "mode": "generate",
+            "run_name": "unused",
+            "output_dir": str(tmp_path / "out"),
+            "inputs": {"datasets_dir": str(datasets)},
+            "params": {
+                "FRAME_SIZE": [512, 512],
+                "SYNTHETIC_FRAME_SIZE": [512, 512],
+                "IMAGE_SIZE": [512, 512],
+                "CLOSED_NODES_FACTOR": 1.2,
+                "CLOSED_EDGES_FACTOR": 0.8,
+                "SYNTHETIC_NETWORK_NUMBER": 1,
+                "SYNTHETIC_GRAPH_NUMBER": 0,
+                "MAX_ATTEMPTS": 2,
+                "ERROR_CHECKER": "none",
+                "MEASURE_WEIGHTED": False,
+                "SEED": 13,
+            },
+        }
+        spec_path = tmp_path / "spec.json"
+        spec_path.write_text(json.dumps(spec))
+
+        assert gui_run.main(["gui_run.py", str(spec_path)]) == 0
+
+        out = tmp_path / "out"
+        roots = [d for d in os.listdir(out) if d.startswith("gui_generate_results_")]
+        assert len(roots) == 1, f"a directory is one run, got {roots}"
+        root = out / roots[0]
+
+        # One subdirectory per dataset, one manifest covering all of them.
+        assert sorted(d for d in os.listdir(root) if (root / d).is_dir()) == [
+            "alpha",
+            "beta",
+        ]
+        manifest = json.loads((root / "manifest.json").read_text())
+        assert manifest["status"] == "ok"
+        produced = manifest["outputs"]["edge_lists"]
+        assert any(p.startswith("alpha/") for p in produced), produced
+        assert any(p.startswith("beta/") for p in produced), produced
+
+
+@pytest.mark.integration
+class TestCompareFullRun:
+    def test_two_chosen_sets_in_analysis_out(self, tmp_path):
+        """Analysis is free-standing: two directories in, plots out."""
+        import networkit as nk
+        import numpy as np
+
+        from configs.file_definitions import save_network_csv
+        from graphs.synth_graph import SynthGraph
+
+        side, spacing = 8, 10.0
+        graph = nk.Graph(side * side, weighted=False)
+        for y in range(side):
+            for x in range(side):
+                here = y * side + x
+                if x + 1 < side:
+                    graph.addEdge(here, here + 1)
+                if y + 1 < side:
+                    graph.addEdge(here, here + side)
+        positions = np.array(
+            [(x * spacing, y * spacing) for y in range(side) for x in range(side)],
+            dtype=float,
+        )
+        lattice = SynthGraph(graph, positions)
+
+        # Two plain directories, named by the caller — no results layout.
+        original, synthetic = tmp_path / "before", tmp_path / "after"
+        original.mkdir()
+        synthetic.mkdir()
+        save_network_csv(lattice, str(original / "original_network.csv"))
+        save_network_csv(lattice, str(synthetic / "synthetic_network.csv"))
+
+        spec = {
+            "contract": 2,
+            "mode": "compare",
+            "run_name": "analysed",
+            "output_dir": str(tmp_path / "out"),
+            "inputs": {
+                "original_dir": str(original),
+                "synthetic_dir": str(synthetic),
+            },
+            "params": {"MEASURE_WEIGHTED": False, "FULL_Q_BAND": False},
+        }
+        spec_path = tmp_path / "spec.json"
+        spec_path.write_text(json.dumps(spec))
+
+        assert gui_run.main(["gui_run.py", str(spec_path)]) == 0
+
+        out = tmp_path / "out"
+        roots = [d for d in os.listdir(out) if d.startswith("gui_compare_results_")]
+        assert len(roots) == 1, f"expected one run dir, got {roots}"
+
+        manifest = json.loads((out / roots[0] / "manifest.json").read_text())
+        assert manifest["status"] == "ok"
+        assert manifest["outputs"].get("analysis"), manifest["outputs"]
+
+
+class TestModeSelection:
+
+    def test_offered_modes_match_dispatchable_modes(self):
+        from gui.spec_builder import MODES
+
+        assert set(MODES) == set(gui_run._MODES)
+
+    def test_the_form_asks_for_what_the_spec_requires(self):
+        from configs.gui_config import MODE_INPUTS
+        from gui.spec_builder import MODES
+
+        offered = {
+            name: tuple(shape.ids for shape in mode.input_shapes)
+            for name, mode in MODES.items()
+        }
+        required = {name: MODE_INPUTS[name] for name in MODES}
+
+        assert offered == required
+
+    @pytest.mark.parametrize("mode", sorted(_MODE_NAMES))
+    def test_every_mode_builds_a_valid_spec(self, mode, tmp_path):
+        from gui import spec_builder
+
+        inputs = _inputs_for(mode, tmp_path)
+        values = spec_builder.default_values(mode)
+        problems = spec_builder.validate(mode, inputs, str(tmp_path), values)
+        assert not problems, problems
+
+        spec = spec_builder.build_spec(mode, inputs, str(tmp_path), values)
+        assert spec["mode"] == mode
+        assert json.loads(json.dumps(spec)), "spec must survive JSON"
+
+    @pytest.mark.parametrize("mode", sorted(_MODE_NAMES))
+    def test_every_mode_rejects_a_missing_input(self, mode, tmp_path):
+        from gui import spec_builder
+
+        blank = {key: "" for key in spec_builder.default_inputs(mode)}
+
+        problems = spec_builder.validate(
+            mode, blank, str(tmp_path), spec_builder.default_values(mode)
+        )
+
+        assert problems, f"{mode} accepted an empty input set"
+
+    @pytest.mark.parametrize("mode", sorted(_MODE_NAMES))
+    def test_every_mode_spec_loads_back_into_a_config(self, mode, tmp_path):
+        from gui import spec_builder
+
+        inputs = _inputs_for(mode, tmp_path)
+        values = spec_builder.default_values(mode)
+        spec_path = tmp_path / "spec.json"
+        spec_path.write_text(
+            json.dumps(spec_builder.build_spec(mode, inputs, str(tmp_path), values))
+        )
+
+        config = GuiConfig.from_spec(str(spec_path))
+
+        assert config.MODE == mode
+
+    #: Attributes each mode's pipeline reads that BaseConfig does not define.
+    _MODE_EXTRAS = {
+        "scaling": [
+            "SCALE_ROWS",
+            "SCALE_COLS",
+            "ROOT_SPACING_FACTOR",
+            "MAX_GENERATION_ROUNDS",
+        ],
+        "hybrid": ["TARGET_SCALE", "PHASE2_MAX_ROUNDS"],
+    }
+
+    @pytest.mark.parametrize("mode", sorted(_MODE_EXTRAS))
+    def test_mode_specific_params_reach_the_config(self, mode, tmp_path):
+        from gui import spec_builder
+
+        if mode not in _MODE_NAMES:
+            pytest.skip(f"{mode} is not currently offered by the GUI")
+        required = self._MODE_EXTRAS[mode]
+
+        values = spec_builder.default_values(mode)
+        spec = spec_builder.build_spec(
+            mode, _inputs_for(mode, tmp_path), str(tmp_path), values
+        )
+        spec_path = tmp_path / "spec.json"
+        spec_path.write_text(json.dumps(spec))
+
+        config = GuiConfig.from_spec(str(spec_path))
+
+        for name in required:
+            assert hasattr(config, name), f"{mode} needs {name}"
+
+    def test_size_params_become_tuples(self, tmp_path):
+        from gui import spec_builder
+
+        values = spec_builder.default_values("hybrid")
+        spec = spec_builder.build_spec(
+            "hybrid", _inputs_for("hybrid", tmp_path), str(tmp_path), values
+        )
+        spec_path = tmp_path / "spec.json"
+        spec_path.write_text(json.dumps(spec))
+
+        config = GuiConfig.from_spec(str(spec_path))
+
+        assert isinstance(config.TARGET_SCALE, tuple)
+        assert isinstance(config.SYNTHETIC_FRAME_SIZE, tuple)
+
+
+class TestSpecConfigCrossesProcesses:
+
+    def test_a_spec_built_config_survives_pickling(self, tmp_path):
+        import pickle
+
+        config = GuiConfig.from_spec(_spec(tmp_path))
+
+        restored = pickle.loads(pickle.dumps(config))
+
+        assert restored.MODE == config.MODE
+        assert restored.SEED == config.SEED
+        assert restored.BASE_OUTPUT_PATH == config.BASE_OUTPUT_PATH
+        assert [str(d) for d in restored.DATASETS] == [str(d) for d in config.DATASETS]
+
+    def test_tuple_params_stay_tuples_after_a_round_trip(self, tmp_path):
+        import pickle
+
+        config = GuiConfig.from_spec(_spec(tmp_path))
+
+        restored = pickle.loads(pickle.dumps(config))
+
+        assert isinstance(restored.FRAME_SIZE, tuple)
+        assert restored.FRAME_SIZE == config.FRAME_SIZE
+
+    def test_the_base_class_still_pickles_by_name(self, tmp_path):
+        import pickle
+
+        assert pickle.loads(pickle.dumps(GuiConfig)) is GuiConfig
+
+    def test_the_loader_paths_survive(self, tmp_path):
+        import pickle
+
+        config = GuiConfig.from_spec(_spec(tmp_path))
+
+        restored = pickle.loads(pickle.dumps(config))
+
+        assert restored.PATHS["edge_list"] == config.PATHS["edge_list"]
+        assert restored.PATHS["positions"] == config.PATHS["positions"]

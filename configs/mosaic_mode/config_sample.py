@@ -1,18 +1,3 @@
-# src/configs/mosaic_mode/config_sample.py
-"""
-Mosaic mode sample configuration — simple flat-file data layout.
-
-Uses data from ``samples/mosaic_mode/`` with single-level
-DatasetId (like the generate_mode sample config).  The grid is
-kept small (2×2) for quick smoke-testing.
-
-Data layout
------------
-samples/mosaic_mode/
-├── sample_1_pos.npy     (N×2 positions)
-├── sample_1_mat.npy     (scipy sparse adjacency)
-└── sample_1_image.tif   (grayscale background)
-"""
 import logging
 import os
 from typing import Tuple
@@ -32,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 
 class SampleConfig(BaseConfig):
-    """Small mosaic for testing — 2×2 grid, sample data."""
 
     # --- Dataset (single-level id) ---
     DATASETS = [DatasetId("sample_1")]
@@ -57,7 +41,6 @@ class SampleConfig(BaseConfig):
     MAX_ATTEMPTS = 10
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = True
-    FULL_ANALYSIS = False
 
     # --- Input paths (flat sample layout) ---
     BASE_INPUT_PATH = os.path.join(
@@ -71,7 +54,6 @@ class SampleConfig(BaseConfig):
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
-        cls._inject_dependencies()
 
     @classmethod
     def save_synthetic_graph(cls):
@@ -100,7 +82,7 @@ class SampleConfig(BaseConfig):
         if image is None:
             return None
         image = _trim_cv2_image(image)
-        image = _resize_cv2_image(image)
+        image = _resize_cv2_image(image, SampleConfig.FRAME_SIZE)
         return image
 
 

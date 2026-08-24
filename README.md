@@ -352,7 +352,7 @@ in three specific places:
 | File                                     | Purpose                                                                          |
 | ---------------------------------------- | -------------------------------------------------------------------------------- |
 | `graphs/synth_graph.py`                  | `from_networkx()` — converts legacy `nx.Graph` pickle files to `SynthGraph`      |
-| `configs/analyze_mode/config_sample.py`  | Detects old `.pkl` files containing `nx.Graph` and converts via `from_networkx()` |
+| `configs/compare_mode/config_sample.py`  | Detects old `.pkl` files containing `nx.Graph` and converts via `from_networkx()` |
 | `scripts/helpers/convert_pkl_network.py` | Standalone converter — reads `nx.Graph` pickles, exports CSV + NetworKit binary   |
 
 

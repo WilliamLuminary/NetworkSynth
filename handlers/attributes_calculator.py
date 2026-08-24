@@ -1,4 +1,3 @@
-# src/handlers/attributes_calculator.py
 import logging
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
@@ -137,10 +136,6 @@ class AttributesCalculator:
     average_degree: float = 0.0
 
     def analyze(self, graph: SynthGraph) -> "AttributesCalculator":
-        """
-        Analyze the graph to compute degree distribution, transition probabilities,
-        edge lengths, angle differences, average edge length, and average degree.
-        """
         if graph.number_of_nodes() == 0:
             logger.warning("Graph is empty. Skipping analysis.")
             return self
@@ -204,9 +199,6 @@ class AttributesCalculator:
     def _compute_degree_distribution(
         degrees: Dict[int, int], num_nodes: int
     ) -> Dict[int, float]:
-        """
-        Count how many nodes have each degree, then normalize by total node count.
-        """
         return {
             deg: count / num_nodes for deg, count in Counter(degrees.values()).items()
         }
@@ -215,10 +207,6 @@ class AttributesCalculator:
     def _compute_degree_transition_probs(
         degree_neighbors: Dict[int, List[int]],
     ) -> Dict[int, Dict[int, float]]:
-        """
-        For each degree d, gather the distribution of neighbor degrees
-        and convert counts to probabilities.
-        """
         return {
             degree: (
                 {
@@ -242,10 +230,6 @@ class AttributesCalculator:
     def _compute_degree_angles(
         node_angles: Dict[int, List[float]], degrees: Dict[int, int]
     ) -> Dict[int, List[float]]:
-        """
-        For each node, compute the angular differences between sorted angles
-        and map them to that node's degree bucket.
-        """
         degree_angle_diffs = defaultdict(list)
         for node, angle_list in node_angles.items():
             if len(angle_list) < 2:
