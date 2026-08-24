@@ -6,7 +6,7 @@ import pickle
 from typing import List
 
 from ..base_config import BaseConfig
-from ..enums import DatasetId
+from ..dataset_id import DatasetId
 
 logger = logging.getLogger(__name__)
 

@@ -15,7 +15,6 @@ from analysis.error_checker import (
     create_error_checker,
 )
 from configs import DatasetId, SynthParams
-from configs.base_config import tagged
 from graphs import GraphGenerator
 from handlers import (
     STATUS_CANCELLED,
@@ -34,6 +33,7 @@ from utils import (
     metric_distance,
     save_bfs_snapshot,
     spawn_context,
+    tagged,
     trim_graph,
 )
 

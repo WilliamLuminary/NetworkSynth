@@ -30,7 +30,7 @@ def log_memory(label: str, enabled: bool) -> None:
     The gate is a parameter rather than a config read so this stays usable from
     worker processes, where a mutated ``BaseConfig`` is not visible.
     """
-    from configs.base_config import tagged
+    from .run_log import tagged
 
     if not enabled:
         return

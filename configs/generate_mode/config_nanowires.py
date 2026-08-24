@@ -5,9 +5,10 @@ from typing import List, Tuple
 import cv2
 import numpy as np
 
-from .._utils import _transpose_network_pos
+from utils import transpose_positions
+
 from ..base_config import BaseConfig
-from ..enums import DatasetId
+from ..dataset_id import DatasetId
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,7 @@ class ConfigNanowires(BaseConfig):
         from utils import build_graph
 
         original_network = build_graph(positions, edge_list, arg_type="edge_list")
-        _transpose_network_pos(original_network)
+        transpose_positions(original_network)
         return original_network
 
     @staticmethod

@@ -6,8 +6,7 @@ from typing import Dict, List, Optional, Tuple, Union
 from numpy import ndarray
 
 from configs import SynthParams
-from configs.base_config import tagged
-from utils import build_graph, calculate_frame
+from utils import build_graph, calculate_frame, tagged
 
 from ._graph_node import GraphNode
 from .synth_graph import SynthGraph

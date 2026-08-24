@@ -9,7 +9,6 @@ from typing import Dict, Tuple
 import networkit as nk
 
 from configs import SynthParams
-from configs.base_config import tagged
 from configs.mosaic_mode.config_sample import SampleConfig as MosaicConfig
 from graphs import GraphGenerator
 from graphs.mosaic_stitcher import MosaicStitcher
@@ -24,7 +23,7 @@ from handlers import (
     create_run_paths,
     write_manifest,
 )
-from utils import apply_seed, render_network, spawn_context, trim_graph
+from utils import apply_seed, render_network, spawn_context, tagged, trim_graph
 
 logger = logging.getLogger(__name__)
 SIGINT_INFO = "SIGINT received. Terminating child process…"

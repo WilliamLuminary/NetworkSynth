@@ -1,9 +1,12 @@
+from .files import find_file_with_pattern
 from .graph_ops import (
     build_graph,
     calculate_frame,
     largest_connected_component,
+    transpose_positions,
     trim_graph,
 )
+from .images import resize_image, trim_image
 from .metrics import compute_network_metrics, metric_distance
 from .plotting import (
     figure_to_ndarray,
@@ -16,14 +19,20 @@ from .plotting import (
     save_figure_as_webp,
     save_hybrid_snapshot,
 )
+from .run_log import JsonFormatter, tagged
 from .runtime import apply_seed, log_memory, spawn_context, timer
 
 __all__ = [
+    "trim_image",
+    "transpose_positions",
+    "resize_image",
+    "find_file_with_pattern",
     "apply_seed",
     "build_graph",
     "calculate_frame",
     "compute_network_metrics",
     "figure_to_ndarray",
+    "JsonFormatter",
     "finalize_plot",
     "largest_connected_component",
     "log_memory",
@@ -36,6 +45,7 @@ __all__ = [
     "save_figure_as_webp",
     "save_hybrid_snapshot",
     "spawn_context",
+    "tagged",
     "timer",
     "trim_graph",
 ]

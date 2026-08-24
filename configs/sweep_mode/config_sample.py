@@ -3,7 +3,7 @@ import os
 from typing import Tuple
 
 from ..base_config import BaseConfig
-from ..enums import DatasetId
+from ..dataset_id import DatasetId
 from ..generate_mode.config_sample import SampleConfig as GenerateSampleConfig
 
 logger = logging.getLogger(__name__)

@@ -6,14 +6,10 @@ from typing import List
 import cv2
 import numpy as np
 
-from .._utils import (
-    _find_file_with_pattern,
-    _resize_cv2_image,
-    _transpose_network_pos,
-    _trim_cv2_image,
-)
+from utils import find_file_with_pattern, resize_image, transpose_positions, trim_image
+
 from ..base_config import BaseConfig
-from ..enums import DatasetId
+from ..dataset_id import DatasetId
 
 logger = logging.getLogger(__name__)
 
@@ -59,14 +55,14 @@ class Config2(BaseConfig):
         from utils import build_graph
 
         original_network = build_graph(positions, mat)
-        _transpose_network_pos(original_network)
+        transpose_positions(original_network)
         return original_network
 
     @staticmethod
     def load_original_image(dataset_id: DatasetId):
         image = _load_raw_image(dataset_id)
-        image = _trim_cv2_image(image)
-        image = _resize_cv2_image(image, Config2.FRAME_SIZE)
+        image = trim_image(image)
+        image = resize_image(image, Config2.FRAME_SIZE)
         return image
 
 
@@ -74,7 +70,7 @@ def _load_positions(dataset_id: DatasetId) -> np.ndarray:
     set_name = dataset_id[0]
     directory_path = Config2.POSITION_DATA_DIR
     # noinspection SpellCheckingInspection
-    file_path = _find_file_with_pattern(
+    file_path = find_file_with_pattern(
         directory_path,
         rf"W-\d+-\d+-\d+_{re.escape(set_name)}_postion\.npy",
         f"positions_of_nodes for {set_name}",
@@ -87,7 +83,7 @@ def _load_positions(dataset_id: DatasetId) -> np.ndarray:
 def _load_sparse_matrix(dataset_id: DatasetId):
     set_name = dataset_id[0]
     directory_path = Config2.ADJ_MATRIX_DATA_DIR
-    file_path = _find_file_with_pattern(
+    file_path = find_file_with_pattern(
         directory_path, r"sparse_matrices\.npz", details="sparse matrix"
     )
     matrix_data = np.load(file_path, allow_pickle=True)
@@ -120,9 +116,7 @@ def _load_raw_image(dataset_id: DatasetId):
         rf"W-\d+-\d+-\d+_{re.escape(set_name)}\.(tif|png|jpg)", re.IGNORECASE
     )
 
-    file_path = _find_file_with_pattern(
-        directory_path, pattern, f"image for {set_name}"
-    )
+    file_path = find_file_with_pattern(directory_path, pattern, f"image for {set_name}")
     if file_path is None:
         logger.warning("Background image is None.")
         return None

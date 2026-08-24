@@ -19,7 +19,6 @@ import numpy as np
 
 from analysis.error_checker import ErrorChecker, NullErrorChecker, create_error_checker
 from configs import SynthParams
-from configs.base_config import tagged
 from graphs import GraphGenerator
 from graphs._graph_node import GraphNode
 from graphs.graph_generator import FrontierDescriptor
@@ -42,6 +41,7 @@ from utils import (
     render_network,
     save_hybrid_snapshot,
     spawn_context,
+    tagged,
     trim_graph,
 )
 

@@ -12,7 +12,6 @@ from analysis.error_checker import ErrorChecker, create_error_checker
 
 # noinspection PyUnresolvedReferences
 from configs import DatasetId, SynthParams
-from configs.base_config import tagged
 from graphs import GraphGenerator
 from graphs._graph_node import GraphNode
 from handlers import (
@@ -25,7 +24,7 @@ from handlers import (
     write_manifest,
 )
 from pipelines.generate import compute_average_error
-from utils import apply_seed, build_graph, spawn_context, trim_graph
+from utils import apply_seed, build_graph, spawn_context, tagged, trim_graph
 
 
 def _init_config():

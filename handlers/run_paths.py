@@ -4,7 +4,7 @@ import logging
 import os
 from dataclasses import dataclass
 
-from configs.base_config import tagged
+from utils import tagged
 
 logger = logging.getLogger(__name__)
 

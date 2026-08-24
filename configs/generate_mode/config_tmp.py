@@ -4,9 +4,10 @@ import os
 import cv2
 import numpy as np
 
-from .._utils import _resize_cv2_image, _transpose_network_pos, _trim_cv2_image
+from utils import resize_image, transpose_positions, trim_image
+
 from ..base_config import BaseConfig
-from ..enums import DatasetId
+from ..dataset_id import DatasetId
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,7 @@ class ConfigTmp(BaseConfig):
         from utils import build_graph
 
         original_network = build_graph(positions, mat)
-        _transpose_network_pos(original_network)
+        transpose_positions(original_network)
         return original_network
 
     @staticmethod
@@ -70,6 +71,6 @@ class ConfigTmp(BaseConfig):
         if image is None:
             logger.warning("Failed to load image: %s", path)
             return None
-        image = _trim_cv2_image(image)
-        image = _resize_cv2_image(image, ConfigTmp.FRAME_SIZE)
+        image = trim_image(image)
+        image = resize_image(image, ConfigTmp.FRAME_SIZE)
         return image

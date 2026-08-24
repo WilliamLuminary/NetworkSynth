@@ -3,7 +3,7 @@ import logging
 
 import pytest
 
-from configs.base_config import _JsonFormatter, tagged
+from utils import JsonFormatter, tagged
 
 pytestmark = pytest.mark.unit
 
@@ -20,7 +20,7 @@ def _emit(message: str, extra: dict | None = None) -> dict:
     )
     for key, value in (extra or {}).items():
         setattr(record, key, value)
-    return json.loads(_JsonFormatter(run_id="abc123").format(record))
+    return json.loads(JsonFormatter(run_id="abc123").format(record))
 
 
 class TestPercentField:
@@ -57,7 +57,7 @@ class TestPercentField:
         assert entry["dataset"] == "sample_A"
 
     def test_line_is_a_single_json_object(self):
-        line = _JsonFormatter(run_id="r").format(
+        line = JsonFormatter(run_id="r").format(
             logging.LogRecord(
                 "l", logging.INFO, __file__, 1, "multi\nline\nmessage", (), None
             )
