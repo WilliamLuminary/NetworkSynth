@@ -60,14 +60,13 @@ def plot_single(
 
     graph = load_graph(nkbin)
 
-    from pipelines.hybrid import plot_hybrid_network
-    from utils import recommend_dpi_cv2
+    from utils import recommend_dpi_cv2, render_network
 
     if dpi is None:
         dpi = recommend_dpi_cv2(graph.number_of_nodes())
     print(f"DPI: {dpi} (for {graph.number_of_nodes():,} nodes)")
 
-    img = plot_hybrid_network(graph, margin_frac=margin, dpi=dpi)
+    img = render_network(graph, margin_frac=margin, dpi=dpi)
 
     if output is None:
         output = nkbin.rsplit(".", 1)[0] + f".{fmt}"

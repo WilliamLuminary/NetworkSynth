@@ -156,6 +156,16 @@ class BaseConfig:
         """
         from handlers.run_logging import configure_console
 
+        # Snapshots are written straight to disk by the render pool, bypassing
+        # the Saver, so DISABLE_SAVING cannot suppress them.  Rather than let a
+        # "disabled" run litter the output directory, refuse the combination.
+        if cls.DISABLE_SAVING and cls.SNAPSHOT_INTERVAL:
+            raise ValueError(
+                f"SNAPSHOT_INTERVAL={cls.SNAPSHOT_INTERVAL} needs saving enabled: "
+                "snapshots bypass the Saver, so a run with DISABLE_SAVING set "
+                "would still write them.  Set one or the other."
+            )
+
         if not cls.RUN_ID:
             cls.RUN_ID = uuid.uuid4().hex[:8]
         configure_console()

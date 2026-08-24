@@ -1,12 +1,25 @@
 from pathlib import Path
 
-from .._loader import get_all_config_names, load_configs_from_directory
+from .._loader import index_configs, load_config
 
-_configs = load_configs_from_directory(
-    directory=Path(__file__).parent,
-    package_name=__name__,
-    mode_prefix="Compare",
-)
+_INDEX = index_configs(Path(__file__).parent, mode_prefix="Compare")
+__all__ = sorted(_INDEX)
 
-globals().update(_configs)
-__all__ = get_all_config_names(_configs)
+
+def __getattr__(name):
+    """Import a config only when it is asked for.
+
+    The names are known from the filenames, so ``dir()`` and ``__all__`` are
+    complete without importing anything; the module behind a name is loaded on
+    first access and cached in this namespace.
+    """
+    module_stem = _INDEX.get(name)
+    if module_stem is None:
+        raise AttributeError(f"module {__name__!r} has no config {name!r}")
+    config_class = load_config(__name__, module_stem, name)
+    globals()[name] = config_class
+    return config_class
+
+
+def __dir__():
+    return sorted(set(__all__) | set(globals()))

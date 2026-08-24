@@ -1,7 +1,6 @@
 import importlib
 import inspect
 import logging
-import re
 from pathlib import Path
 from typing import Dict, Optional, Type
 
@@ -19,55 +18,44 @@ def _get_config_class_from_module(module) -> Optional[Type]:
     return None
 
 
-def _derive_export_name(class_name: str, mode_prefix: str) -> str:
-    """
-    Derive export name based on class name and mode prefix.
+def _export_name(module_stem: str, mode_prefix: str) -> str:
+    """The name a config module is exported under.
 
-    Naming convention (mode_prefix="Gen"):
-        - SampleConfig -> GenConfig (default)
-        - ConfigXxx -> GenConfigXxx
+    Derived from the *filename*, not from the class inside it, so the index can
+    be built without importing anything::
+
+        config_sample.py       -> GenConfig          (the mode's default)
+        config_nanowires.py    -> GenConfigNanowires
+        config_snapshot_1x1.py -> GenConfigSnapshot1x1
     """
-    if class_name == "SampleConfig":
+    rest = module_stem[len("config_") :]
+    if rest == "sample":
         return f"{mode_prefix}Config"
-
-    config_match = re.match(r"Config(.+)$", class_name)
-    if config_match:
-        return f"{mode_prefix}Config{config_match.group(1)}"
-
-    suffix_match = re.match(r"(.+)Config$", class_name)
-    if suffix_match:
-        return f"{mode_prefix}Config{suffix_match.group(1)}"
-
-    return class_name
+    parts = (part[:1].upper() + part[1:] for part in rest.split("_"))
+    return f"{mode_prefix}Config" + "".join(parts)
 
 
-def load_configs_from_directory(
-    directory: Path,
-    package_name: str,
-    mode_prefix: str,
-) -> Dict[str, Type]:
-    configs = {}
-    config_files = sorted(directory.glob("config_*.py"))
+def index_configs(directory: Path, mode_prefix: str) -> Dict[str, str]:
+    """Map export name -> module name for every config in *directory*.
 
-    for config_file in config_files:
-        module_name = config_file.stem
-        full_module_name = f"{package_name}.{module_name}"
-
-        try:
-            module = importlib.import_module(full_module_name)
-            config_class = _get_config_class_from_module(module)
-            if config_class is None:
-                continue
-
-            class_name = config_class.__name__
-            export_name = _derive_export_name(class_name, mode_prefix)
-            configs[export_name] = config_class
-
-        except (ImportError, AttributeError) as e:
-            logger.warning("Failed to load config from %s: %s", config_file, e)
-
-    return configs
+    Nothing is imported: a config module pulls in cv2, csv readers and its own
+    path arithmetic, and a run needs exactly one of them.  Importing all 17 to
+    find the one being run cost about 200ms and ran module-level code for
+    datasets that may not even exist on this machine.
+    """
+    return {
+        _export_name(path.stem, mode_prefix): path.stem
+        for path in sorted(directory.glob("config_*.py"))
+    }
 
 
-def get_all_config_names(configs: Dict[str, Type]) -> list:
-    return list(configs.keys())
+def load_config(package_name: str, module_stem: str, export_name: str) -> Type:
+    """Import one config module and return its config class."""
+    module = importlib.import_module(f"{package_name}.{module_stem}")
+    config_class = _get_config_class_from_module(module)
+    if config_class is None:
+        raise AttributeError(
+            f"{package_name}.{module_stem} defines no config class, so "
+            f"{export_name!r} cannot be resolved"
+        )
+    return config_class

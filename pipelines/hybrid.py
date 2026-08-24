@@ -39,6 +39,7 @@ from utils import (
     apply_seed,
     build_graph,
     log_memory,
+    render_network,
     save_hybrid_snapshot,
     spawn_context,
     trim_graph,
@@ -523,22 +524,6 @@ def log_connectivity(graph: SynthGraph, label: str = ""):
 # ------------------------------------------------------------------ #
 
 
-def plot_hybrid_network(
-    graph: SynthGraph,
-    margin_frac: float = 0.02,
-    dpi: int = None,
-    max_px: int | None = None,
-):
-    from utils import render_network
-
-    return render_network(
-        graph,
-        margin_frac=margin_frac,
-        dpi=dpi,
-        max_px=max_px,
-    )
-
-
 # ------------------------------------------------------------------ #
 # Main pipeline for one dataset
 # ------------------------------------------------------------------ #
@@ -705,9 +690,7 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
     gc.collect()
 
     log_memory(f"Before plotting ({dataset_id})", config.LOG_MEMORY)
-    img = plot_hybrid_network(
-        hybrid_graph, max_px=getattr(config, "RENDER_MAX_PX", None)
-    )
+    img = render_network(hybrid_graph, max_px=getattr(config, "RENDER_MAX_PX", None))
     del hybrid_graph
     gc.collect()
     saver.save(img, "synthetic_graph", f"{prefix}_")

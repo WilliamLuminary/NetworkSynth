@@ -18,17 +18,12 @@ class RunPaths:
         return os.path.join(self.root, dataset_id.path)
 
 
-def create_run_paths(config, result_dir: str | None = None) -> RunPaths:
+def create_run_paths(config) -> RunPaths:
     """Create this run's output root and return it as a value.
 
-    When *result_dir* is given the run writes directly there (analysis mode
-    re-reading an existing result set).  Otherwise a fresh timestamped
-    directory is created and ``latest_result`` is repointed at it.
+    A fresh timestamped directory, with ``latest_result`` repointed at it.
     """
     from .saver import _ensure_directory, _time_id, _update_soft_link
-
-    if result_dir:
-        return RunPaths(root=os.path.join(config.BASE_OUTPUT_PATH, result_dir))
 
     root = os.path.join(
         config.BASE_OUTPUT_PATH,

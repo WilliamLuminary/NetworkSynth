@@ -258,8 +258,10 @@ def run_mosaic_for_dataset(dataset_id, config, run_paths):
     prefix = f"mosaic_{config.GRID_ROWS}x{config.GRID_COLS}"
     run.saver.begin_batch()
     run.save(mosaic_graph, "synthetic_export", f"{prefix}_")
-    mosaic_img = plot_mosaic_network(
-        mosaic_graph, max_px=getattr(config, "RENDER_MAX_PX", None)
+    # border=True outlines each tile's bounding box, which is the point of a
+    # mosaic render and the only way it differs from every other one.
+    mosaic_img = render_network(
+        mosaic_graph, border=True, max_px=getattr(config, "RENDER_MAX_PX", None)
     )
     run.save(mosaic_img, "synthetic_graph", f"{prefix}_")
     run.saver.end_batch()
@@ -274,21 +276,6 @@ def run_mosaic_for_dataset(dataset_id, config, run_paths):
 # ------------------------------------------------------------------ #
 # Mosaic-aware plotting
 # ------------------------------------------------------------------ #
-def plot_mosaic_network(
-    graph: SynthGraph,
-    margin_frac: float = 0.02,
-    dpi: int = None,
-    max_px: int | None = None,
-):
-    return render_network(
-        graph,
-        margin_frac=margin_frac,
-        dpi=dpi,
-        border=True,
-        max_px=max_px,
-    )
-
-
 # ------------------------------------------------------------------ #
 # Entry point
 # ------------------------------------------------------------------ #

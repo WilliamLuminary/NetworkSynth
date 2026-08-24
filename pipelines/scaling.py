@@ -3,7 +3,6 @@ import logging
 from configs import SynthParams
 from configs.scaling_mode import ScalingConfig
 from graphs import GraphGenerator
-from graphs.synth_graph import SynthGraph
 from handlers import (
     STATUS_CANCELLED,
     STATUS_FAILED,
@@ -52,7 +51,7 @@ def run_scaling_for_dataset(dataset_id, config, run_paths):
 
     run.saver.begin_batch()
     run.save(scaled_graph, "synthetic_export", f"{prefix}_")
-    scaled_img = plot_scaled_network(
+    scaled_img = render_network(
         scaled_graph, max_px=getattr(config, "RENDER_MAX_PX", None)
     )
     run.save(scaled_img, "synthetic_graph", f"{prefix}_")
@@ -62,23 +61,6 @@ def run_scaling_for_dataset(dataset_id, config, run_paths):
         f"Scaling complete — "
         f"{scaled_graph.number_of_nodes():,} nodes, "
         f"{scaled_graph.number_of_edges():,} edges"
-    )
-
-
-# ------------------------------------------------------------------ #
-# Efficient plotting for large networks
-# ------------------------------------------------------------------ #
-def plot_scaled_network(
-    graph: SynthGraph,
-    margin_frac: float = 0.02,
-    dpi: int = None,
-    max_px: int | None = None,
-):
-    return render_network(
-        graph,
-        margin_frac=margin_frac,
-        dpi=dpi,
-        max_px=max_px,
     )
 
 
