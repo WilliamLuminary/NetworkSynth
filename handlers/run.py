@@ -12,6 +12,35 @@ from .saver import Saver, build_saver
 
 logger = logging.getLogger(__name__)
 
+#: One layout for every network report, so ``report.txt`` reads the same
+#: whichever pipeline wrote it.  Counts get thousands separators, measurements
+#: four decimals, and labels share a column.
+_REPORT_RULE = "=" * 40
+_REPORT_LABEL_WIDTH = 21
+
+
+def _report(title: str, graph: SynthGraph, attributes=None) -> str:
+    def row(label: str, value: str) -> str:
+        return f"{label + ':':<{_REPORT_LABEL_WIDTH}}{value}"
+
+    lines = [
+        f"{title} Report",
+        _REPORT_RULE,
+        row("Nodes", f"{graph.number_of_nodes():,}"),
+        row("Edges", f"{graph.number_of_edges():,}"),
+    ]
+    if attributes is not None:
+        lines.append(row("Average degree", f"{attributes.average_degree:.4f}"))
+        lines.append(row("Average edge length", f"{attributes.average_length:.4f}"))
+        if attributes.degree_distribution:
+            lines.append("")
+            lines.append("Degree distribution:")
+            for degree in sorted(attributes.degree_distribution):
+                fraction = attributes.degree_distribution[degree]
+                lines.append(f"  degree {degree:>3d}: {fraction:.4f}")
+    lines.append("")
+    return "\n".join(lines)
+
 
 class Run:
     """One dataset being processed, and the directory it writes to.
@@ -104,23 +133,16 @@ class GenerationRun(Run):
         )
 
     def original_report(self) -> str:
-        graph, attributes = self.original, self.attributes
-        lines = [
-            "Original Network Report",
-            "=" * 40,
-            f"Nodes:              {graph.number_of_nodes()}",
-            f"Edges:              {graph.number_of_edges()}",
-            f"Average degree:     {attributes.average_degree:.4f}",
-            f"Average edge length: {attributes.average_length:.4f}",
-        ]
-        if attributes.degree_distribution:
-            lines.append("")
-            lines.append("Degree distribution:")
-            for deg in sorted(attributes.degree_distribution):
-                frac = attributes.degree_distribution[deg]
-                lines.append(f"  degree {deg:>3d}: {frac:.4f}")
-        lines.append("")
-        return "\n".join(lines)
+        """The input, measured: counts plus the attributes generation reads."""
+        return _report("Original Network", self.original, self.attributes)
+
+    def synthetic_report(self, graph: SynthGraph) -> str:
+        """Counts only.
+
+        Generation deliberately does not measure what it produced — that is
+        ``ComparisonRun``'s job — so there are no averages to report here.
+        """
+        return _report("Synthetic Network", graph)
 
 
 class ComparisonRun(Run):

@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 
 
 class SampleConfig(BaseConfig):
+    MODE = "compare"
+
     MEASURE_WEIGHTED = False
 
     #: One dataset per run: analysis compares the two sets below, and which two

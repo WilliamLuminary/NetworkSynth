@@ -430,7 +430,7 @@ def run_phase2(
 
     if take_snapshots:
         os.makedirs(snapshot_dir, exist_ok=True)
-        snapshot_style = dict(getattr(config, "HYBRID_SNAPSHOT_STYLE", {}))
+        snapshot_style = dict(config.HYBRID_SNAPSHOT_STYLE)
         # Read here in the parent: the plot pool runs in child processes.
         snapshot_style.setdefault("max_px", getattr(config, "RENDER_MAX_PX", None))
         plot_workers = config.get_snapshot_plot_workers()
@@ -529,10 +529,6 @@ def log_connectivity(graph: SynthGraph, label: str = ""):
 # ------------------------------------------------------------------ #
 
 
-def _report_text(title: str, num_nodes: int, num_edges: int) -> str:
-    return f"{title}\nNodes: {num_nodes:,}\nEdges: {num_edges:,}\n"
-
-
 def _apply_dataset_factors(dataset_id, config, params: SynthParams) -> SynthParams:
     """Return *params* with this dataset's (nf, ef) override applied, if any.
 
@@ -610,7 +606,7 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
         extra=tagged("PHASE2", dataset=str(dataset_id)),
     )
 
-    snapshot_interval = getattr(config, "SNAPSHOT_INTERVAL", 0)
+    snapshot_interval = config.SNAPSHOT_INTERVAL
     snapshot_dir = (
         os.path.join(run.saver.output_dir, "snapshots")
         if snapshot_interval != 0
@@ -668,24 +664,13 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
     run.save(hybrid_graph, "synthetic_export", f"{prefix}_")
 
     # --- Write reports before plotting (plotting is memory-intensive) ---
-    original_network = run.original
-    run.save(
-        _report_text(
-            "Original Network",
-            original_network.number_of_nodes(),
-            original_network.number_of_edges(),
-        ),
-        "original_report",
-    )
-    run.save(
-        _report_text("Synthetic Network", num_nodes, num_edges),
-        "synthetic_report",
-    )
+    run.save(run.original_report(), "original_report")
+    run.save(run.synthetic_report(hybrid_graph), "synthetic_report")
 
     # --- Plot synthetic graph (high memory) ---
     # Free everything we can before rendering.
     saver = run.saver
-    del run, original_network, attributes, mapper
+    del run, attributes, mapper
     del error_checker, centers
     gc.collect()
 
@@ -788,7 +773,7 @@ def _run_dataset_in_subprocess(dataset_id, config, run_paths):
 
 def main(config_cls=None):
     if config_cls is None:
-        from configs.hybrid_mode import HybridConfig
+        from configs.hybrid_mode.config_sample import SampleConfig as HybridConfig
 
         config_cls = HybridConfig
     config_cls.initialize()

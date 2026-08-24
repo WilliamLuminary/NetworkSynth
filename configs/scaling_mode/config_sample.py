@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 
 class SampleConfig(BaseConfig):
 
+    MODE = "scaling"
+
     DATASETS = [DatasetId("sample_1")]
 
     # --- Scaling grid parameters ---

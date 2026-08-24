@@ -17,6 +17,8 @@ def _generate_sample_datasets() -> List[DatasetId]:
 
 
 class SampleConfig(BaseConfig):
+    MODE = "generate"
+
     # Use DATASETS with single-level DatasetId
     DATASETS = _generate_sample_datasets()
 

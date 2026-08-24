@@ -10,7 +10,7 @@ import networkit as nk
 
 from configs import SynthParams
 from configs.base_config import tagged
-from configs.mosaic_mode import MosaicConfig
+from configs.mosaic_mode.config_sample import SampleConfig as MosaicConfig
 from graphs import GraphGenerator
 from graphs.mosaic_stitcher import MosaicStitcher
 from graphs.synth_graph import SynthGraph

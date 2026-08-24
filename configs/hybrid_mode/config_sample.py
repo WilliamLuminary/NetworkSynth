@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 
 class SampleConfig(BaseConfig):
 
+    MODE = "hybrid"
+
     LOG_MEMORY = True
 
     DATASETS = [

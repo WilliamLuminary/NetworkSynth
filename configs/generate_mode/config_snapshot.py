@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 
 
 class SnapshotConfig(BaseConfig):
+    MODE = "generate"
+
     DATASETS = [
         DatasetId("sample_A"),
         DatasetId("sample_B"),

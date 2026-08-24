@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 
 class ConfigDickson(BaseConfig):
 
+    MODE = "hybrid"
+
     LOG_MEMORY = True
 
     DATASETS = [

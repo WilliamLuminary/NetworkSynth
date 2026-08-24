@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 
 
 class ConfigTmp(BaseConfig):
+    MODE = "generate"
+
     DATASETS = [DatasetId("sample_1")]
 
     IMAGE_SIZE = (2048, 2048)

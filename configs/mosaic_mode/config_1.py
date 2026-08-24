@@ -20,6 +20,8 @@ logger = logging.getLogger(__name__)
 
 class Config1(BaseConfig):
 
+    MODE = "mosaic"
+
     # --- Dataset ---
     DATASETS = [DatasetId("A", "20kX")]
 

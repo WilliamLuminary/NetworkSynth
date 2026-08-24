@@ -25,6 +25,8 @@ def _generate_old_datasets() -> List[DatasetId]:
 
 
 class Config1(BaseConfig):
+    MODE = "generate"
+
     DATASETS = [DatasetId("A", "20kX")]
 
     IMAGE_SIZE = (510, 510)

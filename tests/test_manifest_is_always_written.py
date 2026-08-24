@@ -8,7 +8,7 @@ pytestmark = pytest.mark.unit
 
 
 #: (module path, the per-dataset function main() calls)
-PIPELINES = [
+CHECKED_PIPELINES = [
     ("pipelines.generate", "run_for_dataset"),
     ("pipelines.mosaic", "run_mosaic_for_dataset"),
     ("pipelines.scaling", "run_scaling_for_dataset"),
@@ -36,9 +36,15 @@ def _prepare(module, runner, replacement, monkeypatch):
 
 
 def _config(tmp_path, name):
+    """A config for the pipeline under test.
+
+    MODE names the pipeline that would claim it; these tests call the module
+    directly, so it only has to be set — every config must say.
+    """
     from configs import BaseConfig, DatasetId
 
     class Config(BaseConfig):
+        MODE = name.rsplit(".", 1)[-1]
         BASE_OUTPUT_PATH = str(tmp_path / f"out_{name}")
         DATASETS = [DatasetId("ds")]
         SYNTHETIC_NETWORK_NUMBER = 1  # a sweep refuses to run without any
@@ -55,7 +61,7 @@ def _read_manifest(tmp_path, name):
     return json.loads(next(iter(found.values())).read_text())
 
 
-@pytest.mark.parametrize("module_path,runner", PIPELINES)
+@pytest.mark.parametrize("module_path,runner", CHECKED_PIPELINES)
 def test_a_completed_run_writes_a_manifest(module_path, runner, tmp_path, monkeypatch):
     import importlib
 
@@ -67,7 +73,7 @@ def test_a_completed_run_writes_a_manifest(module_path, runner, tmp_path, monkey
     assert _read_manifest(tmp_path, module_path)["status"] == STATUS_OK
 
 
-@pytest.mark.parametrize("module_path,runner", PIPELINES)
+@pytest.mark.parametrize("module_path,runner", CHECKED_PIPELINES)
 def test_a_failed_run_writes_a_manifest_saying_so(
     module_path, runner, tmp_path, monkeypatch
 ):
@@ -88,7 +94,7 @@ def test_a_failed_run_writes_a_manifest_saying_so(
     assert "boom" in manifest["error"]
 
 
-@pytest.mark.parametrize("module_path,runner", PIPELINES)
+@pytest.mark.parametrize("module_path,runner", CHECKED_PIPELINES)
 def test_a_cancelled_run_is_distinct_from_a_failed_one(
     module_path, runner, tmp_path, monkeypatch
 ):
@@ -109,8 +115,9 @@ def test_a_cancelled_run_is_distinct_from_a_failed_one(
 
 def test_every_gui_mode_is_covered_here():
     import gui_run
+    from pipelines import PIPELINES
 
-    checked = {path for path, _ in PIPELINES}
-    offered = set(gui_run._MODES.values())
+    checked = {path for path, _ in CHECKED_PIPELINES}
+    offered = {PIPELINES[mode] for mode in gui_run._GUI_MODES}
 
     assert offered <= checked, f"unchecked GUI modes: {offered - checked}"

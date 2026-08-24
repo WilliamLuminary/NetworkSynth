@@ -1,7 +1,7 @@
 import logging
 
 from configs import SynthParams
-from configs.scaling_mode import ScalingConfig
+from configs.scaling_mode.config_sample import SampleConfig as ScalingConfig
 from graphs import GraphGenerator
 from handlers import (
     STATUS_CANCELLED,

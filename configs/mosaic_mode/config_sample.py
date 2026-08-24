@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 
 class SampleConfig(BaseConfig):
 
+    MODE = "mosaic"
+
     # --- Dataset (single-level id) ---
     DATASETS = [DatasetId("sample_1")]
 

@@ -1,147 +1,67 @@
+"""NetworkSynth — run a config.
+
+    python run.py configs/generate_mode/config_sample.py
+
+The config is the whole instruction: it names its datasets, its parameters, and
+the pipeline that runs it (``MODE``).  There is no mode argument to keep in step
+with it, and nothing to remember but the path.
+"""
+
 import logging
 import sys
+from pathlib import Path
 
-import fire
-
+from configs.loader import load_config
 from handlers import configure_console
+from pipelines import PIPELINES, load_pipeline
+
+logger = logging.getLogger("run")
+
+EXIT_OK = 0
+EXIT_FAILED = 1
+EXIT_BAD_ARGS = 2
+# 128 + SIGINT(2), the conventional value for a process stopped by Ctrl-C.
+EXIT_INTERRUPTED = 130
+
+_USAGE = f"""usage: python run.py <path/to/config.py>
+
+The config's MODE picks the pipeline: {", ".join(sorted(PIPELINES))}.
+
+Available configs:
+"""
 
 
-class CLI:
-    """NetworkSynth — unified pipeline runner."""
-
-    def generate(self, config: str = None):
-        """Standard network generation (parallel, quality-checked).
-
-        Set SELECT_BEST > 0 in the config to generate many candidates, rank them
-        against the original, and keep only the best; 0 keeps every network.
-
-        Args:
-            config: Config variant name, e.g. 'Snapshot1x1', 'Snapshot3x3'.
-                    Maps to GenConfig<Name>. Omit for default (Snapshot).
-        """
-        config_cls = None
-        if config:
-            import configs.generate_mode as gm
-
-            cls_name = f"GenConfig{config}"
-            config_cls = getattr(gm, cls_name, None)
-            if config_cls is None:
-                available = [n for n in dir(gm) if n.startswith("GenConfig")]
-                raise SystemExit(
-                    f"Unknown generate config '{config}'. " f"Available: {available}"
-                )
-
-        from pipelines.generate import main
-
-        main(config_cls=config_cls)
-
-    def mosaic(self):
-        """Mosaic: parallel tiles + stitch."""
-        from pipelines.mosaic import main
-
-        main()
-
-    def scaling(self):
-        """Scaling: multi-root synchronized BFS."""
-        from pipelines.scaling import main
-
-        main()
-
-    def hybrid(self, config: str = None, dataset: str = None):
-        """Hybrid: parallel seed tiles + frontier continuation.
-
-        Args:
-            config: Config variant name (e.g. 'snapshot').
-                    Maps to HybridConfig<Name>. Omit for default.
-            dataset: Single dataset letter (A/B/C/D). Omit to run all.
-        """
-        config_cls = None
-        if config:
-            import configs.hybrid_mode as hm
-
-            cls_name = f"HybridConfig{config.capitalize()}"
-            config_cls = getattr(hm, cls_name, None)
-            if config_cls is None:
-                available = [n for n in dir(hm) if n.startswith("HybridConfig")]
-                raise SystemExit(
-                    f"Unknown hybrid config '{config}'. " f"Available: {available}"
-                )
-
-        if dataset:
-            if config_cls is None:
-                from configs.hybrid_mode import HybridConfig as _HC
-
-                config_cls = _HC
-            from configs.enums import DatasetId
-
-            config_cls.DATASETS = [DatasetId(f"sample_{dataset}")]
-
-        from pipelines.hybrid import main
-
-        main(config_cls=config_cls)
-
-    def sweep(self, nf_range: tuple = None, ef_range: tuple = None):
-        """Hyperparameter sweep (wandb) over every dataset in the sweep config.
-
-        Args:
-            nf_range: Node factor range as tuple, e.g. '(2.1, 3.0)'.
-                      Defaults to the config's NF_RANGE.
-            ef_range: Edge factor range as tuple, e.g. '(2.1, 3.0)'.
-                      Defaults to the config's EF_RANGE.
-        """
-        from pipelines.sweep import main
-
-        main(nf_range=nf_range, ef_range=ef_range)
-
-    def compare(self, original: str = None, synthetic: str = None):
-        """Compare two sets of networks and plot the result.
-
-        Free-standing: it reads the two sets you name and nothing else.  To
-        compare a generate run against its input, point it at that run's
-        folders.
-
-        Args:
-            original: Directory holding the original network(s).
-            synthetic: Directory holding the synthetic networks.
-                       Omit both to use the config's own paths.
-        """
-        if bool(original) != bool(synthetic):
-            raise SystemExit(
-                "compare needs two sets: pass both --original and --synthetic, "
-                "or neither to use the config's paths."
-            )
-
-        from configs import CompareConfig
-
-        if original:
-            CompareConfig.ORIGINAL_NETWORKS_PATH = original
-            CompareConfig.SYNTHETIC_NETWORKS_PATH = synthetic
-
-        from pipelines.compare import main
-
-        main(CompareConfig)
+def _available() -> str:
+    configs = sorted(str(p) for p in Path("configs").glob("*_mode/config_*.py"))
+    return "\n".join(f"  {path}" for path in configs)
 
 
-# SIGINT exit code. 128 + SIGINT(2), the conventional value for a process
-# terminated by Ctrl-C.  Note `fire` swallows SystemExit and reports 2, so the
-# handler must live out here rather than inside a pipeline.
-_EXIT_INTERRUPTED = 130
-
-
-def main() -> None:
-    """Run the CLI, mapping cancellation to a non-zero exit code.
-
-    Pipelines log their shutdown and re-raise; deciding the process exit status
-    is the entry point's job.  Without this a cancelled run exits 0 and any
-    caller — notably a GUI launching us as a subprocess — reads it as success.
-    """
+def main(argv=None) -> int:
     configure_console()
+    argv = sys.argv if argv is None else argv
+
+    if len(argv) != 2 or argv[1] in ("-h", "--help"):
+        print(_USAGE + _available())
+        return EXIT_BAD_ARGS
+
     try:
-        fire.Fire(CLI)
+        config = load_config(argv[1])
+        pipeline = load_pipeline(config.MODE)
+    except (FileNotFoundError, ValueError, AttributeError) as exc:
+        logger.error(f"{exc}")
+        return EXIT_BAD_ARGS
+
+    logger.info(f"Running {config.__name__} ({config.MODE})")
+    try:
+        pipeline.main(config_cls=config)
     except KeyboardInterrupt:
-        logging.getLogger(__name__).critical("Interrupted — exiting.")
-        sys.exit(_EXIT_INTERRUPTED)
+        logger.critical("Interrupted — exiting.")
+        return EXIT_INTERRUPTED
+    except Exception:
+        logger.exception("Run failed")
+        return EXIT_FAILED
+    return EXIT_OK
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

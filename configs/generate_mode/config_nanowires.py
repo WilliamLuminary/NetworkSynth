@@ -20,6 +20,8 @@ _NANOWIRES_INPUT_DIR = "Nanowires-20250222-255-input"
 
 
 class ConfigNanowires(BaseConfig):
+    MODE = "generate"
+
     DATASETS = _generate_nanowires_datasets()
 
     IMAGE_SIZE: Tuple[int, int] = (1024, 1536)

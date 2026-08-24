@@ -68,6 +68,10 @@ def load_idle(*_, **__):
 class BaseConfig:
     """Define base paths, this config file must be in the subdirectory of the project root"""
 
+    #: Which pipeline runs this config.  One of ``pipelines.PIPELINES``; a
+    #: config that does not say cannot be run, because nothing else decides.
+    MODE: str = ""
+
     DATASETS: Optional[List[DatasetId]] = None
 
     @classmethod
@@ -116,8 +120,16 @@ class BaseConfig:
     # identically.
     SEED: Optional[int] = None
 
-    SNAPSHOT_INTERVAL: int = 0  # 0 = disabled; N = snapshot every N new nodes
+    # Snapshots of generation in progress.  The only switch: a mode does not
+    # get its own pipeline for them, it sets these.
+    #   0      disabled
+    #   N > 0  every N (new nodes in generate, Phase 2 rounds in hybrid)
+    #   N < 0  hybrid only — roughly |N| log-spaced snapshots across the run
+    SNAPSHOT_INTERVAL: int = 0
     SNAPSHOT_PLOT_WORKERS: int = 20
+    #: Rendering style for hybrid Phase 2 snapshots: dpi, node_size, line_width.
+    #: Empty means the renderer's own defaults.
+    HYBRID_SNAPSHOT_STYLE: dict = {}
     SELECT_BEST: int = 0  # 0 = disabled; N = keep N best networks by metric distance
 
     LOG_MEMORY: bool = False
@@ -155,6 +167,12 @@ class BaseConfig:
         ``handlers.run_paths``) and is needed whether or not anything logs.
         """
         from handlers.run_logging import configure_console
+
+        if not cls.MODE:
+            raise ValueError(
+                f"{cls.__name__} sets no MODE, so no pipeline claims it. Set "
+                "MODE to the pipeline that runs this config."
+            )
 
         # Snapshots are written straight to disk by the render pool, bypassing
         # the Saver, so DISABLE_SAVING cannot suppress them.  Rather than let a

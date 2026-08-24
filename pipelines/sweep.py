@@ -33,7 +33,7 @@ def _init_config():
 
     Sweeps every dataset the config lists; there is no per-dataset variant.
     """
-    from configs.sweep_mode import SweepConfig as cfg
+    from configs.sweep_mode.config_sample import SampleConfig as cfg
 
     cfg.initialize()
     cfg.SYNTHETIC_NETWORK_NUMBER = 100
@@ -206,16 +206,16 @@ def run_for_dataset(
     wandb.agent(sweep_id, function=trial)
 
 
-def main(config_cls=None, nf_range=None, ef_range=None):
+def main(config_cls=None):
     # A GUI run brings its own config, already carrying the trial count and the
-    # ranges from the run-spec; the CLI builds the sweep config here.
+    # ranges from the run-spec; a CLI run brings the config file it was given.
     cfg = _init_config() if config_cls is None else config_cls
     if config_cls is not None:
         cfg.initialize()
 
-    # Caller argument wins, then the config's range, then the module default.
-    nf_lo, nf_hi = nf_range or getattr(cfg, "NF_RANGE", DEFAULT_NF_RANGE)
-    ef_lo, ef_hi = ef_range or getattr(cfg, "EF_RANGE", DEFAULT_EF_RANGE)
+    # The config's range, or the module default.
+    nf_lo, nf_hi = getattr(cfg, "NF_RANGE", DEFAULT_NF_RANGE)
+    ef_lo, ef_hi = getattr(cfg, "EF_RANGE", DEFAULT_EF_RANGE)
     node_factors = _build_factors(nf_lo, nf_hi)
     edge_factors = _build_factors(ef_lo, ef_hi)
 

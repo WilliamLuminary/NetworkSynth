@@ -24,6 +24,8 @@ def _generate_new_datasets() -> List[DatasetId]:
 
 
 class Config2(BaseConfig):
+    MODE = "generate"
+
     DATASETS = [DatasetId("004")]  # Default: single dataset for testing
 
     IMAGE_SIZE = (1887, 2048)
