@@ -9,10 +9,13 @@ Synthetic Generation
   ```bash
    git clone https://github.com/WilliamLuminary/NetworkSynth.git
    cd NetworkSynth
-   pip install -r requirements.txt  # Python 3.10+
+   pip install -r requirements.txt  # Python 3.10-3.13
 
    python run.py configs/generate_mode/config_sample.py
   ```
+
+   Python 3.14 is not supported yet: NetworKit ships no cp314 wheel, and neither do the numpy, scipy and matplotlib versions pinned here, so a 3.14 install has to compile from source. See `INTEGRATION_PLAN.md`, Appendix A.
+
 2. **Prepare Sample Data**
   ```
    data/input/samples/generate_mode/
