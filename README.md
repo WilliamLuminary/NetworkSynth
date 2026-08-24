@@ -137,9 +137,9 @@ Saving is config-driven: each config declares **what** formats to save, and the 
 ```
 Pipeline  →  Saver.save(content, identifier, prefix)
                  ↓
-              Config.save(identifier)  →  returns list of specs
+              Config.save(identifier)  →  a tuple of SaveSpec
                  ↓
-              Serializer(content, filepath)  →  writes to disk
+              spec.save_fn(content, filepath)  →  writes to disk
 ```
 
 **Layer 1 — Serializers** (`configs/file_definitions.py`): Pure `(content, filepath)` functions. These are the *available formats* — pick them in a config spec (Layer 2).
@@ -166,105 +166,102 @@ column unconditionally produced a file that read back as weighted — and both t
 column's presence as the answer, so weightedness now survives a round trip
 truthfully in both directions.
 
-**Layer 2 — Config save methods** (`BaseConfig` + mode overrides): Each `save_*` classmethod returns a list of spec tuples — no dependency on the Saver.
-
-**Layer 3 — Saver** (`handlers/saver.py`): Single public method `save()`. Gets specs from the config, builds file paths, creates directories, and calls the serializer with `(content, filepath)`.
-
-#### How specs work
-
-Each `save_*` method returns a list of tuples:
+**Layer 2 — Save specs** (`BaseConfig.SAVE_<IDENTIFIER>`): one attribute per
+output, holding a tuple of `SaveSpec`. Every setting is named, so a spec reads as
+what it is:
 
 ```python
-(relative_dir, detail, extension, save_fn)
-# Optional 5th element: False to disable timestamp
+SaveSpec(ORIGINAL_DIR, "report", "txt", save_text, use_timestamp=False)
 ```
 
-The Saver constructs the path as: `{output_dir}/{relative_dir}/{prefix}{detail}_{timestamp}.{extension}`
+`SaveSpec` is a frozen dataclass in `configs/file_definitions.py`:
 
-#### Default save methods
+| Field | Meaning |
+| --- | --- |
+| `relative_dir` | Subdirectory under the run's output root (`""` = the root) |
+| `detail` | Descriptive stem in the filename |
+| `extension` | File extension, without the dot |
+| `save_fn` | Serialiser, called as `save_fn(content, filepath)` |
+| `use_timestamp` | Whether the filename carries the run's timestamp (default `True`) |
 
-`DEFAULT_SAVE_SPECS` in `configs/file_definitions.py` defines defaults for all
-standard identifiers. These are inherited by every mode config automatically.
-**Default policy: images → `.webp`, network exports → `.csv`.**
+**Layer 3 — Saver** (`handlers/saver.py`): single public method `save()`. Gets
+specs from the config, builds file paths, creates directories, and calls the
+serialiser with `(content, filepath)`. The path is
+`{output_dir}/{relative_dir}/{prefix}{detail}_{timestamp}.{extension}`.
 
-| Identifier | Directory | Formats | Serializer |
+#### The defaults
+
+`BaseConfig` declares one `SAVE_*` attribute per output. Every mode config
+inherits them. **Default policy: images → `.webp`, network exports → `.csv`.**
+
+| Identifier | Attribute | Directory | Format |
 | --- | --- | --- | --- |
-| `original_image` | `original/` | `.webp` | `save_webp` |
-| `original_network` | `original/` | `.csv` | `save_network_csv` |
-| `original_property` | `original/` | `.pkl` | `save_pickle` |
-| `original_graph` | `original/` | `.webp` | `save_webp` |
-| `original_report` | `original/` | `.txt` (no timestamp) | `save_text` |
-| `synthetic_graph` | `synthetic/` | `.webp` | `save_webp` |
-| `synthetic_network` | `synthetic/` | `.pkl` | `save_pickle` |
-| `synthetic_export` | `synthetic/` | `.csv` | `save_network_csv` |
-| `synthetic_report` | `synthetic/` | `.txt` (no timestamp) | `save_text` |
-| `analysis_data` | root | `.pkl` (no timestamp) | `save_pickle` |
-| `analysis_figure` | root | `.webp` | `save_webp` |
+| `original_image` | `SAVE_ORIGINAL_IMAGE` | `original/` | `.webp` |
+| `original_graph` | `SAVE_ORIGINAL_GRAPH` | `original/` | `.webp` |
+| `original_network` | `SAVE_ORIGINAL_NETWORK` | `original/` | `.csv` |
+| `original_property` | `SAVE_ORIGINAL_PROPERTY` | `original/` | `.pkl` |
+| `original_report` | `SAVE_ORIGINAL_REPORT` | `original/` | `.txt`, no timestamp |
+| `synthetic_graph` | `SAVE_SYNTHETIC_GRAPH` | `synthetic/` | `.webp` |
+| `synthetic_network` | `SAVE_SYNTHETIC_NETWORK` | `synthetic/` | `.pkl` |
+| `synthetic_export` | `SAVE_SYNTHETIC_EXPORT` | `synthetic/` | `.csv` |
+| `synthetic_report` | `SAVE_SYNTHETIC_REPORT` | `synthetic/` | `.txt`, no timestamp |
+| `analysis_data` | `SAVE_ANALYSIS_DATA` | root | `.pkl`, no timestamp |
+| `analysis_figure` | `SAVE_ANALYSIS_FIGURE` | root | `.webp` |
 
-The `save_svg` (vector image) and `save_network_nkbin` (`.nkbin` + `.npy`)
-serializers are **not in the defaults** but remain available — re-enable them
-per config as shown below.
+`save_svg` (vector) and `save_network_nkbin` (`.nkbin` + `.npy`) are **not**
+defaults but remain available — name them in an override.
 
-#### Controlling output formats from the config
+#### Changing what a config writes
 
-**To change what format an output is saved in, you only touch the config** — no
-pipeline or serializer changes. Define a `save_<identifier>()` classmethod on
-your mode config returning the spec list you want. The dispatcher
-(`BaseConfig.save`) uses that method if present, otherwise falls back to
-`DEFAULT_SAVE_SPECS`. Each spec is a tuple:
+**Only the config changes** — no pipeline or serialiser edits. Declare the
+attribute; ordinary class inheritance does the rest, and everything you do not
+mention stays on the default.
 
 ```python
-(relative_dir, detail, extension, save_fn)   # optional 5th element: False = no timestamp
-```
+from ..file_definitions import (
+    ORIGINAL_DIR,
+    SYNTHETIC_DIR,
+    SaveSpec,
+    save_network_csv,
+    save_network_nkbin,
+    save_png,
+    save_svg,
+    save_webp,
+)
 
-Rules of thumb:
-- **One tuple = one file.** List several tuples to emit several formats for the
-  same output.
-- **Choose the format by choosing the serializer** (`save_fn`) and its
-  `extension`, both from the table above.
-- Only override the identifiers you want to change; everything else stays on the
-  defaults.
 
-Examples (put these on your config class, e.g. `configs/hybrid_mode/config_dickson.py`):
-
-```python
 class ConfigDickson(BaseConfig):
 
-    # Save the original graph as vector SVG instead of the default WebP:
-    @classmethod
-    def save_original_graph(cls):
-        from ..file_definitions import save_svg
-        return [("original", "original_graph", "svg", save_svg)]
+    # Vector SVG instead of the default WebP:
+    SAVE_ORIGINAL_GRAPH = (
+        SaveSpec(ORIGINAL_DIR, "original_graph", "svg", save_svg),
+    )
 
-    # Emit the synthetic network as BOTH csv and the binary .nkbin (+ .npy):
-    @classmethod
-    def save_synthetic_export(cls):
-        from ..file_definitions import save_network_csv, save_network_nkbin
-        return [
-            ("synthetic", "synthetic_network", "csv", save_network_csv),
-            ("synthetic", "synthetic_network", "nkbin", save_network_nkbin),
-        ]
+    # One save call, two files — csv and the binary .nkbin (+ .npy):
+    SAVE_SYNTHETIC_EXPORT = (
+        SaveSpec(SYNTHETIC_DIR, "synthetic_network", "csv", save_network_csv),
+        SaveSpec(SYNTHETIC_DIR, "synthetic_network", "nkbin", save_network_nkbin),
+    )
 
-    # Save the synthetic graph image as webp AND png:
-    @classmethod
-    def save_synthetic_graph(cls):
-        from ..file_definitions import save_png, save_webp
-        return [
-            ("synthetic", "synthetic_graph", "webp", save_webp),
-            ("synthetic", "synthetic_graph", "png", save_png),
-        ]
+    # webp AND png:
+    SAVE_SYNTHETIC_GRAPH = (
+        SaveSpec(SYNTHETIC_DIR, "synthetic_graph", "webp", save_webp),
+        SaveSpec(SYNTHETIC_DIR, "synthetic_graph", "png", save_png),
+    )
 ```
+
+One `SaveSpec` = one file. List several to emit several formats for the same
+output. Pick the format by picking the `save_fn` and its `extension` from the
+serialiser table above.
 
 #### Adding a brand-new output type
 
-Identifiers are plain strings — there is no enum to register. To save a new kind
-of data:
+Identifiers are plain strings — nothing to register:
 
-1. Add a default spec to `DEFAULT_SAVE_SPECS` in `configs/file_definitions.py`
-   (or just define the `save_<identifier>()` method on your config):
+1. Declare `SAVE_MY_CUSTOM_DATA` on `BaseConfig` (or just on your config):
 
 ```python
-"my_custom_data": [("custom_dir", "my_data", "pkl", save_pickle)],
+SAVE_MY_CUSTOM_DATA = (SaveSpec("custom_dir", "my_data", "pkl", save_pickle),)
 ```
 
 2. Call it from the pipeline with that identifier:
@@ -273,8 +270,70 @@ of data:
 run.save(my_data, "my_custom_data")
 ```
 
-If none of the existing serializers fit, add a new `(content, filepath)`
-function in `configs/file_definitions.py` and reference it in the spec.
+`BaseConfig.save("my_custom_data")` resolves `SAVE_MY_CUSTOM_DATA`. If none of
+the existing serialisers fit, add a `(content, filepath)` function in
+`configs/file_definitions.py` and name it in the spec.
+
+### Render System
+
+Saving decides *where a file goes*; rendering decides *how the picture looks*.
+The two are deliberately separate, and rendering follows the same shape.
+
+**The paradigm** — `RenderStyle` in `configs/file_definitions.py` names every
+field you can set. It is a frozen, flat dataclass: any output may set any subset,
+so "a plot with a background image" needs no special class.
+
+| Field | Meaning |
+| --- | --- |
+| `node_size` | Marker diameter in **points** (matplotlib's `markersize` unit). `None` = thinnest the renderer can draw |
+| `line_width` | Edge width in points. `None` = thinnest |
+| `alpha` | Opacity of a background image, for outputs that have one |
+| `dpi` | `None` lets the renderer choose from the node count |
+| `max_px` | Cap on the longest side in pixels |
+| `margin_frac` | Fractional margin around the bounding box |
+| `border` | Draw a rectangle around the bounding box |
+| `show_on_the_fly` | Preview on screen while the run is in progress |
+
+The OpenCV renderers convert points to pixels at `dpi` (a point is 1/72 inch), so
+one number means the same thing in every renderer. Note that a sub-point value
+at a high dpi still rounds to one pixel.
+
+**The defaults** — `BaseConfig` declares one `RENDER_*` attribute per rendered
+output. These are the generate mode's: matplotlib plots at 300 dpi with 6pt
+markers. The OpenCV renderers (hybrid, mosaic, scaling) leave `node_size` and
+`line_width` unset, drawing single-pixel nodes and 1px edges — worth setting once
+a network is large.
+
+| Identifier | Attribute | Renderer |
+| --- | --- | --- |
+| `original_graph` | `RENDER_ORIGINAL_GRAPH` | matplotlib |
+| `synthetic_graph` | `RENDER_SYNTHETIC_GRAPH` | matplotlib |
+| `bfs_snapshot` | `RENDER_BFS_SNAPSHOT` | matplotlib |
+| `hybrid_snapshot` | `RENDER_HYBRID_SNAPSHOT` | OpenCV |
+| `hybrid_graph` | `RENDER_HYBRID_GRAPH` | OpenCV |
+| `mosaic_graph` | `RENDER_MOSAIC_GRAPH` | OpenCV (`border=True`) |
+| `scaled_graph` | `RENDER_SCALED_GRAPH` | OpenCV |
+
+**Overriding** — declare the attribute, changing only the fields you care about:
+
+```python
+from dataclasses import replace
+
+
+class ConfigDickson(BaseConfig):
+
+    # Dense gel networks read better with smaller dots.
+    RENDER_ORIGINAL_GRAPH = replace(BaseConfig.RENDER_ORIGINAL_GRAPH, node_size=3.0)
+
+    # At the 16383px WebP limit an 11M-node network is ~190 megapixels, which
+    # most viewers refuse to open.
+    RENDER_HYBRID_GRAPH = replace(BaseConfig.RENDER_HYBRID_GRAPH, max_px=8000)
+```
+
+`RenderStyle` is **frozen**, so a config cannot mutate a shared style and
+restyle every other config's plots in the process — `replace()` returns a new
+one. Pipelines read a style with `config.render("hybrid_graph")`, the twin of
+`config.save("synthetic_export")`.
 
 ### Choosing a config
 

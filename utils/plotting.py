@@ -52,11 +52,7 @@ def recommend_dpi(num_nodes: int) -> int:
 
 
 def _points_to_px(points: float | None, dpi: int, *, minimum: int) -> int:
-    """Points to pixels at *dpi*, floored at *minimum*.
-
-    A point is 1/72 inch, and these canvases are 12 inches tall, matching the
-    matplotlib renderers so one number means one thing across all of them.
-    """
+    """Points to pixels at *dpi*, floored at *minimum*.  A point is 1/72 inch."""
     if points is None:
         return minimum
     return max(minimum, round(points * dpi / 72))
@@ -73,34 +69,22 @@ def recommend_dpi_cv2(num_nodes: int) -> int:
 _WEBP_MAX_PX = 16383
 
 
-def render_network(
-    graph: SynthGraph,
-    margin_frac: float = 0.02,
-    dpi: int = None,
-    border: bool = False,
-    max_px: int | None = None,
-):
+def render_network(graph: SynthGraph, style):
     """Render a SynthGraph to a BGR ndarray using OpenCV.
 
     Only allocates a fixed-size pixel buffer (H × W × 3 bytes) regardless
     of the number of nodes/edges, avoiding OOM on multi-million-element
     graphs.
 
-    Parameters
-    ----------
-    graph : SynthGraph
-    margin_frac : float
-        Fractional margin around the bounding box.
-    dpi : int, optional
-        Resolution. Auto-selected from node count if omitted.
-    border : bool
-        If True, draw a thin black rectangle around the bounding box
-        (used by the mosaic pipeline).
+    *style* supplies dpi, max_px, margin_frac, border and the node/edge sizes.
     """
     import cv2
 
+    margin_frac = style.margin_frac
+    dpi = style.dpi
     if dpi is None:
         dpi = recommend_dpi_cv2(graph.number_of_nodes())
+    max_px = style.max_px
 
     pos_arr = graph.positions()
     x_min, y_min = pos_arr.min(axis=0)
@@ -142,21 +126,29 @@ def render_network(
     # Edges (red, batched)
     edge_color = (0, 0, 255)  # BGR
     BATCH = 1_000_000
+    thickness = _points_to_px(style.line_width, dpi, minimum=1)
     edge_list = np.asarray(list(graph.edges()), dtype=np.int64)
     for start in range(0, len(edge_list), BATCH):
         batch = edge_list[start : start + BATCH]
         pts_u = np.column_stack([px[batch[:, 0]], py[batch[:, 0]]])
         pts_v = np.column_stack([px[batch[:, 1]], py[batch[:, 1]]])
         segments = np.stack([pts_u, pts_v], axis=1).astype(np.int32)
-        cv2.polylines(canvas, segments, isClosed=False, color=edge_color, thickness=1)
+        cv2.polylines(
+            canvas, segments, isClosed=False, color=edge_color, thickness=thickness
+        )
     del edge_list
 
-    # Nodes (blue, direct pixel write)
+    # Nodes (blue)
     node_color_bgr = np.array([255, 0, 0], dtype=np.uint8)
     valid = (px >= 0) & (px < img_w) & (py >= 0) & (py < img_h)
-    canvas[py[valid], px[valid]] = node_color_bgr
+    radius = _points_to_px(style.node_size, dpi, minimum=0) // 2
+    if radius < 1:
+        canvas[py[valid], px[valid]] = node_color_bgr
+    else:
+        for x, y in zip(px[valid], py[valid]):
+            cv2.circle(canvas, (int(x), int(y)), radius, (255, 0, 0), thickness=-1)
 
-    if border:
+    if style.border:
         cv2.rectangle(canvas, (0, 0), (img_w - 1, img_h - 1), (0, 0, 0), 2)
 
     return canvas
@@ -197,7 +189,7 @@ def save_figure_as_webp(fig, filepath: str, *, dpi: int = None, lossless: bool =
         scale = min(_WEBP_MAX_PX / w, _WEBP_MAX_PX / h)
         new_w, new_h = int(w * scale), int(h * scale)
         logging.getLogger(__name__).info(
-            f"WebP resize: {w}x{h} -> {new_w}x{new_h} " f"(limit {_WEBP_MAX_PX}px)"
+            f"WebP resize: {w}x{h} -> {new_w}x{new_h} (limit {_WEBP_MAX_PX}px)"
         )
         img = img.resize((new_w, new_h), Image.LANCZOS)
 
@@ -227,10 +219,7 @@ def save_bfs_snapshot(
     frame,
     index: int,
     output_dir: str,
-    *,
-    dpi: int = 300,
-    node_size: float = 6.0,
-    line_width: float = 3.0,
+    style,
 ) -> None:
     """Render a BFS snapshot matching the original-network plot style.
 
@@ -242,12 +231,16 @@ def save_bfs_snapshot(
     index : int
         Snapshot sequence number (used in filename).
     output_dir : str
-    dpi : int
-    node_size : float
-        Marker diameter in points (same unit as ``ax.plot`` markersize).
-    line_width : float
-        Edge line width in points.
+    style : RenderStyle
+        Supplies dpi and the node/edge sizes, in points.
     """
+    dpi = style.dpi
+    node_size = style.node_size
+    line_width = style.line_width
+    assert (
+        node_size is not None and line_width is not None
+    ), "bfs_snapshot needs node_size and line_width"
+
     import os
 
     from matplotlib.figure import Figure
@@ -301,26 +294,22 @@ def save_hybrid_snapshot(
     frame,
     index: int,
     output_dir: str,
-    *,
-    margin_frac: float = 0.02,
-    dpi: int | None = None,
-    max_px: int | None = None,
-    node_size: float | None = None,
-    line_width: float | None = None,
+    style,
 ) -> None:
     """Render one hybrid Phase 2 snapshot with OpenCV.
 
-    ``node_size`` (marker diameter) and ``line_width`` are in points, the same
-    unit as :func:`save_bfs_snapshot` and matplotlib, and are converted to
-    pixels at *dpi*.  Unset means the thinnest the renderer can draw: a 1px line
-    and a single-pixel node.
-
-    No ``**kwargs``: an unsupported key is a config asking for something this
-    renderer cannot do, and it used to be swallowed silently.
+    Sizes are in points, converted to pixels at *style.dpi*; unset draws a 1px
+    line and a single-pixel node.
     """
     import os
 
     import cv2
+
+    margin_frac = style.margin_frac
+    dpi = style.dpi
+    max_px = style.max_px
+    node_size = style.node_size
+    line_width = style.line_width
 
     if dpi is None:
         dpi = recommend_dpi_cv2(len(node_positions))
@@ -409,28 +398,20 @@ def save_hybrid_snapshot(
 def plot_network(
     data_type: str,
     graph: SynthGraph,
-    node_scale: float = 1.0,
+    style,
     frame_size=None,
     synthetic_frame_size=None,
-    node_size: float | None = None,
-    line_width: float | None = None,
-    **kwargs,
+    background=None,
 ):
-    """Plot a network with matplotlib.
-
-    ``node_size`` and ``line_width`` (points) override the identifier's
-    :class:`PlotConfig` for this call.  Passed per call rather than written into
-    the shared PlotConfig, which would restyle every plot in the process.
-    """
+    """Plot a network with matplotlib, styled by ``config.render(data_type)``."""
     from matplotlib.figure import Figure
     from matplotlib.patches import Rectangle
 
-    from configs import FILE_CONFIGURATIONS, PlotConfig
-
-    file_config = FILE_CONFIGURATIONS.get(data_type)
-    assert isinstance(
-        file_config, PlotConfig
-    ), f"{data_type} shouldn't call plot_network."
+    node_size = style.node_size
+    line_width = style.line_width
+    assert (
+        node_size is not None and line_width is not None
+    ), f"{data_type} needs node_size and line_width"
 
     if data_type == "original_graph":
         assert frame_size is not None, "original_graph requires frame_size"
@@ -450,11 +431,11 @@ def plot_network(
     fig_height = 10
     fig_width = fig_height * aspect_ratio
 
-    fig = Figure(figsize=(fig_width, fig_height), dpi=300)
+    fig = Figure(figsize=(fig_width, fig_height), dpi=style.dpi)
     ax = fig.add_subplot(111)
 
     positions = graph.positions()
-    edge_width = file_config.line_width if line_width is None else line_width
+    edge_width = line_width
     for u, v in graph.edges():
         pos_u = positions[u]
         pos_v = positions[v]
@@ -466,20 +447,17 @@ def plot_network(
             zorder=2,
         )
 
-    node_scale = node_scale if data_type == "original_graph" else 1.0
-    base_node_size = file_config.node_size if node_size is None else node_size
-    marker_size = base_node_size * node_scale
     for node in graph.nodes():
         pos = positions[node]
-        ax.plot(pos[0], pos[1], "bo", markersize=marker_size, zorder=2)
+        ax.plot(pos[0], pos[1], "bo", markersize=node_size, zorder=2)
 
     ax.set_xlim(frame[0])
     ax.set_ylim(frame[1])
 
     if data_type == "original_graph":
-        image = kwargs.get("background", None)
+        image = background
         if image is not None:
-            alpha = file_config.alpha
+            alpha = style.alpha
             img_height, img_width = image.shape[:2]
             ax.imshow(
                 image,
@@ -503,16 +481,8 @@ def plot_network(
             )
         )
 
-    if "title" in kwargs:
-        ax.set_title(kwargs["title"])
-
     ax.set_xticks([])
     ax.set_yticks([])
     ax.axis("off")
 
-    show_on_the_fly = (
-        kwargs["show"]
-        if "show" in kwargs
-        else getattr(file_config, "show_on_the_fly", True)
-    )
-    return finalize_plot(fig, show_on_the_fly)
+    return finalize_plot(fig, style.show_on_the_fly)

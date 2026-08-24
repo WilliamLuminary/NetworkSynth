@@ -2,9 +2,11 @@ import os
 import re
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
+_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
 
-from utils import save_hybrid_snapshot
+from utils import save_hybrid_snapshot  # noqa: E402
 
 
 def find_snapshot_pairs(snapshot_dir):
@@ -28,7 +30,7 @@ def _plot_one(idx, pos_path, edge_path, snapshot_dir, frame, style):
 
     positions = np.load(pos_path).tolist()
     edges = np.load(edge_path).tolist()
-    save_hybrid_snapshot(positions, edges, frame, idx, snapshot_dir, **style)
+    save_hybrid_snapshot(positions, edges, frame, idx, snapshot_dir, style)
 
 
 def plot(
@@ -80,12 +82,14 @@ def plot(
         (y_min - margin, y_max + margin),
     )
 
-    style = {
-        "dpi": dpi,
-        "node_size": node_size,
-        "line_width": line_width,
-        "margin_frac": 0.0,
-    }
+    from configs import RenderStyle
+
+    style = RenderStyle(
+        dpi=dpi,
+        node_size=node_size,
+        line_width=line_width,
+        margin_frac=0.0,
+    )
 
     if workers is None:
         cpu_count = os.cpu_count() or 1

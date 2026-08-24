@@ -6,7 +6,6 @@ from typing import Optional, Tuple
 
 @dataclass(frozen=True)
 class SynthParams:
-
     synthetic_frame_size: Tuple[int, int]
     closed_nodes_factor: float
     closed_edges_factor: float

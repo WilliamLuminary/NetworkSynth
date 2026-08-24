@@ -1,9 +1,11 @@
 import logging
 import os
+from typing import Optional
 
 import cv2
 import numpy as np
 
+from graphs.synth_graph import SynthGraph
 from utils import resize_image, transpose_positions, trim_image
 
 from ..base_config import BaseConfig
@@ -35,13 +37,13 @@ class ConfigTmp(BaseConfig):
     BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, "samples", "mosaic_mode")
 
     @classmethod
-    def initialize(cls):
+    def initialize(cls) -> None:
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
 
     @staticmethod
-    def load_original_network(dataset_id: DatasetId):
+    def load_original_network(dataset_id: DatasetId) -> SynthGraph:
         set_name = dataset_id[0]
         path_pos = os.path.join(ConfigTmp.BASE_INPUT_PATH, f"{set_name}_pos.npy")
         path_mat = os.path.join(ConfigTmp.BASE_INPUT_PATH, f"{set_name}_mat.npy")
@@ -61,7 +63,7 @@ class ConfigTmp(BaseConfig):
         return original_network
 
     @staticmethod
-    def load_original_image(dataset_id: DatasetId):
+    def load_original_image(dataset_id: DatasetId) -> Optional[np.ndarray]:
         set_name = dataset_id[0]
         path = os.path.join(ConfigTmp.BASE_INPUT_PATH, f"{set_name}_image.tif")
         if not os.path.exists(path):

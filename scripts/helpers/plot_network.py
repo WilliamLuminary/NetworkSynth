@@ -60,13 +60,14 @@ def plot_single(
 
     graph = load_graph(nkbin)
 
+    from configs import RenderStyle
     from utils import recommend_dpi_cv2, render_network
 
     if dpi is None:
         dpi = recommend_dpi_cv2(graph.number_of_nodes())
     print(f"DPI: {dpi} (for {graph.number_of_nodes():,} nodes)")
 
-    img = render_network(graph, margin_frac=margin, dpi=dpi)
+    img = render_network(graph, RenderStyle(dpi=dpi, margin_frac=margin))
 
     if output is None:
         output = nkbin.rsplit(".", 1)[0] + f".{fmt}"

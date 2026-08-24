@@ -1,21 +1,22 @@
 import logging
 import os
 import re
-from typing import Tuple
+from typing import Optional, Tuple
 
 import cv2
 import numpy as np
 
+from graphs.synth_graph import SynthGraph
 from utils import find_file_with_pattern, resize_image, transpose_positions, trim_image
 
 from ..base_config import BaseConfig
 from ..dataset_id import DatasetId
+from ..file_definitions import SYNTHETIC_DIR, SaveSpec, save_png, save_webp
 
 logger = logging.getLogger(__name__)
 
 
 class Config1(BaseConfig):
-
     MODE = "mosaic"
 
     # --- Dataset ---
@@ -51,22 +52,18 @@ class Config1(BaseConfig):
     IMAGES_DIR = os.path.join(BASE_INPUT_PATH, "Original Graphs")
 
     @classmethod
-    def initialize(cls):
+    def initialize(cls) -> None:
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
 
-    @classmethod
-    def save_synthetic_graph(cls):
-        from ..file_definitions import save_png, save_webp
-
-        return [
-            ("synthetic", "synthetic_graph", "webp", save_webp),
-            ("synthetic", "synthetic_graph", "png", save_png),
-        ]
+    SAVE_SYNTHETIC_GRAPH = (
+        SaveSpec(SYNTHETIC_DIR, "synthetic_graph", "webp", save_webp),
+        SaveSpec(SYNTHETIC_DIR, "synthetic_graph", "png", save_png),
+    )
 
     @staticmethod
-    def load_original_network(dataset_id: DatasetId):
+    def load_original_network(dataset_id: DatasetId) -> SynthGraph:
         positions = _load_positions(dataset_id)
         mat = _load_sparse_matrix(dataset_id)
         from utils import build_graph
@@ -76,7 +73,7 @@ class Config1(BaseConfig):
         return original_network
 
     @staticmethod
-    def load_original_image(dataset_id: DatasetId):
+    def load_original_image(dataset_id: DatasetId) -> Optional[np.ndarray]:
         image = _load_raw_image(dataset_id)
         if image is None:
             return None
@@ -117,12 +114,12 @@ def _load_sparse_matrix(dataset_id: DatasetId):
         elif "C" not in matrix_data:
             available = list(matrix_data.keys())
             raise KeyError(
-                f"Neither 'C' nor 'C1' in sparse matrix. " f"Available: {available}"
+                f"Neither 'C' nor 'C1' in sparse matrix. Available: {available}"
             )
 
     if matrix_key not in matrix_data:
         available = list(matrix_data.keys())
-        raise KeyError(f"Set '{matrix_key}' not found. " f"Available: {available}")
+        raise KeyError(f"Set '{matrix_key}' not found. Available: {available}")
 
     return matrix_data[matrix_key].item()
 

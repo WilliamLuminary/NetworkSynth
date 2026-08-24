@@ -1,10 +1,12 @@
 import logging
 import os
-from typing import Tuple
+from dataclasses import replace
+from typing import Optional, Tuple
 
 import cv2
 import numpy as np
 
+from graphs.synth_graph import SynthGraph
 from utils import resize_image, transpose_positions, trim_image
 
 from ..base_config import BaseConfig
@@ -40,30 +42,24 @@ class SnapshotConfig(BaseConfig):
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = True
 
-    # Shared visual style for both BFS snapshots and final synthetic plots.
-    # Adjust node_size / line_width when SYNTHETIC_FRAME_SIZE differs
-    # from FRAME_SIZE — larger frames need thinner strokes.
-    #   1×1 (510):  node_size=6.0, line_width=3.0
-    #   3×3 (1530): node_size=2.0, line_width=1.0
-    PLOT_STYLE: dict = {
-        "dpi": 300,
-        "node_size": 0.5,
-        "line_width": 0.5,
-    }
+    # Thinner strokes: a larger SYNTHETIC_FRAME_SIZE needs finer lines.
+    RENDER_BFS_SNAPSHOT = replace(
+        BaseConfig.RENDER_BFS_SNAPSHOT, node_size=0.5, line_width=0.5
+    )
+    RENDER_SYNTHETIC_GRAPH = replace(
+        BaseConfig.RENDER_SYNTHETIC_GRAPH, node_size=0.5, line_width=0.5
+    )
 
     BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, "samples", "hybrid_mode")
 
     @classmethod
-    def initialize(cls):
+    def initialize(cls) -> None:
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
-        # PLOT_STYLE reaches the plot through GenerationRun.save_synthetic_plot.
-        # This used to write it into the shared FILE_CONFIGURATIONS entry, which
-        # restyled every config's plots for the rest of the process.
 
     @staticmethod
-    def load_original_network(dataset_id: DatasetId):
+    def load_original_network(dataset_id: DatasetId) -> SynthGraph:
         set_name = dataset_id[0]
         positions = _load_positions(set_name)
         mat = _load_sparse_matrix(set_name)
@@ -75,7 +71,7 @@ class SnapshotConfig(BaseConfig):
         return original_network
 
     @staticmethod
-    def load_original_image(dataset_id: DatasetId):
+    def load_original_image(dataset_id: DatasetId) -> Optional[np.ndarray]:
         image = _load_raw_image(dataset_id[0])
         if image is None:
             return None

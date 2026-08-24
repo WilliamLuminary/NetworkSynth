@@ -20,13 +20,12 @@ def _worker_count(requested: Optional[int], num_jobs: int) -> int:
 
 
 def _analyze_one(job) -> Dict:
-    """Analyse one graph.  Module level and self-contained so a pool can run it."""
+    """Analyse one graph.  Module level so a process pool can run it."""
     idx, graph, measure_weighted, full_q_band = job
 
     import networkit as nk
 
-    # A worker inheriting a multi-thread OpenMP runtime spins instead of
-    # working; every other pool in the repo pins this the same way.
+    # A worker inheriting a multi-thread OpenMP runtime spins instead of working.
     nk.setNumberOfThreads(1)
 
     result = MultifractalAnalyzer(graph, measure_weighted, full_q_band).analyze_graph()
@@ -96,7 +95,6 @@ class MultifractalProcessor:
         with ProcessPoolExecutor(
             max_workers=workers, mp_context=spawn_context()
         ) as pool:
-            # map preserves input order, so results stay aligned with the graphs.
             return list(pool.map(_analyze_one, jobs))
 
     def _augment_with_averages(self) -> None:
