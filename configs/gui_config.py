@@ -4,7 +4,11 @@ import copyreg
 import json
 import logging
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Optional
+
+from numpy import ndarray
+
+from graphs.synth_graph import SynthGraph
 
 from .base_config import BaseConfig
 from .dataset_id import DatasetId
@@ -211,7 +215,7 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
         return config
 
     @classmethod
-    def initialize(cls):
+    def initialize(cls) -> None:
         super().initialize()
         # Set explicitly: BaseConfig derives OUTPUT_DENOTE from a `*_mode`
         # segment in the module path, and this config has none.
@@ -228,7 +232,7 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
             cls.NETWORKS_FUNC = staticmethod(_load_networks)
 
     @classmethod
-    def load_original_network(cls, dataset_id: DatasetId):
+    def load_original_network(cls, dataset_id: DatasetId) -> SynthGraph:
         from graphs import read_graph_csv
 
         edge_list, positions = cls._network_paths(dataset_id)
@@ -245,7 +249,7 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
         )
 
     @classmethod
-    def load_original_image(cls, dataset_id: DatasetId):
+    def load_original_image(cls, dataset_id: DatasetId) -> Optional[ndarray]:
         directory = cls.PATHS.get("datasets_dir")
         if directory:
             # Optional, and the only per-dataset file that is: a network is

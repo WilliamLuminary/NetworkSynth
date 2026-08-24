@@ -1,20 +1,21 @@
 import logging
 import os
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 import cv2
 import numpy as np
 
+from graphs.synth_graph import SynthGraph
 from utils import resize_image, transpose_positions, trim_image
 
 from ..base_config import BaseConfig
 from ..dataset_id import DatasetId
+from ..file_definitions import SYNTHETIC_DIR, SaveSpec, save_png, save_webp
 
 logger = logging.getLogger(__name__)
 
 
 class SampleConfig(BaseConfig):
-
     MODE = "hybrid"
 
     LOG_MEMORY = True
@@ -89,22 +90,18 @@ class SampleConfig(BaseConfig):
     )
 
     @classmethod
-    def initialize(cls):
+    def initialize(cls) -> None:
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
 
-    @classmethod
-    def save_synthetic_graph(cls):
-        from ..file_definitions import save_png, save_webp
-
-        return [
-            ("synthetic", "synthetic_graph", "webp", save_webp),
-            ("synthetic", "synthetic_graph", "png", save_png),
-        ]
+    SAVE_SYNTHETIC_GRAPH = (
+        SaveSpec(SYNTHETIC_DIR, "synthetic_graph", "webp", save_webp),
+        SaveSpec(SYNTHETIC_DIR, "synthetic_graph", "png", save_png),
+    )
 
     @staticmethod
-    def load_original_network(dataset_id: DatasetId):
+    def load_original_network(dataset_id: DatasetId) -> SynthGraph:
         set_name = dataset_id[0]
         positions = _load_positions(set_name)
         mat = _load_sparse_matrix(set_name)
@@ -116,7 +113,7 @@ class SampleConfig(BaseConfig):
         return original_network
 
     @staticmethod
-    def load_original_image(dataset_id: DatasetId):
+    def load_original_image(dataset_id: DatasetId) -> Optional[np.ndarray]:
         image = _load_raw_image(dataset_id[0])
         if image is None:
             return None

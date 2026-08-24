@@ -4,6 +4,17 @@ import uuid
 from typing import List, Optional, Tuple
 
 from .dataset_id import DatasetId
+from .file_definitions import (
+    INPLACE_DIR,
+    ORIGINAL_DIR,
+    SYNTHETIC_DIR,
+    RenderStyle,
+    SaveSpec,
+    save_network_csv,
+    save_pickle,
+    save_text,
+    save_webp,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,10 +73,8 @@ class BaseConfig:
     ERROR_TOLERANCE = 0.15  # Generally should be 0.15
     MIN_TILE_NODES = 100
 
-    # Hybrid tiling geometry, declared without values so a config that omits
-    # one raises instead of picking up a number buried in the pipeline body.
-    # TILE_FRAME_SIZE None = auto: nearest-neighbour distance *
-    # TILE_FRAME_FACTOR, floored at MIN_TILE_FRAME.  NUM_CENTERS 0 = no cap.
+    # Hybrid tiling geometry: no values, so a config that omits one raises
+    # rather than picking up a number buried in the pipeline body.
     TILE_FRAME_SIZE: Optional[Tuple[int, int]]
     TILE_FRAME_FACTOR: float
     MIN_TILE_FRAME: float
@@ -87,15 +96,50 @@ class BaseConfig:
     #   N < 0  hybrid only — roughly |N| log-spaced snapshots across the run
     SNAPSHOT_INTERVAL: int = 0
     SNAPSHOT_PLOT_WORKERS: int = 20
-    #: Rendering style for hybrid Phase 2 snapshots: dpi, node_size, line_width.
-    #: Empty means the renderer's own defaults.
-    HYBRID_SNAPSHOT_STYLE: dict = {}
-    #: Rendering style for generate snapshots, same keys as above.
-    PLOT_STYLE: dict = {}
-    #: Cap on a rendered image's longest side in pixels.  None = no cap.
-    RENDER_MAX_PX: Optional[int] = None
-    ORIGINAL_GRAPH_NODE_SCALE: float = 1.0
     SELECT_BEST: int = 0  # 0 = disabled; N = keep N best networks by metric distance
+
+    # How each output is drawn.  Override with replace(BaseConfig.RENDER_X, ...).
+    # The OpenCV renderers leave node_size/line_width unset: one pixel each.
+    RENDER_ORIGINAL_GRAPH = RenderStyle(node_size=6.0, line_width=3.0, dpi=300)
+    RENDER_SYNTHETIC_GRAPH = RenderStyle(
+        node_size=6.0, line_width=3.0, dpi=300, show_on_the_fly=False
+    )
+    RENDER_BFS_SNAPSHOT = RenderStyle(node_size=6.0, line_width=3.0, dpi=300)
+    RENDER_HYBRID_SNAPSHOT = RenderStyle()
+    RENDER_HYBRID_GRAPH = RenderStyle()
+    RENDER_MOSAIC_GRAPH = RenderStyle(border=True)
+    RENDER_SCALED_GRAPH = RenderStyle()
+
+    # What each output is written as.  Several specs = several files.
+    SAVE_ORIGINAL_IMAGE = (SaveSpec(ORIGINAL_DIR, "original_image", "webp", save_webp),)
+    SAVE_ORIGINAL_GRAPH = (SaveSpec(ORIGINAL_DIR, "original_graph", "webp", save_webp),)
+    SAVE_ORIGINAL_NETWORK = (
+        SaveSpec(ORIGINAL_DIR, "original_network", "csv", save_network_csv),
+    )
+    SAVE_ORIGINAL_PROPERTY = (
+        SaveSpec(ORIGINAL_DIR, "original_property", "pkl", save_pickle),
+    )
+    SAVE_ORIGINAL_REPORT = (
+        SaveSpec(ORIGINAL_DIR, "report", "txt", save_text, use_timestamp=False),
+    )
+    SAVE_SYNTHETIC_GRAPH = (
+        SaveSpec(SYNTHETIC_DIR, "synthetic_graph", "webp", save_webp),
+    )
+    SAVE_SYNTHETIC_NETWORK = (
+        SaveSpec(SYNTHETIC_DIR, "synthetic_network", "pkl", save_pickle),
+    )
+    SAVE_SYNTHETIC_EXPORT = (
+        SaveSpec(SYNTHETIC_DIR, "synthetic_network", "csv", save_network_csv),
+    )
+    SAVE_SYNTHETIC_REPORT = (
+        SaveSpec(SYNTHETIC_DIR, "report", "txt", save_text, use_timestamp=False),
+    )
+    SAVE_ANALYSIS_DATA = (
+        SaveSpec(INPLACE_DIR, "analysis_data", "pkl", save_pickle, use_timestamp=False),
+    )
+    SAVE_ANALYSIS_FIGURE = (
+        SaveSpec(INPLACE_DIR, "analysis_figure", "webp", save_webp),
+    )
 
     LOG_MEMORY: bool = False
     # Declared per config, never toggled at runtime: a mutator here would set
@@ -124,7 +168,7 @@ class BaseConfig:
         return min(max(1, cpu_count // 2), cls.SNAPSHOT_PLOT_WORKERS)
 
     @classmethod
-    def initialize(cls):
+    def initialize(cls) -> None:
         """Establish this run's identity.  Logging is set up by the entry point.
 
         ``RUN_ID`` is generated here rather than as a side effect of logging
@@ -158,26 +202,33 @@ class BaseConfig:
         cls.OUTPUT_DENOTE = f"{mode}_{cls.__name__}" if mode else cls.__name__
 
     @classmethod
-    def save(cls, identifier: str):
-        """Return the save specs for *identifier*.
+    def render(cls, identifier: str) -> RenderStyle:
+        """Return the :class:`RenderStyle` for *identifier*.
 
-        Checks for a ``save_<identifier>`` classmethod on *cls* first, which
-        resolves a mode's override through the normal MRO, then falls back to
-        ``DEFAULT_SAVE_SPECS`` in ``file_definitions``.  Call this on the active
-        config, not on ``BaseConfig``.
-
-        Each spec is a tuple::
-
-            (relative_dir, detail, extension, save_fn[, use_timestamp])
+        Reads ``RENDER_<IDENTIFIER>``, so a mode's override resolves through the
+        normal MRO.  Call this on the active config, not on ``BaseConfig``.
         """
-        method = getattr(cls, f"save_{identifier}", None)
-        if method is not None:
-            return method()
-        from .file_definitions import DEFAULT_SAVE_SPECS
+        style = getattr(cls, f"RENDER_{identifier.upper()}", None)
+        assert style is not None, (
+            f"no render style for {identifier!r}; declare "
+            f"RENDER_{identifier.upper()} on the config or on BaseConfig"
+        )
+        return style
 
-        specs = DEFAULT_SAVE_SPECS.get(identifier)
+    @classmethod
+    def save(cls, identifier: str) -> Tuple[SaveSpec, ...]:
+        """Return the :class:`SaveSpec` tuple for *identifier*.
+
+        Reads ``SAVE_<IDENTIFIER>``, so a mode's override resolves through the
+        normal MRO.  The twin of :meth:`render`; call it on the active config,
+        not on ``BaseConfig``.
+        """
+        specs = getattr(cls, f"SAVE_{identifier.upper()}", None)
         if specs is None:
-            raise ValueError(f"No save spec for '{identifier}' in {cls.__name__}.")
+            raise ValueError(
+                f"No save spec for '{identifier}' in {cls.__name__}. Declare "
+                f"SAVE_{identifier.upper()} on the config or on BaseConfig."
+            )
         return specs
 
     RUN_ID: str = ""

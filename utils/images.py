@@ -19,8 +19,9 @@ def resize_image(image: ndarray, target_size: Tuple[int, int]) -> ndarray:
     """
     height, width = image.shape[:2]
     scaling_factor = max(target_size) / max(height, width)
-    new_height, new_width = round(height * scaling_factor), round(
-        width * scaling_factor
+    new_height, new_width = (
+        round(height * scaling_factor),
+        round(width * scaling_factor),
     )
     import cv2
 

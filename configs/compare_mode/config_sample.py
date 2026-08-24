@@ -25,7 +25,7 @@ class SampleConfig(BaseConfig):
     SYNTHETIC_NETWORKS_PATH = os.path.join(_RESULTS, "synthetic")
 
     @classmethod
-    def initialize(cls):
+    def initialize(cls) -> None:
         super().initialize()
         cls.NETWORKS_FUNC = staticmethod(_load_networks)
 

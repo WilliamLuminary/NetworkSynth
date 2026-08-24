@@ -342,7 +342,8 @@ def generate_with_snapshots(run: GenerationRun, config):
     os.makedirs(snapshot_dir, exist_ok=True)
 
     interval = config.SNAPSHOT_INTERVAL
-    style = config.PLOT_STYLE
+    # Resolved in the parent: the plot pool runs in child processes.
+    style = config.render("bfs_snapshot")
 
     plot_pool = ProcessPoolExecutor(
         max_workers=config.get_snapshot_plot_workers(), mp_context=spawn_context()
@@ -357,7 +358,7 @@ def generate_with_snapshots(run: GenerationRun, config):
             frame,
             step_idx,
             snapshot_dir,
-            **style,
+            style,
         )
         plot_futures.append(fut)
 
@@ -412,7 +413,7 @@ def _render_snapshots(snapshot_data, output_dir, style, plot_workers: int):
                 frame,
                 step_idx,
                 output_dir,
-                **style,
+                style,
             )
             for positions, edges, frame, step_idx in snapshot_data
         ]
@@ -523,7 +524,7 @@ def generate_and_select(run: GenerationRun, config):
     num_network = config.SYNTHETIC_NETWORK_NUMBER
     select_best = config.SELECT_BEST
     snapshot_interval = config.SNAPSHOT_INTERVAL
-    snapshot_style = config.PLOT_STYLE
+    snapshot_style = config.render("bfs_snapshot")
     use_snapshots = snapshot_interval > 0
 
     original_network = run.original
@@ -606,7 +607,7 @@ def generate_and_select(run: GenerationRun, config):
                     )
                 if done_count % max(1, num_network // 10) == 0:
                     logger.info(
-                        f"({done_count}/{num_network}) " f"{len(graphs)} valid so far"
+                        f"({done_count}/{num_network}) {len(graphs)} valid so far"
                     )
     except KeyboardInterrupt:
         logger.info(SIGINT_INFO)

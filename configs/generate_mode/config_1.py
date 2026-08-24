@@ -1,11 +1,12 @@
 import logging
 import os
 import re
-from typing import List
+from typing import List, Optional
 
 import cv2
 import numpy as np
 
+from graphs.synth_graph import SynthGraph
 from utils import find_file_with_pattern, resize_image, transpose_positions, trim_image
 
 from ..base_config import BaseConfig
@@ -44,13 +45,13 @@ class Config1(BaseConfig):
     IMAGES_DIR = os.path.join(BASE_INPUT_PATH, "Original Graphs")
 
     @classmethod
-    def initialize(cls):
+    def initialize(cls) -> None:
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
 
     @staticmethod
-    def load_original_network(dataset_id: DatasetId):
+    def load_original_network(dataset_id: DatasetId) -> SynthGraph:
         positions = _load_positions(dataset_id)
         mat = _load_sparse_matrix(dataset_id)
         from utils import build_graph
@@ -60,7 +61,7 @@ class Config1(BaseConfig):
         return original_network
 
     @staticmethod
-    def load_original_image(dataset_id: DatasetId):
+    def load_original_image(dataset_id: DatasetId) -> Optional[np.ndarray]:
         image = _load_raw_image(dataset_id)
         image = trim_image(image)
         image = resize_image(image, Config1.FRAME_SIZE)

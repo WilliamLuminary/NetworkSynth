@@ -1,10 +1,11 @@
 import logging
 import os
-from typing import List
+from typing import List, Optional
 
 import cv2
 import numpy as np
 
+from graphs.synth_graph import SynthGraph
 from utils import resize_image, transpose_positions, trim_image
 
 from ..base_config import BaseConfig
@@ -50,13 +51,13 @@ class SampleConfig(BaseConfig):
     # └── IMAGES_DIR
 
     @classmethod
-    def initialize(cls):
+    def initialize(cls) -> None:
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
 
     @classmethod
-    def load_original_network(cls, dataset_id: DatasetId):
+    def load_original_network(cls, dataset_id: DatasetId) -> SynthGraph:
         """Load original network. dataset_id has single level: [set_name]
 
         A classmethod, not a static one, so a subclass reads *its own*
@@ -72,7 +73,7 @@ class SampleConfig(BaseConfig):
         return original_network
 
     @classmethod
-    def load_original_image(cls, dataset_id: DatasetId):
+    def load_original_image(cls, dataset_id: DatasetId) -> Optional[np.ndarray]:
         image = _load_raw_image(cls.IMAGES_DIR, dataset_id)
         if image is None:
             return None
