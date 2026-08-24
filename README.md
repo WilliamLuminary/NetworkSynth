@@ -21,25 +21,34 @@ Synthetic Generation
    └── sample_1_image.tif  # Background image (optional)
   ```
 3. **Expected Output**
+
+   One directory per run, named `{MODE}_{ConfigClass}_results_{timestamp}_{run_id}`, with `data/output/latest_result` repointed at it:
+
   ```
-   data/output/ConfigName_results_YYYYMMDD_HHMMSS/
+   data/output/generate_mode_SampleConfig_results_20260824_130049_c6a6a6ec/
+   ├── manifest.json                       # what the run produced, and how it ended
+   ├── run.jsonl                           # this run's structured log
    └── sample_1/
        ├── original/
-       │   ├── original_graph_*.svg
-       │   ├── original_image_*.png
+       │   ├── original_graph_*.webp
+       │   ├── original_image_*.webp
        │   ├── original_network_*_edgelist.csv
        │   ├── original_network_*_positions.csv
-       │   ├── original_network_*.nkbin
-       │   ├── original_network_*_positions.npy
-       │   └── original_property_*.pkl
+       │   ├── original_property_*.pkl
+       │   └── report.txt
        └── synthetic/
            ├── synthetic_graph_*.webp
            ├── synthetic_network_*.pkl
            ├── synthetic_network_*_edgelist.csv
            ├── synthetic_network_*_positions.csv
-           ├── synthetic_network_*.nkbin
-           └── synthetic_network_*_positions.npy
+           └── report.txt
   ```
+
+   `manifest.json` is written from a `finally`, so it exists even for a run that
+   failed or was interrupted — its `status` is `ok`, `failed` or `cancelled`, and
+   `outputs` groups every file the run wrote by kind.
+
+   A run with `DISABLE_SAVING` set creates none of this, not even the directory.
 
 ## Configuration System
 
@@ -69,7 +78,7 @@ dataset[1]      # "10kX"
 ```python
 from typing import List
 from ..base_config import BaseConfig
-from ..enums import DatasetId
+from ..dataset_id import DatasetId
 
 def _generate_datasets() -> List[DatasetId]:
     return [DatasetId("set_1"), DatasetId("set_2")]
@@ -88,12 +97,15 @@ class ConfigMydata(BaseConfig):
     SYNTHETIC_GRAPH_NUMBER = 3
     ERROR_TOLERANCE = 0.15
 
+    # Required, no default: measure edge widths, or only topology.  Asking for
+    # widths a network does not carry raises rather than quietly downgrading.
+    MEASURE_WEIGHTED = True
+
     @classmethod
     def initialize(cls):
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
-        cls._inject_dependencies()
 
     @staticmethod
     def load_original_network(dataset_id: DatasetId):
@@ -140,11 +152,19 @@ Pipeline  →  Saver.save(content, identifier, prefix)
 | `save_webp` | `.webp` | matplotlib Figure **or** ndarray **or** PIL image |
 | `save_png` | `.png` | matplotlib Figure **or** ndarray **or** PIL image |
 | `save_svg` | `.svg` (vector) | matplotlib Figure only |
-| `save_network_csv` | `_edgelist.csv` (+ weights) + `_positions.csv` | a SynthGraph |
+| `save_network_csv` | `_edgelist.csv` + `_positions.csv` | a SynthGraph |
 | `save_network_nkbin` | `.nkbin` + `_positions.npy` | a SynthGraph |
 | `save_networkit` | `.nkbin` + companion `_positions.npy` | `nk.Graph` or `(graph, positions)` |
 
 Rendered visual output comes in exactly two canonical kinds: a **matplotlib `Figure`** (the only kind that can also be saved as vector `.svg`) or a **BGR `ndarray`** (raster). `save_webp`/`save_png` accept either.
+
+`save_network_csv` writes the `edge_weight` column **only for a weighted graph**.
+An unweighted NetworKit graph reports every weight as `1.0`, so writing the
+column unconditionally produced a file that read back as weighted — and both the
+`Mapper` (which decides whether to assign widths at all) and the analyzer
+(weighted vs topological measure) act on that answer. The reader treats the
+column's presence as the answer, so weightedness now survives a round trip
+truthfully in both directions.
 
 **Layer 2 — Config save methods** (`BaseConfig` + mode overrides): Each `save_*` classmethod returns a list of spec tuples — no dependency on the Saver.
 
@@ -271,6 +291,53 @@ step with the file. `ls configs/*_mode/config_*.py` is the list of what you can
 pass, and only the file you name is imported.
 
 
+## Analysing Networks That Already Exist
+
+Generating a network and measuring one are different jobs, so measuring has its
+own entry point — `analyse.py` — and no config module at all. There is nothing
+to configure but where to read, where to write, and how to measure:
+
+```bash
+python analyse.py                                  # uses the constants in the script
+python analyse.py <input> [<input> ...] <out_dir>   # last argument is the output directory
+```
+
+An input is a directory of networks, a single `*_edgelist.csv`, or a `.pkl`
+batch. Each input is analysed as **its own labelled set**, so several inputs
+produce one figure per measure with every set drawn on it. Labels come from the
+input paths, taking on parent directories as needed to stay distinct — two runs'
+own `original` directories become `sample_A_original` and `sample_B_original`
+rather than colliding.
+
+Four constants at the top of the script hold the defaults; the two paths can be
+overridden on the command line:
+
+| Constant | Meaning |
+| --- | --- |
+| `INPUTS` | Default input paths |
+| `OUTPUT_DIR` | Default output directory |
+| `MEASURE_WEIGHTED` | Measure edge widths, or topology only |
+| `FULL_Q_BAND` | Wide q band (401 points, `-20..20`) instead of the narrow one (61 points, `-3..3`) |
+
+Output is a plain directory — no timestamped run root, no `latest_result`, no
+manifest:
+
+```
+analysis_data.pkl        # {results: {label: [...]}, measure_weighted, full_q_band}
+analysis_spectra.webp    # f(alpha) vs alpha, one curve per network
+analysis_dimensions.webp # D(q) vs q
+```
+
+The measurement settings are stored **inside** the data file, because the same
+networks measured weighted and topologically give different answers and nothing
+else in the file distinguishes them.
+
+`MEASURE_WEIGHTED` is required rather than inferred: a weighted network measured
+as pure topology is a legitimate choice, so it cannot be read off the data.
+Asking for widths a network does not carry raises immediately instead of
+quietly measuring something else.
+
+
 ## Key Parameters
 
 | Parameter                  | Typical Values | Description                           |
@@ -345,26 +412,34 @@ SynthGraph
   └── np.ndarray (N,2)  # node positions indexed by integer node ID
 ```
 
-**Key methods**: `positions()`, `degree()`, `neighbors()`, `edges()`,
-`weight()`, `set_weight()`, `largest_connected_component()`, `subgraph()`,
-`copy()`, `to_networkx()`, `from_networkx()`, `from_sparse_matrix()`,
-`from_graph_nodes()`.
+**Key methods**: `positions()`, `degree()`, `weighted_degree()`, `neighbors()`,
+`edges()`, `edges_with_weights()`, `weight()`, `set_weight()`, `is_weighted()`,
+`make_weighted()`, `make_unweighted()`, `largest_connected_component()`,
+`subgraph()`, `copy()`, `from_networkx()`, `from_sparse_matrix()`,
+`from_edge_list()`, `from_graph_nodes()`.
+
+Whether a graph is weighted depends on where it came from, and it matters:
+`from_sparse_matrix()` always produces a weighted graph, while
+`from_edge_list()` and `from_graph_nodes()` produce unweighted ones.
+`read_graph_csv()` follows the file — weighted only if the edge list has a
+weight column. A generated synthetic network inherits its original's answer,
+because the `Mapper` assigns widths only when the original had them.
 
 ### Where NetworkX is still used
 
-NetworkX (`networkx`) remains installed as a dependency but is only imported
-in three specific places:
+NetworkX is **not** a dependency and is not in `requirements.txt`. It is
+imported lazily in two places, and only to read pickles written before the
+NetworKit migration:
 
+| File | Purpose |
+| ---- | ------- |
+| `graphs/synth_graph.py` | `from_networkx()` — converts a legacy `nx.Graph` to `SynthGraph` |
+| `graphs/graph_loader.py` | Detects a legacy `nx.Graph` payload in a `.pkl` and converts it |
 
-| File                                     | Purpose                                                                          |
-| ---------------------------------------- | -------------------------------------------------------------------------------- |
-| `graphs/synth_graph.py`                  | `from_networkx()` — converts legacy `nx.Graph` pickle files to `SynthGraph`      |
-| `configs/compare_mode/config_sample.py`  | Detects old `.pkl` files containing `nx.Graph` and converts via `from_networkx()` |
-
-
-All graph algorithms (Dijkstra, betweenness, closeness, eigenvector
-centrality, diameter, connected components, clustering) now use **NetworKit**
-natively.
+Reading such a pickle requires `pip install networkx`; the loader says so
+explicitly if it hits one. Nothing else needs it — all graph algorithms
+(Dijkstra, betweenness, closeness, eigenvector centrality, diameter, connected
+components, clustering) use **NetworKit** natively.
 
 ## Data Loader Requirements
 
@@ -377,7 +452,7 @@ natively.
 
 ## Log Analysis with `jq`
 
-All pipeline runs emit structured **JSON lines** (`.jsonl`) logs to `data/output/logs/`. Each log entry contains:
+Each run writes its own structured **JSON lines** log to `run.jsonl` inside that run's output directory, so one run's log is never interleaved with another's. Each entry contains:
 
 ```json
 {
@@ -404,8 +479,8 @@ All pipeline runs emit structured **JSON lines** (`.jsonl`) logs to `data/output
 ### Common queries
 
 ```bash
-# Set the log file (tab-complete friendly)
-LOG=data/output/logs/project_SampleConfig.jsonl
+# Set the log file — latest_result points at the most recent run
+LOG=data/output/latest_result/run.jsonl
 
 # Show all entries from a specific run
 jq 'select(.run_id == "304868d0")' "$LOG"
@@ -457,9 +532,15 @@ ERROR_TOLERANCE *= 1.5      # Accept less similar networks
 MAX_ATTEMPTS = 20           # More retry attempts
 ```
 
-**Import Errors**
+**Config Won't Load**
 
-- Ensure config class follows naming convention: `ConfigXxx` in `config_xxx.py`
+- Each config file must hold **exactly one** class defining `DATASETS`. The
+  loader finds it by that attribute, not by name, and says so if a file has none
+  or several.
+- The class must set `MODE`, or `initialize()` raises: without it no pipeline
+  claims the config.
+- `SNAPSHOT_INTERVAL` needs saving enabled — snapshots bypass the `Saver`, so
+  pairing it with `DISABLE_SAVING` raises rather than silently writing nothing.
 
 
 ## CI / Code Quality

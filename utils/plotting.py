@@ -51,6 +51,17 @@ def recommend_dpi(num_nodes: int) -> int:
     return 1800
 
 
+def _points_to_px(points: float | None, dpi: int, *, minimum: int) -> int:
+    """Points to pixels at *dpi*, floored at *minimum*.
+
+    A point is 1/72 inch, and these canvases are 12 inches tall, matching the
+    matplotlib renderers so one number means one thing across all of them.
+    """
+    if points is None:
+        return minimum
+    return max(minimum, round(points * dpi / 72))
+
+
 def recommend_dpi_cv2(num_nodes: int) -> int:
     """Pick DPI for the CV2/OpenCV renderer (+300 over matplotlib tiers).
 
@@ -294,8 +305,19 @@ def save_hybrid_snapshot(
     margin_frac: float = 0.02,
     dpi: int | None = None,
     max_px: int | None = None,
-    **_kwargs,
+    node_size: float | None = None,
+    line_width: float | None = None,
 ) -> None:
+    """Render one hybrid Phase 2 snapshot with OpenCV.
+
+    ``node_size`` (marker diameter) and ``line_width`` are in points, the same
+    unit as :func:`save_bfs_snapshot` and matplotlib, and are converted to
+    pixels at *dpi*.  Unset means the thinnest the renderer can draw: a 1px line
+    and a single-pixel node.
+
+    No ``**kwargs``: an unsupported key is a config asking for something this
+    renderer cannot do, and it used to be swallowed silently.
+    """
     import os
 
     import cv2
@@ -354,13 +376,14 @@ def save_hybrid_snapshot(
         )
         segments = np.stack([pts_u, pts_v], axis=1).astype(np.int32)
         BATCH = 1_000_000
+        thickness = _points_to_px(line_width, dpi, minimum=1)
         for start in range(0, len(segments), BATCH):
             cv2.polylines(
                 canvas,
                 segments[start : start + BATCH],
                 isClosed=False,
                 color=(0, 0, 255),
-                thickness=1,
+                thickness=thickness,
             )
 
     # Draw nodes
@@ -369,7 +392,15 @@ def save_hybrid_snapshot(
         px = ((pos_arr[:, 0] - x_min) * sx).astype(np.int32)
         py = ((y_max - pos_arr[:, 1]) * sy).astype(np.int32)
         valid = (px >= 0) & (px < img_w) & (py >= 0) & (py < img_h)
-        canvas[py[valid], px[valid]] = np.array([255, 0, 0], dtype=np.uint8)
+        node_color = np.array([255, 0, 0], dtype=np.uint8)
+        radius = _points_to_px(node_size, dpi, minimum=0) // 2
+        if radius < 1:
+            # A single pixel per node: cheaper than a circle of radius 0, and
+            # the same result.
+            canvas[py[valid], px[valid]] = node_color
+        else:
+            for x, y in zip(px[valid], py[valid]):
+                cv2.circle(canvas, (int(x), int(y)), radius, (255, 0, 0), thickness=-1)
 
     path = os.path.join(output_dir, f"snapshot_{index:05d}.png")
     cv2.imwrite(path, canvas)
@@ -381,8 +412,16 @@ def plot_network(
     node_scale: float = 1.0,
     frame_size=None,
     synthetic_frame_size=None,
+    node_size: float | None = None,
+    line_width: float | None = None,
     **kwargs,
 ):
+    """Plot a network with matplotlib.
+
+    ``node_size`` and ``line_width`` (points) override the identifier's
+    :class:`PlotConfig` for this call.  Passed per call rather than written into
+    the shared PlotConfig, which would restyle every plot in the process.
+    """
     from matplotlib.figure import Figure
     from matplotlib.patches import Rectangle
 
@@ -415,7 +454,7 @@ def plot_network(
     ax = fig.add_subplot(111)
 
     positions = graph.positions()
-    edge_width = file_config.line_width
+    edge_width = file_config.line_width if line_width is None else line_width
     for u, v in graph.edges():
         pos_u = positions[u]
         pos_v = positions[v]
@@ -428,10 +467,11 @@ def plot_network(
         )
 
     node_scale = node_scale if data_type == "original_graph" else 1.0
-    node_size = file_config.node_size * node_scale
+    base_node_size = file_config.node_size if node_size is None else node_size
+    marker_size = base_node_size * node_scale
     for node in graph.nodes():
         pos = positions[node]
-        ax.plot(pos[0], pos[1], "bo", markersize=node_size, zorder=2)
+        ax.plot(pos[0], pos[1], "bo", markersize=marker_size, zorder=2)
 
     ax.set_xlim(frame[0])
     ax.set_ylim(frame[1])
@@ -439,7 +479,7 @@ def plot_network(
     if data_type == "original_graph":
         image = kwargs.get("background", None)
         if image is not None:
-            alpha = getattr(file_config, "alpha", 1.0)
+            alpha = file_config.alpha
             img_height, img_width = image.shape[:2]
             ax.imshow(
                 image,

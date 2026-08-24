@@ -48,7 +48,9 @@ _TUPLE_PARAMS = frozenset(
     }
 )
 
-_REQUIRED_KEYS = ("mode", "output_dir", "inputs", "params")
+# "contract" and "run_name" are required, not defaulted: defaulting the
+# contract defeats the only check that catches version drift.
+_REQUIRED_KEYS = ("contract", "mode", "output_dir", "inputs", "params", "run_name")
 
 
 class SpecError(ValueError):
@@ -122,10 +124,17 @@ def discover_datasets(directory: str) -> list:
 
 
 class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
-
     MODE: str = ""
     #: Input file paths from the spec.
     PATHS: Dict[str, Any] = {}
+
+    # Hybrid geometry BaseConfig requires but the GUI form does not offer; a
+    # spec can still override these through its params.  Values match
+    # configs/hybrid_mode/config_sample.py.
+    TILE_FRAME_SIZE = None
+    MIN_CENTER_DISTANCE_FACTOR: float = 1.5
+    NUM_CENTERS: int = 2000
+    DATASET_FACTORS: dict = {}
 
     @classmethod
     def from_spec(cls, spec_path: str) -> type:
@@ -141,7 +150,7 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
         if missing:
             raise SpecError(f"{spec_path}: missing required key(s): {missing}")
 
-        version = spec.get("contract", SPEC_CONTRACT_VERSION)
+        version = spec["contract"]
         if version != SPEC_CONTRACT_VERSION:
             raise SpecError(
                 f"{spec_path}: contract version {version}, but this build "
@@ -187,7 +196,7 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
                 DatasetId(name) for name in discover_datasets(inputs["datasets_dir"])
             ]
         else:
-            config.DATASETS = [DatasetId(spec.get("run_name", "gui_run"))]
+            config.DATASETS = [DatasetId(spec["run_name"])]
 
         for key, value in spec["params"].items():
             if key in _TUPLE_PARAMS and isinstance(value, list):

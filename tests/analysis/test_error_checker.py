@@ -107,16 +107,23 @@ class TestAnalyzerHonoursExplicitSettings:
         with pytest.raises(TypeError):
             MultifractalAnalyzer(load_unweighted_test_synth_graph)
 
-    def test_weighted_setting_ignored_for_unweighted_graph(
+    def test_weighted_setting_rejected_for_unweighted_graph(
         self, load_unweighted_test_synth_graph
     ):
+        """Asking for weights a graph does not have is a misconfiguration.
+
+        This used to downgrade to an unweighted measure with only a debug line,
+        so a run configured for a weighted analysis reported unweighted numbers
+        under a weighted label.
+        """
         from analysis.multifractal_analyzer import MultifractalAnalyzer
 
-        analyzer = MultifractalAnalyzer(
-            load_unweighted_test_synth_graph, measure_weighted=True, full_q_band=False
-        )
-
-        assert analyzer.weighted is False
+        with pytest.raises(AssertionError, match="carries no edge weights"):
+            MultifractalAnalyzer(
+                load_unweighted_test_synth_graph,
+                measure_weighted=True,
+                full_q_band=False,
+            )
 
 
 # ---------------------------------------------------------------------------
