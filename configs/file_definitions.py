@@ -149,7 +149,7 @@ def save_network_nkbin(graph, filepath: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Plot / image display configuration (used by RunAgent.plot_network,
+# Plot / image display configuration (used by utils.plot_network,
 # NOT by Saver).  Kept for rendering parameters only.
 # ---------------------------------------------------------------------------
 

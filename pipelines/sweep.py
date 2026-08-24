@@ -19,7 +19,7 @@ from handlers import (
     STATUS_CANCELLED,
     STATUS_FAILED,
     STATUS_OK,
-    RunAgent,
+    GenerationRun,
     attach_run_log,
     create_run_paths,
     write_manifest,
@@ -105,7 +105,7 @@ def _generate_with_factors(
     return None, float("inf")
 
 
-def generate_networks(data_agent, error_checker: ErrorChecker, nf, ef, config):
+def generate_networks(run: GenerationRun, error_checker: ErrorChecker, nf, ef, config):
     from dataclasses import replace
 
     num_network = config.SYNTHETIC_NETWORK_NUMBER
@@ -131,8 +131,8 @@ def generate_networks(data_agent, error_checker: ErrorChecker, nf, ef, config):
                     _generate_with_factors,
                     exit_event,
                     error_checker,
-                    data_agent.attributes,
-                    data_agent.mapper,
+                    run.attributes,
+                    run.mapper,
                     trial_params.for_worker(i),
                 )
                 for i in range(num_network)
@@ -177,10 +177,9 @@ def run_for_dataset(
     )
     logger.info(f"  total trials: {len(node_factors) * len(edge_factors)}")
 
-    data_agent = RunAgent(config, run_paths=run_paths, dataset_id=dataset_id)
-    data_agent.prepare_data()
+    run = GenerationRun(config, run_paths, dataset_id)
     error_checker = create_error_checker(config)
-    error_checker.compute_reference(data_agent.get_original_network())
+    error_checker.compute_reference(run.original)
 
     sweep_config = {
         "name": f"sweep-{dataset_id}",
@@ -198,9 +197,7 @@ def run_for_dataset(
             ef = wandb.config.edge_factor
             logger.info(f"Trial: nf={nf}, ef={ef}")
 
-            error, success_rate = generate_networks(
-                data_agent, error_checker, nf, ef, config
-            )
+            error, success_rate = generate_networks(run, error_checker, nf, ef, config)
             if error is None:
                 error = float("inf")
 

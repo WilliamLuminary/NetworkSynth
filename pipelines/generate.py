@@ -22,8 +22,8 @@ from handlers import (
     STATUS_FAILED,
     STATUS_OK,
     AttributesCalculator,
+    GenerationRun,
     Mapper,
-    RunAgent,
     attach_run_log,
     create_run_paths,
     write_manifest,
@@ -251,7 +251,7 @@ def compute_average_error(errors: List) -> float:
     return round(np.mean(non_outliers), 3) if non_outliers else float("inf")
 
 
-def generate_with_multiprocessing(data_agent: RunAgent, config):
+def generate_with_multiprocessing(run: GenerationRun, config):
     num_network, num_figures = (
         config.SYNTHETIC_NETWORK_NUMBER,
         config.SYNTHETIC_GRAPH_NUMBER,
@@ -265,7 +265,7 @@ def generate_with_multiprocessing(data_agent: RunAgent, config):
     exit_event = spawn_context().Manager().Event()
     error_checker = create_error_checker(config)
     if config.SYNTHETIC_NETWORK_NUMBER > 0:
-        error_checker.compute_reference(data_agent.get_original_network())
+        error_checker.compute_reference(run.original)
 
     max_workers = config.get_max_workers(num_network)
     logger.info(f"Using {max_workers} worker(s) for {num_network} networks")
@@ -285,8 +285,8 @@ def generate_with_multiprocessing(data_agent: RunAgent, config):
                     generate_synthetic_network,
                     exit_event,
                     error_checker,
-                    data_agent.attributes,
-                    data_agent.mapper,
+                    run.attributes,
+                    run.mapper,
                     params.for_worker(i),
                 )
                 for i in range(num_network)
@@ -306,8 +306,8 @@ def generate_with_multiprocessing(data_agent: RunAgent, config):
                     next_log += 10
 
                 if (num_figures := num_figures - 1) >= 0:
-                    data_agent.save("synthetic_graph", content=synthetic_graph)
-                data_agent.add_synthetic_graph(synthetic_graph)
+                    run.save_synthetic_plot(synthetic_graph)
+                run.add_synthetic_graph(synthetic_graph)
                 errors.append(error)
     except KeyboardInterrupt:
         logger.info(SIGINT_INFO)
@@ -322,7 +322,7 @@ def generate_with_multiprocessing(data_agent: RunAgent, config):
 
     avg_err = compute_average_error(errors)
     prefix = f"len_{len(errors)}_err_{avg_err:.3f}"
-    data_agent.save_synthetic_outputs(prefix)
+    run.save_synthetic_outputs(prefix)
 
 
 # ------------------------------------------------------------------ #
@@ -330,7 +330,7 @@ def generate_with_multiprocessing(data_agent: RunAgent, config):
 # ------------------------------------------------------------------ #
 
 
-def generate_with_snapshots(data_agent: RunAgent, config):
+def generate_with_snapshots(run: GenerationRun, config):
     """Generate a single network while saving intermediate BFS snapshots.
 
     Snapshot rendering is offloaded to a process pool so the BFS
@@ -338,7 +338,7 @@ def generate_with_snapshots(data_agent: RunAgent, config):
     """
     from concurrent.futures import ProcessPoolExecutor
 
-    snapshot_dir = os.path.join(data_agent.saver.output_dir, "snapshots")
+    snapshot_dir = os.path.join(run.saver.output_dir, "snapshots")
     os.makedirs(snapshot_dir, exist_ok=True)
 
     interval = config.SNAPSHOT_INTERVAL
@@ -363,22 +363,22 @@ def generate_with_snapshots(data_agent: RunAgent, config):
 
     params = SynthParams.from_config(config)
     apply_seed(params.seed)
-    generator = GraphGenerator(data_agent.attributes, params)
+    generator = GraphGenerator(run.attributes, params)
     synthetic_graph = generator.generate_network_with_snapshots(
         snapshot_callback=on_snapshot,
         snapshot_interval=interval,
     )
-    synthetic_graph = trim_graph(synthetic_graph, data_agent.attributes.average_degree)
-    data_agent.mapper.assign_weights(synthetic_graph)
+    synthetic_graph = trim_graph(synthetic_graph, run.attributes.average_degree)
+    run.mapper.assign_weights(synthetic_graph)
 
     for fut in plot_futures:
         fut.result()
     plot_pool.shutdown(wait=False)
     logger.info(f"{len(plot_futures)} snapshots rendered")
 
-    data_agent.save("synthetic_graph", content=synthetic_graph)
-    data_agent.add_synthetic_graph(synthetic_graph)
-    data_agent.save_synthetic_outputs(prefix="snapshot_run")
+    run.save_synthetic_plot(synthetic_graph)
+    run.add_synthetic_graph(synthetic_graph)
+    run.save_synthetic_outputs(prefix="snapshot_run")
 
     logger.info(f"Snapshot generation complete. Snapshots saved to {snapshot_dir}")
 
@@ -505,7 +505,7 @@ def _save_metric_report(ranked, ref_metrics, path):
 # ------------------------------------------------------------------ #
 
 
-def generate_and_select(data_agent: RunAgent, config):
+def generate_and_select(run: GenerationRun, config):
     """Generate many networks, rank by metric distance to original, save best.
 
     Each candidate is validated with the multifractal error check.
@@ -526,7 +526,7 @@ def generate_and_select(data_agent: RunAgent, config):
     snapshot_style = getattr(config, "PLOT_STYLE", {})
     use_snapshots = snapshot_interval > 0
 
-    original_network = data_agent.get_original_network()
+    original_network = run.original
     original_node_count = original_network.number_of_nodes()
     ref_metrics = compute_network_metrics(original_network)
     error_checker = create_error_checker(config)
@@ -534,7 +534,7 @@ def generate_and_select(data_agent: RunAgent, config):
     error_checker.compute_reference(original_network)
     logger.info("Original metrics: %s", _fmt_metrics(ref_metrics))
 
-    candidates_dir = os.path.join(data_agent.saver.output_dir, "candidates")
+    candidates_dir = os.path.join(run.saver.output_dir, "candidates")
 
     graphs = []
 
@@ -572,8 +572,8 @@ def generate_and_select(data_agent: RunAgent, config):
                         _generate_single_network_collecting_snapshots,
                         exit_event,
                         error_checker,
-                        data_agent.attributes,
-                        data_agent.mapper,
+                        run.attributes,
+                        run.mapper,
                         snapshot_interval,
                         early_node_count,
                         params.for_worker(i),
@@ -583,8 +583,8 @@ def generate_and_select(data_agent: RunAgent, config):
                         _generate_single_network,
                         exit_event,
                         error_checker,
-                        data_agent.attributes,
-                        data_agent.mapper,
+                        run.attributes,
+                        run.mapper,
                         params.for_worker(i),
                     )
                 future_to_idx[future] = i
@@ -638,11 +638,11 @@ def generate_and_select(data_agent: RunAgent, config):
     best = ranked[:select_best]
 
     for _, _, graph, _, _, _ in best:
-        data_agent.save("synthetic_graph", content=graph)
-        data_agent.add_synthetic_graph(graph)
+        run.save_synthetic_plot(graph)
+        run.add_synthetic_graph(graph)
 
     prefix = f"best{len(best)}_of_{len(graphs)}"
-    data_agent.save_synthetic_outputs(prefix)
+    run.save_synthetic_outputs(prefix)
 
     if use_snapshots:
         logger.info(f"Rendering snapshots for {len(best)} best candidates ...")
@@ -654,7 +654,7 @@ def generate_and_select(data_agent: RunAgent, config):
             )
             _render_snapshots(snaps, snap_dir, snapshot_style)
 
-    report_path = os.path.join(data_agent.saver.output_dir, "metric_report.csv")
+    report_path = os.path.join(run.saver.output_dir, "metric_report.csv")
     _save_metric_report(ranked, ref_metrics, report_path)
     logger.info(
         f"Saved {len(best)} best networks (of {len(graphs)} total). "
@@ -665,20 +665,16 @@ def generate_and_select(data_agent: RunAgent, config):
 def run_for_dataset(dataset_id: DatasetId, config, run_paths):
     logger.info(f"Processing dataset: {dataset_id}")
     logger.info(config())
-    data_agent = RunAgent(config, run_paths=run_paths, dataset_id=dataset_id)
-    data_agent.prepare_data()
-    data_agent.save("original_image")
-    data_agent.save("original_network")
-    data_agent.save("original_property")
-    data_agent.save("original_report")
-    data_agent.save("original_graph")
+    run = GenerationRun(config, run_paths, dataset_id)
+    run.save_original()
+    run.save(run.original_report(), "original_report")
 
     if config.SELECT_BEST > 0:
-        generate_and_select(data_agent, config)
+        generate_and_select(run, config)
     elif config.SNAPSHOT_INTERVAL > 0:
-        generate_with_snapshots(data_agent, config)
+        generate_with_snapshots(run, config)
     else:
-        generate_with_multiprocessing(data_agent, config)
+        generate_with_multiprocessing(run, config)
 
 
 def main(config_cls=None):

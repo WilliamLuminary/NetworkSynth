@@ -11,7 +11,7 @@ from configs.enums import DatasetId
 from graphs import GraphGenerator
 from graphs._graph_node import GraphNode
 from graphs.graph_generator import FrontierDescriptor
-from handlers import RunAgent
+from handlers import GenerationRun
 from pipelines.hybrid import (
     _apply_dataset_factors,
     _report_text,
@@ -145,13 +145,12 @@ def run_hybrid_snapshot_for_dataset(
     )
     logger.info(config())
 
-    data_agent = RunAgent(config, run_paths=run_paths, dataset_id=dataset_id)
-    data_agent.prepare_data()
-    attributes = data_agent.attributes
-    mapper = data_agent.mapper
+    run = GenerationRun(config, run_paths, dataset_id)
+    attributes = run.attributes
+    mapper = run.mapper
 
     error_checker = create_error_checker(config)
-    error_checker.compute_reference(data_agent.get_original_network())
+    error_checker.compute_reference(run.original)
 
     scale_rows, scale_cols = config.TARGET_SCALE
     max_rounds = config.PHASE2_MAX_ROUNDS
@@ -184,7 +183,7 @@ def run_hybrid_snapshot_for_dataset(
     max_threads = os.cpu_count() or 1
     nk.setNumberOfThreads(max_threads)
 
-    snapshot_dir = os.path.join(data_agent.saver.output_dir, "snapshots")
+    snapshot_dir = os.path.join(run.saver.output_dir, "snapshots")
 
     t1 = time.time()
     hybrid_graph = run_phase2_with_snapshots(
@@ -213,26 +212,21 @@ def run_hybrid_snapshot_for_dataset(
     mapper.assign_weights(hybrid_graph)
 
     # --- Save original/ outputs ---
-    data_agent.saver.begin_batch()
-    data_agent.save("original_image")
-    data_agent.save("original_network")
-    data_agent.save("original_property")
-    data_agent.save("original_graph")
-    data_agent.saver.end_batch()
+    run.save_original()
 
     # --- Save synthetic/ outputs ---
-    data_agent.add_synthetic_graph(hybrid_graph)
+    run.add_synthetic_graph(hybrid_graph)
     prefix = f"hybrid_snapshot_{len(centers)}centers"
 
-    data_agent.saver.begin_batch()
-    data_agent.saver.save(hybrid_graph, "synthetic_export", f"{prefix}_")
+    run.saver.begin_batch()
+    run.save(hybrid_graph, "synthetic_export", f"{prefix}_")
     img = plot_hybrid_network(hybrid_graph)
-    data_agent.saver.save(img, "synthetic_graph", f"{prefix}_")
-    data_agent.saver.end_batch()
+    run.save(img, "synthetic_graph", f"{prefix}_")
+    run.saver.end_batch()
 
     # --- Write reports ---
-    original_network = data_agent.get_original_network()
-    data_agent.saver.save(
+    original_network = run.original
+    run.save(
         _report_text(
             "Original Network",
             original_network.number_of_nodes(),
@@ -240,7 +234,7 @@ def run_hybrid_snapshot_for_dataset(
         ),
         "original_report",
     )
-    data_agent.saver.save(
+    run.save(
         _report_text(
             "Synthetic Network",
             hybrid_graph.number_of_nodes(),

@@ -15,9 +15,9 @@ class Saver:
     :func:`~handlers.run_paths.create_run_paths` and passed in as a value, so
     nothing here is global and many runs can coexist.
 
-    A Saver that exists always writes.  Whether a run saves at all is decided
-    once, by :class:`~handlers.run_agent.RunAgent`, which simply does not build
-    one when ``DISABLE_SAVING`` is set.
+    A Saver always writes.  Whether a run saves at all is decided once, by
+    :func:`build_saver`, which hands back a :class:`NullSaver` instead when
+    ``DISABLE_SAVING`` is set.
     """
 
     def __init__(self, config, out_dir: str):
@@ -79,6 +79,53 @@ class Saver:
 
             save_fn(content, abs_path)
             logger.info(f"Saved file: {abs_path}", extra=tagged("IO"))
+
+
+class NullSaver(Saver):
+    """A Saver that accepts everything and writes nothing.
+
+    ``DISABLE_SAVING`` used to yield ``None``, which every caller then had to
+    remember to check — and most did not: two dozen ``run.saver.save(...)``
+    calls across the pipelines would raise on a disabled run.  A no-op of the
+    same shape removes the question, the way ``NullErrorChecker`` does for the
+    quality gate.
+
+    ``output_dir`` is still the path this run *would* have written to, because
+    callers build subdirectory paths from it.  Nothing is created here.
+    """
+
+    def __init__(self, config, out_dir: str):
+        self._config = config
+        self.output_dir = out_dir
+        self._save_func = config.save
+        self._batch_timestamp = None
+
+    def begin_batch(self) -> str:
+        return ""
+
+    def end_batch(self) -> None:
+        return None
+
+    def save(self, content: Any, identifier: str, prefix: str = "") -> None:
+        # Debug, not info: a run with saving off is usually a sweep trial or a
+        # quick experiment, and one line per would-be file would bury the rest.
+        logger.debug(f"Saving disabled — skipped {prefix}{identifier}")
+
+
+def build_saver(config, out_dir: str) -> Saver:
+    """The saver this run should use: a real one, or a no-op.
+
+    The single place ``DISABLE_SAVING`` decides anything about saving.  The
+    other place it is read is :func:`~handlers.run_paths.create_run_paths`,
+    which decides whether the directory is created at all.
+    """
+    if config.DISABLE_SAVING:
+        logger.info(
+            f"Saving is disabled; nothing will be written. "
+            f"{config.DISABLE_SAVING_NOTE}"
+        )
+        return NullSaver(config, out_dir)
+    return Saver(config, out_dir)
 
 
 def _is_junction(path: str) -> bool:

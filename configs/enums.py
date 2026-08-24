@@ -41,8 +41,3 @@ class AnalysisMode(Enum):
     BASIC = auto()
     FULL = auto()
     RETROACTIVE = auto()
-
-
-class Mode(Enum):
-    GEN = "generate_from_original_network"
-    ANA = "multifractal_analyze"
