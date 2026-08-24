@@ -7,7 +7,7 @@ import os
 from typing import Any, Dict
 
 from .base_config import BaseConfig
-from .enums import DatasetId
+from .dataset_id import DatasetId
 
 logger = logging.getLogger(__name__)
 

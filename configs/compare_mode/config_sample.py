@@ -6,12 +6,14 @@ import pickle
 from typing import List
 
 from ..base_config import BaseConfig
-from ..enums import DatasetId
+from ..dataset_id import DatasetId
 
 logger = logging.getLogger(__name__)
 
 
 class SampleConfig(BaseConfig):
+    MODE = "compare"
+
     MEASURE_WEIGHTED = False
 
     #: One dataset per run: analysis compares the two sets below, and which two

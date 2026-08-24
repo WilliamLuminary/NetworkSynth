@@ -11,7 +11,7 @@ Synthetic Generation
    cd NetworkSynth
    pip install -r requirements.txt  # Python 3.10+
 
-   python -m run generate
+   python run.py configs/generate_mode/config_sample.py
   ```
 2. **Prepare Sample Data**
   ```
@@ -75,6 +75,7 @@ def _generate_datasets() -> List[DatasetId]:
     return [DatasetId("set_1"), DatasetId("set_2")]
 
 class ConfigMydata(BaseConfig):
+    MODE = "generate"          # which pipeline runs this config
     DATASETS = _generate_datasets()
 
     IMAGE_SIZE = (1024, 1024)
@@ -106,13 +107,14 @@ class ConfigMydata(BaseConfig):
         ...
 ```
 
-2. Run with your config:
+2. Set `MODE` on it so a pipeline claims it (`generate`, `hybrid`, `mosaic`,
+   `scaling`, `sweep`, or `compare`), then run it:
 
 ```bash
-python -m run generate --config Mydata
+python run.py configs/generate_mode/config_mydata.py
 ```
 
-The config is automatically exported as `GenConfigMydata` based on the naming convention.
+The file is the name — nothing has to be registered or exported.
 
 ### Save System
 
@@ -254,14 +256,19 @@ run.save(my_data, "my_custom_data")
 If none of the existing serializers fit, add a new `(content, filepath)`
 function in `configs/file_definitions.py` and reference it in the spec.
 
-### Config Naming Convention
+### Choosing a config
 
+A config is named by its file, and each file holds exactly one config class:
 
-| File Name             | Class Name        | Exported As          |
-| --------------------- | ----------------- | -------------------- |
-| `config_sample.py`    | `SampleConfig`    | `GenConfig`          |
-| `config_nanowires.py` | `ConfigNanowires` | `GenConfigNanowires` |
-| `config_mydata.py`    | `ConfigMydata`    | `GenConfigMydata`    |
+```bash
+python run.py configs/generate_mode/config_snapshot_1x1.py
+python run.py configs/hybrid_mode/config_snapshot.py
+```
+
+The config is the only argument: it carries its datasets, its parameters, and a
+`MODE` naming the pipeline that runs it, so there is no mode argument to keep in
+step with the file. `ls configs/*_mode/config_*.py` is the list of what you can
+pass, and only the file you name is imported.
 
 
 ## Key Parameters
@@ -279,7 +286,7 @@ function in `configs/file_definitions.py` and reference it in the spec.
 
 ## Hybrid Mode: Tile Frame Sizing
 
-Hybrid mode (`python -m run hybrid`) builds one large network in two phases:
+Hybrid mode (`configs/hybrid_mode/config_sample.py`) builds one large network in two phases:
 
 - **Phase 1** scatters many *seed centers* across the canvas and grows an independent network *tile* around each one, in parallel.
 - **Phase 2** stitches the tiles together, continuing growth from each tile's frontier nodes to fill the gaps between them.
@@ -353,7 +360,6 @@ in three specific places:
 | ---------------------------------------- | -------------------------------------------------------------------------------- |
 | `graphs/synth_graph.py`                  | `from_networkx()` — converts legacy `nx.Graph` pickle files to `SynthGraph`      |
 | `configs/compare_mode/config_sample.py`  | Detects old `.pkl` files containing `nx.Graph` and converts via `from_networkx()` |
-| `scripts/helpers/convert_pkl_network.py` | Standalone converter — reads `nx.Graph` pickles, exports CSV + NetworKit binary   |
 
 
 All graph algorithms (Dijkstra, betweenness, closeness, eigenvector

@@ -38,26 +38,66 @@ def test_pipeline_main_reraises_interruption(module_name, monkeypatch):
         module.main()
 
 
-def test_entry_point_maps_interruption_to_130(monkeypatch):
+_A_CONFIG = "configs/generate_mode/config_sample.py"
+
+
+def _pipeline(monkeypatch, behaviour):
+    """Stand in for the pipeline the config's MODE selects."""
     import run
 
+    module = type(sys)("fake_pipeline")
+    module.main = behaviour
+    monkeypatch.setattr(run, "load_pipeline", lambda mode: module)
+    return run
+
+
+def test_entry_point_maps_interruption_to_130(monkeypatch):
     def interrupted(*args, **kwargs):
         raise KeyboardInterrupt
 
-    monkeypatch.setattr(run.fire, "Fire", interrupted)
+    run = _pipeline(monkeypatch, interrupted)
 
-    with pytest.raises(SystemExit) as exc_info:
-        run.main()
+    assert run.main(["run.py", _A_CONFIG]) == 130
 
-    assert exc_info.value.code == 130
+
+def test_entry_point_maps_failure_to_1(monkeypatch):
+    def failed(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    run = _pipeline(monkeypatch, failed)
+
+    assert run.main(["run.py", _A_CONFIG]) == 1
 
 
 def test_entry_point_leaves_success_alone(monkeypatch):
+    run = _pipeline(monkeypatch, lambda *a, **k: None)
+
+    assert run.main(["run.py", _A_CONFIG]) == 0
+
+
+def test_a_bad_argument_count_is_rejected_with_2():
     import run
 
-    monkeypatch.setattr(run.fire, "Fire", lambda *a, **k: None)
+    assert run.main(["run.py"]) == 2
+    assert run.main(["run.py", "a", "b"]) == 2
 
-    run.main()  # must not raise
+
+def test_an_unknown_config_path_is_rejected_with_2():
+    import run
+
+    assert run.main(["run.py", "configs/generate_mode/config_nope.py"]) == 2
+
+
+def test_a_config_without_a_mode_is_rejected_with_2(monkeypatch, tmp_path):
+    import run
+    from configs import BaseConfig
+
+    class Modeless(BaseConfig):
+        pass
+
+    monkeypatch.setattr(run, "load_config", lambda path: Modeless)
+
+    assert run.main(["run.py", _A_CONFIG]) == 2
 
 
 @pytest.mark.slow
@@ -67,7 +107,7 @@ def test_real_sigint_exits_130():
     import time
 
     proc = subprocess.Popen(
-        [sys.executable, "run.py", "generate"],
+        [sys.executable, "run.py", "configs/generate_mode/config_snapshot.py"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         cwd=os.path.join(os.path.dirname(__file__), ".."),
