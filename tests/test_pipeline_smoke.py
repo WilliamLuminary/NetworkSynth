@@ -153,15 +153,22 @@ class TestHybridPipeline:
 
 
 # ------------------------------------------------------------------ #
-# hybrid_snapshot
+# hybrid, with snapshots
 # ------------------------------------------------------------------ #
 
 
-class TestHybridSnapshotPipeline:
-    def test_run_hybrid_snapshot_for_dataset(self, tmp_path):
+class TestHybridSnapshots:
+    """Snapshots are a config setting, not a pipeline of their own.
+
+    ``hybrid_snapshot.py`` used to be a second copy of Phase 2 reached only by
+    a runner script.  The same run is now ``hybrid`` with SNAPSHOT_INTERVAL
+    set, so this asserts the images actually appear on that path.
+    """
+
+    def test_hybrid_writes_snapshots_when_the_config_asks_for_them(self, tmp_path):
         from configs.hybrid_mode.config_sample import SampleConfig
         from handlers import create_run_paths
-        from pipelines.hybrid_snapshot import run_hybrid_snapshot_for_dataset
+        from pipelines.hybrid import run_hybrid_for_dataset
 
         config = _tune(
             SampleConfig,
@@ -170,15 +177,19 @@ class TestHybridSnapshotPipeline:
             NUM_CENTERS=2,
             PHASE2_MAX_ROUNDS=6,
             TILE_FRAME_SIZE=(510, 510),
+            # Larger than the round count, so exactly the first snapshot fires.
+            SNAPSHOT_INTERVAL=100,
+            HYBRID_SNAPSHOT_STYLE={"dpi": 72},
         )
         run_paths = create_run_paths(config)
 
-        # snapshot_round_interval is large so at most one snapshot renders
-        run_hybrid_snapshot_for_dataset(
-            config.get_datasets()[0], config, run_paths, snapshot_round_interval=100
-        )
+        run_hybrid_for_dataset(config.get_datasets()[0], config, run_paths)
 
-        assert _outputs(str(tmp_path)), "hybrid_snapshot produced no output files"
+        outputs = _outputs(str(tmp_path))
+        assert outputs, "hybrid produced no output files"
+        assert any(
+            name.startswith("snapshot_") for name in outputs
+        ), f"SNAPSHOT_INTERVAL was set but nothing was rendered: {outputs}"
 
 
 # ------------------------------------------------------------------ #

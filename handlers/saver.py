@@ -3,7 +3,7 @@ import os
 import sys
 from typing import Any, Optional
 
-from configs.base_config import tagged
+from utils import tagged
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +28,11 @@ class Saver:
         Postconditions:
             - ``out_dir`` exists.
         """
-        self._config = config
         self.output_dir = out_dir
         _ensure_directory(self.output_dir, exist_ok=True)
-        # Bound to the real config class, so `save_<identifier>` overrides
-        # resolve through the normal MRO with no injection required.
+        # The config is needed for this and nothing else, so only the bound
+        # method is kept: `save_<identifier>` overrides resolve through the
+        # normal MRO with no injection required.
         self._save_func = config.save
         self._batch_timestamp: Optional[str] = None
 
@@ -90,21 +90,20 @@ class NullSaver(Saver):
     same shape removes the question, the way ``NullErrorChecker`` does for the
     quality gate.
 
-    ``output_dir`` is still the path this run *would* have written to, because
-    callers build subdirectory paths from it.  Nothing is created here.
+    ``output_dir`` is the one thing it keeps, because callers build
+    subdirectory paths from it.  Nothing else: a Saver's save function and batch
+    timestamp only matter to the methods below, and those do nothing here.
+    Nothing is created on disk.
     """
 
-    def __init__(self, config, out_dir: str):
-        self._config = config
+    def __init__(self, out_dir: str):
         self.output_dir = out_dir
-        self._save_func = config.save
-        self._batch_timestamp = None
 
     def begin_batch(self) -> str:
         return ""
 
     def end_batch(self) -> None:
-        return None
+        pass
 
     def save(self, content: Any, identifier: str, prefix: str = "") -> None:
         # Debug, not info: a run with saving off is usually a sweep trial or a
@@ -124,7 +123,7 @@ def build_saver(config, out_dir: str) -> Saver:
             f"Saving is disabled; nothing will be written. "
             f"{config.DISABLE_SAVING_NOTE}"
         )
-        return NullSaver(config, out_dir)
+        return NullSaver(out_dir)
     return Saver(config, out_dir)
 
 

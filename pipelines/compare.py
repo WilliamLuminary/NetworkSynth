@@ -4,7 +4,8 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 import logging
 
-from configs import CompareConfig, DatasetId
+from configs import DatasetId
+from configs.compare_mode.config_sample import SampleConfig as CompareConfig
 from handlers import (
     STATUS_CANCELLED,
     STATUS_FAILED,

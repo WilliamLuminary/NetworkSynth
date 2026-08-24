@@ -1,7 +1,7 @@
 import logging
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import numpy as np
 from scipy.spatial.distance import euclidean
@@ -9,121 +9,6 @@ from scipy.spatial.distance import euclidean
 from graphs.synth_graph import SynthGraph
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(slots=True)
-class OldAttributesCalculator:
-    degree_distribution: Dict[int, float] = field(default_factory=dict)
-    degree_transition_probs: Dict[int, Dict[int, float]] = field(default_factory=dict)
-    degree_edge_lengths: Dict[int, List[float]] = field(default_factory=dict)
-    degree_angle_diffs: Dict[int, List[float]] = field(default_factory=dict)
-    average_edge_length: float = 0.0
-    average_degree: float = 0.0
-
-    def analyze(self, graph: SynthGraph) -> "OldAttributesCalculator":
-        if graph.number_of_nodes() == 0:
-            return self
-
-        self.degree_distribution = dict(self._compute_degree_distribution(graph))
-        self.degree_transition_probs = dict(
-            self._compute_degree_transition_probs(graph)
-        )
-        self.average_degree = self._compute_average_degree(graph)
-        (degree_edge_lengths, degree_angle_diffs, self.average_edge_length) = (
-            self._compute_edge_lengths_and_angle_diffs(graph)
-        )
-        self.degree_edge_lengths = dict(degree_edge_lengths)
-        self.degree_angle_diffs = dict(degree_angle_diffs)
-        return self
-
-    @staticmethod
-    def _compute_degree_distribution(graph: SynthGraph) -> Dict[int, float]:
-        degrees = [graph.degree(u) for u in graph.nodes()]
-        total_nodes = graph.number_of_nodes()
-        degree_counts = Counter(degrees)
-        if total_nodes == 0:
-            return {}
-        return {
-            int(degree): count / total_nodes for degree, count in degree_counts.items()
-        }
-
-    @staticmethod
-    def _compute_degree_transition_probs(
-        graph: SynthGraph,
-    ) -> Dict[int, Dict[int, float]]:
-        degree_neighbors = defaultdict(list)
-        for node in graph.nodes():
-            node_degree = graph.degree(node)
-            neighbor_degrees = [graph.degree(nbr) for nbr in graph.neighbors(node)]
-            degree_neighbors[node_degree].extend(neighbor_degrees)
-
-        transition_probs = {}
-        for degree, neighbor_degrees in degree_neighbors.items():
-            counts = Counter(neighbor_degrees)
-            total = sum(counts.values())
-            if total == 0:
-                transition_probs[degree] = {}
-            else:
-                transition_probs[degree] = {
-                    neighbor_degree: count / total
-                    for neighbor_degree, count in counts.items()
-                }
-        return transition_probs
-
-    @staticmethod
-    def _compute_edge_lengths_and_angle_diffs(
-        graph: SynthGraph,
-    ) -> Tuple[Dict[int, List[float]], Dict[int, List[float]], float]:
-        positions = graph.positions()
-        degree_to_lengths = defaultdict(list)
-        degree_to_angle_diffs = defaultdict(list)
-
-        total_length = 0.0
-        total_edges_count = 0
-        for node in graph.nodes():
-            nbrs = graph.neighbors(node)
-            if not nbrs:
-                continue
-
-            node_pos = positions[node]
-            lengths = []
-            angles = []
-
-            for neighbor in nbrs:
-                neighbor_pos = positions[neighbor]
-                length = euclidean(node_pos, neighbor_pos)
-                lengths.append(length)
-                angle = (
-                    np.arctan2(
-                        neighbor_pos[1] - node_pos[1], neighbor_pos[0] - node_pos[0]
-                    )
-                    * 180
-                    / np.pi
-                )
-                angles.append(angle)
-
-            node_degree = graph.degree(node)
-            degree_to_lengths[node_degree].extend(lengths)
-            total_length += sum(lengths)
-            total_edges_count += len(lengths)
-
-            if len(angles) > 1:
-                sorted_angles = np.sort(angles)
-                angles_diff = np.diff(sorted_angles)
-                angles_diff = np.append(
-                    angles_diff, 360.0 + sorted_angles[0] - sorted_angles[-1]
-                )
-                degree_to_angle_diffs[node_degree].extend(angles_diff)
-
-        avg_length = total_length / total_edges_count if total_edges_count > 0 else 0.0
-        return degree_to_lengths, degree_to_angle_diffs, avg_length
-
-    @staticmethod
-    def _compute_average_degree(graph: SynthGraph):
-        if graph.number_of_nodes() == 0:
-            return 0.0
-        degrees = [graph.degree(u) for u in graph.nodes()]
-        return float(np.mean(degrees))
 
 
 @dataclass(slots=True)

@@ -4,6 +4,7 @@ import sys
 
 from configs.gui_config import GuiConfig, SpecError
 from handlers import configure_console
+from pipelines import load_pipeline
 
 logger = logging.getLogger("gui_run")
 
@@ -12,14 +13,10 @@ EXIT_FAILED = 1
 EXIT_BAD_SPEC = 2
 EXIT_INTERRUPTED = 130
 
-#: Only the modes the GUI actually offers.  Add to this deliberately: each entry
-#: needs its loader slots checked, not just a name.
-_MODES = {
-    "generate": "pipelines.generate",
-    "hybrid": "pipelines.hybrid",
-    "sweep": "pipelines.sweep",
-    "compare": "pipelines.compare",
-}
+#: Only the modes the GUI actually offers.  A subset of ``pipelines.PIPELINES``,
+#: which is the full table: add to this deliberately, since each entry needs its
+#: loader slots and its input shapes checked, not just a name.
+_GUI_MODES = frozenset({"generate", "hybrid", "sweep", "compare"})
 
 
 def _resolve_spec_path(argv) -> str:
@@ -41,18 +38,16 @@ def main(argv=None) -> int:
     try:
         spec_path = _resolve_spec_path(argv)
         config = GuiConfig.from_spec(spec_path)
-        if config.MODE not in _MODES:
+        if config.MODE not in _GUI_MODES:
             raise SpecError(
                 f"mode {config.MODE!r} is not available; "
-                f"this build supports: {sorted(_MODES)}"
+                f"this build supports: {sorted(_GUI_MODES)}"
             )
     except SpecError as exc:
         logger.error(f"Bad run-spec: {exc}")
         return EXIT_BAD_SPEC
 
-    import importlib
-
-    pipeline = importlib.import_module(_MODES[config.MODE])
+    pipeline = load_pipeline(config.MODE)
 
     try:
         pipeline.main(config_cls=config)

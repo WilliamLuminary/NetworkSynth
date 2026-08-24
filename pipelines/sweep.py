@@ -12,7 +12,6 @@ from analysis.error_checker import ErrorChecker, create_error_checker
 
 # noinspection PyUnresolvedReferences
 from configs import DatasetId, SynthParams
-from configs.base_config import tagged
 from graphs import GraphGenerator
 from graphs._graph_node import GraphNode
 from handlers import (
@@ -25,7 +24,7 @@ from handlers import (
     write_manifest,
 )
 from pipelines.generate import compute_average_error
-from utils import apply_seed, build_graph, spawn_context, trim_graph
+from utils import apply_seed, build_graph, spawn_context, tagged, trim_graph
 
 
 def _init_config():
@@ -33,7 +32,7 @@ def _init_config():
 
     Sweeps every dataset the config lists; there is no per-dataset variant.
     """
-    from configs.sweep_mode import SweepConfig as cfg
+    from configs.sweep_mode.config_sample import SampleConfig as cfg
 
     cfg.initialize()
     cfg.SYNTHETIC_NETWORK_NUMBER = 100
@@ -70,39 +69,38 @@ def _generate_with_factors(
     if exit_event.is_set():
         return None, float("inf")
 
-    GraphNode.initialize(attributes, params)
+    with GraphNode.traversal(attributes, params):
+        for attempt in range(params.max_attempts):
+            # Seeded from this trial's params rather than the PID, so a seeded
+            # sweep repeats. Attempt index keeps retries from re-drawing the same
+            # failed network.
+            apply_seed(None if params.seed is None else params.seed + attempt)
 
-    for attempt in range(params.max_attempts):
-        # Seeded from this trial's params rather than the PID, so a seeded
-        # sweep repeats. Attempt index keeps retries from re-drawing the same
-        # failed network.
-        apply_seed(None if params.seed is None else params.seed + attempt)
+            try:
+                result = GraphGenerator._bfs_network_with_frontier(
+                    params.synthetic_frame_size
+                )
+                inner_nodes, inner_edges, *_ = result
 
-        try:
-            result = GraphGenerator._bfs_network_with_frontier(
-                params.synthetic_frame_size
-            )
-            inner_nodes, inner_edges, *_ = result
+                if not inner_nodes or len(inner_nodes) < 100:
+                    continue
 
-            if not inner_nodes or len(inner_nodes) < 100:
+                graph = build_graph(inner_nodes, inner_edges, arg_type="graph_node")
+                graph = trim_graph(graph, attributes.average_degree)
+                mapper.assign_weights(graph)
+
+                if exit_event.is_set():
+                    return None, float("inf")
+
+                passed, error = error_checker.check(graph)
+                if passed:
+                    return graph, error
+            except KeyboardInterrupt:
+                raise
+            except Exception:
                 continue
 
-            graph = build_graph(inner_nodes, inner_edges, arg_type="graph_node")
-            graph = trim_graph(graph, attributes.average_degree)
-            mapper.assign_weights(graph)
-
-            if exit_event.is_set():
-                return None, float("inf")
-
-            passed, error = error_checker.check(graph)
-            if passed:
-                return graph, error
-        except KeyboardInterrupt:
-            raise
-        except Exception:
-            continue
-
-    return None, float("inf")
+        return None, float("inf")
 
 
 def generate_networks(run: GenerationRun, error_checker: ErrorChecker, nf, ef, config):
@@ -207,16 +205,16 @@ def run_for_dataset(
     wandb.agent(sweep_id, function=trial)
 
 
-def main(config_cls=None, nf_range=None, ef_range=None):
+def main(config_cls=None):
     # A GUI run brings its own config, already carrying the trial count and the
-    # ranges from the run-spec; the CLI builds the sweep config here.
+    # ranges from the run-spec; a CLI run brings the config file it was given.
     cfg = _init_config() if config_cls is None else config_cls
     if config_cls is not None:
         cfg.initialize()
 
-    # Caller argument wins, then the config's range, then the module default.
-    nf_lo, nf_hi = nf_range or getattr(cfg, "NF_RANGE", DEFAULT_NF_RANGE)
-    ef_lo, ef_hi = ef_range or getattr(cfg, "EF_RANGE", DEFAULT_EF_RANGE)
+    # The config's range, or the module default.
+    nf_lo, nf_hi = getattr(cfg, "NF_RANGE", DEFAULT_NF_RANGE)
+    ef_lo, ef_hi = getattr(cfg, "EF_RANGE", DEFAULT_EF_RANGE)
     node_factors = _build_factors(nf_lo, nf_hi)
     edge_factors = _build_factors(ef_lo, ef_hi)
 

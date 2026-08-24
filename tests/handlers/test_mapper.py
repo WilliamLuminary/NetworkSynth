@@ -9,7 +9,7 @@ import pytest  # noqa: E402
 from matplotlib import pyplot as plt  # noqa: E402
 from scipy.stats import pearsonr  # noqa: E402
 
-from configs import GenConfig1
+from configs.generate_mode.config_1 import Config1 as GenConfig1
 from handlers import Mapper
 
 GenConfig1.initialize()

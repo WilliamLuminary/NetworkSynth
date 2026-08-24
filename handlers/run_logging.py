@@ -48,7 +48,7 @@ def attach_run_log(
     process gets its own file instead of silently continuing to write to the
     first one's — or, as before, getting no file at all.
     """
-    from configs.base_config import _JsonFormatter
+    from utils import JsonFormatter
 
     root = logging.getLogger()
     root.setLevel(level)
@@ -66,7 +66,7 @@ def attach_run_log(
     path = os.path.join(run_root, "run.jsonl")
     handler = logging.FileHandler(path, mode="a")
     handler.setLevel(level)
-    handler.setFormatter(_JsonFormatter(run_id=run_id))
+    handler.setFormatter(JsonFormatter(run_id=run_id))
     setattr(handler, _RUN_LOG_FLAG, True)
     root.addHandler(handler)
     return path

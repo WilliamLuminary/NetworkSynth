@@ -12,6 +12,7 @@ pytestmark = pytest.mark.unit
 @pytest.fixture
 def config(tmp_path):
     class Config(BaseConfig):
+        MODE = "hybrid"
         BASE_OUTPUT_PATH = str(tmp_path)
         DATASETS = [DatasetId("ds")]
         initialised = False

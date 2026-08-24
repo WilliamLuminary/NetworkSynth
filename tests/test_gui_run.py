@@ -10,7 +10,7 @@ pytestmark = pytest.mark.unit
 
 #: Derived, never restated: a mode list written out by hand goes stale the moment
 #: one is wired or unwired, and then the tests quietly stop covering it.
-_MODE_NAMES = set(gui_run._MODES)
+_MODE_NAMES = set(gui_run._GUI_MODES)
 
 
 def _inputs_for(mode, tmp_path, shape_index=0):
@@ -469,7 +469,7 @@ class TestModeSelection:
     def test_offered_modes_match_dispatchable_modes(self):
         from gui.spec_builder import MODES
 
-        assert set(MODES) == set(gui_run._MODES)
+        assert set(MODES) == set(gui_run._GUI_MODES)
 
     def test_the_form_asks_for_what_the_spec_requires(self):
         from configs.gui_config import MODE_INPUTS
