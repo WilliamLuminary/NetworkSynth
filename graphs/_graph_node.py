@@ -3,14 +3,95 @@ import math
 import random
 from collections import defaultdict
 from contextlib import contextmanager
-from typing import Dict, List, Set, Tuple
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Set, Tuple
 
 import numpy as np
 
 from configs import SynthParams
 
 
+@dataclass(frozen=True)
+class TraversalRules:
+    """What the BFS compares a candidate placement against.
+
+    Derived, not chosen: the distributions are measured from the original
+    network and the thresholds come from those times the run's factors, so this
+    holds only what an inner loop reads — squared thresholds and integer cell
+    radii, in the form the comparison needs.  What the *caller* chose lives in
+    :class:`~configs.params.SynthParams`, which is the single source of the
+    factors and the only one of the two that crosses a process boundary.
+
+    Fixed for the whole traversal: nothing here changes as the BFS proceeds.
+    """
+
+    degree_dist: Dict[int, float]
+    degree_trans_probs: dict
+    degree_angles: dict
+    degree_lengths: dict
+
+    closed_nodes_thr_sq: float
+    closed_edges_thr_sq: float
+    #: One grid cell is one mean edge length, so a close-node search only has
+    #: to look at the cells within ``closed_nodes_factor`` of the candidate.
+    grid_size: float
+    node_search_radius: int
+    edge_search_radius: int
+
+    @classmethod
+    def build(cls, attrs, params: SynthParams) -> "TraversalRules":
+        avg_length = attrs.average_length
+        closed_nodes_thr = avg_length * params.closed_nodes_factor
+        closed_edges_thr = avg_length * params.closed_edges_factor
+        return cls(
+            degree_dist=attrs.degree_distribution,
+            degree_trans_probs=attrs.degree_transition_probs,
+            degree_angles=attrs.degree_angles,
+            degree_lengths=attrs.degree_lengths,
+            closed_nodes_thr_sq=closed_nodes_thr**2,
+            closed_edges_thr_sq=closed_edges_thr**2,
+            grid_size=avg_length,
+            node_search_radius=math.ceil(params.closed_nodes_factor),
+            edge_search_radius=math.ceil(params.closed_edges_factor),
+        )
+
+
+@dataclass(frozen=True)
+class PlacementCounts:
+    """How a traversal's candidate placements turned out.
+
+    A result of the traversal rather than part of it: read it while the
+    traversal is open, since leaving the scope clears the record it came from.
+    """
+
+    merged: int
+    aborted: int
+
+    def __str__(self) -> str:
+        return f"merged={self.merged:,}, aborted={self.aborted:,}"
+
+
 class GraphNode:
+    """One node of a BFS traversal, plus the traversal itself.
+
+    Generation records a single BFS rather than placing nodes on a board that
+    several callers share, so the record — the id counter, the node and edge
+    grids, and the placement counts — lives on the class.  Two consequences
+    worth knowing before changing anything here:
+
+    - Exactly one traversal exists per process, so generation parallelises
+      across *processes* only, never threads.  Every generation pool in
+      ``pipelines/`` is a ``ProcessPoolExecutor`` for this reason; the thread
+      pools there render snapshots, which never touch this class.
+    - :meth:`traversal` is the scope that owns the record.  The static BFS
+      entry points on ``GraphGenerator`` read it straight off the class, so
+      they are only callable from inside that block.
+
+    The rules the traversal follows are separate and immutable: see
+    :class:`TraversalRules`.
+    """
+
+    #: The record: rebuilt by :meth:`reset` for every traversal.
     id_counter = None
     node_grid: Dict[tuple[float, float], set]
     edge_grid: Dict[
@@ -19,39 +100,20 @@ class GraphNode:
     _aborted_edge: int
     _merged_edge: int
 
-    # Class-level properties
-    _degree_dist = None
-    _degree_trans_probs = None
-    _degree_angles = None
-    _degree_lengths = None
-    _avg_length: float
-
-    # Class-level Parameters
-    _closed_nodes_thr: float
-    _closed_edges_thr: float
-    _grid_size: float
-
-    _closed_nodes_factor: float
-    _closed_edges_factor: float
+    #: The rules: installed once per traversal, read-only thereafter.
+    _rules: Optional[TraversalRules] = None
 
     _traversal_active = False
 
     @classmethod
     @contextmanager
     def traversal(cls, attrs, params: SynthParams):
-        """Scope one BFS traversal: install its parameters, drop its record.
-
-        Generation records a single traversal rather than filling a board that
-        several callers share, so the record lives on the class and exactly one
-        traversal may be open in a process at a time.  The BFS entry points on
-        :class:`~graphs.graph_generator.GraphGenerator` are static and read
-        that state off the class, which is why they are only callable from
-        inside this block.
+        """Scope one BFS traversal: install its rules, drop its record.
 
         Leaving the block drops the node and edge grids, so the spatial index
         over a multi-million-node traversal is freed where the traversal ends
-        rather than wherever a caller remembers to reset.  The parameters stay
-        installed; only the record is per-traversal.
+        rather than wherever a caller remembers to reset.  Only one may be open
+        at a time, for the reason given in the class docstring.
         """
         assert not cls._traversal_active, (
             "a traversal is already open: the record is class-level, so two "
@@ -67,35 +129,26 @@ class GraphNode:
 
     @classmethod
     def initialize(cls, attrs, params: SynthParams):
-        cls._degree_dist = attrs.degree_distribution
-        cls._degree_trans_probs = attrs.degree_transition_probs
-        cls._degree_angles = attrs.degree_angles
-        cls._degree_lengths = attrs.degree_lengths
-        cls._avg_length = attrs.average_length
-
-        cls._closed_nodes_thr = cls._avg_length * params.closed_nodes_factor
-        cls._closed_edges_thr = cls._avg_length * params.closed_edges_factor
-        cls._closed_nodes_thr_sq = cls._closed_nodes_thr**2
-        cls._closed_edges_thr_sq = cls._closed_edges_thr**2
-        cls._grid_size = cls._avg_length
-
-        cls._node_search_radius = math.ceil(params.closed_nodes_factor)
-        cls._edge_search_radius = math.ceil(params.closed_edges_factor)
-
-        cls._closed_nodes_factor = params.closed_nodes_factor
-        cls._closed_edges_factor = params.closed_edges_factor
-
-        cls.node_grid = defaultdict(set)
-        cls.edge_grid = defaultdict(set)
+        """Install the rules, then start an empty record."""
+        cls._rules = TraversalRules.build(attrs, params)
         cls.reset()
 
     @classmethod
     def reset(cls):
+        """Start a fresh record, keeping the rules in place.
+
+        Called at the top of every BFS entry point, so a retry re-draws from
+        the same rules rather than reinstalling them.
+        """
         cls.id_counter = itertools.count()
         cls.node_grid = defaultdict(set)
         cls.edge_grid = defaultdict(set)
         cls._aborted_edge = 0
         cls._merged_edge = 0
+
+    @classmethod
+    def counts(cls) -> PlacementCounts:
+        return PlacementCounts(merged=cls._merged_edge, aborted=cls._aborted_edge)
 
     @classmethod
     def create_interior_node(cls, position):
@@ -166,18 +219,19 @@ class GraphNode:
 
     @staticmethod
     def _choose_degree_by_parent(parent_degree) -> int:
-        degrees = list(GraphNode._degree_trans_probs[parent_degree].keys())
-        probabilities = list(GraphNode._degree_trans_probs[parent_degree].values())
+        transitions = GraphNode._rules.degree_trans_probs[parent_degree]
+        degrees = list(transitions.keys())
+        probabilities = list(transitions.values())
         return np.random.choice(degrees, p=probabilities)
 
     @staticmethod
     def _choose_degree_random() -> int:
-        degrees = list(GraphNode._degree_dist.keys())
-        probabilities = list(GraphNode._degree_dist.values())
+        degrees = list(GraphNode._rules.degree_dist.keys())
+        probabilities = list(GraphNode._rules.degree_dist.values())
         return np.random.choice(degrees, p=probabilities)
 
     def _initialize_root_node(self) -> None:
-        length = random.choice(GraphNode._degree_lengths[self.degree])
+        length = random.choice(GraphNode._rules.degree_lengths[self.degree])
         child_position = self._polar_to_cartesian([length], [self.base_angle])[0]
         child = GraphNode(child_position, parent=self, parent_angle=self.base_angle)
         self._add_child(child)
@@ -259,8 +313,9 @@ class GraphNode:
     def _find_close_node(self, position):
         key = self._spatial_hash(position)
         px, py = position
-        thr_sq = self._closed_nodes_thr_sq
-        r = self._node_search_radius
+        rules = GraphNode._rules
+        thr_sq = rules.closed_nodes_thr_sq
+        r = rules.node_search_radius
         close_nodes_with_distances = []
         for dx in range(-r, r + 1):
             for dy in range(-r, r + 1):
@@ -275,7 +330,7 @@ class GraphNode:
 
     def _any_close_edge(self, position) -> bool:
         key = self._spatial_hash(position)
-        r = self._edge_search_radius
+        r = GraphNode._rules.edge_search_radius
         for dx in range(-r, r + 1):
             for dy in range(-r, r + 1):
                 for edge in GraphNode.edge_grid.get((key[0] + dx, key[1] + dy), ()):
@@ -287,7 +342,7 @@ class GraphNode:
         if self.parent and (self.parent.position in edge or self.position in edge):
             return False
         p1, p2 = edge
-        thr_sq = self._closed_edges_thr_sq
+        thr_sq = GraphNode._rules.closed_edges_thr_sq
         dx1 = position[0] - p1[0]
         dy1 = position[1] - p1[1]
         if dx1 * dx1 + dy1 * dy1 < thr_sq:
@@ -299,7 +354,9 @@ class GraphNode:
     def _generate_angles_and_lengths(self) -> Tuple[list[float], ...]:
         if self.degree == 1:
             return [], []
-        raw = random.choices(GraphNode._degree_angles[self.degree], k=self.degree - 1)
+        raw = random.choices(
+            GraphNode._rules.degree_angles[self.degree], k=self.degree - 1
+        )
         sign = 1 if self.clockwise else -1
         base = self.base_angle
         acc = 0.0
@@ -308,7 +365,7 @@ class GraphNode:
             acc += sign * a
             angles.append(acc + base)
         lengths = random.choices(
-            GraphNode._degree_lengths[self.degree], k=self.degree - 1
+            GraphNode._rules.degree_lengths[self.degree], k=self.degree - 1
         )
         return angles, lengths
 
@@ -342,14 +399,14 @@ class GraphNode:
 
     @staticmethod
     def _spatial_hash(position: Tuple[float, float]) -> Tuple[int, int]:
-        grid_size = GraphNode._grid_size
+        grid_size = GraphNode._rules.grid_size
         return int(position[0] // grid_size), int(position[1] // grid_size)
 
     @staticmethod
     def _edge_spatial_hash(
         p1: Tuple[float, float], p2: Tuple[float, float]
     ) -> Set[Tuple[int, int]]:
-        gs = GraphNode._grid_size
+        gs = GraphNode._rules.grid_size
         gx1 = int(p1[0] // gs)
         gx2 = int(p2[0] // gs)
         gy1 = int(p1[1] // gs)

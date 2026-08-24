@@ -457,17 +457,15 @@ class GraphGenerator:
                     if not frontier:
                         logger.info(
                             f"Phase 2 round {virtual_round}: converged. "
-                            f"merged={GraphNode._merged_edge:,}, "
-                            f"aborted={GraphNode._aborted_edge:,}",
+                            f"{GraphNode.counts()}",
                             extra=tagged("PHASE2"),
                         )
                         break
 
                     if (virtual_round + 1) % 10 == 0 or virtual_round == 0:
                         logger.info(
-                            f"Phase 2 round {virtual_round}: frontier={len(frontier):,}, "
-                            f"merged={GraphNode._merged_edge:,}, "
-                            f"aborted={GraphNode._aborted_edge:,}",
+                            f"Phase 2 round {virtual_round}: "
+                            f"frontier={len(frontier):,}, {GraphNode.counts()}",
                             extra=tagged("PHASE2"),
                         )
 
@@ -508,9 +506,7 @@ class GraphGenerator:
 
         logger.info(
             f"Phase 2 complete: {len(all_nodes):,} nodes, "
-            f"{len(all_edges):,} edges, "
-            f"merged={GraphNode._merged_edge:,}, "
-            f"aborted={GraphNode._aborted_edge:,}",
+            f"{len(all_edges):,} edges, {GraphNode.counts()}",
             extra=tagged("PHASE2"),
         )
 
@@ -591,8 +587,7 @@ class GraphGenerator:
                 logger.info(
                     f"Round {round_num}: frontier={len(next_frontier):,}, "
                     f"nodes={len(all_nodes):,}, edges={len(all_edges):,}, "
-                    f"merged={GraphNode._merged_edge:,}, "
-                    f"aborted={GraphNode._aborted_edge:,}",
+                    f"{GraphNode.counts()}",
                     extra=tagged("BFS"),
                 )
 
@@ -600,9 +595,7 @@ class GraphGenerator:
 
         logger.info(
             f"Multi-root BFS complete: {len(all_nodes):,} nodes, "
-            f"{len(all_edges):,} edges, "
-            f"merged={GraphNode._merged_edge:,}, "
-            f"aborted={GraphNode._aborted_edge:,}",
+            f"{len(all_edges):,} edges, {GraphNode.counts()}",
             extra=tagged("BFS"),
         )
         return all_nodes, all_edges
