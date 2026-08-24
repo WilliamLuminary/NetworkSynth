@@ -106,6 +106,13 @@ class TestMetricDistance:
 # ---------------------------------------------------------------------------
 
 
+def _style(**overrides):
+    """A RenderStyle with the sizes the matplotlib renderer requires."""
+    from configs import RenderStyle
+
+    return RenderStyle(node_size=6.0, line_width=3.0, **overrides)
+
+
 class TestSaveBfsSnapshot:
     def test_creates_png(self, tmp_path):
         from utils import save_bfs_snapshot
@@ -114,9 +121,7 @@ class TestSaveBfsSnapshot:
         edges = {((10, 20), (30, 40)), ((30, 40), (50, 60))}
         frame = ((0, 100), (0, 100))
 
-        save_bfs_snapshot(
-            positions, edges, frame, index=0, output_dir=str(tmp_path), dpi=72
-        )
+        save_bfs_snapshot(positions, edges, frame, 0, str(tmp_path), _style(dpi=72))
 
         expected = os.path.join(str(tmp_path), "snapshot_00000.png")
         assert os.path.isfile(expected), f"PNG not created at {expected}"
@@ -130,9 +135,7 @@ class TestSaveBfsSnapshot:
         frame = ((0, 10), (0, 10))
 
         for i in range(3):
-            save_bfs_snapshot(
-                positions, edges, frame, index=i, output_dir=str(tmp_path), dpi=72
-            )
+            save_bfs_snapshot(positions, edges, frame, i, str(tmp_path), _style(dpi=72))
 
         for i in range(3):
             assert os.path.isfile(os.path.join(str(tmp_path), f"snapshot_{i:05d}.png"))
@@ -151,9 +154,7 @@ class TestSaveHybridSnapshot:
         edges = [((10, 20), (30, 40))]
         frame = ((0, 100), (0, 100))
 
-        save_hybrid_snapshot(
-            positions, edges, frame, index=0, output_dir=str(tmp_path), dpi=72
-        )
+        save_hybrid_snapshot(positions, edges, frame, 0, str(tmp_path), _style(dpi=72))
 
         expected = os.path.join(str(tmp_path), "snapshot_00000.png")
         assert os.path.isfile(expected)
@@ -163,12 +164,7 @@ class TestSaveHybridSnapshot:
         from utils import save_hybrid_snapshot
 
         save_hybrid_snapshot(
-            node_positions=[],
-            edges=[],
-            frame=((0, 50), (0, 50)),
-            index=0,
-            output_dir=str(tmp_path),
-            dpi=72,
+            [], [], ((0, 50), (0, 50)), 0, str(tmp_path), _style(dpi=72)
         )
 
         expected = os.path.join(str(tmp_path), "snapshot_00000.png")

@@ -267,22 +267,15 @@ class TestSnapshotMode:
         snapshot_dir = os.path.join(agent.saver.output_dir, "snapshots")
         os.makedirs(snapshot_dir, exist_ok=True)
 
-        style = getattr(Snapshot1x1Config, "PLOT_STYLE", {})
+        from dataclasses import replace
+
+        # The config's own style, at a low dpi for speed.
+        style = replace(Snapshot1x1Config.render("bfs_snapshot"), dpi=72)
         recorded_calls = []
 
         def on_snapshot(positions, edges, frame, step_idx):
             recorded_calls.append(step_idx)
-            # Use low dpi for speed; pass node_size/line_width from PLOT_STYLE
-            save_bfs_snapshot(
-                positions,
-                edges,
-                frame,
-                step_idx,
-                snapshot_dir,
-                dpi=72,
-                node_size=style.get("node_size", 6.0),
-                line_width=style.get("line_width", 3.0),
-            )
+            save_bfs_snapshot(positions, edges, frame, step_idx, snapshot_dir, style)
 
         generator = GraphGenerator(
             agent.attributes, SynthParams.from_config(Snapshot1x1Config)
