@@ -1,27 +1,46 @@
-# Core dependencies
-numpy~=2.2.6
+# Covers the supported surface: run.py, analyse.py, gui_app.py / gui_run.py and
+# scripts/, including every pipeline and config they load dynamically.
+#
+# Python 3.11-3.13.  Every pin below has a binary wheel across that whole range.
+# 3.14 is not usable yet: NetworKit ships no cp314 wheel (INTEGRATION_PLAN.md,
+# Appendix A).
+#
+# Packages shared with structural-gt are pinned to the exact version its main
+# branch pins (sgtlib 3.8.7), so the two environments stay in step.  Everything
+# else uses ~= at the latest release with a 3.13 wheel.
+
+# Core dependencies — exact versions shared with structural-gt
+numpy==2.4.6
+scipy==1.17.1
+matplotlib==3.10.9
+Pillow==12.2.0
+scikit-learn==1.9.0
+# structural-gt sets a floor (opencv-python>=4.13.0) rather than a pin.  Held at
+# 4.13.x deliberately: 5.x is a major bump across 19 cv2 call sites.
 opencv-python~=4.13.0
-matplotlib~=3.10.0
-Pillow~=12.1.1
-scipy~=1.15.3
-networkit~=11.0
-scikit-learn~=1.7.2
+
+# Core dependencies — ours alone
+networkit~=11.2.1
 # Exact optimal transport (ot.emd2) for Ollivier-Ricci curvature
 pot~=0.9.7
 
-# Experiment tracking
-wandb~=0.25.0
+# Experiment tracking (pipelines/sweep.py, scripts/helpers/extract_sweep_results.py)
+wandb~=0.28.2
 
-# GUI (gui_app.py / gui_run.py)
-PySide6~=6.11.1
+# GUI (gui_app.py / gui_run.py); QtQml ships with PySide6, gui/qml needs no extra
+PySide6==6.11.1
 
-# CLI helpers
+# CLI helpers (scripts/helpers/*)
 fire~=0.7.1
-tqdm~=4.67.0
 
-# Monitoring
-psutil~=7.0.0
+# Monitoring (utils/runtime.py, under LOG_MEMORY)
+psutil~=7.2.2
 
 # Dev / testing
-pytest~=9.0.2
-pre-commit~=4.5.1
+pytest~=9.1.1
+pre-commit~=4.6.2
+
+# Deliberately not installed:
+#   networkx   Only needed to read pre-NetworKit nx.Graph pickles.  Both call
+#              sites import it lazily and say "pip install networkx" if they hit
+#              one.  structural-gt pins 3.6.1, if we ever need to match it.
