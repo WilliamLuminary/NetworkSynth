@@ -29,8 +29,8 @@ from handlers import (
     STATUS_FAILED,
     STATUS_OK,
     AttributesCalculator,
+    GenerationRun,
     Mapper,
-    RunAgent,
     attach_run_log,
     create_run_paths,
     write_manifest,
@@ -182,8 +182,6 @@ def _generate_tile_worker(args):
         return tile_idx, None
 
     try:
-        # TODO: built here rather than passed from the
-        # parent, so this path is still fork-dependent.
         GraphNode.initialize(attributes, params)
 
         best_error = float("inf")
@@ -424,8 +422,6 @@ def run_phase2(
             }
         )
 
-    # TODO: built here rather than passed from the
-    # parent, so this path is still fork-dependent.
     apply_seed(params.seed)
     GraphNode.initialize(attributes, params)
 
@@ -574,13 +570,12 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
     )
     logger.info(config())
 
-    data_agent = RunAgent(config, run_paths=run_paths, dataset_id=dataset_id)
-    data_agent.prepare_data()
-    attributes = data_agent.attributes
-    mapper = data_agent.mapper
+    run = GenerationRun(config, run_paths, dataset_id)
+    attributes = run.attributes
+    mapper = run.mapper
 
     error_checker = create_error_checker(config)
-    error_checker.compute_reference(data_agent.get_original_network())
+    error_checker.compute_reference(run.original)
 
     scale_rows, scale_cols = config.TARGET_SCALE
     max_rounds = config.PHASE2_MAX_ROUNDS
@@ -628,7 +623,7 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
 
     snapshot_interval = getattr(config, "SNAPSHOT_INTERVAL", 0)
     snapshot_dir = (
-        os.path.join(data_agent.saver.output_dir, "snapshots")
+        os.path.join(run.saver.output_dir, "snapshots")
         if snapshot_interval != 0
         else None
     )
@@ -673,23 +668,18 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
     mapper.assign_weights(hybrid_graph)
 
     # --- Save original/ ---
-    data_agent.saver.begin_batch()
-    data_agent.save("original_image")
-    data_agent.save("original_network")
-    data_agent.save("original_property")
-    data_agent.save("original_graph")
-    data_agent.saver.end_batch()
+    run.save_original()
 
     # --- Save synthetic/ ---
-    data_agent.add_synthetic_graph(hybrid_graph)
+    run.add_synthetic_graph(hybrid_graph)
     prefix = f"hybrid_{len(centers)}centers"
 
-    data_agent.saver.begin_batch()
-    data_agent.saver.save(hybrid_graph, "synthetic_export", f"{prefix}_")
+    run.saver.begin_batch()
+    run.save(hybrid_graph, "synthetic_export", f"{prefix}_")
 
     # --- Write reports before plotting (plotting is memory-intensive) ---
-    original_network = data_agent.get_original_network()
-    data_agent.saver.save(
+    original_network = run.original
+    run.save(
         _report_text(
             "Original Network",
             original_network.number_of_nodes(),
@@ -697,15 +687,15 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
         ),
         "original_report",
     )
-    data_agent.saver.save(
+    run.save(
         _report_text("Synthetic Network", num_nodes, num_edges),
         "synthetic_report",
     )
 
     # --- Plot synthetic graph (high memory) ---
     # Free everything we can before rendering.
-    saver = data_agent.saver
-    del data_agent, original_network, attributes, mapper
+    saver = run.saver
+    del run, original_network, attributes, mapper
     del error_checker, centers
     gc.collect()
 

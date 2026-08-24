@@ -28,29 +28,36 @@ def _small_graph(side=8, spacing=10.0, seed=3):
 
 
 # ---------------------------------------------------------------------------
-# analyze — discovers saved network directories and analyses what it finds
+# compare — measures two sets of networks the caller names
 # ---------------------------------------------------------------------------
 
 
 class TestGenerationDoesNotAnalyse:
-    def test_a_generation_run_refuses_to_analyse(self, tmp_path):
-        """The two are separate modes: generation makes networks, nothing else."""
-        from configs import BaseConfig, DatasetId
-        from handlers import RunAgent, create_run_paths
+    def test_generation_has_no_analysis_of_its_own(self):
+        """Generation makes networks; measuring them is compare's job.
 
-        class TinyConfig(BaseConfig):
-            BASE_OUTPUT_PATH = str(tmp_path / "out")
-            DATASETS = [DatasetId("ds")]
+        Structural, not behavioural: the point is that this cannot grow back by
+        someone reaching for the batch processor inside the generate pipeline.
+        """
+        import inspect
 
-        TinyConfig.initialize()
-        agent = RunAgent(
-            TinyConfig,
-            run_paths=create_run_paths(TinyConfig),
-            dataset_id=DatasetId("ds"),
-        )
+        import pipelines.generate
 
-        with pytest.raises(AssertionError, match="analyse mode's job"):
-            agent.multifractal_analysis()
+        source = inspect.getsource(pipelines.generate)
+        for forbidden in (
+            "MultifractalBatchProcessor",
+            "analysis_data",
+            "analysis_figure",
+        ):
+            assert forbidden not in source, f"generate reaches for {forbidden}"
+
+    def test_the_generation_run_has_no_analysis_methods(self):
+        from handlers import GenerationRun
+
+        # analyse/save_analysis belong to ComparisonRun; a generating run is a
+        # sibling of it, not a subclass, so it cannot inherit them by accident.
+        for forbidden in ("multifractal_analysis", "analyse", "save_analysis"):
+            assert not hasattr(GenerationRun, forbidden), forbidden
 
 
 class TestAnalyzeReadsEveryFormatWeWrite:
@@ -92,7 +99,7 @@ class TestAnalyzeReadsEveryFormatWeWrite:
             _load_networks(str(folder))
 
 
-class TestAnalyzeLoadsTheTwoSetsItIsGiven:
+class TestComparisonLoadsTheTwoSetsItIsGiven:
     def _config(self, tmp_path, original, synthetic):
         from configs.compare_mode.config_sample import SampleConfig
 
@@ -106,15 +113,15 @@ class TestAnalyzeLoadsTheTwoSetsItIsGiven:
         TinyConfig.initialize()
         return TinyConfig
 
-    def _agent(self, config, tmp_path):
-        from handlers import RunAgent, create_run_paths
+    def _run(self, config):
+        from handlers import ComparisonRun, create_run_paths
 
-        return RunAgent(
+        return ComparisonRun(
             config,
-            run_paths=create_run_paths(config),
-            dataset_id=DatasetId("analysis"),
-            original_path=config.ORIGINAL_NETWORKS_PATH,
-            synthetic_path=config.SYNTHETIC_NETWORKS_PATH,
+            create_run_paths(config),
+            DatasetId("analysis"),
+            config.ORIGINAL_NETWORKS_PATH,
+            config.SYNTHETIC_NETWORKS_PATH,
         )
 
     def test_it_loads_both_sides(self, tmp_path):
@@ -126,12 +133,11 @@ class TestAnalyzeLoadsTheTwoSetsItIsGiven:
         with open(synthetic / "synthetic_network.pkl", "wb") as handle:
             pickle.dump([_small_graph(), _small_graph(seed=4)], handle)
 
-        agent = self._agent(self._config(tmp_path, original, synthetic), tmp_path)
-        agent.prepare_data()
+        # Ready on construction: there is no second step to forget.
+        run = self._run(self._config(tmp_path, original, synthetic))
 
-        assert agent.batch_processor is not None
-        assert len(agent.data_loader.get_synthetic_networks()) == 2
-        assert len(agent.data_loader.get_original_network()) == 1
+        assert len(run.synthetic) == 2
+        assert len(run.original) == 1
 
     def test_the_two_sets_can_be_any_directories(self, tmp_path):
         """Nothing about a results layout is assumed — the caller chooses."""
@@ -143,23 +149,27 @@ class TestAnalyzeLoadsTheTwoSetsItIsGiven:
         save_network_csv(_small_graph(), str(left / "a.csv"))
         save_network_csv(_small_graph(seed=4), str(right / "b.csv"))
 
-        agent = self._agent(self._config(tmp_path, left, right), tmp_path)
-        agent.prepare_data()
+        run = self._run(self._config(tmp_path, left, right))
 
-        assert len(agent.data_loader.get_original_network()) == 1
-        assert len(agent.data_loader.get_synthetic_networks()) == 1
+        assert len(run.original) == 1
+        assert len(run.synthetic) == 1
 
-    def test_one_set_alone_is_refused(self, tmp_path):
-        from handlers import RunAgent, create_run_paths
+    def test_it_writes_its_analysis_where_the_run_paths_say(self, tmp_path):
+        from configs.file_definitions import save_network_csv
 
-        config = self._config(tmp_path, tmp_path, tmp_path)
-        with pytest.raises(AssertionError, match="analysis compares two sets"):
-            RunAgent(
-                config,
-                run_paths=create_run_paths(config),
-                dataset_id=DatasetId("analysis"),
-                original_path=str(tmp_path),
-            )
+        left, right = tmp_path / "a", tmp_path / "b"
+        left.mkdir()
+        right.mkdir()
+        save_network_csv(_small_graph(), str(left / "a.csv"))
+        save_network_csv(_small_graph(seed=4), str(right / "b.csv"))
+
+        run = self._run(self._config(tmp_path, left, right))
+        run.analyse()
+        run.save_analysis()
+
+        written = list((tmp_path / "out").rglob("*"))
+        assert any(f.name.endswith("analysis_data.pkl") for f in written), written
+        assert any("analysis_figure" in f.name for f in written), written
 
 
 def test_base_config_is_untouched_by_these_runs():

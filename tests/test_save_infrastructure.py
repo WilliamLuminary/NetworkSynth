@@ -382,21 +382,8 @@ class TestDisabledSaving:
 
         assert isinstance(saver, Saver)
 
-    def test_run_agent_builds_no_saver_when_disabled(self, tmp_path):
-        from handlers.run_agent import RunAgent
-
-        class Disabled(BaseConfig):
-            DISABLE_SAVING = True
-            DISABLE_SAVING_NOTE = "test"
-
-        assert RunAgent._build_saver(Disabled, str(tmp_path)) is None
-
-    def test_run_agent_builds_a_saver_when_enabled(self, tmp_path):
-        from handlers.run_agent import RunAgent
-
-        built = RunAgent._build_saver(BaseConfig, str(tmp_path))
-
-        assert isinstance(built, Saver)
+    # Which saver a run gets is build_saver's decision now; both branches are
+    # covered in tests/test_null_saver.py.
 
     def test_the_flag_is_never_set_on_base_config(self):
 

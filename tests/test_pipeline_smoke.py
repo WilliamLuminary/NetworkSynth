@@ -190,16 +190,13 @@ class TestSweepPipeline:
     def test_generate_networks_threads_trial_params(self, tmp_path, monkeypatch):
         from analysis.error_checker import NullErrorChecker
         from configs.sweep_mode.config_sample import SampleConfig as SweepConfig
-        from handlers import RunAgent, create_run_paths
+        from handlers import GenerationRun, create_run_paths
         from pipelines.sweep import generate_networks
 
         config = _tune(SweepConfig, tmp_path, SYNTHETIC_NETWORK_NUMBER=2)
         run_paths = create_run_paths(config)
 
-        agent = RunAgent(
-            config, run_paths=run_paths, dataset_id=config.get_datasets()[0]
-        )
-        agent.prepare_data()
+        agent = GenerationRun(config, run_paths, config.get_datasets()[0])
 
         nodes_before = config.CLOSED_NODES_FACTOR
         avg_error, success_rate = generate_networks(

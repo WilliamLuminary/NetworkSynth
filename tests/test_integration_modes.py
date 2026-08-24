@@ -26,16 +26,13 @@ class TestGenerateMode:
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
         SampleConfig.initialize()
 
-        from handlers import RunAgent, create_run_paths
+        from handlers import GenerationRun, create_run_paths
 
         run_paths = create_run_paths(SampleConfig)
         dataset_id = SampleConfig.get_datasets()[0]
-        agent = RunAgent(SampleConfig, run_paths=run_paths, dataset_id=dataset_id)
-        agent.prepare_data()
+        agent = GenerationRun(SampleConfig, run_paths, dataset_id)
 
-        agent.save("original_network")
-        agent.save("original_graph")
-        agent.save("original_property")
+        agent.save_original()
 
         out = agent.saver.output_dir
         assert os.path.isdir(out), f"Output dir not created: {out}"
@@ -56,13 +53,12 @@ class TestGenerateMode:
 
         from configs import SynthParams
         from graphs import GraphGenerator
-        from handlers import RunAgent, create_run_paths
+        from handlers import GenerationRun, create_run_paths
         from utils import trim_graph
 
         run_paths = create_run_paths(SampleConfig)
         dataset_id = SampleConfig.get_datasets()[0]
-        agent = RunAgent(SampleConfig, run_paths=run_paths, dataset_id=dataset_id)
-        agent.prepare_data()
+        agent = GenerationRun(SampleConfig, run_paths, dataset_id)
 
         generator = GraphGenerator(
             agent.attributes, SynthParams.from_config(SampleConfig)
@@ -75,7 +71,7 @@ class TestGenerateMode:
         assert synth.number_of_edges() > 50
 
         agent.add_synthetic_graph(synth)
-        agent.save("synthetic_graph", content=synth)
+        agent.save_synthetic_plot(synth)
         agent.save_synthetic_outputs("test_")
 
         out = agent.saver.output_dir
@@ -107,13 +103,12 @@ class TestMosaicMode:
         from configs import SynthParams
         from graphs import GraphGenerator
         from graphs.mosaic_stitcher import MosaicStitcher
-        from handlers import RunAgent, create_run_paths
+        from handlers import GenerationRun, create_run_paths
         from utils import trim_graph
 
         run_paths = create_run_paths(SampleConfig)
         dataset_id = SampleConfig.get_datasets()[0]
-        agent = RunAgent(SampleConfig, run_paths=run_paths, dataset_id=dataset_id)
-        agent.prepare_data()
+        agent = GenerationRun(SampleConfig, run_paths, dataset_id)
         attributes = agent.attributes
 
         tile_w, tile_h = SampleConfig.TILE_FRAME_SIZE
@@ -173,13 +168,12 @@ class TestScalingMode:
 
         from configs import SynthParams
         from graphs import GraphGenerator
-        from handlers import RunAgent, create_run_paths
+        from handlers import GenerationRun, create_run_paths
         from utils import trim_graph
 
         run_paths = create_run_paths(SampleConfig)
         dataset_id = SampleConfig.get_datasets()[0]
-        agent = RunAgent(SampleConfig, run_paths=run_paths, dataset_id=dataset_id)
-        agent.prepare_data()
+        agent = GenerationRun(SampleConfig, run_paths, dataset_id)
 
         gen = GraphGenerator(agent.attributes, SynthParams.from_config(SampleConfig))
         scaled = gen.generate_scaled_network(
@@ -225,14 +219,13 @@ class TestAnalyzeMode:
         SampleConfig.initialize()
 
         from analysis import MultifractalAnalyzer
-        from handlers import RunAgent, create_run_paths
+        from handlers import GenerationRun, create_run_paths
 
         run_paths = create_run_paths(SampleConfig)
         dataset_id = SampleConfig.get_datasets()[0]
-        agent = RunAgent(SampleConfig, run_paths=run_paths, dataset_id=dataset_id)
-        agent.prepare_data()
+        agent = GenerationRun(SampleConfig, run_paths, dataset_id)
 
-        original = agent.get_original_network()
+        original = agent.original
         analyzer = MultifractalAnalyzer(
             original, SampleConfig.MEASURE_WEIGHTED, SampleConfig.FULL_Q_BAND
         )
@@ -262,12 +255,11 @@ class TestSnapshotMode:
         Snapshot1x1Config.initialize()
 
         from configs import SynthParams
-        from handlers import RunAgent, create_run_paths
+        from handlers import GenerationRun, create_run_paths
 
         run_paths = create_run_paths(Snapshot1x1Config)
         dataset_id = Snapshot1x1Config.get_datasets()[0]
-        agent = RunAgent(Snapshot1x1Config, run_paths=run_paths, dataset_id=dataset_id)
-        agent.prepare_data()
+        agent = GenerationRun(Snapshot1x1Config, run_paths, dataset_id)
 
         from graphs import GraphGenerator
         from utils import save_bfs_snapshot, trim_graph
@@ -328,15 +320,14 @@ class TestSnapshotMode:
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
         SampleConfig.initialize()
 
-        from handlers import RunAgent, create_run_paths
+        from handlers import GenerationRun, create_run_paths
         from utils import compute_network_metrics, metric_distance
 
         run_paths = create_run_paths(SampleConfig)
         dataset_id = SampleConfig.get_datasets()[0]
-        agent = RunAgent(SampleConfig, run_paths=run_paths, dataset_id=dataset_id)
-        agent.prepare_data()
+        agent = GenerationRun(SampleConfig, run_paths, dataset_id)
 
-        original = agent.get_original_network()
+        original = agent.original
         ref_metrics = compute_network_metrics(original)
 
         # Metrics should be well-formed

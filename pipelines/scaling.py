@@ -8,7 +8,7 @@ from handlers import (
     STATUS_CANCELLED,
     STATUS_FAILED,
     STATUS_OK,
-    RunAgent,
+    GenerationRun,
     attach_run_log,
     create_run_paths,
     write_manifest,
@@ -26,9 +26,8 @@ def run_scaling_for_dataset(dataset_id, config, run_paths):
     logger.info(config())
 
     # 1. Load original network → compute structural attributes
-    data_agent = RunAgent(config, run_paths=run_paths, dataset_id=dataset_id)
-    data_agent.prepare_data()
-    attributes = data_agent.attributes
+    run = GenerationRun(config, run_paths, dataset_id)
+    attributes = run.attributes
 
     # 2. Generate scaled network
     params = SynthParams.from_config(config)
@@ -45,19 +44,19 @@ def run_scaling_for_dataset(dataset_id, config, run_paths):
     scaled_graph = trim_graph(scaled_graph, attributes.average_degree)
 
     # 4. Assign edge weights from original network's length→weight distribution
-    data_agent.mapper.assign_weights(scaled_graph)
+    run.mapper.assign_weights(scaled_graph)
 
     # 5. Save network data + plot
-    data_agent.add_synthetic_graph(scaled_graph)
+    run.add_synthetic_graph(scaled_graph)
     prefix = f"scaled_{config.SCALE_ROWS}x{config.SCALE_COLS}"
 
-    data_agent.saver.begin_batch()
-    data_agent.saver.save(scaled_graph, "synthetic_export", f"{prefix}_")
+    run.saver.begin_batch()
+    run.save(scaled_graph, "synthetic_export", f"{prefix}_")
     scaled_img = plot_scaled_network(
         scaled_graph, max_px=getattr(config, "RENDER_MAX_PX", None)
     )
-    data_agent.saver.save(scaled_img, "synthetic_graph", f"{prefix}_")
-    data_agent.saver.end_batch()
+    run.save(scaled_img, "synthetic_graph", f"{prefix}_")
+    run.saver.end_batch()
 
     logger.info(
         f"Scaling complete — "

@@ -10,7 +10,6 @@ from .base_config import BaseConfig  # noqa: F401
 from .enums import (  # noqa: F401
     AnalysisMode,
     DatasetId,
-    Mode,
 )
 from .file_definitions import (  # noqa: F401
     DEFAULT_SAVE_SPECS,
