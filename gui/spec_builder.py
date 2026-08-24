@@ -35,6 +35,9 @@ class Input:
     #: A run goes ahead without it.  Left out of ``InputShape.ids``, so an
     #: optional input never becomes something the run-spec demands.
     optional: bool = False
+    #: What this file has to contain, shown behind the row's info button.
+    #: Wrapped by hand: a tooltip does not wrap for itself.
+    help: str = ""
 
     def as_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -204,34 +207,68 @@ def _hybrid_fields() -> List[Field]:
 _CHECKER_NAMES = tuple(sorted(_registered_checkers()))
 
 
+def _background() -> Input:
+    """The image a network was traced from, drawn behind it.
+
+    Optional everywhere: a network is plottable and analysable without one.  A
+    directory of networks gets this for free instead, by the `…_image.tif`
+    convention, so only the single-network shapes offer it.
+    """
+    return Input(
+        "image",
+        "Image",
+        filter="Images (*.tif *.tiff *.png *.jpg *.jpeg *.webp)",
+        placeholder="optional — background the network is drawn over",
+        optional=True,
+        help=(
+            "Any image OpenCV can read; used in greyscale.\n"
+            "Drawn at its own pixel size inside the frame, so\n"
+            "its width and height should match the range the\n"
+            "positions cover — an image of another size lands\n"
+            "beside the network rather than under it."
+        ),
+    )
+
+
 def _network_shapes() -> List[InputShape]:
+    """Every way one of these modes can be handed the network to copy.
+
+    One entry per format the loaders read, in the order ``MODE_INPUTS`` lists
+    them.  A format the app cannot load is worse offered than absent, so
+    ``.nkbin`` is not here: it is written, and read back only by
+    ``scripts/helpers/load_network_example.py``.
+    """
     return [
         InputShape(
-            "One network",
+            "One network (CSV pair)",
             [
                 Input(
                     "edge_list",
                     "Edge list",
                     filter="CSV files (*.csv)",
                     placeholder="…_edgelist.csv",
+                    help=(
+                        "CSV, one edge per row.\n"
+                        "Columns: source_index, target_index, and\n"
+                        "edge_weight for a weighted network.\n"
+                        "The indices are row numbers in the positions\n"
+                        "file; one that names a node with no position\n"
+                        "stops the run."
+                    ),
                 ),
                 Input(
                     "positions",
                     "Positions",
                     filter="CSV files (*.csv)",
                     placeholder="…_positions.csv",
+                    help=(
+                        "CSV, one node per row.\n"
+                        "Columns: x, y.\n"
+                        "A row's number is the node index the edge\n"
+                        "list refers to."
+                    ),
                 ),
-                # What a directory of networks gets for free, by the
-                # `…_image.tif` convention: the image the network was traced
-                # from, drawn behind it.  Optional, because a network is
-                # plottable and analysable without one.
-                Input(
-                    "image",
-                    "Image",
-                    filter="Images (*.tif *.tiff *.png *.jpg *.jpeg *.webp)",
-                    placeholder="optional — background the network is drawn over",
-                    optional=True,
-                ),
+                _background(),
             ],
         ),
         InputShape(
@@ -242,7 +279,66 @@ def _network_shapes() -> List[InputShape]:
                     "Networks dir",
                     kind="dir",
                     placeholder="every …_edgelist.csv + …_positions.csv pair in it",
+                    help=(
+                        "One dataset per …_edgelist.csv, each needing a\n"
+                        "matching …_positions.csv beside it.\n"
+                        "…_image.tif is used as the background when it\n"
+                        "is there, and skipped when it is not.\n"
+                        "An edge list with no positions stops the run\n"
+                        "rather than being passed over."
+                    ),
                 )
+            ],
+        ),
+        InputShape(
+            "One network (NumPy pair)",
+            [
+                Input(
+                    "adjacency",
+                    "Adjacency",
+                    filter="NumPy files (*.npy)",
+                    placeholder="…_mat.npy — a scipy sparse matrix",
+                    help=(
+                        "…_mat.npy holding a scipy sparse adjacency\n"
+                        "matrix, saved as a 0-d object array and read\n"
+                        "with np.load(...).item().\n"
+                        "A plain dense array is refused rather than\n"
+                        "read as something else."
+                    ),
+                ),
+                Input(
+                    "positions_npy",
+                    "Positions",
+                    filter="NumPy files (*.npy)",
+                    placeholder="…_pos.npy — (row, column), transposed on load",
+                    help=(
+                        "…_pos.npy, shape (N, 2), one row per node.\n"
+                        "Recorded as (row, column) and transposed to\n"
+                        "(x, y) when loaded — the same thing every CLI\n"
+                        "config does with a pair like this."
+                    ),
+                ),
+                _background(),
+            ],
+        ),
+        InputShape(
+            "One network (pickle)",
+            [
+                Input(
+                    "network_pkl",
+                    "Network",
+                    filter="Pickle files (*.pkl)",
+                    placeholder="a SynthGraph, or the batch a run wrote",
+                    help=(
+                        "A pickled SynthGraph, or a list of them — the\n"
+                        "synthetic_network_*.pkl a run writes.\n"
+                        "From a list the first is read, and the log\n"
+                        "says so.\n"
+                        "A legacy networkx pickle needs networkx\n"
+                        "installed, which it is not by default."
+                    ),
+                ),
+                _background(),
             ],
         ),
     ]
@@ -258,12 +354,24 @@ def _results_shapes() -> List[InputShape]:
                     "Original",
                     kind="dir",
                     placeholder="folder holding the original network",
+                    help=(
+                        "A folder of networks, read as a batch .pkl if\n"
+                        "one is in it, and otherwise as every\n"
+                        "…_edgelist.csv + …_positions.csv pair.\n"
+                        "A run's own original/ folder is what this\n"
+                        "expects."
+                    ),
                 ),
                 Input(
                     "synthetic_dir",
                     "Synthetic",
                     kind="dir",
                     placeholder="folder holding the synthetic networks",
+                    help=(
+                        "The same, for the networks being compared\n"
+                        "against the originals — a run's synthetic/\n"
+                        "folder."
+                    ),
                 ),
             ],
         )
@@ -473,7 +581,7 @@ def build_spec(
         )
         for spec_input in shape.inputs
     }
-    if "edge_list" in shape.ids:
+    if "image" in shape.all_ids:
         # Either source, one key: *image* for a caller that has a path in hand,
         # the form's own optional input for the GUI.
         chosen = image or inputs.get("image")

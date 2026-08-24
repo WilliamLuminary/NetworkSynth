@@ -29,8 +29,11 @@ logger = logging.getLogger("gui_preview")
 
 #: Previews are shown in a panel a few hundred pixels wide.  Node and line
 #: sizes are in points, so a lower DPI is the same picture with fewer pixels —
-#: and a fraction of the render time.
-PREVIEW_DPI = 110
+#: at 90 a render is ~900px and takes about half as long as the 300 the run
+#: saves at, nearly all of it in encoding the PNG.  Lower buys little: below
+#: this the per-edge cost of building the figure dominates, and it does not
+#: change with DPI.
+PREVIEW_DPI = 90
 
 #: The batch file ``GenerationRun.save_synthetic_outputs`` writes: every
 #: synthetic network from the run, in the order they were collected.

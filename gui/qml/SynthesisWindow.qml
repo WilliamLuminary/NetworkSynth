@@ -169,6 +169,20 @@ ApplicationWindow {
                                 text: "Browse…"
                                 onClicked: root.browseFor(modelData)
                             }
+                            // What this input's format has to contain.  Each
+                            // shape reads a different one, and the wrong file
+                            // fails deep inside a run rather than here.
+                            Button {
+                                id: contract
+                                text: "!"
+                                checkable: true
+                                implicitWidth: 34
+                                visible: modelData.help !== ""
+                                ToolTip.text: modelData.help
+                                ToolTip.visible: contract.checked
+                                    || contractHover.hovered
+                                HoverHandler { id: contractHover }
+                            }
                         }
                     }
 

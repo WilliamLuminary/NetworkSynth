@@ -24,7 +24,14 @@ SPEC_CONTRACT_VERSION = 2
 #: analysis takes a directory of finished results.  A spec must satisfy one
 #: shape completely; a mode absent from here is rejected, because the
 #: alternative is a spec that looks valid until a loader is handed nothing.
-_PAIR_OR_DIRECTORY = (("edge_list", "positions"), ("datasets_dir",))
+#: One entry per format the loaders read, in the order the form offers them.
+#: ``.nkbin`` is absent deliberately: it is written, never read back here.
+_PAIR_OR_DIRECTORY = (
+    ("edge_list", "positions"),
+    ("datasets_dir",),
+    ("adjacency", "positions_npy"),
+    ("network_pkl",),
+)
 MODE_INPUTS = {
     "generate": _PAIR_OR_DIRECTORY,
     "hybrid": _PAIR_OR_DIRECTORY,
@@ -125,6 +132,44 @@ def discover_datasets(directory: str) -> list:
     if not names:
         raise SpecError(f"no '*{_EDGE_SUFFIX}' file found in {directory}")
     return names
+
+
+def _load_npy_pair(positions_path: str, adjacency_path: str) -> SynthGraph:
+    """A ``_pos.npy`` / ``_mat.npy`` pair, read the way every CLI config reads one.
+
+    The transpose belongs to the format rather than to any one dataset: these
+    files record (row, column) where the rest of the toolkit expects (x, y),
+    which is why every config that loads a pair transposes it too.
+    """
+    import numpy as np
+
+    from utils import build_graph, transpose_positions
+
+    positions = np.load(positions_path, allow_pickle=True)
+    # .item() unwraps the 0-d object array a scipy sparse matrix is saved as;
+    # a plain dense array raises here rather than being read as the wrong thing.
+    matrix = np.load(adjacency_path, allow_pickle=True).item()
+    graph = build_graph(positions, matrix)
+    transpose_positions(graph)
+    return graph
+
+
+def _load_pickled(path: str) -> SynthGraph:
+    """The network in a pickle, or the first of the batch in one.
+
+    A run writes its synthetic networks as one pickled list, so that file is
+    the obvious thing to hand back in as an input.  Taking the first is said
+    out loud, because which one it was is not otherwise visible.
+    """
+    from graphs import load_graphs
+
+    graphs = load_graphs(path)
+    if len(graphs) > 1:
+        logger.warning(
+            f"{path} holds {len(graphs)} networks; reading the first. Point at "
+            "a single-network pickle to choose a different one."
+        )
+    return graphs[0]
 
 
 class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
@@ -233,6 +278,16 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
 
     @classmethod
     def load_original_network(cls, dataset_id: DatasetId) -> SynthGraph:
+        """The network named in the spec, read the way its format asks.
+
+        Which keys the spec filled decide, because that is what the shape check
+        in :meth:`from_spec` has already established; nothing sniffs the file.
+        """
+        if cls.PATHS.get("network_pkl"):
+            return _load_pickled(cls.PATHS["network_pkl"])
+        if cls.PATHS.get("adjacency"):
+            return _load_npy_pair(cls.PATHS["positions_npy"], cls.PATHS["adjacency"])
+
         from graphs import read_graph_csv
 
         edge_list, positions = cls._network_paths(dataset_id)
