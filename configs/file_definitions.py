@@ -130,10 +130,9 @@ def save_network_csv(graph, filepath: str) -> None:
     - ``…/synthetic_network_edgelist.csv``
     - ``…/synthetic_network_positions.csv``
 
-    The weight column is written only for a weighted graph.  An unweighted
-    networkit graph reports every weight as 1.0, so writing the column
-    unconditionally produced a file that read back as weighted — the reader
-    takes the column's presence as the answer.
+    The weight column is written only for a weighted graph: the reader takes
+    its presence as the answer, and an unweighted networkit graph reports every
+    weight as 1.0.
     """
     base, ext = os.path.splitext(filepath)
 
@@ -178,6 +177,8 @@ class PlotConfig(FileConfig):
     node_size: float = 6.0
     line_width: float = 3.0
     show_on_the_fly: bool = True
+    #: Opacity of a background image drawn behind the plot, when there is one.
+    alpha: float = 0.6
 
 
 ORIGINAL_DIR = "original"

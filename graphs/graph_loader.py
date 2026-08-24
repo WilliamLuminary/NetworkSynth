@@ -1,10 +1,4 @@
-"""Read networks off disk in whichever format they were written.
-
-Which formats count as a network is a property of this repo's output, not of
-any one run's configuration, so it lives here rather than in a config.  Both
-the compare mode and the standalone analysis entry point read the same
-directories through this module.
-"""
+"""Read networks off disk in whichever format they were written."""
 
 from __future__ import annotations
 
@@ -23,12 +17,7 @@ _POSITIONS_SUFFIX = "_positions.csv"
 
 
 def load_graphs(path: str) -> List[SynthGraph]:
-    """Every network at *path*, which may be a directory or a single file.
-
-    A directory is read whole: pickles first, because one holds a batch, then
-    the CSV pairs — the original network is only ever written as CSV, so a
-    results directory cannot be read without both.
-    """
+    """Every network at *path*, which may be a directory or a single file."""
     if os.path.isdir(path):
         graphs = _load_dir(path)
         assert graphs, f"no networks found in {path}"
@@ -39,6 +28,7 @@ def load_graphs(path: str) -> List[SynthGraph]:
 
 
 def _load_dir(folder: str) -> List[SynthGraph]:
+    # Pickles first: one holds a whole batch, where a CSV pair holds one graph.
     pickled = _load_pickles(folder)
     if pickled:
         return pickled
@@ -61,8 +51,6 @@ def _load_file(path: str) -> List[SynthGraph]:
 
 def _load_csv_pair(edge_list: str) -> SynthGraph:
     positions = edge_list[: -len(_EDGELIST_SUFFIX)] + _POSITIONS_SUFFIX
-    # Named and stopped rather than skipped: half a results directory analysed
-    # as if it were whole is a wrong answer, not a smaller one.
     assert os.path.exists(
         positions
     ), f"{edge_list} has no positions file beside it ({positions})"
@@ -92,7 +80,6 @@ def _read_pickle(path: str):
 
 
 def _from_pickle(content) -> List[SynthGraph]:
-    """Unwrap a pickle, converting legacy ``nx.Graph`` payloads."""
     if isinstance(content, list):
         return [_as_synth_graph(item) for item in content]
     return [_as_synth_graph(content)]
@@ -101,8 +88,7 @@ def _from_pickle(content) -> List[SynthGraph]:
 def _as_synth_graph(obj) -> SynthGraph:
     if isinstance(obj, SynthGraph):
         return obj
-    # Only reached for a legacy pickle: unpickling it already required
-    # networkx, so importing it here cannot be what fails.
+
     import networkx as nx
 
     assert isinstance(obj, nx.Graph), f"not a network: {type(obj).__name__}"

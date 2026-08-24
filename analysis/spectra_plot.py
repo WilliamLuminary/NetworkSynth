@@ -1,10 +1,4 @@
-"""Multifractal spectra and dimension curves for any number of labelled sets.
-
-Takes ``{label: results}`` rather than a fixed original/synthetic pair, so one
-set (a standalone analysis) and two (a comparison) draw through the same code.
-The two familiar labels keep their established colours, so a comparison figure
-looks the way it always has.
-"""
+"""Multifractal spectra and dimension curves for any number of labelled sets."""
 
 from __future__ import annotations
 
@@ -22,7 +16,7 @@ from utils import finalize_plot
 
 logger = logging.getLogger(__name__)
 
-# Applied per-figure via rc_context (never mutates global rcParams).
+# Applied per-figure via rc_context, never to global rcParams.
 _PLOT_CONFIG = {
     "font.size": 24,
     "axes.linewidth": 2,
@@ -132,8 +126,6 @@ def _plot_dataset(ax, entries, label, style, x_key, y_key, legend) -> None:
             [0],
             color=cmap(np.mean(color_values)),
             lw=4,
-            # Not capitalize(): it lowercases the rest, which mangles any
-            # label carrying its own case (a dataset named sample_A).
             label=f"{_titled(label)} (n={len(entries)})",
         )
     )

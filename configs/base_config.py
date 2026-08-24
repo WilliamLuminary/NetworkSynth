@@ -62,6 +62,17 @@ class BaseConfig:
     ERROR_TOLERANCE = 0.15  # Generally should be 0.15
     MIN_TILE_NODES = 100
 
+    # Hybrid tiling geometry, declared without values so a config that omits
+    # one raises instead of picking up a number buried in the pipeline body.
+    # TILE_FRAME_SIZE None = auto: nearest-neighbour distance *
+    # TILE_FRAME_FACTOR, floored at MIN_TILE_FRAME.  NUM_CENTERS 0 = no cap.
+    TILE_FRAME_SIZE: Optional[Tuple[int, int]]
+    TILE_FRAME_FACTOR: float
+    MIN_TILE_FRAME: float
+    MIN_CENTER_DISTANCE_FACTOR: float
+    NUM_CENTERS: int
+    DATASET_FACTORS: dict
+
     # Master seed for reproducible generation.  None = unseeded, i.e. a
     # different network on every run (the historical behaviour).  When set,
     # each worker is given a distinct derived seed (SEED + worker index) so
@@ -79,6 +90,11 @@ class BaseConfig:
     #: Rendering style for hybrid Phase 2 snapshots: dpi, node_size, line_width.
     #: Empty means the renderer's own defaults.
     HYBRID_SNAPSHOT_STYLE: dict = {}
+    #: Rendering style for generate snapshots, same keys as above.
+    PLOT_STYLE: dict = {}
+    #: Cap on a rendered image's longest side in pixels.  None = no cap.
+    RENDER_MAX_PX: Optional[int] = None
+    ORIGINAL_GRAPH_NODE_SCALE: float = 1.0
     SELECT_BEST: int = 0  # 0 = disabled; N = keep N best networks by metric distance
 
     LOG_MEMORY: bool = False

@@ -202,9 +202,8 @@ class MultifractalAnalyzer:
         self.f_digit = 0
         self.q_ = None
         self._full_q_band = full_q_band
-        # Asked for a weighted measure of a graph that has none: silently
-        # downgrading here reported unweighted numbers under a weighted label,
-        # which is a wrong answer rather than a smaller one.
+        # Downgrading silently reported unweighted numbers under a weighted
+        # label, which is a wrong answer rather than a smaller one.
         assert graph.is_weighted() or not measure_weighted, (
             "measure_weighted=True but this graph carries no edge weights. "
             "Either the input has no weights (set MEASURE_WEIGHTED=False) or "

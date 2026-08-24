@@ -3,14 +3,8 @@
     python analyse.py                     # uses INPUTS / OUTPUT_DIR below
     python analyse.py <in> [<in> ...] <out>
 
-No config module: analysis takes networks as they are and measures them, so
-there is nothing to configure but where to read, where to write, and how to
-measure.  Edit the four constants below to set the defaults, or pass paths on
-the command line to override INPUTS and OUTPUT_DIR for one run.
-
 An input may be a directory of networks, a single ``*_edgelist.csv``, or a
-``.pkl`` batch.  Each input is analysed as its own labelled set, so several
-inputs produce one figure per measure with every set on it.
+``.pkl`` batch.  Each input is analysed as its own labelled set.
 """
 
 import os
@@ -29,25 +23,19 @@ from utils import save_figure_as_webp
 
 logger = logging.getLogger("analyse")
 
-# --- Defaults, overridable from the command line ---------------------------
 INPUTS = ["data/output/latest_result/sample_1/original"]
 OUTPUT_DIR = "data/output/analysis"
 
-#: Measure edge widths, not just topology.  Required, not inferred: a network
-#: written by this repo carries widths only if its source had them, and
-#: measuring a weighted network topologically is a legitimate choice.  Asking
-#: for widths a network does not have raises rather than quietly downgrading.
+#: Measure edge widths, or topology only.  Required rather than inferred: a
+#: weighted network measured topologically is a legitimate choice.
 MEASURE_WEIGHTED = False
 
-#: Widen the q band (401 points instead of 61).  Slower, and only worth it when
-#: the tails of the spectrum matter.
+#: Wide q band (401 points) instead of the narrow one (61).
 FULL_Q_BAND = True
-# ---------------------------------------------------------------------------
 
 EXIT_OK = 0
 EXIT_FAILED = 1
 EXIT_BAD_ARGS = 2
-# 128 + SIGINT(2), the conventional value for a process stopped by Ctrl-C.
 EXIT_INTERRUPTED = 130
 
 _USAGE = """usage: python analyse.py [<input> ...  <output_dir>]
@@ -60,12 +48,11 @@ An input is a directory of networks, a *_edgelist.csv, or a .pkl batch.
 
 
 def _labels_for(paths) -> list:
-    """A distinct name per input, used in the figures and the data file.
+    """A distinct name per input.
 
-    The basename is the obvious name but collides constantly — two runs' own
-    ``original`` directories are the usual case — and a collision would drop a
-    whole set on the floor, so colliding names take on as many parent
-    directories as it takes to tell them apart.
+    Basenames collide constantly — two runs' own ``original`` directories are
+    the usual case — and a collision would drop a whole set, so colliding names
+    take on parent directories until they differ.
     """
     stems = []
     for path in paths:
@@ -85,7 +72,6 @@ def _labels_for(paths) -> list:
 
 
 def analyse(inputs, output_dir: str) -> None:
-    """Analyse each input as its own set, then write data and figures."""
     os.makedirs(output_dir, exist_ok=True)
 
     results = {}
@@ -99,9 +85,8 @@ def analyse(inputs, output_dir: str) -> None:
 
     data_path = os.path.join(output_dir, "analysis_data.pkl")
     with open(data_path, "wb") as handle:
-        # The settings travel with the numbers: the same networks measured
-        # weighted and topologically give different answers, and nothing else
-        # in the file distinguishes them.
+        # Settings travel with the numbers: weighted and topological measures of
+        # the same networks differ, and nothing else in the file says which.
         pickle.dump(
             {
                 "results": results,
