@@ -9,7 +9,7 @@ Synthetic Generation
   ```bash
    git clone https://github.com/WilliamLuminary/NetworkSynth.git
    cd NetworkSynth
-   pip install -r requirements.txt  # Python 3.10-3.13
+   pip install -r requirements.txt  # Python 3.11-3.13
 
    python run.py configs/generate_mode/config_sample.py
   ```
