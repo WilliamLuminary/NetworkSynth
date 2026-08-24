@@ -129,12 +129,20 @@ def save_network_csv(graph, filepath: str) -> None:
     Given ``filepath`` (e.g. ``…/synthetic_network.csv``), writes:
     - ``…/synthetic_network_edgelist.csv``
     - ``…/synthetic_network_positions.csv``
+
+    The weight column is written only for a weighted graph.  An unweighted
+    networkit graph reports every weight as 1.0, so writing the column
+    unconditionally produced a file that read back as weighted — the reader
+    takes the column's presence as the answer.
     """
     base, ext = os.path.splitext(filepath)
 
-    edgelist_rows = [["source_index", "target_index", "edge_weight"]]
-    for u, v, w in graph.edges_with_weights():
-        edgelist_rows.append([u, v, w])
+    if graph.is_weighted():
+        edgelist_rows = [["source_index", "target_index", "edge_weight"]]
+        edgelist_rows.extend([u, v, w] for u, v, w in graph.edges_with_weights())
+    else:
+        edgelist_rows = [["source_index", "target_index"]]
+        edgelist_rows.extend([u, v] for u, v in graph.edges())
     save_csv(edgelist_rows, f"{base}_edgelist{ext}")
 
     positions = graph.positions()
