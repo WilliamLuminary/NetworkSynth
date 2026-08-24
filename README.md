@@ -248,7 +248,7 @@ of data:
 2. Call it from the pipeline with that identifier:
 
 ```python
-data_agent.saver.save(my_data, "my_custom_data")
+run.save(my_data, "my_custom_data")
 ```
 
 If none of the existing serializers fit, add a new `(content, filepath)`

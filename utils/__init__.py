@@ -8,6 +8,7 @@ from .metrics import compute_network_metrics, metric_distance
 from .plotting import (
     figure_to_ndarray,
     finalize_plot,
+    plot_network,
     recommend_dpi,
     recommend_dpi_cv2,
     render_network,
@@ -27,6 +28,7 @@ __all__ = [
     "largest_connected_component",
     "log_memory",
     "metric_distance",
+    "plot_network",
     "recommend_dpi",
     "recommend_dpi_cv2",
     "render_network",

@@ -6,8 +6,12 @@ from typing import TYPE_CHECKING
 import numpy as np
 from numpy import ndarray
 
+from .graph_ops import calculate_frame
+
 if TYPE_CHECKING:
     from graphs.synth_graph import SynthGraph
+
+logger = logging.getLogger(__name__)
 
 
 def finalize_plot(fig, show: bool = False):
@@ -369,3 +373,106 @@ def save_hybrid_snapshot(
 
     path = os.path.join(output_dir, f"snapshot_{index:05d}.png")
     cv2.imwrite(path, canvas)
+
+
+def plot_network(
+    data_type: str,
+    graph: SynthGraph,
+    node_scale: float = 1.0,
+    frame_size=None,
+    synthetic_frame_size=None,
+    **kwargs,
+):
+    from matplotlib.figure import Figure
+    from matplotlib.patches import Rectangle
+
+    from configs import FILE_CONFIGURATIONS, PlotConfig
+
+    file_config = FILE_CONFIGURATIONS.get(data_type)
+    assert isinstance(
+        file_config, PlotConfig
+    ), f"{data_type} shouldn't call plot_network."
+
+    if data_type == "original_graph":
+        assert frame_size is not None, "original_graph requires frame_size"
+        frame = (
+            (0, frame_size[0]),
+            (0, frame_size[1]),
+        )
+    else:
+        assert (
+            synthetic_frame_size is not None
+        ), f"{data_type} requires synthetic_frame_size"
+        frame = calculate_frame(graph, frame_range=synthetic_frame_size)
+
+    frame_width = frame[0][1] - frame[0][0]
+    frame_height = frame[1][1] - frame[1][0]
+    aspect_ratio = frame_width / frame_height
+    fig_height = 10
+    fig_width = fig_height * aspect_ratio
+
+    fig = Figure(figsize=(fig_width, fig_height), dpi=300)
+    ax = fig.add_subplot(111)
+
+    positions = graph.positions()
+    edge_width = file_config.line_width
+    for u, v in graph.edges():
+        pos_u = positions[u]
+        pos_v = positions[v]
+        ax.plot(
+            [pos_u[0], pos_v[0]],
+            [pos_u[1], pos_v[1]],
+            "r-",
+            linewidth=edge_width,
+            zorder=2,
+        )
+
+    node_scale = node_scale if data_type == "original_graph" else 1.0
+    node_size = file_config.node_size * node_scale
+    for node in graph.nodes():
+        pos = positions[node]
+        ax.plot(pos[0], pos[1], "bo", markersize=node_size, zorder=2)
+
+    ax.set_xlim(frame[0])
+    ax.set_ylim(frame[1])
+
+    if data_type == "original_graph":
+        image = kwargs.get("background", None)
+        if image is not None:
+            alpha = getattr(file_config, "alpha", 1.0)
+            img_height, img_width = image.shape[:2]
+            ax.imshow(
+                image,
+                cmap="gray",
+                alpha=alpha,
+                extent=(0, img_width, img_height, 0),
+                aspect="auto",
+            )
+        else:
+            logger.info("No background image provided.")
+    else:
+        ax.add_patch(
+            Rectangle(
+                (frame[0][0], frame[1][0]),
+                frame[0][1] - frame[0][0],
+                frame[1][1] - frame[1][0],
+                facecolor="none",
+                edgecolor=(0, 0, 0, 0.8),
+                linewidth=2,
+                zorder=1,
+            )
+        )
+
+    if "title" in kwargs:
+        ax.set_title(kwargs["title"])
+
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.axis("off")
+
+    show_on_the_fly = (
+        kwargs["show"]
+        if "show" in kwargs
+        else getattr(file_config, "show_on_the_fly", True)
+    )
+    return finalize_plot(fig, show_on_the_fly)

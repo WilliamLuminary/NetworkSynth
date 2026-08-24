@@ -19,7 +19,7 @@ from handlers import (
     STATUS_FAILED,
     STATUS_OK,
     AttributesCalculator,
-    RunAgent,
+    GenerationRun,
     attach_run_log,
     create_run_paths,
     write_manifest,
@@ -231,9 +231,8 @@ def run_mosaic_for_dataset(dataset_id, config, run_paths):
     logger.info(config())
 
     # 1. Load original network → compute structural attributes
-    data_agent = RunAgent(config, run_paths=run_paths, dataset_id=dataset_id)
-    data_agent.prepare_data()
-    attributes = data_agent.attributes
+    run = GenerationRun(config, run_paths, dataset_id)
+    attributes = run.attributes
 
     # 2. Tile layout (positions + overlap)
     tile_gen_frame, tile_offsets = compute_tile_layout(config)
@@ -252,18 +251,18 @@ def run_mosaic_for_dataset(dataset_id, config, run_paths):
     mosaic_graph = stitcher.stitch(tile_graphs)
 
     # 5. Assign edge weights from original network's length→weight distribution
-    data_agent.mapper.assign_weights(mosaic_graph)
+    run.mapper.assign_weights(mosaic_graph)
 
     # 6. Save network data + plot
-    data_agent.add_synthetic_graph(mosaic_graph)
+    run.add_synthetic_graph(mosaic_graph)
     prefix = f"mosaic_{config.GRID_ROWS}x{config.GRID_COLS}"
-    data_agent.saver.begin_batch()
-    data_agent.saver.save(mosaic_graph, "synthetic_export", f"{prefix}_")
+    run.saver.begin_batch()
+    run.save(mosaic_graph, "synthetic_export", f"{prefix}_")
     mosaic_img = plot_mosaic_network(
         mosaic_graph, max_px=getattr(config, "RENDER_MAX_PX", None)
     )
-    data_agent.saver.save(mosaic_img, "synthetic_graph", f"{prefix}_")
-    data_agent.saver.end_batch()
+    run.save(mosaic_img, "synthetic_graph", f"{prefix}_")
+    run.saver.end_batch()
 
     logger.info(
         f"Mosaic complete — "
