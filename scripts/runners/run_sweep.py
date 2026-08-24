@@ -11,6 +11,7 @@ from itertools import product
 from typing import Tuple
 
 import wandb
+
 from analysis import MultifractalAnalyzer
 from configs import DatasetId, SynthParams
 from configs.generate_mode import GenConfigTmp as GenConfig

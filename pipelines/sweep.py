@@ -6,8 +6,8 @@ import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import networkit as nk
-
 import wandb
+
 from analysis.error_checker import ErrorChecker, create_error_checker
 
 # noinspection PyUnresolvedReferences
