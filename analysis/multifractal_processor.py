@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Dict, List, Optional, Union
 
 import numpy as np
@@ -10,15 +11,52 @@ from .multifractal_analyzer import MultifractalAnalyzer
 logger = logging.getLogger(__name__)
 
 
+def _worker_count(requested: Optional[int], num_jobs: int) -> int:
+    if num_jobs <= 1:
+        return 1
+    if requested is not None:
+        return max(1, min(requested, num_jobs))
+    return max(1, min((os.cpu_count() or 1) // 2, num_jobs))
+
+
+def _analyze_one(job) -> Dict:
+    """Analyse one graph.  Module level and self-contained so a pool can run it."""
+    idx, graph, measure_weighted, full_q_band = job
+
+    import networkit as nk
+
+    # A worker inheriting a multi-thread OpenMP runtime spins instead of
+    # working; every other pool in the repo pins this the same way.
+    nk.setNumberOfThreads(1)
+
+    result = MultifractalAnalyzer(graph, measure_weighted, full_q_band).analyze_graph()
+    return {
+        "graph_idx": idx,
+        "tau_list": result["tau_list"],
+        "al_list": result["al_list"],
+        "fal_list": result["fal_list"],
+        "dim_list": result["dim_list"],
+        "dim_diff": result["dim_diff"],
+        "valid_q": result["valid_q"],
+        "diameter": result["diameter"],
+        "holder_exp": result["alpha_0"],
+        "width": result["width"],
+        "assortativity": result["assortativity"],
+        **MultifractalProcessor._calculate_averages(result),
+    }
+
+
 class MultifractalProcessor:
     def __init__(
         self,
         arg: Union[Dict, SynthGraph, List[Dict], List[SynthGraph]],
         measure_weighted: bool,
         full_q_band: bool,
+        max_workers: Optional[int] = None,
     ):
         self._measure_weighted = measure_weighted
         self._full_q_band = full_q_band
+        self._max_workers = max_workers
         self._graphs: Optional[List[SynthGraph]] = None
         self._analysis_results: Optional[List[Dict]] = None
         if isinstance(arg, SynthGraph):
@@ -42,28 +80,24 @@ class MultifractalProcessor:
             self._analysis_results = self._perform_full_analysis()
 
     def _perform_full_analysis(self) -> List[Dict]:
-        return [self._analyze_single_graph(i, G) for i, G in enumerate(self._graphs)]
+        jobs = [
+            (i, g, self._measure_weighted, self._full_q_band)
+            for i, g in enumerate(self._graphs)
+        ]
+        workers = _worker_count(self._max_workers, len(jobs))
+        if workers == 1:
+            return [_analyze_one(job) for job in jobs]
 
-    def _analyze_single_graph(self, idx: int, graph: SynthGraph) -> Dict:
-        analyzer = MultifractalAnalyzer(
-            graph, self._measure_weighted, self._full_q_band
-        )
-        result = analyzer.analyze_graph()
+        from concurrent.futures import ProcessPoolExecutor
 
-        return {
-            "graph_idx": idx,
-            "tau_list": result["tau_list"],
-            "al_list": result["al_list"],
-            "fal_list": result["fal_list"],
-            "dim_list": result["dim_list"],
-            "dim_diff": result["dim_diff"],
-            "valid_q": result["valid_q"],
-            "diameter": result["diameter"],
-            "holder_exp": result["alpha_0"],
-            "width": result["width"],
-            "assortativity": result["assortativity"],
-            **self._calculate_averages(result),
-        }
+        from utils import spawn_context
+
+        logger.info(f"Analysing {len(jobs)} networks across {workers} processes.")
+        with ProcessPoolExecutor(
+            max_workers=workers, mp_context=spawn_context()
+        ) as pool:
+            # map preserves input order, so results stay aligned with the graphs.
+            return list(pool.map(_analyze_one, jobs))
 
     def _augment_with_averages(self) -> None:
         if self._has_averages(self._analysis_results[0]):

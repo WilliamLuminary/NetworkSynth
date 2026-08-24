@@ -58,13 +58,9 @@ class SnapshotConfig(BaseConfig):
         super().initialize()
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
-
-        from configs.file_definitions import FILE_CONFIGURATIONS
-
-        style = cls.PLOT_STYLE
-        syn_cfg = FILE_CONFIGURATIONS["synthetic_graph"]
-        syn_cfg.node_size = style.get("node_size", syn_cfg.node_size)
-        syn_cfg.line_width = style.get("line_width", syn_cfg.line_width)
+        # PLOT_STYLE reaches the plot through GenerationRun.save_synthetic_plot.
+        # This used to write it into the shared FILE_CONFIGURATIONS entry, which
+        # restyled every config's plots for the rest of the process.
 
     @staticmethod
     def load_original_network(dataset_id: DatasetId):

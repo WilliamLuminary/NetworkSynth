@@ -111,12 +111,15 @@ class GenerationRun(Run):
             self.saver.end_batch()
 
     def save_synthetic_plot(self, graph: SynthGraph, prefix: str = "") -> None:
+        style = self._config.PLOT_STYLE
         self.save(
             plot_network(
                 data_type="synthetic_graph",
                 graph=graph,
                 show=False,
                 synthetic_frame_size=self._config.SYNTHETIC_FRAME_SIZE,
+                node_size=style.get("node_size"),
+                line_width=style.get("line_width"),
             ),
             "synthetic_graph",
             prefix,
@@ -128,7 +131,7 @@ class GenerationRun(Run):
             graph=self.original,
             background=self.original_image,
             show=True,
-            node_scale=getattr(self._config, "ORIGINAL_GRAPH_NODE_SCALE", 1.0),
+            node_scale=self._config.ORIGINAL_GRAPH_NODE_SCALE,
             frame_size=self._config.FRAME_SIZE,
         )
 

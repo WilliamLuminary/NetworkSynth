@@ -116,7 +116,7 @@ def compute_center_frames(
     Falls back to ``SYNTHETIC_FRAME_SIZE`` when fewer than two centers
     exist (no neighbor to measure).
     """
-    fixed = getattr(config, "TILE_FRAME_SIZE", None)
+    fixed = config.TILE_FRAME_SIZE
     if fixed is not None:
         logger.info(f"Tile frames: fixed {fixed}", extra=tagged("PHASE1"))
         return [tuple(fixed)] * len(centers)
@@ -124,8 +124,8 @@ def compute_center_frames(
     if len(centers) < 2:
         return [config.SYNTHETIC_FRAME_SIZE] * len(centers)
 
-    factor = getattr(config, "TILE_FRAME_FACTOR", 0.5)
-    floor = getattr(config, "MIN_TILE_FRAME", 0.0)
+    factor = config.TILE_FRAME_FACTOR
+    floor = config.MIN_TILE_FRAME
 
     from scipy.spatial import cKDTree
 
@@ -432,7 +432,7 @@ def run_phase2(
         os.makedirs(snapshot_dir, exist_ok=True)
         snapshot_style = dict(config.HYBRID_SNAPSHOT_STYLE)
         # Read here in the parent: the plot pool runs in child processes.
-        snapshot_style.setdefault("max_px", getattr(config, "RENDER_MAX_PX", None))
+        snapshot_style.setdefault("max_px", config.RENDER_MAX_PX)
         plot_workers = config.get_snapshot_plot_workers()
         plot_executor = ThreadPoolExecutor(max_workers=plot_workers)
         logger.info(
@@ -535,7 +535,7 @@ def _apply_dataset_factors(dataset_id, config, params: SynthParams) -> SynthPara
     Returns a new params object rather than mutating config, so per-dataset
     factors cannot leak into another dataset or another run.
     """
-    overrides = getattr(config, "DATASET_FACTORS", {})
+    overrides = config.DATASET_FACTORS
     key = dataset_id[0]
     if key not in overrides:
         return params
@@ -564,14 +564,14 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
 
     scale_rows, scale_cols = config.TARGET_SCALE
     max_rounds = config.PHASE2_MAX_ROUNDS
-    min_dist_factor = getattr(config, "MIN_CENTER_DISTANCE_FACTOR", 1.5)
+    min_dist_factor = config.MIN_CENTER_DISTANCE_FACTOR
 
     img_h, img_w = config.IMAGE_SIZE
     whiteboard_w = scale_cols * img_w
     whiteboard_h = scale_rows * img_h
     min_distance = min_dist_factor * max(img_w, img_h)
 
-    max_centers = getattr(config, "NUM_CENTERS", 0)
+    max_centers = config.NUM_CENTERS
 
     # --- Generate random centers ---
     centers = generate_random_centers(
@@ -675,7 +675,7 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
     gc.collect()
 
     log_memory(f"Before plotting ({dataset_id})", config.LOG_MEMORY)
-    img = render_network(hybrid_graph, max_px=getattr(config, "RENDER_MAX_PX", None))
+    img = render_network(hybrid_graph, max_px=config.RENDER_MAX_PX)
     del hybrid_graph
     gc.collect()
     saver.save(img, "synthetic_graph", f"{prefix}_")

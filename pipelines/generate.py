@@ -342,7 +342,7 @@ def generate_with_snapshots(run: GenerationRun, config):
     os.makedirs(snapshot_dir, exist_ok=True)
 
     interval = config.SNAPSHOT_INTERVAL
-    style = getattr(config, "PLOT_STYLE", {})
+    style = config.PLOT_STYLE
 
     plot_pool = ProcessPoolExecutor(
         max_workers=config.get_snapshot_plot_workers(), mp_context=spawn_context()
@@ -523,7 +523,7 @@ def generate_and_select(run: GenerationRun, config):
     num_network = config.SYNTHETIC_NETWORK_NUMBER
     select_best = config.SELECT_BEST
     snapshot_interval = config.SNAPSHOT_INTERVAL
-    snapshot_style = getattr(config, "PLOT_STYLE", {})
+    snapshot_style = config.PLOT_STYLE
     use_snapshots = snapshot_interval > 0
 
     original_network = run.original

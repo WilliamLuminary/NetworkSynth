@@ -259,9 +259,7 @@ def run_mosaic_for_dataset(dataset_id, config, run_paths):
     run.save(mosaic_graph, "synthetic_export", f"{prefix}_")
     # border=True outlines each tile's bounding box, which is the point of a
     # mosaic render and the only way it differs from every other one.
-    mosaic_img = render_network(
-        mosaic_graph, border=True, max_px=getattr(config, "RENDER_MAX_PX", None)
-    )
+    mosaic_img = render_network(mosaic_graph, border=True, max_px=config.RENDER_MAX_PX)
     run.save(mosaic_img, "synthetic_graph", f"{prefix}_")
     run.saver.end_batch()
 

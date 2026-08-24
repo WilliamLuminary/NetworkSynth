@@ -81,6 +81,47 @@ class TestOurOwnFormat:
         assert loaded.number_of_edges() == original.number_of_edges()
         assert sorted(loaded.edges()) == sorted(original.edges())
 
+    def test_round_trip_preserves_unweightedness(
+        self, tmp_path, load_unweighted_test_synth_graph
+    ):
+        """An unweighted graph must not come back weighted.
+
+        The writer used to emit the ``edge_weight`` header unconditionally, and
+        an unweighted networkit graph reports every weight as 1.0 — so the file
+        claimed weights the graph never had.  The reader takes the column's
+        presence as the answer, so the claim became true on reload, and both
+        the Mapper (which decides whether to assign widths at all) and the
+        analyzer (weighted vs topological measure) then acted on it.
+        """
+        from configs.file_definitions import save_network_csv
+
+        original = load_unweighted_test_synth_graph
+        assert not original.is_weighted()
+
+        save_network_csv(original, str(tmp_path / "net.csv"))
+        loaded = read_graph_csv(
+            str(tmp_path / "net_edgelist.csv"), str(tmp_path / "net_positions.csv")
+        )
+
+        assert not loaded.is_weighted()
+
+    def test_round_trip_preserves_weights(
+        self, tmp_path, load_weighted_test_synth_graph
+    ):
+        from configs.file_definitions import save_network_csv
+
+        original = load_weighted_test_synth_graph
+        assert original.is_weighted()
+
+        save_network_csv(original, str(tmp_path / "net.csv"))
+        loaded = read_graph_csv(
+            str(tmp_path / "net_edgelist.csv"), str(tmp_path / "net_positions.csv")
+        )
+
+        assert loaded.is_weighted()
+        for u, v in original.edges():
+            assert loaded.weight(u, v) == pytest.approx(original.weight(u, v))
+
     def test_round_trip_preserves_positions(
         self, tmp_path, load_unweighted_test_synth_graph
     ):
