@@ -107,8 +107,6 @@ def run_phase2_with_snapshots(
             f"{len(edges):,} edges  (pending plots: {sum(1 for f in pending if not f.done())})"
         )
 
-    # TODO: built here rather than passed from the
-    # parent, so this path is still fork-dependent.
     GraphNode.initialize(attributes, params)
     graph = GraphGenerator.assemble_and_continue(
         tile_data_list,

@@ -182,8 +182,6 @@ def _generate_tile_worker(args):
         return tile_idx, None
 
     try:
-        # TODO: built here rather than passed from the
-        # parent, so this path is still fork-dependent.
         GraphNode.initialize(attributes, params)
 
         best_error = float("inf")
@@ -424,8 +422,6 @@ def run_phase2(
             }
         )
 
-    # TODO: built here rather than passed from the
-    # parent, so this path is still fork-dependent.
     apply_seed(params.seed)
     GraphNode.initialize(attributes, params)
 
