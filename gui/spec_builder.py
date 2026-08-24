@@ -5,7 +5,42 @@ import os
 from dataclasses import asdict, dataclass, field, replace
 from typing import Any, Dict, List, Optional
 
-from configs.gui_config import SPEC_CONTRACT_VERSION
+from configs.gui_config import (
+    NETWORK_FORMATS,
+    PLOT_FORMATS,
+    SPEC_CONTRACT_VERSION,
+    format_param,
+)
+
+#: What each output format is for.  Keyed by the format tables above, so a
+#: format added there without a word about it fails loudly here.
+_FORMAT_HELP = {
+    "csv": "…_edgelist.csv + …_positions.csv — what every loader here reads.",
+    "pkl": "The graph itself, pickled. Reloadable as a single network.",
+    "nkbin": "Compact binary plus …_positions.npy. Worth it for a big network.",
+    "webp": "Lossless and small.",
+    "png": "Lossless, larger, opens anywhere.",
+    "svg": "Vector, for a figure that has to scale.",
+}
+
+
+def _format_fields(group: str, formats, default: str) -> List[Field]:
+    """One switch per format this group can be written in.
+
+    Derived from the tables the config writes by, so the form offers exactly
+    what the save layer can do — no more, and nothing it has forgotten.
+    """
+    noun = {"network": "networks", "plot": "plots"}[group]
+    return [
+        Field(
+            format_param(group, name),
+            f"Save {noun} as .{name}",
+            name == default,
+            kind="bool",
+            help=_FORMAT_HELP[name],
+        )
+        for name in formats
+    ]
 
 
 @dataclass(frozen=True)
@@ -81,86 +116,90 @@ def _registered_checkers() -> tuple:
 
 
 def _common_fields() -> List[Field]:
-    return [
-        Field(
-            "SYNTHETIC_FRAME_SIZE",
-            "Synthetic frame (w × h)",
-            (512, 512),
-            kind="size",
-            help="Area the generated network grows into.",
-        ),
-        Field(
-            "CLOSED_NODES_FACTOR",
-            "Node factor",
-            1.2,
-            minimum=0.1,
-            maximum=5.0,
-            step=0.1,
-            help="Node-merge distance, relative to mean edge length.",
-        ),
-        Field(
-            "CLOSED_EDGES_FACTOR",
-            "Edge factor",
-            0.8,
-            minimum=0.1,
-            maximum=5.0,
-            step=0.1,
-        ),
-        Field(
-            "SYNTHETIC_NETWORK_NUMBER",
-            "Networks to generate",
-            5,
-            kind="integer",
-            minimum=1,
-            maximum=500,
-            step=1,
-        ),
-        Field(
-            "SYNTHETIC_GRAPH_NUMBER",
-            "Preview images",
-            1,
-            kind="integer",
-            minimum=0,
-            maximum=50,
-            step=1,
-        ),
-        Field(
-            "MAX_ATTEMPTS",
-            "Max attempts per network",
-            10,
-            kind="integer",
-            minimum=1,
-            maximum=100,
-            step=1,
-        ),
-        Field(
-            "ERROR_TOLERANCE",
-            "Error tolerance",
-            0.15,
-            minimum=0.0,
-            maximum=1.0,
-            step=0.01,
-            help="Multifractal quality gate; ignored when the gate is off.",
-        ),
-        Field(
-            "ERROR_CHECKER",
-            "Quality gate",
-            "multifractal",
-            kind="text",
-            help='"multifractal", "length_angle" or "none". Off is much faster.',
-        ),
-        Field("MEASURE_WEIGHTED", "Weighted analysis", False, kind="bool"),
-        Field(
-            "SEED",
-            "Seed",
-            0,
-            kind="integer",
-            minimum=0,
-            maximum=2**31 - 1,
-            step=1,
-            help="Same seed reproduces the same networks. 0 means unseeded.",
-        ),
-    ]
+    return (
+        [
+            Field(
+                "SYNTHETIC_FRAME_SIZE",
+                "Synthetic frame (w × h)",
+                (512, 512),
+                kind="size",
+                help="Area the generated network grows into.",
+            ),
+            Field(
+                "CLOSED_NODES_FACTOR",
+                "Node factor",
+                1.2,
+                minimum=0.1,
+                maximum=5.0,
+                step=0.1,
+                help="Node-merge distance, relative to mean edge length.",
+            ),
+            Field(
+                "CLOSED_EDGES_FACTOR",
+                "Edge factor",
+                0.8,
+                minimum=0.1,
+                maximum=5.0,
+                step=0.1,
+            ),
+            Field(
+                "SYNTHETIC_NETWORK_NUMBER",
+                "Networks to generate",
+                5,
+                kind="integer",
+                minimum=1,
+                maximum=500,
+                step=1,
+            ),
+            Field(
+                "SYNTHETIC_GRAPH_NUMBER",
+                "Preview images",
+                1,
+                kind="integer",
+                minimum=0,
+                maximum=50,
+                step=1,
+            ),
+            Field(
+                "MAX_ATTEMPTS",
+                "Max attempts per network",
+                10,
+                kind="integer",
+                minimum=1,
+                maximum=100,
+                step=1,
+            ),
+            Field(
+                "ERROR_TOLERANCE",
+                "Error tolerance",
+                0.15,
+                minimum=0.0,
+                maximum=1.0,
+                step=0.01,
+                help="Multifractal quality gate; ignored when the gate is off.",
+            ),
+            Field(
+                "ERROR_CHECKER",
+                "Quality gate",
+                "multifractal",
+                kind="text",
+                help='"multifractal", "length_angle" or "none". Off is much faster.',
+            ),
+            Field("MEASURE_WEIGHTED", "Weighted analysis", False, kind="bool"),
+            Field(
+                "SEED",
+                "Seed",
+                0,
+                kind="integer",
+                minimum=0,
+                maximum=2**31 - 1,
+                step=1,
+                help="Same seed reproduces the same networks. 0 means unseeded.",
+            ),
+        ]
+        + _format_fields("network", NETWORK_FORMATS, "csv")
+        + _format_fields("plot", PLOT_FORMATS, "webp")
+    )
 
 
 def _hybrid_fields() -> List[Field]:
@@ -434,7 +473,8 @@ def _analysis_fields() -> List[Field]:
             kind="bool",
             help="Wider q range: slower, smoother spectrum.",
         ),
-    ]
+        # No network formats: comparison writes spectra, not networks.
+    ] + _format_fields("plot", PLOT_FORMATS, "webp")
 
 
 #: Only modes the entry point can actually dispatch.  Kept in step with
@@ -528,6 +568,18 @@ def validate(
         span = values.get(key)
         if isinstance(span, (list, tuple)) and span[0] > span[1]:
             problems.append(f"{key.replace('_', ' ').title()}: start is above end.")
+
+    for group, formats in (("network", NETWORK_FORMATS), ("plot", PLOT_FORMATS)):
+        offered = [
+            format_param(group, name)
+            for name in formats
+            if format_param(group, name) in values
+        ]
+        if offered and not any(values[key] for key in offered):
+            problems.append(
+                f"Choose at least one {group} format to save, or the run "
+                f"writes no {group} files."
+            )
 
     checker = values.get("ERROR_CHECKER")
     if checker is not None and checker not in _CHECKER_NAMES:

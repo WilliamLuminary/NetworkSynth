@@ -332,8 +332,10 @@ ApplicationWindow {
                     text: "Synthetic"
                     checkable: true
                     checked: controller.previewSynthetic
-                    // Only generate mode leaves the batch of synthetic
-                    // networks a preview reads.
+                    // Absent outside generate: a hybrid network is far too
+                    // large to draw, and neither it nor sweep writes the batch
+                    // a preview reads.
+                    visible: controller.offersSyntheticPreview
                     enabled: controller.canPreviewSynthetic
                     onToggled: controller.setPreviewSynthetic(checked)
                 }

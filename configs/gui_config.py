@@ -12,6 +12,18 @@ from graphs.synth_graph import SynthGraph
 
 from .base_config import BaseConfig
 from .dataset_id import DatasetId
+from .file_definitions import (
+    INPLACE_DIR,
+    ORIGINAL_DIR,
+    SYNTHETIC_DIR,
+    SaveSpec,
+    save_network_csv,
+    save_network_nkbin,
+    save_pickle,
+    save_png,
+    save_svg,
+    save_webp,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +78,49 @@ _REQUIRED_KEYS = ("contract", "mode", "output_dir", "inputs", "params", "run_nam
 
 class SpecError(ValueError):
     pass
+
+
+#: What the GUI can write, per kind of output, and the serialiser each needs.
+#: The name is the extension.  Split in two because the serialisers are not
+#: interchangeable: ``save_svg`` takes a matplotlib figure and nothing else,
+#: and ``save_network_csv`` takes one graph.
+NETWORK_FORMATS = {
+    "csv": save_network_csv,
+    "pkl": save_pickle,
+    "nkbin": save_network_nkbin,
+}
+PLOT_FORMATS = {
+    "webp": save_webp,
+    "png": save_png,
+    "svg": save_svg,
+}
+
+#: The outputs each group covers: ``(attribute, directory, name)``.
+#:
+#: Three are deliberately not here.  ``synthetic_network`` is the batch — a
+#: *list* of graphs, which only a pickle can hold.  ``original_image`` is the
+#: input image rather than a plot, so the vector format cannot apply.  Reports
+#: and properties are text and a pickle by nature.
+_FORMATTED_OUTPUTS = {
+    "network": (
+        ("SAVE_ORIGINAL_NETWORK", ORIGINAL_DIR, "original_network"),
+        ("SAVE_SYNTHETIC_EXPORT", SYNTHETIC_DIR, "synthetic_network"),
+    ),
+    "plot": (
+        ("SAVE_ORIGINAL_GRAPH", ORIGINAL_DIR, "original_graph"),
+        ("SAVE_SYNTHETIC_GRAPH", SYNTHETIC_DIR, "synthetic_graph"),
+        ("SAVE_ANALYSIS_FIGURE", INPLACE_DIR, "analysis_figure"),
+    ),
+}
+
+
+def format_param(group: str, name: str) -> str:
+    """The run-spec param that switches one format on, e.g. WRITE_NETWORK_CSV.
+
+    Derived rather than written out twice, so the form and the config cannot
+    drift into disagreeing about what a checkbox is called.
+    """
+    return f"WRITE_{group.upper()}_{name.upper()}"
 
 
 def _rebuild_from_spec(spec_path: str) -> type:
@@ -252,12 +307,49 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
                 value = tuple(value)
             setattr(config, key, value)
 
+        config._apply_output_formats()
+
         logger.info(
             f"Run-spec loaded: mode={config.MODE} "
             f"output_dir={config.BASE_OUTPUT_PATH} "
             f"params={sorted(spec['params'])}"
         )
         return config
+
+    @classmethod
+    def _apply_output_formats(cls) -> None:
+        """Rebuild the save specs from the formats the spec asked for.
+
+        A group the spec says nothing about keeps ``BaseConfig``'s default, so
+        a spec written by hand needs none of this.  A group it names but leaves
+        entirely off is refused instead: that run would finish having written
+        nothing, which is not a thing anyone asks for on purpose.
+        """
+        for group, formats in (("network", NETWORK_FORMATS), ("plot", PLOT_FORMATS)):
+            named = [
+                name for name in formats if hasattr(cls, format_param(group, name))
+            ]
+            if not named:
+                continue
+
+            chosen = [name for name in named if getattr(cls, format_param(group, name))]
+            if not chosen:
+                raise SpecError(
+                    f"every {group} format is switched off, so the run would "
+                    f"write no {group} files at all. Choose at least one of: "
+                    f"{', '.join(formats)}"
+                )
+
+            for attribute, directory, detail in _FORMATTED_OUTPUTS[group]:
+                setattr(
+                    cls,
+                    attribute,
+                    tuple(
+                        SaveSpec(directory, detail, name, formats[name])
+                        for name in chosen
+                    ),
+                )
+            logger.info(f"{group} outputs will be written as: {', '.join(chosen)}")
 
     @classmethod
     def initialize(cls) -> None:

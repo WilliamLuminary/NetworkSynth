@@ -146,6 +146,9 @@ class SynthesisController(QObject):
         self._shape = 0
         self._inputs = spec_builder.default_inputs(self._mode)
         self._info["original"] = None
+        # The other mode's run is not this mode's output.
+        self._shown["synthetic"] = False
+        self._info["synthetic"] = None
         self._note_ready()
 
     @Property("QVariantList", notify=changed)
@@ -223,14 +226,22 @@ class SynthesisController(QObject):
         return bool({"edge_list", "datasets_dir"} & set(shape.all_ids))
 
     @Property(bool, notify=changed)
-    def canPreviewSynthetic(self) -> bool:
-        """Whether a finished run left synthetic networks to show.
+    def offersSyntheticPreview(self) -> bool:
+        """Whether this mode's output is worth previewing at all.
 
-        ``generate`` is the only mode that writes the batch a preview reads;
-        the others write plots and CSVs, from which no network can be measured.
+        ``generate`` only.  A hybrid network is assembled from thousands of
+        tiles, so drawing one is a long job with an unreadable result — and
+        hybrid and sweep write no batch of networks for a preview to read
+        either.
         """
+        return self._mode == "generate"
+
+    @Property(bool, notify=changed)
+    def canPreviewSynthetic(self) -> bool:
+        """Whether a finished run of that mode actually left something to show."""
         return (
-            self._ran_ok
+            self.offersSyntheticPreview
+            and self._ran_ok
             and self._run_mode == "generate"
             and self._process is None
             and self._run_root is not None
