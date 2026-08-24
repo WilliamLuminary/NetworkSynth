@@ -32,6 +32,9 @@ class Input:
     kind: str = "file"  # file | dir
     filter: str = ""
     placeholder: str = ""
+    #: A run goes ahead without it.  Left out of ``InputShape.ids``, so an
+    #: optional input never becomes something the run-spec demands.
+    optional: bool = False
 
     def as_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -46,6 +49,14 @@ class InputShape:
 
     @property
     def ids(self) -> tuple:
+        """What this shape cannot run without — the keys ``MODE_INPUTS`` names."""
+        return tuple(
+            spec_input.id for spec_input in self.inputs if not spec_input.optional
+        )
+
+    @property
+    def all_ids(self) -> tuple:
+        """Every key the form offers, optional ones included."""
         return tuple(spec_input.id for spec_input in self.inputs)
 
 
@@ -210,6 +221,17 @@ def _network_shapes() -> List[InputShape]:
                     filter="CSV files (*.csv)",
                     placeholder="…_positions.csv",
                 ),
+                # What a directory of networks gets for free, by the
+                # `…_image.tif` convention: the image the network was traced
+                # from, drawn behind it.  Optional, because a network is
+                # plottable and analysable without one.
+                Input(
+                    "image",
+                    "Image",
+                    filter="Images (*.tif *.tiff *.png *.jpg *.jpeg *.webp)",
+                    placeholder="optional — background the network is drawn over",
+                    optional=True,
+                ),
             ],
         ),
         InputShape(
@@ -335,11 +357,14 @@ def shape_for(mode: str, inputs: Dict[str, str]) -> InputShape:
         raise ValueError(f"unknown mode {mode!r}; available: {sorted(MODES)}")
     keys = set(inputs)
     for shape in MODES[mode].input_shapes:
-        if set(shape.ids) == keys:
+        # Every required key, and nothing the shape does not offer: an optional
+        # key may be absent, but a key from the *other* shape must not decide
+        # this one.
+        if set(shape.ids) <= keys <= set(shape.all_ids):
             return shape
     raise ValueError(
         f"{mode}: {sorted(keys)} matches none of its input shapes: "
-        f"{[list(s.ids) for s in MODES[mode].input_shapes]}"
+        f"{[list(s.all_ids) for s in MODES[mode].input_shapes]}"
     )
 
 
@@ -368,7 +393,8 @@ def validate(
     for spec_input in shape_for(mode, inputs).inputs:
         path = inputs.get(spec_input.id) or ""
         if not path:
-            problems.append(f"Choose the {spec_input.label.lower()}.")
+            if not spec_input.optional:
+                problems.append(f"Choose the {spec_input.label.lower()}.")
         elif not os.path.exists(path):
             problems.append(f"{spec_input.label} not found: {path}")
         elif spec_input.kind == "dir" and not os.path.isdir(path):
@@ -448,7 +474,10 @@ def build_spec(
         for spec_input in shape.inputs
     }
     if "edge_list" in shape.ids:
-        spec_inputs["image"] = os.path.abspath(image) if image else None
+        # Either source, one key: *image* for a caller that has a path in hand,
+        # the form's own optional input for the GUI.
+        chosen = image or inputs.get("image")
+        spec_inputs["image"] = os.path.abspath(chosen) if chosen else None
 
     return {
         "contract": SPEC_CONTRACT_VERSION,

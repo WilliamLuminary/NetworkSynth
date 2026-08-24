@@ -56,6 +56,51 @@ ApplicationWindow {
         onAccepted: controller.setOutputDir(selectedFolder)
     }
 
+    // One preview pane, used by both sides.  Nothing in it refers to
+    // `controller` — the two values are bound from outside, where that
+    // certainly resolves.
+    component PreviewPane: RowLayout {
+        property alias image: picture.source
+        property alias info: details.text
+
+        spacing: 10
+
+        Rectangle {
+            Layout.preferredWidth: 320
+            Layout.preferredHeight: 320
+            color: "transparent"
+            border.color: "#9e9e9e"
+            border.width: 1
+
+            Image {
+                id: picture
+                anchors.fill: parent
+                anchors.margins: 1
+                fillMode: Image.PreserveAspectFit
+                asynchronous: true
+                cache: false
+            }
+            Label {
+                anchors.centerIn: parent
+                visible: picture.source == ""
+                text: "Nothing to draw"
+                opacity: 0.5
+            }
+        }
+
+        ScrollView {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 320
+            TextArea {
+                id: details
+                readOnly: true
+                wrapMode: TextArea.NoWrap
+                font.family: "monospace"
+                font.pixelSize: 11
+            }
+        }
+    }
+
     function browseFor(spec) {
         root.pendingInput = spec.id
         if (spec.kind === "dir") {
@@ -255,6 +300,103 @@ ApplicationWindow {
                 wrapMode: Text.WordWrap
                 text: controller.status
                 color: controller.failed ? "#c0392b" : palette.text
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+                visible: controller.canPreview
+
+                Label { text: "Preview"; opacity: 0.6 }
+                Button {
+                    text: "Original"
+                    checkable: true
+                    checked: controller.previewOriginal
+                    onToggled: controller.setPreviewOriginal(checked)
+                }
+                Button {
+                    text: "Synthetic"
+                    checkable: true
+                    checked: controller.previewSynthetic
+                    // Only generate mode leaves the batch of synthetic
+                    // networks a preview reads.
+                    enabled: controller.canPreviewSynthetic
+                    onToggled: controller.setPreviewSynthetic(checked)
+                }
+                Label {
+                    Layout.fillWidth: true
+                    text: controller.previewStatus
+                    color: controller.previewFailed ? "#c0392b" : palette.text
+                    elide: Text.ElideRight
+                }
+            }
+
+            GroupBox {
+                title: "Original network"
+                Layout.fillWidth: true
+                visible: controller.previewOriginal
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    spacing: 8
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        // Absent when the input came without an image: with
+                        // nothing behind the network there is nothing to switch.
+                        Button {
+                            text: "Background"
+                            checkable: true
+                            checked: controller.showBackground
+                            visible: controller.hasBackground
+                            onToggled: controller.setShowBackground(checked)
+                        }
+                        Button {
+                            text: "Network"
+                            checkable: true
+                            checked: controller.showNetwork
+                            onToggled: controller.setShowNetwork(checked)
+                        }
+                        Label {
+                            Layout.fillWidth: true
+                            text: controller.originalNote
+                            elide: Text.ElideRight
+                            opacity: 0.7
+                        }
+                    }
+
+                    PreviewPane {
+                        Layout.fillWidth: true
+                        image: controller.originalImage
+                        info: controller.originalInfo
+                    }
+                }
+            }
+
+            GroupBox {
+                title: "Synthetic network"
+                Layout.fillWidth: true
+                visible: controller.previewSynthetic
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    spacing: 8
+
+                    Label {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        text: controller.syntheticNote
+                        opacity: 0.7
+                    }
+
+                    PreviewPane {
+                        Layout.fillWidth: true
+                        image: controller.syntheticImage
+                        info: controller.syntheticInfo
+                    }
+                }
             }
 
             GroupBox {
