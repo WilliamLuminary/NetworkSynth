@@ -2,6 +2,7 @@ import itertools
 import math
 import random
 from collections import defaultdict
+from contextlib import contextmanager
 from typing import Dict, List, Set, Tuple
 
 import numpy as np
@@ -32,6 +33,37 @@ class GraphNode:
 
     _closed_nodes_factor: float
     _closed_edges_factor: float
+
+    _traversal_active = False
+
+    @classmethod
+    @contextmanager
+    def traversal(cls, attrs, params: SynthParams):
+        """Scope one BFS traversal: install its parameters, drop its record.
+
+        Generation records a single traversal rather than filling a board that
+        several callers share, so the record lives on the class and exactly one
+        traversal may be open in a process at a time.  The BFS entry points on
+        :class:`~graphs.graph_generator.GraphGenerator` are static and read
+        that state off the class, which is why they are only callable from
+        inside this block.
+
+        Leaving the block drops the node and edge grids, so the spatial index
+        over a multi-million-node traversal is freed where the traversal ends
+        rather than wherever a caller remembers to reset.  The parameters stay
+        installed; only the record is per-traversal.
+        """
+        assert not cls._traversal_active, (
+            "a traversal is already open: the record is class-level, so two "
+            "cannot be interleaved in one process"
+        )
+        cls.initialize(attrs, params)
+        cls._traversal_active = True
+        try:
+            yield
+        finally:
+            cls._traversal_active = False
+            cls.reset()
 
     @classmethod
     def initialize(cls, attrs, params: SynthParams):

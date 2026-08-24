@@ -70,39 +70,38 @@ def _generate_with_factors(
     if exit_event.is_set():
         return None, float("inf")
 
-    GraphNode.initialize(attributes, params)
+    with GraphNode.traversal(attributes, params):
+        for attempt in range(params.max_attempts):
+            # Seeded from this trial's params rather than the PID, so a seeded
+            # sweep repeats. Attempt index keeps retries from re-drawing the same
+            # failed network.
+            apply_seed(None if params.seed is None else params.seed + attempt)
 
-    for attempt in range(params.max_attempts):
-        # Seeded from this trial's params rather than the PID, so a seeded
-        # sweep repeats. Attempt index keeps retries from re-drawing the same
-        # failed network.
-        apply_seed(None if params.seed is None else params.seed + attempt)
+            try:
+                result = GraphGenerator._bfs_network_with_frontier(
+                    params.synthetic_frame_size
+                )
+                inner_nodes, inner_edges, *_ = result
 
-        try:
-            result = GraphGenerator._bfs_network_with_frontier(
-                params.synthetic_frame_size
-            )
-            inner_nodes, inner_edges, *_ = result
+                if not inner_nodes or len(inner_nodes) < 100:
+                    continue
 
-            if not inner_nodes or len(inner_nodes) < 100:
+                graph = build_graph(inner_nodes, inner_edges, arg_type="graph_node")
+                graph = trim_graph(graph, attributes.average_degree)
+                mapper.assign_weights(graph)
+
+                if exit_event.is_set():
+                    return None, float("inf")
+
+                passed, error = error_checker.check(graph)
+                if passed:
+                    return graph, error
+            except KeyboardInterrupt:
+                raise
+            except Exception:
                 continue
 
-            graph = build_graph(inner_nodes, inner_edges, arg_type="graph_node")
-            graph = trim_graph(graph, attributes.average_degree)
-            mapper.assign_weights(graph)
-
-            if exit_event.is_set():
-                return None, float("inf")
-
-            passed, error = error_checker.check(graph)
-            if passed:
-                return graph, error
-        except KeyboardInterrupt:
-            raise
-        except Exception:
-            continue
-
-    return None, float("inf")
+        return None, float("inf")
 
 
 def generate_networks(run: GenerationRun, error_checker: ErrorChecker, nf, ef, config):

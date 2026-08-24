@@ -107,14 +107,14 @@ def run_phase2_with_snapshots(
             f"{len(edges):,} edges  (pending plots: {sum(1 for f in pending if not f.done())})"
         )
 
-    GraphNode.initialize(attributes, params)
-    graph = GraphGenerator.assemble_and_continue(
-        tile_data_list,
-        global_frame,
-        max_rounds,
-        snapshot_callback=on_snapshot,
-        snapshot_round_interval=snapshot_round_interval,
-    )
+    with GraphNode.traversal(attributes, params):
+        graph = GraphGenerator.assemble_and_continue(
+            tile_data_list,
+            global_frame,
+            max_rounds,
+            snapshot_callback=on_snapshot,
+            snapshot_round_interval=snapshot_round_interval,
+        )
 
     remaining = sum(1 for f in pending if not f.done())
     if remaining:
