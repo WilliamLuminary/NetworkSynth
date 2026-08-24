@@ -308,7 +308,7 @@ def _analysis_fields() -> List[Field]:
 
 
 #: Only modes the entry point can actually dispatch.  Kept in step with
-#: ``gui_run._MODES`` — a mode offered here that cannot run is worse than one
+#: ``gui_run._GUI_MODES`` — a mode offered here that cannot run is worse than one
 #: that is simply absent.
 #:
 #: Each mode gets the common fields plus whatever its pipeline reads that

@@ -94,10 +94,11 @@ class TestParamsWinOverBaseConfig:
         )
         GraphNode.initialize(Attrs(), params)
 
-        assert GraphNode._closed_nodes_factor == 5.0
-        assert GraphNode._closed_edges_factor == 4.0
-        assert GraphNode._closed_nodes_thr == 10.0 * 5.0
-        assert GraphNode._closed_edges_thr == 10.0 * 4.0
+        # Asserted on the squared thresholds because those are what the inner
+        # loops actually compare against; the factors themselves stay in
+        # SynthParams rather than being copied onto the rules.
+        assert GraphNode._rules.closed_nodes_thr_sq == (10.0 * 5.0) ** 2
+        assert GraphNode._rules.closed_edges_thr_sq == (10.0 * 4.0) ** 2
 
     def test_generator_uses_params_frame_size(self, base_config_values):
         from graphs.graph_generator import GraphGenerator

@@ -161,7 +161,6 @@ def saver_in_tmpdir(tmp_path):
     saver = object.__new__(Saver)
     saver.output_dir = str(tmp_path)
     saver._save_func = BaseConfig.save
-    saver._config = BaseConfig
     saver._batch_timestamp = None
     return saver
 
@@ -327,7 +326,6 @@ class TestEndToEnd:
         saver = object.__new__(Saver)
         saver.output_dir = str(tmp_path)
         saver._save_func = BaseConfig.save
-        saver._config = BaseConfig
         saver._batch_timestamp = None
 
         data = {"hello": "world"}
@@ -343,7 +341,6 @@ class TestEndToEnd:
         saver = object.__new__(Saver)
         saver.output_dir = str(tmp_path)
         saver._save_func = BaseConfig.save
-        saver._config = BaseConfig
         saver._batch_timestamp = "20250101_000000"
 
         graph = FakeGraph(n_nodes=5)

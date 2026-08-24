@@ -19,6 +19,7 @@ def _line_graph():
 
 def _config(tmp_path, disabled):
     class Config(BaseConfig):
+        MODE = "generate"
         BASE_OUTPUT_PATH = str(tmp_path)
         DATASETS = [DatasetId("ds")]
         DISABLE_SAVING = disabled

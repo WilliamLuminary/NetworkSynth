@@ -1,16 +1,6 @@
-from . import (
-    compare_mode,
-    generate_mode,
-    hybrid_mode,
-    mosaic_mode,
-    scaling_mode,
-    sweep_mode,
-)
 from .base_config import BaseConfig  # noqa: F401
-from .enums import (  # noqa: F401
-    AnalysisMode,
-    DatasetId,
-)
+from .dataset_id import DatasetId  # noqa: F401
+from .enums import AnalysisMode  # noqa: F401
 from .file_definitions import (  # noqa: F401
     DEFAULT_SAVE_SPECS,
     FILE_CONFIGURATIONS,
@@ -27,14 +17,3 @@ from .file_definitions import (  # noqa: F401
     save_webp,
 )
 from .params import SynthParams  # noqa: F401
-
-for _module in (
-    compare_mode,
-    generate_mode,
-    hybrid_mode,
-    mosaic_mode,
-    scaling_mode,
-    sweep_mode,
-):
-    for _name in getattr(_module, "__all__", []):
-        globals()[_name] = getattr(_module, _name)

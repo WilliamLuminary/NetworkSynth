@@ -152,3 +152,13 @@ def trim_graph(graph: SynthGraph, tar_avg_deg: float) -> SynthGraph:
         round_num += 1
 
     return graph
+
+
+def transpose_positions(graph) -> None:
+    """Swap x and y for every node, in place.
+
+    Some inputs record positions row-major (row, column) where the rest of the
+    toolkit expects (x, y).
+    """
+    positions = graph.positions()
+    positions[:, [0, 1]] = positions[:, [1, 0]]

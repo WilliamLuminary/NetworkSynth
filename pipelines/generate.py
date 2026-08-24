@@ -15,7 +15,6 @@ from analysis.error_checker import (
     create_error_checker,
 )
 from configs import DatasetId, SynthParams
-from configs.base_config import tagged
 from graphs import GraphGenerator
 from handlers import (
     STATUS_CANCELLED,
@@ -34,6 +33,7 @@ from utils import (
     metric_distance,
     save_bfs_snapshot,
     spawn_context,
+    tagged,
     trim_graph,
 )
 
@@ -679,9 +679,9 @@ def run_for_dataset(dataset_id: DatasetId, config, run_paths):
 
 def main(config_cls=None):
     if config_cls is None:
-        from configs.generate_mode import GenConfigSnapshot
+        from configs.generate_mode.config_snapshot import SnapshotConfig
 
-        config_cls = GenConfigSnapshot
+        config_cls = SnapshotConfig
     config_cls.initialize()
 
     run_paths = create_run_paths(config_cls)

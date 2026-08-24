@@ -19,7 +19,6 @@ import numpy as np
 
 from analysis.error_checker import ErrorChecker, NullErrorChecker, create_error_checker
 from configs import SynthParams
-from configs.base_config import tagged
 from graphs import GraphGenerator
 from graphs._graph_node import GraphNode
 from graphs.graph_generator import FrontierDescriptor
@@ -39,8 +38,10 @@ from utils import (
     apply_seed,
     build_graph,
     log_memory,
+    render_network,
     save_hybrid_snapshot,
     spawn_context,
+    tagged,
     trim_graph,
 )
 
@@ -182,65 +183,68 @@ def _generate_tile_worker(args):
         return tile_idx, None
 
     try:
-        GraphNode.initialize(attributes, params)
+        with GraphNode.traversal(attributes, params):
+            best_error = float("inf")
+            best_result = None
 
-        best_error = float("inf")
-        best_result = None
+            for attempt in range(params.max_attempts):
+                if exit_event.is_set():
+                    break
 
-        for attempt in range(params.max_attempts):
-            if exit_event.is_set():
-                break
+                result = GraphGenerator._bfs_network_with_frontier(frame_range)
+                (
+                    inner_nodes,
+                    inner_edges,
+                    frontier_descs,
+                    all_positions,
+                    all_edge_tuples,
+                ) = result
 
-            result = GraphGenerator._bfs_network_with_frontier(frame_range)
-            inner_nodes, inner_edges, frontier_descs, all_positions, all_edge_tuples = (
-                result
-            )
+                if not inner_nodes or len(inner_nodes) < min_tile_nodes:
+                    continue
 
-            if not inner_nodes or len(inner_nodes) < min_tile_nodes:
-                continue
+                # Skip quality analysis entirely when no checker is configured.
+                if isinstance(error_checker, NullErrorChecker):
+                    return tile_idx, {
+                        "error": 0.0,
+                        "positions": all_positions,
+                        "edges": all_edge_tuples,
+                        "frontier": frontier_descs,
+                    }
 
-            # Skip quality analysis entirely when no checker is configured.
-            if isinstance(error_checker, NullErrorChecker):
-                return tile_idx, {
-                    "error": 0.0,
+                graph = build_graph(inner_nodes, inner_edges, arg_type="graph_node")
+                graph = trim_graph(graph, attributes.average_degree)
+                mapper.assign_weights(graph)
+
+                passed, error = error_checker.check(graph)
+
+                tile_payload = {
+                    "error": error,
                     "positions": all_positions,
                     "edges": all_edge_tuples,
                     "frontier": frontier_descs,
                 }
 
-            graph = build_graph(inner_nodes, inner_edges, arg_type="graph_node")
-            graph = trim_graph(graph, attributes.average_degree)
-            mapper.assign_weights(graph)
+                if passed:
+                    return tile_idx, tile_payload
 
-            passed, error = error_checker.check(graph)
+                if error < best_error:
+                    best_error = error
+                    best_result = tile_payload
 
-            tile_payload = {
-                "error": error,
-                "positions": all_positions,
-                "edges": all_edge_tuples,
-                "frontier": frontier_descs,
-            }
+            if best_result is not None:
+                logger.warning(
+                    f"Tile {tile_idx}: max attempts reached "
+                    f"(best error={best_error:.4f})",
+                    extra=tagged("TILE"),
+                )
+                return tile_idx, best_result
 
-            if passed:
-                return tile_idx, tile_payload
-
-            if error < best_error:
-                best_error = error
-                best_result = tile_payload
-
-        if best_result is not None:
-            logger.warning(
-                f"Tile {tile_idx}: max attempts reached "
-                f"(best error={best_error:.4f})",
+            logger.error(
+                f"Tile {tile_idx}: all attempts produced <{min_tile_nodes} nodes",
                 extra=tagged("TILE"),
             )
-            return tile_idx, best_result
-
-        logger.error(
-            f"Tile {tile_idx}: all attempts produced <{min_tile_nodes} nodes",
-            extra=tagged("TILE"),
-        )
-        return tile_idx, None
+            return tile_idx, None
 
     except Exception as exc:
         logger.error(
@@ -423,11 +427,10 @@ def run_phase2(
         )
 
     apply_seed(params.seed)
-    GraphNode.initialize(attributes, params)
 
     if take_snapshots:
         os.makedirs(snapshot_dir, exist_ok=True)
-        snapshot_style = dict(getattr(config, "HYBRID_SNAPSHOT_STYLE", {}))
+        snapshot_style = dict(config.HYBRID_SNAPSHOT_STYLE)
         # Read here in the parent: the plot pool runs in child processes.
         snapshot_style.setdefault("max_px", getattr(config, "RENDER_MAX_PX", None))
         plot_workers = config.get_snapshot_plot_workers()
@@ -464,13 +467,14 @@ def run_phase2(
                 extra=tagged("SNAPSHOT"),
             )
 
-        graph = GraphGenerator.assemble_and_continue(
-            tile_data_list,
-            global_frame,
-            max_rounds,
-            snapshot_callback=on_snapshot,
-            snapshot_round_interval=snapshot_round_interval,
-        )
+        with GraphNode.traversal(attributes, params):
+            graph = GraphGenerator.assemble_and_continue(
+                tile_data_list,
+                global_frame,
+                max_rounds,
+                snapshot_callback=on_snapshot,
+                snapshot_round_interval=snapshot_round_interval,
+            )
 
         remaining = sum(1 for f in pending if not f.done())
         if remaining:
@@ -488,9 +492,10 @@ def run_phase2(
             extra=tagged("SNAPSHOT"),
         )
     else:
-        graph = GraphGenerator.assemble_and_continue(
-            tile_data_list, global_frame, max_rounds
-        )
+        with GraphNode.traversal(attributes, params):
+            graph = GraphGenerator.assemble_and_continue(
+                tile_data_list, global_frame, max_rounds
+            )
 
     return graph
 
@@ -519,29 +524,9 @@ def log_connectivity(graph: SynthGraph, label: str = ""):
 # ------------------------------------------------------------------ #
 
 
-def plot_hybrid_network(
-    graph: SynthGraph,
-    margin_frac: float = 0.02,
-    dpi: int = None,
-    max_px: int | None = None,
-):
-    from utils import render_network
-
-    return render_network(
-        graph,
-        margin_frac=margin_frac,
-        dpi=dpi,
-        max_px=max_px,
-    )
-
-
 # ------------------------------------------------------------------ #
 # Main pipeline for one dataset
 # ------------------------------------------------------------------ #
-
-
-def _report_text(title: str, num_nodes: int, num_edges: int) -> str:
-    return f"{title}\nNodes: {num_nodes:,}\nEdges: {num_edges:,}\n"
 
 
 def _apply_dataset_factors(dataset_id, config, params: SynthParams) -> SynthParams:
@@ -621,7 +606,7 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
         extra=tagged("PHASE2", dataset=str(dataset_id)),
     )
 
-    snapshot_interval = getattr(config, "SNAPSHOT_INTERVAL", 0)
+    snapshot_interval = config.SNAPSHOT_INTERVAL
     snapshot_dir = (
         os.path.join(run.saver.output_dir, "snapshots")
         if snapshot_interval != 0
@@ -649,8 +634,9 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
     log_memory(f"After Phase 2 ({dataset_id})", config.LOG_MEMORY)
 
     # --- Free Phase 1 tile data before post-processing ---
+    # Phase 2's traversal already dropped the node and edge grids on its way
+    # out; this is only the tile payloads.
     del tile_results
-    GraphNode.reset()
     gc.collect()
     log_memory(f"After Phase 2 cleanup ({dataset_id})", config.LOG_MEMORY)
 
@@ -678,31 +664,18 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
     run.save(hybrid_graph, "synthetic_export", f"{prefix}_")
 
     # --- Write reports before plotting (plotting is memory-intensive) ---
-    original_network = run.original
-    run.save(
-        _report_text(
-            "Original Network",
-            original_network.number_of_nodes(),
-            original_network.number_of_edges(),
-        ),
-        "original_report",
-    )
-    run.save(
-        _report_text("Synthetic Network", num_nodes, num_edges),
-        "synthetic_report",
-    )
+    run.save(run.original_report(), "original_report")
+    run.save(run.synthetic_report(hybrid_graph), "synthetic_report")
 
     # --- Plot synthetic graph (high memory) ---
     # Free everything we can before rendering.
     saver = run.saver
-    del run, original_network, attributes, mapper
+    del run, attributes, mapper
     del error_checker, centers
     gc.collect()
 
     log_memory(f"Before plotting ({dataset_id})", config.LOG_MEMORY)
-    img = plot_hybrid_network(
-        hybrid_graph, max_px=getattr(config, "RENDER_MAX_PX", None)
-    )
+    img = render_network(hybrid_graph, max_px=getattr(config, "RENDER_MAX_PX", None))
     del hybrid_graph
     gc.collect()
     saver.save(img, "synthetic_graph", f"{prefix}_")
@@ -800,7 +773,7 @@ def _run_dataset_in_subprocess(dataset_id, config, run_paths):
 
 def main(config_cls=None):
     if config_cls is None:
-        from configs.hybrid_mode import HybridConfig
+        from configs.hybrid_mode.config_sample import SampleConfig as HybridConfig
 
         config_cls = HybridConfig
     config_cls.initialize()

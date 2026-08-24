@@ -6,19 +6,17 @@ from typing import Tuple
 import cv2
 import numpy as np
 
-from .._utils import (
-    _find_file_with_pattern,
-    _resize_cv2_image,
-    _transpose_network_pos,
-    _trim_cv2_image,
-)
+from utils import find_file_with_pattern, resize_image, transpose_positions, trim_image
+
 from ..base_config import BaseConfig
-from ..enums import DatasetId
+from ..dataset_id import DatasetId
 
 logger = logging.getLogger(__name__)
 
 
 class Config1(BaseConfig):
+
+    MODE = "mosaic"
 
     # --- Dataset ---
     DATASETS = [DatasetId("A", "20kX")]
@@ -74,7 +72,7 @@ class Config1(BaseConfig):
         from utils import build_graph
 
         original_network = build_graph(positions, mat)
-        _transpose_network_pos(original_network)
+        transpose_positions(original_network)
         return original_network
 
     @staticmethod
@@ -82,8 +80,8 @@ class Config1(BaseConfig):
         image = _load_raw_image(dataset_id)
         if image is None:
             return None
-        image = _trim_cv2_image(image)
-        image = _resize_cv2_image(image, Config1.FRAME_SIZE)
+        image = trim_image(image)
+        image = resize_image(image, Config1.FRAME_SIZE)
         return image
 
 
@@ -94,7 +92,7 @@ class Config1(BaseConfig):
 
 def _load_positions(dataset_id: DatasetId) -> np.ndarray:
     set_name, resolution = dataset_id[0], dataset_id[1]
-    file_path = _find_file_with_pattern(
+    file_path = find_file_with_pattern(
         Config1.POSITION_DATA_DIR,
         rf"{re.escape(set_name)}_{re.escape(resolution)}" rf".*\.npy",
         f"positions for {set_name} {resolution}",
@@ -105,7 +103,7 @@ def _load_positions(dataset_id: DatasetId) -> np.ndarray:
 
 def _load_sparse_matrix(dataset_id: DatasetId):
     set_name, resolution = dataset_id[0], dataset_id[1]
-    file_path = _find_file_with_pattern(
+    file_path = find_file_with_pattern(
         Config1.ADJ_MATRIX_DATA_DIR,
         rf"sparse_matrices_{re.escape(resolution)}" rf".*\.npz",
         "sparse matrix",
@@ -137,7 +135,7 @@ def _load_raw_image(dataset_id: DatasetId):
         directory_path = os.path.join(directory_path, "1811")
         logger.warning("For set B, using 1811 subdirectory.")
 
-    file_path = _find_file_with_pattern(
+    file_path = find_file_with_pattern(
         directory_path,
         rf"\b{re.escape(resolution)}\b" rf".*\.(tif|png|jpg)",
         f"image for {set_name} {resolution}",
