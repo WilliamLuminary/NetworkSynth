@@ -25,6 +25,9 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _GUI_RUN = os.path.join(_REPO_ROOT, "gui_run.py")
 _GUI_PREVIEW = os.path.join(_REPO_ROOT, "gui_preview.py")
 
+#: The frames that follow the input image until the user sets one.
+_FRAME_KEYS = ("FRAME_SIZE", "SYNTHETIC_FRAME_SIZE")
+
 #: Exit codes gui_run.py promises.
 _EXIT_MEANING = {
     0: "Finished.",
@@ -85,6 +88,8 @@ class SynthesisController(QObject):
         self._spec_path: Optional[str] = None
         self._run_mode = ""
         self._ran_ok = False
+        #: Whether the frames are still the image's, or the user's own.
+        self._frame_touched = False
 
         # Previews.  Each side is shown or not, and holds the info.json its
         # render wrote; the layer switches choose between the original's three
@@ -167,27 +172,117 @@ class SynthesisController(QObject):
         return [
             section
             for section in self._sections()
-            if section["name"] != spec_builder.OUTPUT_GROUP
+            if section["name"]
+            not in (spec_builder.OUTPUT_GROUP, spec_builder.ALIGN_GROUP)
         ]
+
+    @Property("QVariantList", notify=changed)
+    def alignLines(self) -> list:
+        """The align section's rows — only for a single network.
+
+        A folder holds networks that were traced from different images, and one
+        turn applied to all of them would be right for at most one.  Editing is
+        a thing you do to a network you are looking at.
+        """
+        if self._shapes()[self._shape].scope != spec_builder.SINGLE:
+            return []
+        return self._lines_of(spec_builder.ALIGN_GROUP)
+
+    @Slot()
+    def saveEdited(self) -> None:
+        """Write the input as it is being read now, and read it back."""
+        self._want("save_edited")
 
     @Property("QVariantList", notify=changed)
     def outputLines(self) -> list:
         """The output section's rows, for the pane that holds them."""
+        return self._lines_of(spec_builder.OUTPUT_GROUP)
+
+    def _lines_of(self, group: str) -> list:
         for section in self._sections():
-            if section["name"] == spec_builder.OUTPUT_GROUP:
+            if section["name"] == group:
                 return section["lines"]
         return []
 
     def _sections(self) -> list:
-        return spec_builder.sections_of(spec_builder.MODES[self._mode].fields)
+        """The mode's sections, each field carrying what it is set to now.
+
+        The value travels in the model rather than being fetched by a slot: a
+        binding on a slot call is evaluated once and never again, so a control
+        went on showing whatever it was handed when it was built, however often
+        the value behind it changed.
+        """
+        sections = spec_builder.sections_of(spec_builder.MODES[self._mode].fields)
+        for section in sections:
+            for line in section["lines"]:
+                for spec_field in line["fields"]:
+                    value = self._values.get(spec_field["id"], spec_field["value"])
+                    spec_field["current"] = (
+                        list(value) if isinstance(value, tuple) else value
+                    )
+        return sections
+
+    @Property(bool, notify=changed)
+    def hasInputChoice(self) -> bool:
+        return len(spec_builder.MODES[self._mode].input_shapes) > 1
 
     @Property("QStringList", notify=changed)
-    def inputShapes(self) -> list:
-        return [shape.label for shape in spec_builder.MODES[self._mode].input_shapes]
+    def inputScopes(self) -> list:
+        """One network, or a folder of them — said apart from the format."""
+        return [spec_builder.SCOPE_LABELS[scope] for scope in self._scopes()]
 
     @Property(int, notify=changed)
-    def inputShape(self) -> int:
-        return self._shape
+    def inputScope(self) -> int:
+        return self._scopes().index(self._shapes()[self._shape].scope)
+
+    @Slot(int)
+    def selectInputScope(self, index: int) -> None:
+        """Switch between one network and a folder, keeping the format if it
+        exists on the other side.  A folder can only be read as CSV pairs, so
+        coming back from one lands on whatever that scope does offer."""
+        scopes = self._scopes()
+        if not 0 <= index < len(scopes):
+            return
+        wanted = self._shapes()[self._shape].format
+        for position, shape in enumerate(self._shapes()):
+            if shape.scope == scopes[index] and shape.format == wanted:
+                self.selectInputShape(position)
+                return
+        for position, shape in enumerate(self._shapes()):
+            if shape.scope == scopes[index]:
+                self.selectInputShape(position)
+                return
+
+    @Property("QStringList", notify=changed)
+    def inputFormats(self) -> list:
+        """The formats this scope can actually be read as."""
+        scope = self._shapes()[self._shape].scope
+        return [shape.format for shape in self._shapes() if shape.scope == scope]
+
+    @Property(int, notify=changed)
+    def inputFormat(self) -> int:
+        return self.inputFormats.index(self._shapes()[self._shape].format)
+
+    @Slot(int)
+    def selectInputFormat(self, index: int) -> None:
+        scope = self._shapes()[self._shape].scope
+        matching = [
+            position
+            for position, shape in enumerate(self._shapes())
+            if shape.scope == scope
+        ]
+        if 0 <= index < len(matching):
+            self.selectInputShape(matching[index])
+
+    def _shapes(self) -> list:
+        return spec_builder.MODES[self._mode].input_shapes
+
+    def _scopes(self) -> list:
+        seen = []
+        for shape in self._shapes():
+            if shape.scope not in seen:
+                seen.append(shape.scope)
+        return seen
 
     @Slot(int)
     def selectInputShape(self, index: int) -> None:
@@ -202,6 +297,10 @@ class SynthesisController(QObject):
             return
         self._shape = index
         self._inputs = spec_builder.default_inputs(self._mode, index)
+        if self._shapes()[index].scope != spec_builder.SINGLE:
+            # The turn is not offered for a folder, so it must not linger in
+            # the spec and quietly turn every network in one.
+            self._values["INPUT_ORIENTATION"] = "none"
         self._info["original"] = None
         self._note_ready()
 
@@ -218,7 +317,14 @@ class SynthesisController(QObject):
         for spec_input in shape.inputs:
             value = self._inputs.get(spec_input.id, "")
             state, _ = spec_builder.input_state(spec_input, value)
-            rows.append({**spec_input.as_dict(), "value": value, "state": state})
+            rows.append(
+                {
+                    **spec_input.as_dict(),
+                    # Shown short; stored, checked and run absolute.
+                    "value": spec_builder.display_path(value),
+                    "state": state,
+                }
+            )
         return rows
 
     @Property(str, notify=changed)
@@ -256,7 +362,7 @@ class SynthesisController(QObject):
 
     @Property(str, notify=changed)
     def outputDir(self) -> str:
-        return self._output_dir
+        return spec_builder.display_path(self._output_dir)
 
     @Property(str, notify=changed)
     def status(self) -> str:
@@ -390,6 +496,33 @@ class SynthesisController(QObject):
     def previewFailed(self) -> bool:
         return bool(self._preview_error)
 
+    @Slot()
+    def clearOutputs(self) -> None:
+        """Write nothing beyond what a run cannot help writing.
+
+        Every format off, and the plot count to zero with them: asking for
+        images in no format is the one combination the form refuses, and
+        "none" should not walk into it.
+        """
+        for spec_field in self._output_fields():
+            self._values[spec_field.id] = False if spec_field.kind == "bool" else 0
+        self._note_ready()
+
+    @Slot()
+    def resetOutputs(self) -> None:
+        """Back to what the mode declares: networks as CSV, plots as WebP."""
+        for spec_field in self._output_fields():
+            self._values[spec_field.id] = spec_field.value
+        self._note_ready()
+
+    def _output_fields(self) -> list:
+        """Whatever the output section holds — not a list repeated here."""
+        return [
+            spec_field
+            for spec_field in spec_builder.MODES[self._mode].fields
+            if spec_field.group == spec_builder.OUTPUT_GROUP
+        ]
+
     @Slot(bool)
     def setShowBackground(self, on: bool) -> None:
         self._layers["background"] = on
@@ -401,11 +534,6 @@ class SynthesisController(QObject):
         self.changed.emit()
 
     # ---- slots the form calls ----
-
-    @Slot(str, result="QVariant")
-    def valueOf(self, key: str):
-        value = self._values.get(key)
-        return list(value) if isinstance(value, tuple) else value
 
     @Slot(str, "QVariant")
     def setValue(self, key: str, value) -> None:
@@ -422,17 +550,20 @@ class SynthesisController(QObject):
         except (TypeError, ValueError):
             return
         self._values[key] = tuple(current)
+        if key in _FRAME_KEYS:
+            # From here the frame is theirs, and the image stops setting it.
+            self._frame_touched = True
         self._touch_preview()
 
     @Slot(str, str)
     def setInput(self, key: str, value: str) -> None:
-        self._inputs[key] = _local_path(value)
+        self._inputs[key] = spec_builder.resolve_path(_local_path(value))
         self._touch_preview()
         self._note_ready()
 
     @Slot(str)
     def setOutputDir(self, value: str) -> None:
-        self._output_dir = _local_path(value)
+        self._output_dir = spec_builder.resolve_path(_local_path(value))
         self.changed.emit()
 
     @Slot()
@@ -504,7 +635,10 @@ class SynthesisController(QObject):
                     return int(float(value))
                 if spec_field.kind == "bool":
                     return bool(value)
-                if spec_field.kind == "text":
+                # "choice" with them: it is a string from a fixed set, and
+                # falling through to float() made every pick revert to the
+                # default without a word.
+                if spec_field.kind in ("text", "choice"):
                     return str(value)
                 return float(value)
             except (TypeError, ValueError):
@@ -609,6 +743,40 @@ class SynthesisController(QObject):
         info = self._info[kind]
         return info["note"] if info else ""
 
+    def _read_edited(self, info: dict) -> None:
+        """Point the form at the copy that was just written.
+
+        The turn goes back to none with it: the saved data already has it, and
+        leaving it set would turn the network a second time on the next read.
+        """
+        shape = spec_builder.shape_for(self._mode, self._inputs)
+        for key, path in info["inputs"].items():
+            if key in shape.all_ids:
+                self._inputs[key] = path
+        self._values["INPUT_ORIENTATION"] = "none"
+        self._info["original"] = None
+        self._stale.add("original")
+        self._set_status(f"Saved {info['count']} edited network(s) to {info['dir']}")
+
+    def _adopt_image_size(self, info: dict) -> None:
+        """Take the frames from the image the input came with.
+
+        Only until the user sets one of their own: after that the image is
+        just what gets drawn behind the network.  Re-renders once, because the
+        picture that arrived was drawn in the frame this replaces.
+        """
+        size = info.get("image_size")
+        if not size or self._frame_touched:
+            return
+
+        frame = (int(size[0]), int(size[1]))
+        present = [key for key in _FRAME_KEYS if key in self._values]
+        if all(self._values[key] == frame for key in present):
+            return
+        for key in present:
+            self._values[key] = frame
+        self._stale.add("original")
+
     def _touch_preview(self) -> None:
         """The form changed, so a shown preview is of something else now.
 
@@ -630,14 +798,20 @@ class SynthesisController(QObject):
         cancelling it, so turning both on shows both.
         """
         while self._preview_process is None and self._stale:
-            kind = "original" if "original" in self._stale else "synthetic"
+            kind = next(
+                name
+                for name in ("save_edited", "original", "synthetic")
+                if name in self._stale
+            )
             self._stale.discard(kind)
-            if self._shown[kind]:
+            # Saving is asked for outright; a preview only runs for a side that
+            # is on screen to receive it.
+            if kind == "save_edited" or self._shown[kind]:
                 self._launch_preview(kind)
         self.changed.emit()
 
     def _launch_preview(self, kind: str) -> None:
-        if kind == "original":
+        if kind in ("original", "save_edited"):
             problems = spec_builder.validate(
                 self._mode, self._inputs, self._output_dir, self._values
             )
@@ -692,7 +866,13 @@ class SynthesisController(QObject):
             # Exit 0 promises info.json, so a missing one is a bug worth
             # hearing about rather than an empty panel.
             with open(os.path.join(self._preview_out, "info.json")) as handle:
-                self._info[self._preview_kind] = json.load(handle)
+                info = json.load(handle)
+            if self._preview_kind == "save_edited":
+                self._read_edited(info)
+            else:
+                self._info[self._preview_kind] = info
+                if self._preview_kind == "original":
+                    self._adopt_image_size(info)
             self._preview_error = ""
         else:
             self._info[self._preview_kind] = None

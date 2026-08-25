@@ -52,6 +52,10 @@ def _format_fields(group: str, formats, default: str) -> List[Field]:
 #: know which one it is.
 OUTPUT_GROUP = "Output"
 
+#: The section for squaring the input up with the image it was traced from.
+#: Its own pane, beside the files it is about.
+ALIGN_GROUP = "Align"
+
 
 @dataclass(frozen=True)
 class Field:
@@ -71,13 +75,22 @@ class Field:
     row: str = ""
     #: For ``kind="choice"``: everything the field accepts.
     options: tuple = ()
+    #: The one number in its section that a run is usually about, drawn larger.
+    prominent: bool = False
+    #: What the number is counted in, shown after the editor.  Not every size
+    #: is a length: a target scale counts tiles.
+    unit: str = ""
+    #: What the two halves of a ``size`` are, in order.  Not every pair is a
+    #: width and a height — hybrid reads its target scale as (rows, columns).
+    axes: tuple = ("w", "h")
 
     def as_dict(self) -> Dict[str, Any]:
         data = asdict(self)
         # A tuple crosses into QML as an opaque wrapper rather than an array:
         # it has no length and no indexOf, so a combo box bound to one is an
-        # invalid model.  The same reason ``valueOf`` hands back a list.
+        # invalid model, the same way a tuple value has to be listed too.
         data["options"] = list(self.options)
+        data["axes"] = list(self.axes)
         return data
 
 
@@ -127,12 +140,23 @@ class Input:
         return asdict(self)
 
 
+#: The two things an input can be, kept apart from what format it is in: one
+#: network to work on, or a folder of them to work through.
+SINGLE, DIRECTORY = "single", "directory"
+
+SCOPE_LABELS = {SINGLE: "Single network", DIRECTORY: "Directory"}
+
+
 @dataclass(frozen=True)
 class InputShape:
     """One way a mode can be given its input."""
 
     label: str
     inputs: List[Input]
+    #: One network or a folder of them.  Editing is offered only for one.
+    scope: str = SINGLE
+    #: What the files are, said separately from how many there are.
+    format: str = "CSV pair"
 
     @property
     def ids(self) -> tuple:
@@ -167,14 +191,49 @@ def _registered_checkers() -> tuple:
 
 
 def _common_fields() -> List[Field]:
+    from utils.graph_ops import ORIENTATIONS
+
     return (
         [
             Field(
-                "SYNTHETIC_FRAME_SIZE",
-                "Frame (w × h)",
+                "INPUT_ORIENTATION",
+                "Turn network",
+                "none",
+                kind="choice",
+                options=ORIENTATIONS,
+                group=ALIGN_GROUP,
+                help=(
+                    "For position data recorded in a different orientation to\n"
+                    "the image it was traced from. Turned inside its own\n"
+                    "bounding box, so only the extents swap.\n"
+                    "The image is never turned: scale it with the input frame,\n"
+                    "or prepare it beforehand."
+                ),
+            ),
+            Field(
+                "FRAME_SIZE",
+                "Background image",
                 (512, 512),
                 kind="size",
-                help="Area the generated network grows into.",
+                unit="px",
+                help=(
+                    "The coordinate window everything shares: the input image\n"
+                    "is scaled to it, and the network is drawn in it.\n"
+                    "Defaults to the image's own size, which is the reliable\n"
+                    "answer — position data need not reach the corners, so its\n"
+                    "extent understates the window."
+                ),
+            ),
+            Field(
+                "SYNTHETIC_FRAME_SIZE",
+                "Synthetic frame",
+                (512, 512),
+                kind="size",
+                unit="px",
+                help=(
+                    "Area a generated network grows into. Matching the input\n"
+                    "frame is what makes the two comparable."
+                ),
             ),
             Field(
                 "CLOSED_NODES_FACTOR",
@@ -195,12 +254,14 @@ def _common_fields() -> List[Field]:
             ),
             Field(
                 "SYNTHETIC_NETWORK_NUMBER",
-                "Networks",
+                "Number of networks",
                 5,
                 kind="integer",
                 minimum=1,
                 maximum=500,
                 step=1,
+                prominent=True,
+                help="How many synthetic networks this run produces.",
             ),
             Field(
                 "ERROR_CHECKER",
@@ -271,10 +332,18 @@ def _hybrid_fields() -> List[Field]:
     return [
         Field(
             "TARGET_SCALE",
-            "Target scale (w × h)",
+            "Target scale",
             (100, 100),
             kind="size",
-            help="How many tile-widths of network to assemble.",
+            unit="× the background",
+            # `scale_rows, scale_cols = config.TARGET_SCALE` — down first,
+            # across second, which is the opposite way round to every frame.
+            axes=("rows", "cols"),
+            help=(
+                "A multiplier, not a size. The assembled area is\n"
+                "rows × background height by cols × background width —\n"
+                "so 100 × 100 over a 510 px background is 51000 px square."
+            ),
             group="Tiling",
         ),
         Field(
@@ -302,6 +371,7 @@ def _hybrid_fields() -> List[Field]:
             "MIN_TILE_FRAME",
             "Minimum tile frame",
             382.0,
+            unit="px",
             minimum=1.0,
             maximum=5000.0,
             step=10.0,
@@ -349,7 +419,8 @@ def _network_shapes() -> List[InputShape]:
     return [
         InputShape(
             "One network (CSV pair)",
-            [
+            format="CSV pair",
+            inputs=[
                 Input(
                     "edge_list",
                     "Edge list",
@@ -381,7 +452,11 @@ def _network_shapes() -> List[InputShape]:
         ),
         InputShape(
             "A directory of networks",
-            [
+            scope=DIRECTORY,
+            # The only format a folder can be read as: discover_datasets scans
+            # for `*_edgelist.csv` and its positions partner, nothing else.
+            format="CSV pair",
+            inputs=[
                 Input(
                     "datasets_dir",
                     "Networks dir",
@@ -400,7 +475,8 @@ def _network_shapes() -> List[InputShape]:
         ),
         InputShape(
             "One network (NumPy pair)",
-            [
+            format="NumPy pair",
+            inputs=[
                 Input(
                     "adjacency",
                     "Adjacency",
@@ -431,7 +507,8 @@ def _network_shapes() -> List[InputShape]:
         ),
         InputShape(
             "One network (pickle)",
-            [
+            format="Pickle",
+            inputs=[
                 Input(
                     "network_pkl",
                     "Network",
@@ -456,7 +533,9 @@ def _results_shapes() -> List[InputShape]:
     return [
         InputShape(
             "Two sets to compare",
-            [
+            scope=DIRECTORY,
+            format="Result folders",
+            inputs=[
                 Input(
                     "original_dir",
                     "Original",
@@ -624,6 +703,37 @@ _SAMPLE_INPUTS = {
 }
 
 
+PROJECT_ROOT = BaseConfig.PROJECT_ROOT
+
+
+def display_path(path: str) -> str:
+    """*path* as the form shows it: relative to the project when it is inside.
+
+    Only how it is written, never what is stored: a spec always carries the
+    absolute path, because it is read by a subprocess and again by whatever
+    that spawns, and those do not share a working directory.
+
+    A relative path already means "relative to the project" here — the GUI
+    starts every child with the project root as its working directory — so
+    this is the shorter half of the same name, not a second convention.
+    """
+    if not path:
+        return ""
+    try:
+        inside = os.path.relpath(path, PROJECT_ROOT)
+    except ValueError:
+        # Windows, different drive: there is no relative form.
+        return path
+    return path if inside.startswith(os.pardir) else inside
+
+
+def resolve_path(text: str) -> str:
+    """What the form was given, as the absolute path everything else uses."""
+    if not text:
+        return ""
+    return os.path.abspath(os.path.join(PROJECT_ROOT, os.path.expanduser(text)))
+
+
 def sample_for(key: str) -> str:
     path = _SAMPLE_INPUTS.get(key, "")
     return path if path and os.path.exists(path) else ""
@@ -694,21 +804,31 @@ def validate(
         if isinstance(span, (list, tuple)) and span[0] > span[1]:
             problems.append(f"{key.replace('_', ' ').title()}: start is above end.")
 
-    for group, formats in (("network", NETWORK_FORMATS), ("plot", PLOT_FORMATS)):
-        offered = [
-            format_param(group, name)
-            for name in formats
-            if format_param(group, name) in values
-        ]
-        if offered and not any(values[key] for key in offered):
-            problems.append(
-                f"Choose at least one {group} format to save, or the run "
-                f"writes no {group} files."
-            )
+    # No format at all is a choice, not a mistake: a run made only to look at
+    # the result wants nothing on disk.  Asking for plot images in no format is
+    # a different thing — that request cannot be met, so say so.
+    plot_formats = [
+        format_param("plot", name)
+        for name in PLOT_FORMATS
+        if format_param("plot", name) in values
+    ]
+    wanted_images = values.get("SYNTHETIC_GRAPH_NUMBER") or 0
+    if plot_formats and wanted_images and not any(values[k] for k in plot_formats):
+        problems.append(
+            f"Plot images is {wanted_images:g} but no plot format is chosen, so "
+            "none would be written. Pick a format, or set plot images to 0."
+        )
 
-    checker = values.get("ERROR_CHECKER")
-    if checker is not None and checker not in _CHECKER_NAMES:
-        problems.append(f"Quality gate must be one of: {', '.join(_CHECKER_NAMES)}.")
+    # Every choice field, not the quality gate alone: each one declares what
+    # it accepts, so nothing has to be listed twice here.
+    for spec_field in MODES[mode].fields:
+        if spec_field.kind != "choice" or spec_field.id not in values:
+            continue
+        if values[spec_field.id] not in spec_field.options:
+            problems.append(
+                f"{spec_field.label} must be one of: "
+                f"{', '.join(spec_field.options)}."
+            )
 
     return problems
 
@@ -729,11 +849,13 @@ def build_spec(
         params["SEED"] = None
 
     # The frame the original is measured in matches the synthetic one unless a
-    # caller says otherwise; IMAGE_SIZE only matters when there is an image.
+    # caller says otherwise.
     frame = params.get("SYNTHETIC_FRAME_SIZE")
     if frame is not None:
         params.setdefault("FRAME_SIZE", frame)
-        params.setdefault("IMAGE_SIZE", frame)
+
+    # IMAGE_SIZE is not derived here any more: it is the input image's true
+    # size, which only the loader can know, and it measures it as it reads.
 
     # Every trial replaces these with the combination being scored, but
     # SynthParams still has to be built from the config before that happens, so

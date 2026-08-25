@@ -40,7 +40,9 @@ class BaseConfig:
             raise ValueError("DATASETS must be defined in the config")
         return cls.DATASETS
 
-    # IMAGE_SIZE: Background image dimensions (height, width) in pixels
+    # IMAGE_SIZE: the input image's true size (height, width) in pixels, as it
+    # is on disk.  Recorded, never laid out by: what the network and its
+    # background are drawn in is FRAME_SIZE, which the image is scaled to.
     IMAGE_SIZE: Tuple[int, int] = None
 
     # FRAME_SIZE: Original network plotting frame (X_range, Y_range)

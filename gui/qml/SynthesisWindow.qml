@@ -23,7 +23,7 @@ ApplicationWindow {
     // live in the footer, so the button pressed every time is never scrolled
     // off and the last run stays named.
 
-    readonly property int labelWidth: 140
+    readonly property int labelWidth: 162
     readonly property int numberWidth: 96
 
     readonly property color accent: palette.highlight
@@ -253,7 +253,9 @@ ApplicationWindow {
         // the form complaining afterwards.
         SpinBox {
             visible: editor.field.kind === "integer"
-            Layout.preferredWidth: 132
+            Layout.preferredWidth: editor.field.prominent === true ? 180 : 132
+            Layout.preferredHeight: editor.field.prominent === true ? 40 : -1
+            font.bold: editor.field.prominent === true
             editable: true
             // Loose `!=`, because an unset bound arrives from Python as
             // undefined rather than null, and a strict test lets it through.
@@ -275,6 +277,14 @@ ApplicationWindow {
         RowLayout {
             visible: editor.field.kind === "size" || editor.field.kind === "range"
             spacing: 6
+
+            // Which box is which, rather than leaving it to the order.  A
+            // range is a start and an end, so it gets no letters.
+            Label {
+                visible: editor.field.kind === "size"
+                text: editor.field.axes[0]
+                opacity: 0.5
+            }
             TextField {
                 Layout.preferredWidth: root.numberWidth
                 // Bindings of invisible siblings still evaluate, so guard the
@@ -288,6 +298,11 @@ ApplicationWindow {
                 text: editor.field.kind === "range" ? "→" : "×"
                 opacity: 0.5
             }
+            Label {
+                visible: editor.field.kind === "size"
+                text: editor.field.axes[1]
+                opacity: 0.5
+            }
             TextField {
                 Layout.preferredWidth: root.numberWidth
                 text: editor.field.kind === "size" || editor.field.kind === "range"
@@ -295,6 +310,15 @@ ApplicationWindow {
                 validator: DoubleValidator { bottom: 0 }
                 onEditingFinished: editor.sized(1, text)
             }
+        }
+
+        // What the number is counted in.  Positions are image pixels, which
+        // is why a frame is too — the two have to be the same space for the
+        // network to land on its background.
+        Label {
+            visible: editor.field.unit !== ""
+            text: editor.field.unit
+            opacity: 0.5
         }
 
         Item { Layout.fillWidth: true }
@@ -312,6 +336,8 @@ ApplicationWindow {
             text: formLine.line.row ? formLine.line.row : formLine.line.fields[0].label
             Layout.preferredWidth: root.labelWidth
             elide: Text.ElideRight
+            font.bold: !formLine.line.row
+                && formLine.line.fields[0].prominent === true
             ToolTip.text: formLine.line.row ? "" : formLine.line.fields[0].help
             ToolTip.visible: !formLine.line.row && formLine.line.fields[0].help
                 ? lineHover.hovered : false
@@ -325,7 +351,7 @@ ApplicationWindow {
             delegate: CheckBox {
                 required property var modelData
                 text: modelData.label
-                checked: controller.valueOf(modelData.id) === true
+                checked: modelData.current === true
                 ToolTip.text: modelData.help
                 ToolTip.visible: modelData.help ? hovered : false
                 onToggled: controller.setValue(modelData.id, checked)
@@ -336,7 +362,7 @@ ApplicationWindow {
             visible: !formLine.line.row
             Layout.fillWidth: true
             field: formLine.line.fields[0]
-            value: controller.valueOf(formLine.line.fields[0].id)
+            value: formLine.line.fields[0].current
             onEdited: (newValue) => controller.setValue(
                 formLine.line.fields[0].id, newValue)
             onSized: (index, newValue) => controller.setSize(
@@ -510,12 +536,37 @@ ApplicationWindow {
                         Card {
                             title: "Input"
 
+                            // How many, and what of, as two questions rather
+                            // than one list of every combination.  Only where
+                            // the mode offers a choice: analysis reads a pair
+                            // of results folders and nothing else.
                             RowLayout {
                                 Layout.fillWidth: true
                                 spacing: 10
-                                // Only where the mode offers a choice: analysis
-                                // reads a results directory and nothing else.
-                                visible: controller.inputShapes.length > 1
+                                visible: controller.hasInputChoice
+
+                                Label {
+                                    text: "Input"
+                                    Layout.preferredWidth: root.labelWidth
+                                }
+                                Repeater {
+                                    model: controller.inputScopes
+                                    delegate: RadioButton {
+                                        required property int index
+                                        required property var modelData
+                                        text: modelData
+                                        checked: index === controller.inputScope
+                                        enabled: !controller.running
+                                        onClicked: controller.selectInputScope(index)
+                                    }
+                                }
+                                Item { Layout.fillWidth: true }
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 10
+                                visible: controller.hasInputChoice
 
                                 Label {
                                     text: "Format"
@@ -523,10 +574,14 @@ ApplicationWindow {
                                 }
                                 ComboBox {
                                     Layout.fillWidth: true
-                                    model: controller.inputShapes
-                                    currentIndex: controller.inputShape
-                                    onActivated: controller.selectInputShape(currentIndex)
+                                    model: controller.inputFormats
+                                    currentIndex: controller.inputFormat
+                                    onActivated: controller.selectInputFormat(currentIndex)
+                                    // A folder is only read one way, so there
+                                    // is nothing to choose — shown rather than
+                                    // hidden, so it still says what it will be.
                                     enabled: !controller.running
+                                        && controller.inputFormats.length > 1
                                 }
                             }
 
@@ -629,6 +684,38 @@ ApplicationWindow {
                             }
                         }
 
+                        Card {
+                            title: "Align"
+                            visible: controller.alignLines.length > 0
+                                && controller.canPreview
+
+                            Repeater {
+                                model: controller.alignLines
+                                delegate: FormLine {
+                                    required property var modelData
+                                    line: modelData
+                                }
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+
+                                Item { Layout.preferredWidth: root.labelWidth }
+                                Button {
+                                    text: "Save as edited"
+                                    enabled: controller.canRun
+                                    onClicked: controller.saveEdited()
+                                    ToolTip.text: "Write the network as it is "
+                                        + "drawn now into an 'edited' folder "
+                                        + "beside the source, and read that "
+                                        + "from here on."
+                                    ToolTip.visible: hovered
+                                }
+                                Item { Layout.fillWidth: true }
+                            }
+                        }
+
                         Repeater {
                             model: controller.configSections
 
@@ -664,6 +751,7 @@ ApplicationWindow {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 10
+
                             Label {
                                 text: "Folder"
                                 Layout.preferredWidth: root.labelWidth
@@ -689,6 +777,28 @@ ApplicationWindow {
                                 required property var modelData
                                 line: modelData
                             }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+
+                            Item { Layout.preferredWidth: root.labelWidth }
+                            Button {
+                                text: "Select none"
+                                onClicked: controller.clearOutputs()
+                                ToolTip.text: "Write no networks and no plots. "
+                                    + "A run still leaves its report and the "
+                                    + "batch a preview reads."
+                                ToolTip.visible: hovered
+                            }
+                            Button {
+                                text: "Defaults"
+                                onClicked: controller.resetOutputs()
+                                ToolTip.text: "Networks as .csv, plots as .webp."
+                                ToolTip.visible: hovered
+                            }
+                            Item { Layout.fillWidth: true }
                         }
                     }
 

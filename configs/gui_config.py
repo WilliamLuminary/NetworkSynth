@@ -235,6 +235,11 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
     # Hybrid geometry BaseConfig requires but the GUI form does not offer; a
     # spec can still override these through its params.  Values match
     # configs/hybrid_mode/config_sample.py.
+    #: A quarter turn applied to the input network as it is read, for data
+    #: recorded in a different orientation to the image it was traced from.
+    #: See ``utils.orient_positions``; the image is never turned.
+    INPUT_ORIENTATION: str = "none"
+
     TILE_FRAME_SIZE = None
     MIN_CENTER_DISTANCE_FACTOR: float = 1.5
     NUM_CENTERS: int = 2000
@@ -321,9 +326,11 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
         """Rebuild the save specs from the formats the spec asked for.
 
         A group the spec says nothing about keeps ``BaseConfig``'s default, so
-        a spec written by hand needs none of this.  A group it names but leaves
-        entirely off is refused instead: that run would finish having written
-        nothing, which is not a thing anyone asks for on purpose.
+        a spec written by hand needs none of this.  A group it names and leaves
+        entirely off writes nothing for those outputs, which is a real request:
+        a run made only to look at the result wants as little on disk as
+        possible.  The batch of synthetic networks is not in either group, so
+        that still lands and a preview still has something to read.
         """
         for group, formats in (("network", NETWORK_FORMATS), ("plot", PLOT_FORMATS)):
             named = [
@@ -333,12 +340,6 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
                 continue
 
             chosen = [name for name in named if getattr(cls, format_param(group, name))]
-            if not chosen:
-                raise SpecError(
-                    f"every {group} format is switched off, so the run would "
-                    f"write no {group} files at all. Choose at least one of: "
-                    f"{', '.join(formats)}"
-                )
 
             for attribute, directory, detail in _FORMATTED_OUTPUTS[group]:
                 setattr(
@@ -349,7 +350,10 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
                         for name in chosen
                     ),
                 )
-            logger.info(f"{group} outputs will be written as: {', '.join(chosen)}")
+            if chosen:
+                logger.info(f"{group} outputs will be written as: {', '.join(chosen)}")
+            else:
+                logger.info(f"No {group} files will be written: every format is off.")
 
     @classmethod
     def initialize(cls) -> None:
@@ -375,15 +379,22 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
         Which keys the spec filled decide, because that is what the shape check
         in :meth:`from_spec` has already established; nothing sniffs the file.
         """
+        from utils import orient_positions
+
         if cls.PATHS.get("network_pkl"):
-            return _load_pickled(cls.PATHS["network_pkl"])
-        if cls.PATHS.get("adjacency"):
-            return _load_npy_pair(cls.PATHS["positions_npy"], cls.PATHS["adjacency"])
+            graph = _load_pickled(cls.PATHS["network_pkl"])
+        elif cls.PATHS.get("adjacency"):
+            graph = _load_npy_pair(cls.PATHS["positions_npy"], cls.PATHS["adjacency"])
+        else:
+            from graphs import read_graph_csv
 
-        from graphs import read_graph_csv
+            edge_list, positions = cls._network_paths(dataset_id)
+            graph = read_graph_csv(edge_list, positions)
 
-        edge_list, positions = cls._network_paths(dataset_id)
-        return read_graph_csv(edge_list, positions)
+        # Whatever the format, the turn is applied once, here: a preview and
+        # the run that follows it have to be looking at the same network.
+        orient_positions(graph, cls.INPUT_ORIENTATION)
+        return graph
 
     @classmethod
     def _network_paths(cls, dataset_id: DatasetId):
@@ -413,4 +424,17 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
 
         import cv2
 
-        return cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+        from utils import resize_image
+
+        image = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+        if image is None:
+            logger.warning(f"Image could not be read: {path}")
+            return None
+
+        # Measured, not declared: IMAGE_SIZE is the file's true size, in
+        # (height, width) as it has always been written.
+        cls.IMAGE_SIZE = (image.shape[0], image.shape[1])
+        # Scaled to the frame, the way every CLI config does on load, so the
+        # frame really is the size the background is drawn at.  A frame left
+        # at the image's own size makes this a no-op.
+        return resize_image(image, cls.FRAME_SIZE)

@@ -10,8 +10,13 @@ the same loader, the same style and the same frame as the run's own output —
 not an imitation of it.  Nothing is written into the run's output directory:
 everything lands in the directory named on the command line.
 
-    gui_preview.py <run_spec.json> original  <out_dir>
-    gui_preview.py <run_spec.json> synthetic <out_dir> <run_root>
+    gui_preview.py <run_spec.json> original    <out_dir>
+    gui_preview.py <run_spec.json> synthetic   <out_dir> <run_root>
+    gui_preview.py <run_spec.json> save_edited <out_dir>
+
+The last one writes rather than draws: the input network as the spec is
+currently reading it, turn included, so a correction made in the form can be
+kept.
 """
 
 import json
@@ -168,6 +173,10 @@ def preview_original(config, out_dir: str) -> dict:
     return {
         "kind": "original",
         "has_background": image is not None,
+        # (width, height).  The form takes its frame from this: position data
+        # need not reach the corners of what it was traced from, so the image
+        # is the only reliable statement of how big the input really is.
+        "image_size": None if image is None else [image.shape[1], image.shape[0]],
         "images": images,
         "note": note,
         "text": _info_text("Original network", graph, attributes),
@@ -233,6 +242,84 @@ def preview_synthetic(config, run_root: str, out_dir: str) -> dict:
     }
 
 
+def _source(config, dataset_id):
+    """Where the input came from, and what to call an edited copy of it."""
+    paths = config.PATHS
+    if paths.get("datasets_dir"):
+        return paths["datasets_dir"], str(dataset_id)
+    for key, suffix in (
+        ("edge_list", "_edgelist.csv"),
+        ("adjacency", "_mat.npy"),
+        ("network_pkl", ".pkl"),
+    ):
+        if paths.get(key):
+            name = os.path.basename(paths[key])
+            if name.endswith(suffix):
+                name = name[: -len(suffix)]
+            return os.path.dirname(paths[key]), name
+    raise ValueError("the spec names no input to edit")
+
+
+def save_edited(config, out_dir: str) -> dict:
+    """Write the input network as it is being read, turn and all.
+
+    Into an ``edited`` folder beside the source rather than alongside it: a
+    directory of networks is discovered by scanning for ``*_edgelist.csv``, so
+    a copy dropped in there would quietly double every later run.
+
+    The image is copied across untouched when there is one, so the result is a
+    complete dataset — nothing about the image is edited here, or anywhere.
+    """
+    import shutil
+
+    from configs.file_definitions import save_network_csv
+
+    datasets = config.get_datasets()
+    source_dir, _ = _source(config, datasets[0])
+    target_dir = os.path.join(source_dir, "edited")
+    os.makedirs(target_dir, exist_ok=True)
+
+    written = []
+    for dataset_id in datasets:
+        _, name = _source(config, dataset_id)
+        base = f"{name}_edited"
+        graph = config.ORIGINAL_NETWORK_FUNC(dataset_id)
+        save_network_csv(graph, os.path.join(target_dir, f"{base}.csv"))
+        written.append(base)
+
+        image_path = _image_path(config, dataset_id)
+        if image_path:
+            shutil.copyfile(image_path, os.path.join(target_dir, f"{base}_image.tif"))
+
+    logger.info(f"Wrote {len(written)} edited network(s) to {target_dir}")
+    first = os.path.join(target_dir, f"{written[0]}")
+    return {
+        "kind": "save_edited",
+        "dir": target_dir,
+        "count": len(written),
+        # What the form should read from now: the edited copies, which already
+        # have the turn baked in.
+        "inputs": (
+            {"datasets_dir": target_dir}
+            if config.PATHS.get("datasets_dir")
+            else {
+                "edge_list": f"{first}_edgelist.csv",
+                "positions": f"{first}_positions.csv",
+            }
+        ),
+    }
+
+
+def _image_path(config, dataset_id):
+    """The image file behind *dataset_id*, if the spec has one."""
+    directory = config.PATHS.get("datasets_dir")
+    if directory:
+        candidate = os.path.join(directory, f"{dataset_id}_image.tif")
+        return candidate if os.path.exists(candidate) else None
+    path = config.PATHS.get("image")
+    return path if path and os.path.exists(path) else None
+
+
 def main(argv=None) -> int:
     configure_console()
     argv = sys.argv if argv is None else argv
@@ -254,6 +341,8 @@ def main(argv=None) -> int:
         if len(argv) < 5:
             raise SystemExit("a synthetic preview needs the run's output root")
         info = preview_synthetic(config, argv[4], out_dir)
+    elif kind == "save_edited":
+        info = save_edited(config, out_dir)
     else:
         raise SystemExit(f"unknown preview kind {kind!r}")
 

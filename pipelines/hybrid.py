@@ -565,10 +565,15 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
     max_rounds = config.PHASE2_MAX_ROUNDS
     min_dist_factor = config.MIN_CENTER_DISTANCE_FACTOR
 
-    img_h, img_w = config.IMAGE_SIZE
-    whiteboard_w = scale_cols * img_w
-    whiteboard_h = scale_rows * img_h
-    min_distance = min_dist_factor * max(img_w, img_h)
+    # The frame, not IMAGE_SIZE.  A tile's coordinates are in frame space, and
+    # every config that declared both set IMAGE_SIZE to the frame transposed —
+    # config_dickson says so in a comment — so this reads the same numbers by
+    # the name that means them.  IMAGE_SIZE is the input image's true size now,
+    # and nothing lays out by it.
+    frame_w, frame_h = config.FRAME_SIZE
+    whiteboard_w = scale_cols * frame_w
+    whiteboard_h = scale_rows * frame_h
+    min_distance = min_dist_factor * max(frame_w, frame_h)
 
     max_centers = config.NUM_CENTERS
 
