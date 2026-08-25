@@ -5,6 +5,7 @@ import os
 from dataclasses import asdict, dataclass, field, replace
 from typing import Any, Dict, List, Optional, Tuple
 
+from configs.base_config import BaseConfig
 from configs.gui_config import (
     NETWORK_FORMATS,
     PLOT_FORMATS,
@@ -325,7 +326,7 @@ def _background() -> Input:
         "image",
         "Image",
         filter="Images (*.tif *.tiff *.png *.jpg *.jpeg *.webp)",
-        placeholder="optional — background the network is drawn over",
+        placeholder="optional background",
         optional=True,
         help=(
             "Any image OpenCV can read; used in greyscale.\n"
@@ -385,7 +386,7 @@ def _network_shapes() -> List[InputShape]:
                     "datasets_dir",
                     "Networks dir",
                     kind="dir",
-                    placeholder="every …_edgelist.csv + …_positions.csv pair in it",
+                    placeholder="folder of …_edgelist.csv pairs",
                     help=(
                         "One dataset per …_edgelist.csv, each needing a\n"
                         "matching …_positions.csv beside it.\n"
@@ -404,7 +405,7 @@ def _network_shapes() -> List[InputShape]:
                     "adjacency",
                     "Adjacency",
                     filter="NumPy files (*.npy)",
-                    placeholder="…_mat.npy — a scipy sparse matrix",
+                    placeholder="…_mat.npy",
                     help=(
                         "…_mat.npy holding a scipy sparse adjacency\n"
                         "matrix, saved as a 0-d object array and read\n"
@@ -417,7 +418,7 @@ def _network_shapes() -> List[InputShape]:
                     "positions_npy",
                     "Positions",
                     filter="NumPy files (*.npy)",
-                    placeholder="…_pos.npy — (row, column), transposed on load",
+                    placeholder="…_pos.npy",
                     help=(
                         "…_pos.npy, shape (N, 2), one row per node.\n"
                         "Recorded as (row, column) and transposed to\n"
@@ -435,7 +436,7 @@ def _network_shapes() -> List[InputShape]:
                     "network_pkl",
                     "Network",
                     filter="Pickle files (*.pkl)",
-                    placeholder="a SynthGraph, or the batch a run wrote",
+                    placeholder="…_network.pkl",
                     help=(
                         "A pickled SynthGraph, or a list of them — the\n"
                         "synthetic_network_*.pkl a run writes.\n"
@@ -460,7 +461,7 @@ def _results_shapes() -> List[InputShape]:
                     "original_dir",
                     "Original",
                     kind="dir",
-                    placeholder="folder holding the original network",
+                    placeholder="original/ folder",
                     help=(
                         "A folder of networks, read as a batch .pkl if\n"
                         "one is in it, and otherwise as every\n"
@@ -473,7 +474,7 @@ def _results_shapes() -> List[InputShape]:
                     "synthetic_dir",
                     "Synthetic",
                     kind="dir",
-                    placeholder="folder holding the synthetic networks",
+                    placeholder="synthetic/ folder",
                     help=(
                         "The same, for the networks being compared\n"
                         "against the originals — a run's synthetic/\n"
@@ -608,6 +609,26 @@ def shape_for(mode: str, inputs: Dict[str, str]) -> InputShape:
     )
 
 
+_SAMPLES = os.path.join(BaseConfig.BASE_INPUT_PATH, "samples")
+
+#: What each input starts as.  Only used when the sample is actually there: a
+#: checkout has these, a release built without ``data/input`` does not, and an
+#: empty box beats one pointing at a file nobody shipped.
+_SAMPLE_INPUTS = {
+    "edge_list": os.path.join(_SAMPLES, "gui_mode", "sample_1_edgelist.csv"),
+    "positions": os.path.join(_SAMPLES, "gui_mode", "sample_1_positions.csv"),
+    "image": os.path.join(_SAMPLES, "gui_mode", "sample_1_image.tif"),
+    "datasets_dir": os.path.join(_SAMPLES, "gui_mode"),
+    "adjacency": os.path.join(_SAMPLES, "generate_mode", "sample_1_mat.npy"),
+    "positions_npy": os.path.join(_SAMPLES, "generate_mode", "sample_1_pos.npy"),
+}
+
+
+def sample_for(key: str) -> str:
+    path = _SAMPLE_INPUTS.get(key, "")
+    return path if path and os.path.exists(path) else ""
+
+
 def input_state(spec_input: Input, path: str) -> Tuple[str, str]:
     """How one input stands, and what to say when it is wrong.
 
@@ -635,7 +656,7 @@ def default_inputs(mode: str, shape_index: int = 0) -> Dict[str, str]:
     if mode not in MODES:
         raise ValueError(f"unknown mode {mode!r}; available: {sorted(MODES)}")
     shape = MODES[mode].input_shapes[shape_index]
-    return {spec_input.id: "" for spec_input in shape.inputs}
+    return {spec_input.id: sample_for(spec_input.id) for spec_input in shape.inputs}
 
 
 def validate(

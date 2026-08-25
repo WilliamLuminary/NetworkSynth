@@ -115,6 +115,11 @@ class SynthesisController(QObject):
         self._settle.setSingleShot(True)
         self._settle.timeout.connect(lambda: self._want("original"))
 
+        # The form opens on the sample data, so say so and draw it rather than
+        # waiting for an edit that has nothing to correct.
+        self._note_ready()
+        self._touch_preview()
+
     # ---- properties bound by QML ----
 
     @Property(str, notify=changed)

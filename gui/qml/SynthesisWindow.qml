@@ -11,7 +11,10 @@ ApplicationWindow {
     minimumWidth: 1000
     minimumHeight: 620
     title: "NetworkSynth — Synthesis"
-    color: "#f2f3f5"
+    // Every surface below comes from the system palette, so light and dark
+    // both follow the desktop.  A colour written here would be frozen at one
+    // of them, and mixing the two is what makes a window unreadable.
+    color: palette.window
 
     // `controller` is exposed from Python as a context property.
     //
@@ -23,15 +26,25 @@ ApplicationWindow {
     readonly property int labelWidth: 140
     readonly property int numberWidth: 96
 
-    readonly property color accent: "#2f7cf6"
-    readonly property color cardColor: "#ffffff"
-    readonly property color lineColor: "#e2e4e8"
-    readonly property color railColor: "#2b3038"
-    readonly property color goodColor: "#1e8e4c"
-    readonly property color badColor: "#c0392b"
+    readonly property color accent: palette.highlight
+    readonly property color cardColor: palette.base
+    readonly property color paneColor: palette.alternateBase
+    readonly property color lineColor: palette.mid
+    readonly property color railColor: Qt.darker(palette.window, 1.14)
+
+    //: Which way round the desktop is, for the two colours that carry a
+    //: meaning rather than a role: a success green and a failure red have no
+    //: palette entry, and one pair cannot be legible on both.
+    readonly property bool darkTheme: palette.window.hsvValue < 0.5
+    readonly property color goodColor: darkTheme ? "#5ac97f" : "#1e8e4c"
+    readonly property color badColor: darkTheme ? "#f0796d" : "#c0392b"
 
     footer: Rectangle {
-        color: "#ffffff"
+        // root.cardColor, not `palette.base` read here: a bare Rectangle is not
+        // a Control, and Qt resolves its palette from a different source than
+        // the one the controls use.  Reading both is how a window ends up
+        // half-themed, which is the whole bug this file used to have.
+        color: root.cardColor
         implicitHeight: 88
 
         Rectangle {
@@ -84,14 +97,18 @@ ApplicationWindow {
 
                     background: Rectangle {
                         radius: 6
-                        color: !runButton.enabled ? "#cbcfd6"
+                        color: !runButton.enabled ? root.lineColor
                              : controller.running
-                                 ? (runButton.down ? "#96271c" : root.badColor)
-                                 : (runButton.down ? "#1f5fd0" : root.accent)
+                                 ? (runButton.down
+                                     ? Qt.darker(root.badColor, 1.3) : root.badColor)
+                                 : (runButton.down
+                                     ? Qt.darker(root.accent, 1.3) : root.accent)
                     }
                     contentItem: Label {
                         text: runButton.text
-                        color: "#ffffff"
+                        color: runButton.enabled
+                            ? palette.highlightedText : palette.text
+                        opacity: runButton.enabled ? 1.0 : 0.5
                         font.bold: true
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
@@ -107,15 +124,15 @@ ApplicationWindow {
                     text: controller.running ? "◷"
                         : controller.failed ? "!"
                         : controller.canRun ? "✓" : "•"
-                    color: controller.running || !controller.canRun ? "#8a8f98"
-                         : controller.failed ? root.badColor : root.goodColor
+                    opacity: controller.running || !controller.canRun ? 0.6 : 1.0
+                    color: controller.failed ? root.badColor : root.goodColor
                     font.bold: true
                 }
                 Label {
                     Layout.fillWidth: true
                     elide: Text.ElideRight
                     text: controller.status
-                    color: controller.failed ? root.badColor : "#4a4f57"
+                    color: controller.failed ? root.badColor : palette.text
                 }
                 Label {
                     text: controller.runLabel
@@ -183,7 +200,7 @@ ApplicationWindow {
                 font.bold: true
                 font.pixelSize: 10
                 font.letterSpacing: 0.8
-                color: "#7c828c"
+                opacity: 0.55
             }
             ColumnLayout {
                 id: body
@@ -295,7 +312,6 @@ ApplicationWindow {
             text: formLine.line.row ? formLine.line.row : formLine.line.fields[0].label
             Layout.preferredWidth: root.labelWidth
             elide: Text.ElideRight
-            color: "#3d434b"
             ToolTip.text: formLine.line.row ? "" : formLine.line.fields[0].help
             ToolTip.visible: !formLine.line.row && formLine.line.fields[0].help
                 ? lineHover.hovered : false
@@ -340,7 +356,7 @@ ApplicationWindow {
         Rectangle {
             Layout.preferredWidth: 260
             Layout.preferredHeight: 260
-            color: "#fafbfc"
+            color: root.paneColor
             border.color: root.lineColor
             border.width: 1
             radius: 6
@@ -360,14 +376,14 @@ ApplicationWindow {
                 wrapMode: Text.WordWrap
                 visible: picture.source == ""
                 text: parent.parent.placeholder
-                color: "#9aa0a8"
+                opacity: 0.55
             }
         }
 
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 260
-            color: "#fafbfc"
+            color: root.paneColor
             border.color: root.lineColor
             border.width: 1
             radius: 6
@@ -406,7 +422,6 @@ ApplicationWindow {
                     Layout.leftMargin: 18
                     Layout.bottomMargin: 12
                     text: "NetworkSynth"
-                    color: "#ffffff"
                     font.bold: true
                     font.pixelSize: 15
                 }
@@ -414,7 +429,7 @@ ApplicationWindow {
                     Layout.leftMargin: 18
                     Layout.bottomMargin: 4
                     text: "MODE"
-                    color: "#7d868f"
+                    opacity: 0.5
                     font.pixelSize: 10
                     font.letterSpacing: 0.8
                     font.bold: true
@@ -437,15 +452,18 @@ ApplicationWindow {
 
                         background: Rectangle {
                             color: modeItem.current ? root.accent
-                                 : modeItem.hovered ? "#363c46" : "transparent"
+                                 : modeItem.hovered
+                                     ? Qt.darker(root.railColor, 1.12) : "transparent"
                         }
                         contentItem: Label {
                             leftPadding: 18
                             verticalAlignment: Text.AlignVCenter
                             text: modeItem.modelData
-                            color: modeItem.current ? "#ffffff" : "#c4cad2"
+                            color: modeItem.current
+                                ? palette.highlightedText : palette.text
                             font.bold: modeItem.current
-                            opacity: modeItem.enabled ? 1.0 : 0.4
+                            opacity: modeItem.enabled
+                                ? (modeItem.current ? 1.0 : 0.8) : 0.4
                         }
                     }
                 }
@@ -465,13 +483,12 @@ ApplicationWindow {
                 text: controller.modeLabels[controller.modes.indexOf(controller.mode)]
                 font.pixelSize: 22
                 font.bold: true
-                color: "#22262c"
             }
             Label {
                 Layout.fillWidth: true
                 Layout.bottomMargin: 10
                 text: controller.modeBlurb
-                color: "#6b7079"
+                opacity: 0.65
                 elide: Text.ElideRight
             }
 
@@ -503,7 +520,6 @@ ApplicationWindow {
                                 Label {
                                     text: "Format"
                                     Layout.preferredWidth: root.labelWidth
-                                    color: "#3d434b"
                                 }
                                 ComboBox {
                                     Layout.fillWidth: true
@@ -526,14 +542,24 @@ ApplicationWindow {
                                     Label {
                                         text: inputRow.modelData.label
                                         Layout.preferredWidth: root.labelWidth
-                                        color: "#3d434b"
                                     }
                                     TextField {
+                                        id: inputField
                                         Layout.fillWidth: true
                                         text: inputRow.modelData.value
                                         placeholderText: inputRow.modelData.placeholder
                                         onEditingFinished:
                                             controller.setInput(inputRow.modelData.id, text)
+
+                                        // An empty box asks for the file when
+                                        // clicked; once it holds a path it goes
+                                        // back to being editable, so a typed or
+                                        // pasted one is still possible.
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            enabled: inputField.text === ""
+                                            onClicked: root.browseFor(inputRow.modelData)
+                                        }
                                     }
                                     // Whether this file is settled, beside the
                                     // field rather than only in the run's
@@ -568,10 +594,36 @@ ApplicationWindow {
                                         checkable: true
                                         implicitWidth: 34
                                         visible: inputRow.modelData.help !== ""
-                                        ToolTip.text: inputRow.modelData.help
-                                        ToolTip.visible: contract.checked
-                                            || contractHover.hovered
-                                        HoverHandler { id: contractHover }
+                                        // checkedChanged, not toggled: the
+                                        // latter fires only for a click, so
+                                        // anything else that sets the button
+                                        // would leave the panel behind it shut.
+                                        onCheckedChanged: contract.checked
+                                            ? contractPopup.open() : contractPopup.close()
+
+                                        Popup {
+                                            id: contractPopup
+                                            // Ours rather than the style's: an
+                                            // attached ToolTip is drawn by the
+                                            // platform and does not show the
+                                            // same way on every one of them.
+                                            y: contract.height + 6
+                                            x: -width + contract.width
+                                            width: 380
+                                            padding: 12
+                                            onClosed: contract.checked = false
+
+                                            background: Rectangle {
+                                                color: root.cardColor
+                                                border.color: root.lineColor
+                                                border.width: 1
+                                                radius: 6
+                                            }
+                                            contentItem: Label {
+                                                text: inputRow.modelData.help
+                                                wrapMode: Text.WordWrap
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -615,12 +667,18 @@ ApplicationWindow {
                             Label {
                                 text: "Folder"
                                 Layout.preferredWidth: root.labelWidth
-                                color: "#3d434b"
                             }
                             TextField {
+                                id: outputField
                                 Layout.fillWidth: true
                                 text: controller.outputDir
                                 onEditingFinished: controller.setOutputDir(text)
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    enabled: outputField.text === ""
+                                    onClicked: outputDialog.open()
+                                }
                             }
                             Button { text: "Browse…"; onClicked: outputDialog.open() }
                         }
@@ -693,7 +751,8 @@ ApplicationWindow {
                             Label {
                                 text: controller.previewStatus
                                 color: controller.previewFailed
-                                    ? root.badColor : "#6b7079"
+                                    ? root.badColor : palette.text
+                                opacity: controller.previewFailed ? 1.0 : 0.65
                                 elide: Text.ElideRight
                             }
                         }
@@ -701,7 +760,7 @@ ApplicationWindow {
                         Label {
                             Layout.fillWidth: true
                             wrapMode: Text.WordWrap
-                            color: "#6b7079"
+                            opacity: 0.65
                             text: previewTabs.currentIndex === 0
                                 ? controller.originalNote : controller.syntheticNote
                             visible: text !== ""
