@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import asdict, dataclass, field, replace
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from configs.gui_config import (
     NETWORK_FORMATS,
@@ -50,10 +50,6 @@ def _format_fields(group: str, formats, default: str) -> List[Field]:
 #: than in the window, because the window shows it in its own pane and has to
 #: know which one it is.
 OUTPUT_GROUP = "Output"
-
-#: Sections that start folded away.  Their defaults are right for most runs, and
-#: the header keeps showing what they are set to.
-COLLAPSED_GROUPS = frozenset({"Quality"})
 
 
 @dataclass(frozen=True)
@@ -108,14 +104,7 @@ def sections_of(fields: List[Field]) -> List[Dict[str, Any]]:
             order.append(spec_field.group)
             grouped[spec_field.group] = []
         grouped[spec_field.group].append(spec_field)
-    return [
-        {
-            "name": name,
-            "collapsed": name in COLLAPSED_GROUPS,
-            "lines": lines_of(grouped[name]),
-        }
-        for name in order
-    ]
+    return [{"name": name, "lines": lines_of(grouped[name])} for name in order]
 
 
 @dataclass(frozen=True)
@@ -162,6 +151,8 @@ class ModeSpec:
 
     name: str
     label: str
+    #: One line under the title saying what this mode does.
+    blurb: str = ""
     fields: List[Field] = field(default_factory=list)
     #: The ways this mode can be given its input, in order.  Kept in step with
     #: ``MODE_INPUTS``, which is what the run-spec is validated against.
@@ -565,12 +556,34 @@ def _analysis_fields() -> List[Field]:
 #: reads them as plain attributes, so a missing one is an ``AttributeError``
 #: partway through a run rather than a rejected spec.
 MODES: Dict[str, ModeSpec] = {
-    "generate": ModeSpec("generate", "Generate", _common_fields(), _network_shapes()),
-    "hybrid": ModeSpec(
-        "hybrid", "Hybrid", _common_fields() + _hybrid_fields(), _network_shapes()
+    "generate": ModeSpec(
+        "generate",
+        "Generate",
+        "Build new networks with the statistics of one you already have.",
+        _common_fields(),
+        _network_shapes(),
     ),
-    "sweep": ModeSpec("sweep", "Sweep", _sweep_fields(), _network_shapes()),
-    "compare": ModeSpec("compare", "Compare", _analysis_fields(), _results_shapes()),
+    "hybrid": ModeSpec(
+        "hybrid",
+        "Hybrid",
+        "Assemble a large network by tiling generated patches together.",
+        _common_fields() + _hybrid_fields(),
+        _network_shapes(),
+    ),
+    "sweep": ModeSpec(
+        "sweep",
+        "Sweep",
+        "Try a range of node and edge factors, scoring every combination.",
+        _sweep_fields(),
+        _network_shapes(),
+    ),
+    "compare": ModeSpec(
+        "compare",
+        "Compare",
+        "Measure two sets of finished networks against each other.",
+        _analysis_fields(),
+        _results_shapes(),
+    ),
 }
 
 
@@ -593,6 +606,23 @@ def shape_for(mode: str, inputs: Dict[str, str]) -> InputShape:
         f"{mode}: {sorted(keys)} matches none of its input shapes: "
         f"{[list(s.all_ids) for s in MODES[mode].input_shapes]}"
     )
+
+
+def input_state(spec_input: Input, path: str) -> Tuple[str, str]:
+    """How one input stands, and what to say when it is wrong.
+
+    The single reading of it: the form marks the row from this and the run is
+    refused by this, so a row cannot show a tick while the run says otherwise.
+    """
+    if not path:
+        if spec_input.optional:
+            return "blank", ""
+        return "missing", f"Choose the {spec_input.label.lower()}."
+    if not os.path.exists(path):
+        return "missing", f"{spec_input.label} not found: {path}"
+    if spec_input.kind == "dir" and not os.path.isdir(path):
+        return "missing", f"{spec_input.label} is not a directory: {path}"
+    return "ok", ""
 
 
 def default_values(mode: str) -> Dict[str, Any]:
@@ -618,14 +648,9 @@ def validate(
         return problems
 
     for spec_input in shape_for(mode, inputs).inputs:
-        path = inputs.get(spec_input.id) or ""
-        if not path:
-            if not spec_input.optional:
-                problems.append(f"Choose the {spec_input.label.lower()}.")
-        elif not os.path.exists(path):
-            problems.append(f"{spec_input.label} not found: {path}")
-        elif spec_input.kind == "dir" and not os.path.isdir(path):
-            problems.append(f"{spec_input.label} is not a directory: {path}")
+        _, problem = input_state(spec_input, inputs.get(spec_input.id) or "")
+        if problem:
+            problems.append(problem)
 
     if not output_dir:
         problems.append("Choose an output directory.")

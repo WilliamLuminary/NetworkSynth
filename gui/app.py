@@ -89,7 +89,7 @@ class SynthesisController(QObject):
         # Previews.  Each side is shown or not, and holds the info.json its
         # render wrote; the layer switches choose between the original's three
         # variants, which are all rendered at once.
-        self._shown = {"original": False, "synthetic": False}
+        self._shown = {"original": True, "synthetic": False}
         self._info: Dict[str, Optional[dict]] = {"original": None, "synthetic": None}
         self._layers = {"background": True, "network": True}
 
@@ -202,17 +202,52 @@ class SynthesisController(QObject):
 
     @Property("QVariantList", notify=changed)
     def inputs(self) -> list:
-        """What this mode reads, with the paths chosen so far.
+        """What this mode reads, with the paths chosen so far and how they stand.
 
         A list rather than fixed properties: analysis takes a directory of
         finished results where generation takes a network's two CSVs, and a form
         offering the wrong one is a run that fails after it starts.
         """
         shape = spec_builder.MODES[self._mode].input_shapes[self._shape]
-        return [
-            {**spec_input.as_dict(), "value": self._inputs.get(spec_input.id, "")}
-            for spec_input in shape.inputs
-        ]
+        rows = []
+        for spec_input in shape.inputs:
+            value = self._inputs.get(spec_input.id, "")
+            state, _ = spec_builder.input_state(spec_input, value)
+            rows.append({**spec_input.as_dict(), "value": value, "state": state})
+        return rows
+
+    @Property(str, notify=changed)
+    def modeBlurb(self) -> str:
+        return spec_builder.MODES[self._mode].blurb
+
+    @Property(bool, notify=changed)
+    def canRun(self) -> bool:
+        """Whether the form is complete enough to start.
+
+        The button goes dead rather than accepting a click it would only
+        refuse; what is missing is named in the status bar either way.
+        """
+        if self._process is not None:
+            return False
+        return not spec_builder.validate(
+            self._mode, self._inputs, self._output_dir, self._values
+        )
+
+    @Property(str, notify=changed)
+    def runLabel(self) -> str:
+        """Which run the window is showing, for the status bar.
+
+        Read off the directory name the run made, which already carries both:
+        ``gui_generate_results_<date>_<time>_<id>``.
+        """
+        if not self._run_root:
+            return ""
+        parts = os.path.basename(self._run_root).split("_")
+        if len(parts) < 3:
+            return ""
+        stamp = parts[-2]
+        clock = f"{stamp[:2]}:{stamp[2:4]}:{stamp[4:6]}" if len(stamp) == 6 else stamp
+        return f"run {parts[-1]}  ·  {clock}"
 
     @Property(str, notify=changed)
     def outputDir(self) -> str:
@@ -268,13 +303,15 @@ class SynthesisController(QObject):
             and self._run_root is not None
         )
 
-    @Property(bool, notify=changed)
-    def previewOriginal(self) -> bool:
-        return self._shown["original"]
-
-    @Property(bool, notify=changed)
-    def previewSynthetic(self) -> bool:
-        return self._shown["synthetic"]
+    @Slot(int)
+    def selectPreviewTab(self, index: int) -> None:
+        """Show one side of the preview, and render it if it is not drawn yet."""
+        kind = "synthetic" if index else "original"
+        self._shown[kind] = True
+        if self._info[kind] is None:
+            self._want(kind)
+        else:
+            self.changed.emit()
 
     @Property(bool, notify=changed)
     def hasBackground(self) -> bool:
@@ -347,22 +384,6 @@ class SynthesisController(QObject):
     @Property(bool, notify=changed)
     def previewFailed(self) -> bool:
         return bool(self._preview_error)
-
-    @Slot(bool)
-    def setPreviewOriginal(self, on: bool) -> None:
-        self._shown["original"] = on
-        if on:
-            self._want("original")
-        else:
-            self.changed.emit()
-
-    @Slot(bool)
-    def setPreviewSynthetic(self, on: bool) -> None:
-        self._shown["synthetic"] = on
-        if on:
-            self._want("synthetic")
-        else:
-            self.changed.emit()
 
     @Slot(bool)
     def setShowBackground(self, on: bool) -> None:

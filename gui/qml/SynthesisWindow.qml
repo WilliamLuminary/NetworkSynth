@@ -6,99 +6,124 @@ import QtQuick.Layouts
 ApplicationWindow {
     id: root
     visible: true
-    width: 1180
-    height: 820
-    minimumWidth: 900
-    minimumHeight: 560
+    width: 1280
+    height: 860
+    minimumWidth: 1000
+    minimumHeight: 620
     title: "NetworkSynth — Synthesis"
+    color: "#f2f3f5"
 
     // `controller` is exposed from Python as a context property.
     //
-    // Two panes: what a run is given on the left, what it produces on the
-    // right.  Run and progress sit in the footer, so the button you press
-    // every time is never scrolled off.
+    // A rail of modes on the left, the chosen mode's page beside it, and that
+    // page split into what a run is given and what it produces.  Run and state
+    // live in the footer, so the button pressed every time is never scrolled
+    // off and the last run stays named.
 
     readonly property int labelWidth: 140
-    readonly property int numberWidth: 92
+    readonly property int numberWidth: 96
 
-    // What a folded section is set to, so folding hides rows without hiding
-    // state.  Re-read whenever `expanded` flips, which is the only moment it
-    // can be read at all.
-    function summaryOf(section) {
-        var parts = []
-        for (var i = 0; i < section.lines.length; i++) {
-            var fields = section.lines[i].fields
-            for (var j = 0; j < fields.length; j++) {
-                var value = controller.valueOf(fields[j].id)
-                if (fields[j].kind === "bool") {
-                    if (value)
-                        parts.push(fields[j].label)
-                } else {
-                    parts.push(value)
+    readonly property color accent: "#2f7cf6"
+    readonly property color cardColor: "#ffffff"
+    readonly property color lineColor: "#e2e4e8"
+    readonly property color railColor: "#2b3038"
+    readonly property color goodColor: "#1e8e4c"
+    readonly property color badColor: "#c0392b"
+
+    footer: Rectangle {
+        color: "#ffffff"
+        implicitHeight: 88
+
+        Rectangle {
+            width: parent.width
+            height: 1
+            color: root.lineColor
+        }
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 18
+            anchors.rightMargin: 18
+            anchors.topMargin: 10
+            anchors.bottomMargin: 8
+            spacing: 8
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 14
+
+                ProgressBar {
+                    // Only while there is progress to show: an empty trough
+                    // beside the button reads as something broken.
+                    visible: controller.running
+                    Layout.preferredWidth: 260
+                    from: 0
+                    to: 100
+                    value: controller.percent
+                    indeterminate: controller.running && controller.percent <= 0
+                }
+                Label {
+                    visible: controller.running
+                    text: controller.percent.toFixed(0) + "%"
+                    opacity: 0.7
+                }
+                Item { Layout.fillWidth: true }
+
+                Button {
+                    id: runButton
+                    text: controller.running
+                        ? "Cancel"
+                        : "Run " + controller.modeLabels[
+                            controller.modes.indexOf(controller.mode)]
+                    // Dead rather than accepting a click it would only refuse.
+                    // What is missing is named in the status line below.
+                    enabled: controller.running || controller.canRun
+                    implicitWidth: 190
+                    implicitHeight: 40
+                    onClicked: controller.running ? controller.cancel() : controller.run()
+
+                    background: Rectangle {
+                        radius: 6
+                        color: !runButton.enabled ? "#cbcfd6"
+                             : controller.running
+                                 ? (runButton.down ? "#96271c" : root.badColor)
+                                 : (runButton.down ? "#1f5fd0" : root.accent)
+                    }
+                    contentItem: Label {
+                        text: runButton.text
+                        color: "#ffffff"
+                        font.bold: true
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
                 }
             }
-        }
-        return parts.slice(0, 3).join("  ·  ")
-    }
 
-    header: ToolBar {
-        RowLayout {
-            anchors.fill: parent
-            anchors.leftMargin: 12
-            anchors.rightMargin: 12
-            Label {
-                text: "Synthetic network generation"
-                font.pixelSize: 16
-                font.bold: true
+            RowLayout {
                 Layout.fillWidth: true
-            }
-            Label {
-                text: "Mode"
-                opacity: 0.6
-            }
-            ComboBox {
-                id: modeBox
-                model: controller.modeLabels
-                currentIndex: controller.modes.indexOf(controller.mode)
-                onActivated: controller.selectMode(currentIndex)
-                enabled: !controller.running
-                Layout.preferredWidth: 170
-            }
-        }
-    }
+                spacing: 8
 
-    footer: ToolBar {
-        RowLayout {
-            anchors.fill: parent
-            anchors.leftMargin: 12
-            anchors.rightMargin: 12
-            spacing: 12
-
-            Button {
-                text: controller.running ? "Cancel" : "Run"
-                highlighted: !controller.running
-                Layout.preferredWidth: 96
-                onClicked: controller.running ? controller.cancel() : controller.run()
-            }
-            ProgressBar {
-                // Only while there is progress to show: an empty trough beside
-                // the button reads as something broken.
-                visible: controller.running || controller.percent > 0
-                Layout.preferredWidth: 220
-                from: 0
-                to: 100
-                value: controller.percent
-                indeterminate: controller.running && controller.percent <= 0
-            }
-            Label {
-                text: controller.running ? controller.percent.toFixed(0) + "%" : ""
-                Layout.preferredWidth: 40
-            }
-            Label {
-                Layout.fillWidth: true
-                elide: Text.ElideRight
-                text: controller.status
-                color: controller.failed ? "#c0392b" : palette.text
+                Label {
+                    text: controller.running ? "◷"
+                        : controller.failed ? "!"
+                        : controller.canRun ? "✓" : "•"
+                    color: controller.running || !controller.canRun ? "#8a8f98"
+                         : controller.failed ? root.badColor : root.goodColor
+                    font.bold: true
+                }
+                Label {
+                    Layout.fillWidth: true
+                    elide: Text.ElideRight
+                    text: controller.status
+                    color: controller.failed ? root.badColor : "#4a4f57"
+                }
+                Label {
+                    text: controller.runLabel
+                    visible: controller.runLabel !== ""
+                    font.family: "monospace"
+                    font.pixelSize: 11
+                    opacity: 0.55
+                }
             }
         }
     }
@@ -134,28 +159,37 @@ ApplicationWindow {
         }
     }
 
-    // A section title that folds the rows under it away.
-    component SectionHeader: ItemDelegate {
-        property string name: ""
-        property string summary: ""
-        property bool open: true
+    // A titled panel.  Children go straight inside it.
+    component Card: Rectangle {
+        default property alias content: body.data
+        property string title: ""
 
         Layout.fillWidth: true
-        contentItem: RowLayout {
-            spacing: 6
+        implicitHeight: shell.implicitHeight + 24
+        color: root.cardColor
+        border.color: root.lineColor
+        border.width: 1
+        radius: 8
+
+        ColumnLayout {
+            id: shell
+            anchors.fill: parent
+            anchors.margins: 12
+            spacing: 10
+
             Label {
-                text: (open ? "▾  " : "▸  ") + name.toUpperCase()
+                visible: title !== ""
+                text: title.toUpperCase()
                 font.bold: true
-                font.pixelSize: 11
-                opacity: 0.75
+                font.pixelSize: 10
+                font.letterSpacing: 0.8
+                color: "#7c828c"
             }
-            Label {
+            ColumnLayout {
+                id: body
                 Layout.fillWidth: true
-                horizontalAlignment: Text.AlignRight
-                elide: Text.ElideRight
-                visible: !open
-                text: summary
-                opacity: 0.55
+                Layout.fillHeight: true
+                spacing: 8
             }
         }
     }
@@ -165,6 +199,7 @@ ApplicationWindow {
     // `controller` nor `modelData` resolves.  QtQuick.Layouts skips invisible
     // items, so only the relevant one takes space.
     component FieldEditor: RowLayout {
+        id: editor
         required property var field
         required property var value
         signal edited(var newValue)
@@ -173,53 +208,75 @@ ApplicationWindow {
         spacing: 6
 
         CheckBox {
-            visible: field.kind === "bool"
-            checked: value === true
-            onToggled: edited(checked)
+            visible: editor.field.kind === "bool"
+            // No indent of its own: the indicator lines up with the editors
+            // above and below it.
+            leftPadding: 0
+            checked: editor.value === true
+            onToggled: editor.edited(checked)
         }
 
         ComboBox {
-            visible: field.kind === "choice"
-            Layout.preferredWidth: 160
-            model: field.options
-            currentIndex: Math.max(0, field.options.indexOf(value))
-            onActivated: edited(field.options[currentIndex])
+            visible: editor.field.kind === "choice"
+            Layout.preferredWidth: 170
+            model: editor.field.options
+            currentIndex: Math.max(0, editor.field.options.indexOf(editor.value))
+            onActivated: editor.edited(editor.field.options[currentIndex])
         }
 
         TextField {
-            visible: field.kind === "text"
-            Layout.preferredWidth: 200
-            text: field.kind === "text" ? value : ""
-            onEditingFinished: edited(text)
+            visible: editor.field.kind === "text"
+            Layout.preferredWidth: 210
+            text: editor.field.kind === "text" ? editor.value : ""
+            onEditingFinished: editor.edited(text)
+        }
+
+        // Whole numbers get a spin box: the bounds and the step are already
+        // declared on the field, so the control can hold to them rather than
+        // the form complaining afterwards.
+        SpinBox {
+            visible: editor.field.kind === "integer"
+            Layout.preferredWidth: 132
+            editable: true
+            // Loose `!=`, because an unset bound arrives from Python as
+            // undefined rather than null, and a strict test lets it through.
+            from: editor.field.minimum != null ? editor.field.minimum : 0
+            to: editor.field.maximum != null ? editor.field.maximum : 2147483647
+            stepSize: editor.field.step != null ? editor.field.step : 1
+            value: editor.field.kind === "integer" ? Number(editor.value) : 0
+            onValueModified: editor.edited(value)
         }
 
         TextField {
-            visible: field.kind === "number" || field.kind === "integer"
+            visible: editor.field.kind === "number"
             Layout.preferredWidth: root.numberWidth
-            text: field.kind === "number" || field.kind === "integer" ? value : ""
+            text: editor.field.kind === "number" ? editor.value : ""
             validator: DoubleValidator {}
-            onEditingFinished: edited(text)
+            onEditingFinished: editor.edited(text)
         }
 
         RowLayout {
-            visible: field.kind === "size" || field.kind === "range"
+            visible: editor.field.kind === "size" || editor.field.kind === "range"
             spacing: 6
             TextField {
                 Layout.preferredWidth: root.numberWidth
                 // Bindings of invisible siblings still evaluate, so guard the
                 // indexing: on a scalar field this would be undefined.
-                text: field.kind === "size" || field.kind === "range"
-                    ? value[0] : ""
+                text: editor.field.kind === "size" || editor.field.kind === "range"
+                    ? editor.value[0] : ""
                 validator: DoubleValidator { bottom: 0 }
-                onEditingFinished: sized(0, text)
+                onEditingFinished: editor.sized(0, text)
             }
-            Label { text: field.kind === "range" ? "→" : "×"; opacity: 0.6 }
+            Label {
+                text: editor.field.kind === "range" ? "→" : "×"
+                opacity: 0.5
+            }
             TextField {
                 Layout.preferredWidth: root.numberWidth
-                text: field.kind === "size" || field.kind === "range"
-                    ? value[1] : ""
+                text: editor.field.kind === "size" || editor.field.kind === "range"
+                    ? editor.value[1] : ""
                 validator: DoubleValidator { bottom: 0 }
-                onEditingFinished: sized(1, text)
+                onEditingFinished: editor.sized(1, text)
             }
         }
 
@@ -228,27 +285,30 @@ ApplicationWindow {
 
     // One form row: a single field, or a set of switches sharing a label.
     component FormLine: RowLayout {
+        id: formLine
         required property var line
 
         Layout.fillWidth: true
-        spacing: 8
+        spacing: 10
 
         Label {
-            text: line.row ? line.row : line.fields[0].label
+            text: formLine.line.row ? formLine.line.row : formLine.line.fields[0].label
             Layout.preferredWidth: root.labelWidth
             elide: Text.ElideRight
-            ToolTip.text: line.row ? "" : line.fields[0].help
-            ToolTip.visible: !line.row && line.fields[0].help ? lineHover.hovered : false
+            color: "#3d434b"
+            ToolTip.text: formLine.line.row ? "" : formLine.line.fields[0].help
+            ToolTip.visible: !formLine.line.row && formLine.line.fields[0].help
+                ? lineHover.hovered : false
             HoverHandler { id: lineHover }
         }
 
-        // A set: every switch on one line, as the choice it is.
+        // A set: every format on one line, each plainly a switch to turn on or
+        // off rather than a badge stating what is already chosen.
         Repeater {
-            model: line.row ? line.fields : []
-            delegate: Button {
+            model: formLine.line.row ? formLine.line.fields : []
+            delegate: CheckBox {
                 required property var modelData
                 text: modelData.label
-                checkable: true
                 checked: controller.valueOf(modelData.id) === true
                 ToolTip.text: modelData.help
                 ToolTip.visible: modelData.help ? hovered : false
@@ -257,177 +317,135 @@ ApplicationWindow {
         }
 
         FieldEditor {
-            visible: !line.row
+            visible: !formLine.line.row
             Layout.fillWidth: true
-            field: line.fields[0]
-            value: controller.valueOf(line.fields[0].id)
-            onEdited: (newValue) => controller.setValue(line.fields[0].id, newValue)
+            field: formLine.line.fields[0]
+            value: controller.valueOf(formLine.line.fields[0].id)
+            onEdited: (newValue) => controller.setValue(
+                formLine.line.fields[0].id, newValue)
             onSized: (index, newValue) => controller.setSize(
-                line.fields[0].id, index, newValue)
+                formLine.line.fields[0].id, index, newValue)
         }
 
-        Item { Layout.fillWidth: true; visible: line.row }
+        Item { Layout.fillWidth: true; visible: formLine.line.row !== "" }
     }
 
-    // One preview pane, used by both sides.  Nothing in it refers to
-    // `controller` — the two values are bound from outside, where that
-    // certainly resolves.
     component PreviewPane: RowLayout {
         property alias image: picture.source
         property alias info: details.text
+        property string placeholder: "Run, and the result is drawn here."
 
-        spacing: 10
+        spacing: 12
 
         Rectangle {
-            Layout.preferredWidth: 300
-            Layout.preferredHeight: 300
-            color: "transparent"
-            border.color: "#9e9e9e"
+            Layout.preferredWidth: 260
+            Layout.preferredHeight: 260
+            color: "#fafbfc"
+            border.color: root.lineColor
             border.width: 1
+            radius: 6
 
             Image {
                 id: picture
                 anchors.fill: parent
-                anchors.margins: 1
+                anchors.margins: 2
                 fillMode: Image.PreserveAspectFit
                 asynchronous: true
                 cache: false
             }
             Label {
                 anchors.centerIn: parent
+                width: parent.width - 40
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
                 visible: picture.source == ""
-                text: "Nothing to draw"
-                opacity: 0.5
+                text: parent.parent.placeholder
+                color: "#9aa0a8"
             }
         }
 
-        ScrollView {
+        Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 300
-            TextArea {
-                id: details
-                readOnly: true
-                wrapMode: TextArea.NoWrap
-                font.family: "monospace"
-                font.pixelSize: 11
+            Layout.preferredHeight: 260
+            color: "#fafbfc"
+            border.color: root.lineColor
+            border.width: 1
+            radius: 6
+
+            ScrollView {
+                anchors.fill: parent
+                anchors.margins: 8
+                TextArea {
+                    id: details
+                    readOnly: true
+                    wrapMode: TextArea.NoWrap
+                    font.family: "monospace"
+                    font.pixelSize: 11
+                    background: null
+                }
             }
         }
     }
 
-    SplitView {
+    RowLayout {
         anchors.fill: parent
-        orientation: Qt.Horizontal
+        spacing: 0
 
-        // ---- left: what the run is given ----
-        ScrollView {
-            SplitView.preferredWidth: 470
-            SplitView.minimumWidth: 380
-            contentWidth: availableWidth
+        // ---- the modes, as a rail ----
+        Rectangle {
+            Layout.preferredWidth: 196
+            Layout.fillHeight: true
+            color: root.railColor
 
             ColumnLayout {
-                width: parent.width
-                spacing: 10
+                anchors.fill: parent
+                anchors.topMargin: 18
+                spacing: 2
 
-                SectionHeader {
-                    name: "Input"
-                    open: true
-                    onClicked: {}
+                Label {
+                    Layout.leftMargin: 18
+                    Layout.bottomMargin: 12
+                    text: "NetworkSynth"
+                    color: "#ffffff"
+                    font.bold: true
+                    font.pixelSize: 15
                 }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 8
-                    spacing: 6
-
-                    // Only where the mode offers a choice: analysis reads a
-                    // results directory and nothing else.
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 8
-                        visible: controller.inputShapes.length > 1
-
-                        Label { text: "Format"; Layout.preferredWidth: root.labelWidth }
-                        ComboBox {
-                            id: shapeBox
-                            Layout.fillWidth: true
-                            model: controller.inputShapes
-                            currentIndex: controller.inputShape
-                            onActivated: controller.selectInputShape(currentIndex)
-                            enabled: !controller.running
-                        }
-                    }
-
-                    Repeater {
-                        model: controller.inputs
-
-                        delegate: RowLayout {
-                            required property var modelData
-                            Layout.fillWidth: true
-                            spacing: 8
-
-                            Label {
-                                text: modelData.label
-                                Layout.preferredWidth: root.labelWidth
-                            }
-                            TextField {
-                                Layout.fillWidth: true
-                                text: modelData.value
-                                placeholderText: modelData.placeholder
-                                onEditingFinished: controller.setInput(modelData.id, text)
-                            }
-                            Button {
-                                text: "Browse…"
-                                onClicked: root.browseFor(modelData)
-                            }
-                            // What this input's format has to contain.  Each
-                            // shape reads a different one, and the wrong file
-                            // fails deep inside a run rather than here.
-                            Button {
-                                id: contract
-                                text: "!"
-                                checkable: true
-                                implicitWidth: 34
-                                visible: modelData.help !== ""
-                                ToolTip.text: modelData.help
-                                ToolTip.visible: contract.checked
-                                    || contractHover.hovered
-                                HoverHandler { id: contractHover }
-                            }
-                        }
-                    }
+                Label {
+                    Layout.leftMargin: 18
+                    Layout.bottomMargin: 4
+                    text: "MODE"
+                    color: "#7d868f"
+                    font.pixelSize: 10
+                    font.letterSpacing: 0.8
+                    font.bold: true
                 }
 
                 Repeater {
-                    model: controller.configSections
+                    model: controller.modeLabels
 
-                    delegate: ColumnLayout {
+                    delegate: ItemDelegate {
+                        id: modeItem
+                        required property int index
                         required property var modelData
-                        readonly property var section: modelData
-                        property bool expanded: !modelData.collapsed
+                        readonly property bool current:
+                            controller.modes[index] === controller.mode
 
                         Layout.fillWidth: true
-                        spacing: 6
+                        implicitHeight: 38
+                        enabled: !controller.running
+                        onClicked: controller.selectMode(modeItem.index)
 
-                        SectionHeader {
-                            name: section.name
-                            open: expanded
-                            summary: expanded ? "" : root.summaryOf(section)
-                            onClicked: expanded = !expanded
+                        background: Rectangle {
+                            color: modeItem.current ? root.accent
+                                 : modeItem.hovered ? "#363c46" : "transparent"
                         }
-
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            Layout.leftMargin: 8
-                            visible: expanded
-                            spacing: 6
-
-                            Repeater {
-                                model: section.lines
-                                delegate: FormLine {
-                                    required property var modelData
-                                    line: modelData
-                                }
-                            }
+                        contentItem: Label {
+                            leftPadding: 18
+                            verticalAlignment: Text.AlignVCenter
+                            text: modeItem.modelData
+                            color: modeItem.current ? "#ffffff" : "#c4cad2"
+                            font.bold: modeItem.current
+                            opacity: modeItem.enabled ? 1.0 : 0.4
                         }
                     }
                 }
@@ -436,169 +454,301 @@ ApplicationWindow {
             }
         }
 
-        // ---- right: what the run produces ----
+        // ---- the chosen mode's page ----
         ColumnLayout {
-            SplitView.fillWidth: true
-            SplitView.minimumWidth: 420
-            spacing: 10
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.margins: 18
+            spacing: 2
 
-            SectionHeader { name: "Output"; open: true; onClicked: {} }
-
-            ColumnLayout {
+            Label {
+                text: controller.modeLabels[controller.modes.indexOf(controller.mode)]
+                font.pixelSize: 22
+                font.bold: true
+                color: "#22262c"
+            }
+            Label {
                 Layout.fillWidth: true
-                Layout.leftMargin: 8
-                spacing: 6
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-                    Label { text: "Folder"; Layout.preferredWidth: root.labelWidth }
-                    TextField {
-                        Layout.fillWidth: true
-                        text: controller.outputDir
-                        onEditingFinished: controller.setOutputDir(text)
-                    }
-                    Button { text: "Browse…"; onClicked: outputDialog.open() }
-                }
-
-                Repeater {
-                    model: controller.outputLines
-                    delegate: FormLine {
-                        required property var modelData
-                        line: modelData
-                    }
-                }
+                Layout.bottomMargin: 10
+                text: controller.modeBlurb
+                color: "#6b7079"
+                elide: Text.ElideRight
             }
 
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.topMargin: 4
-                spacing: 8
-                visible: controller.canPreview
-
-                Label {
-                    text: "PREVIEW"
-                    font.bold: true
-                    font.pixelSize: 11
-                    opacity: 0.75
-                }
-                Button {
-                    text: "Original"
-                    checkable: true
-                    checked: controller.previewOriginal
-                    onToggled: controller.setPreviewOriginal(checked)
-                }
-                Button {
-                    text: "Synthetic"
-                    checkable: true
-                    checked: controller.previewSynthetic
-                    // Absent outside generate: a hybrid network is far too
-                    // large to draw, and neither it nor sweep writes the batch
-                    // a preview reads.
-                    visible: controller.offersSyntheticPreview
-                    enabled: controller.canPreviewSynthetic
-                    onToggled: controller.setPreviewSynthetic(checked)
-                }
-                Label {
-                    Layout.fillWidth: true
-                    text: controller.previewStatus
-                    color: controller.previewFailed ? "#c0392b" : palette.text
-                    elide: Text.ElideRight
-                }
-            }
-
-            ScrollView {
+            SplitView {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                visible: controller.previewOriginal || controller.previewSynthetic
-                contentWidth: availableWidth
+                orientation: Qt.Horizontal
 
-                ColumnLayout {
-                    width: parent.width
-                    spacing: 10
+                // what the run is given
+                ScrollView {
+                    SplitView.preferredWidth: 460
+                    SplitView.minimumWidth: 420
+                    contentWidth: availableWidth
 
                     ColumnLayout {
-                        Layout.fillWidth: true
-                        visible: controller.previewOriginal
-                        spacing: 6
+                        width: parent.width
+                        spacing: 12
+
+                        Card {
+                            title: "Input"
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 10
+                                // Only where the mode offers a choice: analysis
+                                // reads a results directory and nothing else.
+                                visible: controller.inputShapes.length > 1
+
+                                Label {
+                                    text: "Format"
+                                    Layout.preferredWidth: root.labelWidth
+                                    color: "#3d434b"
+                                }
+                                ComboBox {
+                                    Layout.fillWidth: true
+                                    model: controller.inputShapes
+                                    currentIndex: controller.inputShape
+                                    onActivated: controller.selectInputShape(currentIndex)
+                                    enabled: !controller.running
+                                }
+                            }
+
+                            Repeater {
+                                model: controller.inputs
+
+                                delegate: RowLayout {
+                                    id: inputRow
+                                    required property var modelData
+                                    Layout.fillWidth: true
+                                    spacing: 10
+
+                                    Label {
+                                        text: inputRow.modelData.label
+                                        Layout.preferredWidth: root.labelWidth
+                                        color: "#3d434b"
+                                    }
+                                    TextField {
+                                        Layout.fillWidth: true
+                                        text: inputRow.modelData.value
+                                        placeholderText: inputRow.modelData.placeholder
+                                        onEditingFinished:
+                                            controller.setInput(inputRow.modelData.id, text)
+                                    }
+                                    // Whether this file is settled, beside the
+                                    // field rather than only in the run's
+                                    // refusal at the foot of the window.
+                                    Label {
+                                        Layout.preferredWidth: 14
+                                        horizontalAlignment: Text.AlignHCenter
+                                        font.bold: true
+                                        text: inputRow.modelData.state === "ok" ? "✓"
+                                            : inputRow.modelData.state === "missing"
+                                                ? "!" : ""
+                                        color: inputRow.modelData.state === "ok"
+                                            ? root.goodColor : root.badColor
+                                        ToolTip.text: inputRow.modelData.state === "ok"
+                                            ? "Found."
+                                            : "Needed, and not found yet."
+                                        ToolTip.visible: stateHover.hovered
+                                            && inputRow.modelData.state !== "blank"
+                                        HoverHandler { id: stateHover }
+                                    }
+                                    Button {
+                                        text: "Browse…"
+                                        onClicked: root.browseFor(inputRow.modelData)
+                                    }
+                                    // What this input's format has to contain.
+                                    // Each shape reads a different one, and the
+                                    // wrong file fails deep inside a run rather
+                                    // than here.
+                                    Button {
+                                        id: contract
+                                        text: "?"
+                                        checkable: true
+                                        implicitWidth: 34
+                                        visible: inputRow.modelData.help !== ""
+                                        ToolTip.text: inputRow.modelData.help
+                                        ToolTip.visible: contract.checked
+                                            || contractHover.hovered
+                                        HoverHandler { id: contractHover }
+                                    }
+                                }
+                            }
+                        }
+
+                        Repeater {
+                            model: controller.configSections
+
+                            delegate: Card {
+                                id: sectionCard
+                                required property var modelData
+                                title: sectionCard.modelData.name
+
+                                Repeater {
+                                    model: sectionCard.modelData.lines
+                                    delegate: FormLine {
+                                        required property var modelData
+                                        line: modelData
+                                    }
+                                }
+                            }
+                        }
+
+                        Item { Layout.fillHeight: true }
+                    }
+                }
+
+                // what the run produces
+                ColumnLayout {
+                    SplitView.fillWidth: true
+                    SplitView.minimumWidth: 470
+                    spacing: 12
+
+                    Card {
+                        title: "Output"
+                        Layout.leftMargin: 14
 
                         RowLayout {
                             Layout.fillWidth: true
-                            spacing: 8
+                            spacing: 10
+                            Label {
+                                text: "Folder"
+                                Layout.preferredWidth: root.labelWidth
+                                color: "#3d434b"
+                            }
+                            TextField {
+                                Layout.fillWidth: true
+                                text: controller.outputDir
+                                onEditingFinished: controller.setOutputDir(text)
+                            }
+                            Button { text: "Browse…"; onClicked: outputDialog.open() }
+                        }
 
-                            Label { text: "Original"; font.bold: true }
-                            // Absent when the input came without an image:
-                            // with nothing behind the network there is
-                            // nothing to switch.
+                        Repeater {
+                            model: controller.outputLines
+                            delegate: FormLine {
+                                required property var modelData
+                                line: modelData
+                            }
+                        }
+                    }
+
+                    Card {
+                        title: "Preview"
+                        Layout.leftMargin: 14
+                        visible: controller.canPreview
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 10
+
+                            TabBar {
+                                id: previewTabs
+                                onCurrentIndexChanged:
+                                    controller.selectPreviewTab(currentIndex)
+
+                                // A mode with nothing synthetic to show must
+                                // not be left sitting on that tab.
+                                Connections {
+                                    target: controller
+                                    function onChanged() {
+                                        if (!controller.offersSyntheticPreview
+                                                && previewTabs.currentIndex !== 0)
+                                            previewTabs.currentIndex = 0
+                                    }
+                                }
+
+                                TabButton { text: "Original"; width: 112 }
+                                TabButton {
+                                    text: "Synthetic"
+                                    width: 112
+                                    // Absent outside generate: a hybrid network
+                                    // is far too large to draw, and neither it
+                                    // nor sweep writes the batch a preview reads.
+                                    visible: controller.offersSyntheticPreview
+                                    enabled: controller.canPreviewSynthetic
+                                }
+                            }
+
+                            // Absent when the input came without an image: with
+                            // nothing behind the network there is nothing to
+                            // switch.
                             Button {
                                 text: "Background"
                                 checkable: true
                                 checked: controller.showBackground
-                                visible: controller.hasBackground
+                                visible: previewTabs.currentIndex === 0
+                                    && controller.hasBackground
                                 onToggled: controller.setShowBackground(checked)
                             }
                             Button {
                                 text: "Network"
                                 checkable: true
                                 checked: controller.showNetwork
+                                visible: previewTabs.currentIndex === 0
                                 onToggled: controller.setShowNetwork(checked)
                             }
+                            Item { Layout.fillWidth: true }
                             Label {
-                                Layout.fillWidth: true
-                                text: controller.originalNote
+                                text: controller.previewStatus
+                                color: controller.previewFailed
+                                    ? root.badColor : "#6b7079"
                                 elide: Text.ElideRight
-                                opacity: 0.7
                             }
                         }
 
-                        PreviewPane {
-                            Layout.fillWidth: true
-                            image: controller.originalImage
-                            info: controller.originalInfo
-                        }
-                    }
-
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        visible: controller.previewSynthetic
-                        spacing: 6
-
-                        Label { text: "Synthetic"; font.bold: true }
                         Label {
                             Layout.fillWidth: true
                             wrapMode: Text.WordWrap
-                            text: controller.syntheticNote
-                            opacity: 0.7
+                            color: "#6b7079"
+                            text: previewTabs.currentIndex === 0
+                                ? controller.originalNote : controller.syntheticNote
+                            visible: text !== ""
                         }
-                        PreviewPane {
+
+                        StackLayout {
                             Layout.fillWidth: true
-                            image: controller.syntheticImage
-                            info: controller.syntheticInfo
+                            Layout.preferredHeight: 264
+                            currentIndex: previewTabs.currentIndex
+
+                            PreviewPane {
+                                image: controller.originalImage
+                                info: controller.originalInfo
+                                placeholder: controller.previewStatus !== ""
+                                    ? controller.previewStatus
+                                    : "Choose an edge list and positions, and the input network is drawn here."
+                            }
+                            PreviewPane {
+                                image: controller.syntheticImage
+                                info: controller.syntheticInfo
+                                placeholder: controller.previewStatus !== ""
+                                    ? controller.previewStatus
+                                    : "Run, and the first network of the output is drawn here."
+                            }
                         }
                     }
-                }
-            }
 
-            Item {
-                Layout.fillHeight: true
-                visible: !(controller.previewOriginal || controller.previewSynthetic)
-            }
+                    Card {
+                        title: "Log"
+                        Layout.leftMargin: 14
+                        Layout.fillHeight: true
+                        Layout.minimumHeight: 170
 
-            GroupBox {
-                title: "Log"
-                Layout.fillWidth: true
-                Layout.preferredHeight: 190
-
-                ScrollView {
-                    anchors.fill: parent
-                    TextArea {
-                        id: logArea
-                        readOnly: true
-                        wrapMode: TextArea.NoWrap
-                        font.family: "monospace"
-                        font.pixelSize: 11
-                        text: controller.logText
-                        onTextChanged: cursorPosition = length
+                        ScrollView {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            TextArea {
+                                id: logArea
+                                readOnly: true
+                                wrapMode: TextArea.NoWrap
+                                font.family: "monospace"
+                                font.pixelSize: 11
+                                text: controller.logText
+                                background: null
+                                onTextChanged: cursorPosition = length
+                            }
+                        }
                     }
                 }
             }
