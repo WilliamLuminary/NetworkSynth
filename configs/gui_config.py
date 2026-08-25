@@ -48,7 +48,6 @@ MODE_INPUTS = {
     "generate": _PAIR_OR_DIRECTORY,
     "hybrid": _PAIR_OR_DIRECTORY,
     "sweep": _PAIR_OR_DIRECTORY,
-    "compare": (("original_dir", "synthetic_dir"),),
 }
 
 #: The naming convention a dataset directory follows.  It is not a new
@@ -363,14 +362,6 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
         cls.OUTPUT_DENOTE = f"gui_{cls.MODE}"
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
-        if cls.MODE == "compare":
-            # Reuses the compare mode's own loader rather than a second copy:
-            # which formats count as networks is that mode's business.
-            from .compare_mode.config_sample import _load_networks
-
-            cls.ORIGINAL_NETWORKS_PATH = cls.PATHS["original_dir"]
-            cls.SYNTHETIC_NETWORKS_PATH = cls.PATHS["synthetic_dir"]
-            cls.NETWORKS_FUNC = staticmethod(_load_networks)
 
     @classmethod
     def load_original_network(cls, dataset_id: DatasetId) -> SynthGraph:

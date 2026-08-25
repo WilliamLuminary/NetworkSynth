@@ -52,6 +52,16 @@ def _format_fields(group: str, formats, default: str) -> List[Field]:
 #: know which one it is.
 OUTPUT_GROUP = "Output"
 
+#: A line under a section's heading, for what a tooltip should not have to be
+#: hunted for.  Keyed by group name; a section without one shows nothing.
+SECTION_NOTES = {
+    "Tracking": (
+        "wandb needs a login: run `wandb login` once, or set WANDB_API_KEY in "
+        "the environment. Switched off, nothing is contacted — the sweep "
+        "writes sweep_report.csv either way."
+    ),
+}
+
 #: The section for squaring the input up with the image it was traced from.
 #: Its own pane, beside the files it is about.
 ALIGN_GROUP = "Align"
@@ -118,7 +128,14 @@ def sections_of(fields: List[Field]) -> List[Dict[str, Any]]:
             order.append(spec_field.group)
             grouped[spec_field.group] = []
         grouped[spec_field.group].append(spec_field)
-    return [{"name": name, "lines": lines_of(grouped[name])} for name in order]
+    return [
+        {
+            "name": name,
+            "note": SECTION_NOTES.get(name, ""),
+            "lines": lines_of(grouped[name]),
+        }
+        for name in order
+    ]
 
 
 @dataclass(frozen=True)
@@ -529,42 +546,6 @@ def _network_shapes() -> List[InputShape]:
     ]
 
 
-def _results_shapes() -> List[InputShape]:
-    return [
-        InputShape(
-            "Two sets to compare",
-            scope=DIRECTORY,
-            format="Result folders",
-            inputs=[
-                Input(
-                    "original_dir",
-                    "Original",
-                    kind="dir",
-                    placeholder="original/ folder",
-                    help=(
-                        "A folder of networks, read as a batch .pkl if\n"
-                        "one is in it, and otherwise as every\n"
-                        "…_edgelist.csv + …_positions.csv pair.\n"
-                        "A run's own original/ folder is what this\n"
-                        "expects."
-                    ),
-                ),
-                Input(
-                    "synthetic_dir",
-                    "Synthetic",
-                    kind="dir",
-                    placeholder="synthetic/ folder",
-                    help=(
-                        "The same, for the networks being compared\n"
-                        "against the originals — a run's synthetic/\n"
-                        "folder."
-                    ),
-                ),
-            ],
-        )
-    ]
-
-
 def _sweep_fields() -> List[Field]:
     # The factors are what a sweep varies, so they come from the ranges below
     # rather than from a fixed field, and no preview images are written.
@@ -583,6 +564,20 @@ def _sweep_fields() -> List[Field]:
         fields.append(spec_field)
     return fields + [
         Field(
+            "USE_WANDB",
+            "Log to wandb",
+            True,
+            kind="bool",
+            group="Tracking",
+            help=(
+                "On, the sweep is run by wandb and needs a login: run\n"
+                "`wandb login` once, or put WANDB_API_KEY (or WANDB_KEY)\n"
+                "in the environment before starting the window.\n"
+                "Off, the grid is walked here and nothing is contacted.\n"
+                "Either way the run writes sweep_report.csv."
+            ),
+        ),
+        Field(
             "NF_RANGE",
             "Node factor range",
             (1.0, 1.5),
@@ -590,7 +585,11 @@ def _sweep_fields() -> List[Field]:
             minimum=0.1,
             maximum=5.0,
             step=0.1,
-            help="Swept in steps of 0.1. Trials = node steps x edge steps.",
+            help=(
+                "The first and last node factor tried.\n"
+                "Every combination of node and edge value is one trial, so\n"
+                "the count is node steps × edge steps."
+            ),
         ),
         Field(
             "EF_RANGE",
@@ -601,30 +600,21 @@ def _sweep_fields() -> List[Field]:
             maximum=5.0,
             step=0.1,
         ),
+        Field(
+            "SWEEP_STEP",
+            "Step",
+            0.1,
+            minimum=0.01,
+            maximum=1.0,
+            step=0.01,
+            unit="per step",
+            help=(
+                "How far apart the values tried are, on both ranges.\n"
+                "A smaller step means a finer grid and many more trials:\n"
+                "1.0 → 1.5 is 6 values at 0.1, and 51 at 0.01."
+            ),
+        ),
     ]
-
-
-def _analysis_fields() -> List[Field]:
-    # Analysis is multifractal only, so there is no quality gate to choose.
-    return [
-        Field(
-            "MEASURE_WEIGHTED",
-            "Weighted analysis",
-            False,
-            kind="bool",
-            group="Analysis",
-            help="Use edge weights as distances. Needs a weighted network.",
-        ),
-        Field(
-            "FULL_Q_BAND",
-            "Full q band",
-            False,
-            kind="bool",
-            group="Analysis",
-            help="Wider q range: slower, smoother spectrum.",
-        ),
-        # No network formats: comparison writes spectra, not networks.
-    ] + _format_fields("plot", PLOT_FORMATS, "webp")
 
 
 #: Only modes the entry point can actually dispatch.  Kept in step with
@@ -656,13 +646,6 @@ MODES: Dict[str, ModeSpec] = {
         "Try a range of node and edge factors, scoring every combination.",
         _sweep_fields(),
         _network_shapes(),
-    ),
-    "compare": ModeSpec(
-        "compare",
-        "Compare",
-        "Measure two sets of finished networks against each other.",
-        _analysis_fields(),
-        _results_shapes(),
     ),
 }
 

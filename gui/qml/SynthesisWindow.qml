@@ -178,8 +178,13 @@ ApplicationWindow {
 
     // A titled panel.  Children go straight inside it.
     component Card: Rectangle {
+        id: card
         default property alias content: body.data
         property string title: ""
+        //: A card that can be folded away, for one whose rows are only wanted
+        //: now and then.  The heading keeps saying it is there.
+        property bool collapsible: false
+        property bool expanded: true
 
         Layout.fillWidth: true
         implicitHeight: shell.implicitHeight + 24
@@ -195,15 +200,24 @@ ApplicationWindow {
             spacing: 10
 
             Label {
-                visible: title !== ""
-                text: title.toUpperCase()
+                visible: card.title !== ""
+                text: (card.collapsible ? (card.expanded ? "▾  " : "▸  ") : "")
+                    + card.title.toUpperCase()
                 font.bold: true
                 font.pixelSize: 10
                 font.letterSpacing: 0.8
                 opacity: 0.55
+
+                TapHandler {
+                    enabled: card.collapsible
+                    onTapped: card.expanded = !card.expanded
+                }
             }
             ColumnLayout {
                 id: body
+                // Layouts skip an invisible child, so a folded card shrinks to
+                // its heading rather than leaving the gap behind.
+                visible: card.expanded
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: 8
@@ -686,6 +700,10 @@ ApplicationWindow {
 
                         Card {
                             title: "Align"
+                            // Folded: squaring the input up with its image is
+                            // something you do once, if ever.
+                            collapsible: true
+                            expanded: false
                             visible: controller.alignLines.length > 0
                                 && controller.canPreview
 
@@ -723,6 +741,14 @@ ApplicationWindow {
                                 id: sectionCard
                                 required property var modelData
                                 title: sectionCard.modelData.name
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    wrapMode: Text.WordWrap
+                                    opacity: 0.6
+                                    visible: text !== ""
+                                    text: sectionCard.modelData.note
+                                }
 
                                 Repeater {
                                     model: sectionCard.modelData.lines
@@ -769,6 +795,25 @@ ApplicationWindow {
                                 }
                             }
                             Button { text: "Browse…"; onClicked: outputDialog.open() }
+                        }
+
+                        // Nothing is written into the chosen folder itself, so
+                        // say where it does go before the run rather than in
+                        // the status line afterwards.
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 10
+
+                            Item { Layout.preferredWidth: root.labelWidth }
+                            Label {
+                                Layout.fillWidth: true
+                                wrapMode: Text.WordWrap
+                                opacity: 0.6
+                                text: "Each run makes its own timestamped "
+                                    + "folder in here, named for the mode and "
+                                    + "the run. \"latest_result\" is kept "
+                                    + "pointing at the newest."
+                            }
                         }
 
                         Repeater {
