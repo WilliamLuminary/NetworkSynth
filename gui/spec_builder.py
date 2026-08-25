@@ -30,17 +30,30 @@ def _format_fields(group: str, formats, default: str) -> List[Field]:
     Derived from the tables the config writes by, so the form offers exactly
     what the save layer can do — no more, and nothing it has forgotten.
     """
-    noun = {"network": "networks", "plot": "plots"}[group]
+    noun = {"network": "Networks", "plot": "Plots"}[group]
     return [
         Field(
             format_param(group, name),
-            f"Save {noun} as .{name}",
+            f".{name}",
             name == default,
             kind="bool",
+            group=OUTPUT_GROUP,
+            # One line of switches per kind of output, rather than a line each.
+            row=noun,
             help=_FORMAT_HELP[name],
         )
         for name in formats
     ]
+
+
+#: The section holding everything about what a run writes.  Named here rather
+#: than in the window, because the window shows it in its own pane and has to
+#: know which one it is.
+OUTPUT_GROUP = "Output"
+
+#: Sections that start folded away.  Their defaults are right for most runs, and
+#: the header keeps showing what they are set to.
+COLLAPSED_GROUPS = frozenset({"Quality"})
 
 
 @dataclass(frozen=True)
@@ -49,14 +62,60 @@ class Field:
     id: str
     label: str
     value: Any
-    kind: str = "number"  # number | integer | bool | text | size
+    kind: str = "number"  # number | integer | bool | text | choice | size | range
     minimum: Optional[float] = None
     maximum: Optional[float] = None
     step: Optional[float] = None
     help: str = ""
+    #: Which section of the form this belongs under.
+    group: str = "Network"
+    #: Fields sharing one render side by side under this label, as a set of
+    #: switches rather than a switch per line.
+    row: str = ""
+    #: For ``kind="choice"``: everything the field accepts.
+    options: tuple = ()
 
     def as_dict(self) -> Dict[str, Any]:
-        return asdict(self)
+        data = asdict(self)
+        # A tuple crosses into QML as an opaque wrapper rather than an array:
+        # it has no length and no indexOf, so a combo box bound to one is an
+        # invalid model.  The same reason ``valueOf`` hands back a list.
+        data["options"] = list(self.options)
+        return data
+
+
+def lines_of(fields: List[Field]) -> List[Dict[str, Any]]:
+    """*fields* as the rows a form draws: one per field, or one per ``row``."""
+    lines: List[Dict[str, Any]] = []
+    shared: Dict[str, Dict[str, Any]] = {}
+    for spec_field in fields:
+        if not spec_field.row:
+            lines.append({"row": "", "fields": [spec_field.as_dict()]})
+            continue
+        if spec_field.row not in shared:
+            shared[spec_field.row] = {"row": spec_field.row, "fields": []}
+            lines.append(shared[spec_field.row])
+        shared[spec_field.row]["fields"].append(spec_field.as_dict())
+    return lines
+
+
+def sections_of(fields: List[Field]) -> List[Dict[str, Any]]:
+    """*fields* grouped into sections, in the order they first appear."""
+    order: List[str] = []
+    grouped: Dict[str, List[Field]] = {}
+    for spec_field in fields:
+        if spec_field.group not in grouped:
+            order.append(spec_field.group)
+            grouped[spec_field.group] = []
+        grouped[spec_field.group].append(spec_field)
+    return [
+        {
+            "name": name,
+            "collapsed": name in COLLAPSED_GROUPS,
+            "lines": lines_of(grouped[name]),
+        }
+        for name in order
+    ]
 
 
 @dataclass(frozen=True)
@@ -120,7 +179,7 @@ def _common_fields() -> List[Field]:
         [
             Field(
                 "SYNTHETIC_FRAME_SIZE",
-                "Synthetic frame (w × h)",
+                "Frame (w × h)",
                 (512, 512),
                 kind="size",
                 help="Area the generated network grows into.",
@@ -144,7 +203,7 @@ def _common_fields() -> List[Field]:
             ),
             Field(
                 "SYNTHETIC_NETWORK_NUMBER",
-                "Networks to generate",
+                "Networks",
                 5,
                 kind="integer",
                 minimum=1,
@@ -152,40 +211,42 @@ def _common_fields() -> List[Field]:
                 step=1,
             ),
             Field(
-                "SYNTHETIC_GRAPH_NUMBER",
-                "Preview images",
-                1,
-                kind="integer",
-                minimum=0,
-                maximum=50,
-                step=1,
+                "ERROR_CHECKER",
+                "Gate",
+                "multifractal",
+                kind="choice",
+                options=_CHECKER_NAMES,
+                group="Quality",
+                help="What a candidate is checked against. Off is much faster.",
+            ),
+            Field(
+                "ERROR_TOLERANCE",
+                "Tolerance",
+                0.15,
+                minimum=0.0,
+                maximum=1.0,
+                step=0.01,
+                group="Quality",
+                help="How far from the original a candidate may be.",
             ),
             Field(
                 "MAX_ATTEMPTS",
-                "Max attempts per network",
+                "Max attempts",
                 10,
                 kind="integer",
                 minimum=1,
                 maximum=100,
                 step=1,
+                group="Quality",
+                help="Tries per network before giving up on it.",
             ),
             Field(
-                "ERROR_TOLERANCE",
-                "Error tolerance",
-                0.15,
-                minimum=0.0,
-                maximum=1.0,
-                step=0.01,
-                help="Multifractal quality gate; ignored when the gate is off.",
+                "MEASURE_WEIGHTED",
+                "Weighted analysis",
+                False,
+                kind="bool",
+                group="Quality",
             ),
-            Field(
-                "ERROR_CHECKER",
-                "Quality gate",
-                "multifractal",
-                kind="text",
-                help='"multifractal", "length_angle" or "none". Off is much faster.',
-            ),
-            Field("MEASURE_WEIGHTED", "Weighted analysis", False, kind="bool"),
             Field(
                 "SEED",
                 "Seed",
@@ -194,7 +255,19 @@ def _common_fields() -> List[Field]:
                 minimum=0,
                 maximum=2**31 - 1,
                 step=1,
+                group="Quality",
                 help="Same seed reproduces the same networks. 0 means unseeded.",
+            ),
+            Field(
+                "SYNTHETIC_GRAPH_NUMBER",
+                "Plot images",
+                1,
+                kind="integer",
+                minimum=0,
+                maximum=50,
+                step=1,
+                group=OUTPUT_GROUP,
+                help="How many of the generated networks get a saved plot.",
             ),
         ]
         + _format_fields("network", NETWORK_FORMATS, "csv")
@@ -210,6 +283,7 @@ def _hybrid_fields() -> List[Field]:
             (100, 100),
             kind="size",
             help="How many tile-widths of network to assemble.",
+            group="Tiling",
         ),
         Field(
             "PHASE2_MAX_ROUNDS",
@@ -220,6 +294,7 @@ def _hybrid_fields() -> List[Field]:
             maximum=10000,
             step=50,
             help="Frontier continuation after the seed tiles are placed.",
+            group="Tiling",
         ),
         Field(
             "TILE_FRAME_FACTOR",
@@ -229,6 +304,7 @@ def _hybrid_fields() -> List[Field]:
             maximum=2.0,
             step=0.1,
             help="Tile frame side = nearest-neighbour distance x this.",
+            group="Tiling",
         ),
         Field(
             "MIN_TILE_FRAME",
@@ -237,6 +313,7 @@ def _hybrid_fields() -> List[Field]:
             minimum=1.0,
             maximum=5000.0,
             step=10.0,
+            group="Tiling",
         ),
     ]
 
@@ -464,6 +541,7 @@ def _analysis_fields() -> List[Field]:
             "Weighted analysis",
             False,
             kind="bool",
+            group="Analysis",
             help="Use edge weights as distances. Needs a weighted network.",
         ),
         Field(
@@ -471,6 +549,7 @@ def _analysis_fields() -> List[Field]:
             "Full q band",
             False,
             kind="bool",
+            group="Analysis",
             help="Wider q range: slower, smoother spectrum.",
         ),
         # No network formats: comparison writes spectra, not networks.

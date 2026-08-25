@@ -152,8 +152,29 @@ class SynthesisController(QObject):
         self._note_ready()
 
     @Property("QVariantList", notify=changed)
-    def fields(self) -> list:
-        return [f.as_dict() for f in spec_builder.MODES[self._mode].fields]
+    def configSections(self) -> list:
+        """The parameter sections the form pane shows, in order.
+
+        Everything except the output section, which the window gives a pane of
+        its own beside the preview: one side is what a run is given, the other
+        is what it produces.
+        """
+        return [
+            section
+            for section in self._sections()
+            if section["name"] != spec_builder.OUTPUT_GROUP
+        ]
+
+    @Property("QVariantList", notify=changed)
+    def outputLines(self) -> list:
+        """The output section's rows, for the pane that holds them."""
+        for section in self._sections():
+            if section["name"] == spec_builder.OUTPUT_GROUP:
+                return section["lines"]
+        return []
+
+    def _sections(self) -> list:
+        return spec_builder.sections_of(spec_builder.MODES[self._mode].fields)
 
     @Property("QStringList", notify=changed)
     def inputShapes(self) -> list:
