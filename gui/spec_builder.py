@@ -83,8 +83,20 @@ class Field:
     #: Fields sharing one render side by side under this label, as a set of
     #: switches rather than a switch per line.
     row: str = ""
-    #: For ``kind="choice"``: everything the field accepts.
+    #: For ``kind="choice"``: everything the field accepts.  These are the
+    #: values a run is given, which are not always fit to be read: a checker is
+    #: registered under a key, and a q-band is a boolean.
     options: tuple = ()
+    #: What to call each option on screen, in the same order.  Empty shows the
+    #: options themselves.
+    labels: tuple = ()
+    #: What each option does, in the same order — a line under the control,
+    #: changing with the pick, because a name alone rarely settles the choice.
+    option_help: tuple = ()
+    #: ``(field id, values)``: this field is not shown while that field holds
+    #: one of those.  A setting the chosen algorithm never reads is worse than
+    #: absent, because it looks as though it were doing something.
+    hide_when: tuple = ()
     #: The one number in its section that a run is usually about, drawn larger.
     prominent: bool = False
     #: What the number is counted in, shown after the editor.  Not every size
@@ -94,13 +106,20 @@ class Field:
     #: width and a height — hybrid reads its target scale as (rows, columns).
     axes: tuple = ("w", "h")
 
+    def option_names(self) -> tuple:
+        """What the options are called — for a control, or for a complaint."""
+        return self.labels or tuple(str(option) for option in self.options)
+
     def as_dict(self) -> Dict[str, Any]:
         data = asdict(self)
         # A tuple crosses into QML as an opaque wrapper rather than an array:
         # it has no length and no indexOf, so a combo box bound to one is an
         # invalid model, the same way a tuple value has to be listed too.
-        data["options"] = list(self.options)
-        data["axes"] = list(self.axes)
+        for key in ("options", "labels", "option_help", "axes"):
+            data[key] = list(getattr(self, key))
+        # Resolved before the form is built, so nothing crosses that the window
+        # would have to know how to read.
+        data.pop("hide_when")
         return data
 
 
@@ -201,14 +220,66 @@ class ModeSpec:
     input_shapes: List[InputShape] = field(default_factory=list)
 
 
+#: Each gate as it is offered: the name ``create_error_checker`` accepts,
+#: mapped to what to call it and what it actually does.  Ordered strongest
+#: first, which is also the order a form lists them in.
+_GATES = {
+    "multifractal": (
+        "Multifractal spectrum",
+        "Compares the whole network's multifractal spectrum against the "
+        "original's. The most searching of the three, and by far the slowest: "
+        "every candidate costs an all-pairs shortest-path pass.",
+    ),
+    "length_angle": (
+        "Edge length and angle",
+        "Compares mean edge length and mean branching angle. Fast, but local — "
+        "it says nothing about connectivity, so a candidate can pass here and "
+        "still be wired quite unlike the original.",
+    ),
+    "none": (
+        "No checking",
+        "Every candidate is kept as it was generated. Nothing is measured, so "
+        "a run takes as little time as it can.",
+    ),
+}
+
+
 def _registered_checkers() -> tuple:
+    """Gate names, described ones first, then anything else registered.
+
+    Read from the registry rather than listed, so a checker added there still
+    reaches the form — under its own key and undescribed, rather than not at
+    all.
+    """
     from analysis.error_checker import _CHECKERS
 
-    return tuple(_CHECKERS)
+    described = [name for name in _GATES if name in _CHECKERS]
+    return tuple(described + sorted(set(_CHECKERS) - set(described)))
+
+
+#: What each turn is called on screen, against the keys ``orient_positions``
+#: takes.  Listed rather than derived, because "rot270" is a name for a
+#: function argument, not for a reader.
+_ORIENTATIONS_NAMED = {
+    "none": "Leave as it is",
+    # Clockwise as the preview draws it, which is what there is to go on: the
+    # y axis runs down there, so rot90 carries the top-left corner to the top
+    # right.
+    "rot90": "Rotate 90° clockwise",
+    "rot180": "Rotate 180°",
+    "rot270": "Rotate 90° anticlockwise",
+    "transpose": "Transpose (swap x and y)",
+}
 
 
 def _common_fields() -> List[Field]:
     from utils.graph_ops import ORIENTATIONS
+
+    # A turn added there but not named here still reaches the form, under its
+    # own key.
+    _ORIENTATION_LABELS = tuple(
+        _ORIENTATIONS_NAMED.get(name, name) for name in ORIENTATIONS
+    )
 
     return (
         [
@@ -218,6 +289,7 @@ def _common_fields() -> List[Field]:
                 "none",
                 kind="choice",
                 options=ORIENTATIONS,
+                labels=_ORIENTATION_LABELS,
                 group=ALIGN_GROUP,
                 help=(
                     "For position data recorded in a different orientation to\n"
@@ -281,13 +353,28 @@ def _common_fields() -> List[Field]:
                 help="How many synthetic networks this run produces.",
             ),
             Field(
+                "SEED",
+                "Seed",
+                0,
+                kind="integer",
+                minimum=0,
+                maximum=2**31 - 1,
+                step=1,
+                help="Same seed reproduces the same networks. 0 means unseeded.",
+            ),
+            Field(
                 "ERROR_CHECKER",
-                "Gate",
+                "Measured by",
                 "multifractal",
                 kind="choice",
                 options=_CHECKER_NAMES,
+                labels=_CHECKER_LABELS,
+                option_help=_CHECKER_HELP,
                 group="Quality",
-                help="What a candidate is checked against. Off is much faster.",
+                help=(
+                    "How a candidate network is compared with the original "
+                    "before it is kept."
+                ),
             ),
             Field(
                 "ERROR_TOLERANCE",
@@ -297,7 +384,8 @@ def _common_fields() -> List[Field]:
                 maximum=1.0,
                 step=0.01,
                 group="Quality",
-                help="How far from the original a candidate may be.",
+                hide_when=("ERROR_CHECKER", ("none",)),
+                help="How far from the original a candidate may be and still pass.",
             ),
             Field(
                 "MAX_ATTEMPTS",
@@ -308,25 +396,41 @@ def _common_fields() -> List[Field]:
                 maximum=100,
                 step=1,
                 group="Quality",
+                hide_when=("ERROR_CHECKER", ("none",)),
                 help="Tries per network before giving up on it.",
             ),
             Field(
                 "MEASURE_WEIGHTED",
-                "Weighted analysis",
+                "Edge weights",
                 False,
                 kind="bool",
                 group="Quality",
+                hide_when=("ERROR_CHECKER", ("none", "length_angle")),
+                help=(
+                    "Measure along weighted paths rather than counting edges. "
+                    "The input has to carry weights, or the run stops."
+                ),
             ),
             Field(
-                "SEED",
-                "Seed",
-                0,
-                kind="integer",
-                minimum=0,
-                maximum=2**31 - 1,
-                step=1,
+                "FULL_Q_BAND",
+                "Moment range",
+                False,
+                kind="choice",
+                options=(False, True),
+                labels=("Narrow", "Wide"),
+                option_help=(
+                    "Moments q from -3 to 3. Enough to tell candidates apart, "
+                    "and the usual choice.",
+                    "Moments q from -20 to 20. Reaches further into the sparse "
+                    "and dense extremes of the network, and costs much more "
+                    "for it.",
+                ),
                 group="Quality",
-                help="Same seed reproduces the same networks. 0 means unseeded.",
+                hide_when=("ERROR_CHECKER", ("none", "length_angle")),
+                help=(
+                    "The span of moments the spectrum is measured over. Wider "
+                    "weighs the extremes more heavily."
+                ),
             ),
             Field(
                 "SYNTHETIC_GRAPH_NUMBER",
@@ -397,9 +501,12 @@ def _hybrid_fields() -> List[Field]:
     ]
 
 
-#: Gate names ``create_error_checker`` accepts.  Derived, so a new checker does
-#: not have to be remembered here as well.
-_CHECKER_NAMES = tuple(sorted(_registered_checkers()))
+#: Gate names ``create_error_checker`` accepts, with what to call each and
+#: what each does.  Derived, so a new checker does not have to be remembered
+#: here as well.
+_CHECKER_NAMES = _registered_checkers()
+_CHECKER_LABELS = tuple(_GATES.get(name, (name, ""))[0] for name in _CHECKER_NAMES)
+_CHECKER_HELP = tuple(_GATES.get(name, (name, ""))[1] for name in _CHECKER_NAMES)
 
 
 def _background() -> Input:
@@ -810,7 +917,7 @@ def validate(
         if values[spec_field.id] not in spec_field.options:
             problems.append(
                 f"{spec_field.label} must be one of: "
-                f"{', '.join(spec_field.options)}."
+                f"{', '.join(spec_field.option_names())}."
             )
 
     return problems

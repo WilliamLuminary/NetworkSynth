@@ -212,7 +212,12 @@ class SynthesisController(QObject):
         went on showing whatever it was handed when it was built, however often
         the value behind it changed.
         """
-        sections = spec_builder.sections_of(spec_builder.MODES[self._mode].fields)
+        fields = [
+            spec_field
+            for spec_field in spec_builder.MODES[self._mode].fields
+            if self._applies(spec_field)
+        ]
+        sections = spec_builder.sections_of(fields)
         for section in sections:
             for line in section["lines"]:
                 for spec_field in line["fields"]:
@@ -221,6 +226,20 @@ class SynthesisController(QObject):
                         list(value) if isinstance(value, tuple) else value
                     )
         return sections
+
+    def _applies(self, spec_field) -> bool:
+        """Whether *spec_field* bears on what is currently chosen.
+
+        A gate that measures nothing has no tolerance to be within, and only
+        the multifractal one reads weights or a moment range.  Drawing those
+        anyway offers a setting the run will ignore without saying so.  What
+        was typed into one is kept, not reset, so turning the gate back on
+        brings the row back as it was left.
+        """
+        if not spec_field.hide_when:
+            return True
+        other, hidden_by = spec_field.hide_when
+        return self._values.get(other) not in hidden_by
 
     @Property(bool, notify=changed)
     def hasInputChoice(self) -> bool:
@@ -635,10 +654,18 @@ class SynthesisController(QObject):
                     return int(float(value))
                 if spec_field.kind == "bool":
                     return bool(value)
-                # "choice" with them: it is a string from a fixed set, and
-                # falling through to float() made every pick revert to the
-                # default without a word.
-                if spec_field.kind in ("text", "choice"):
+                # A choice is one of the values the field declares, whatever
+                # type those are: a gate is named by a string, a moment range
+                # by a boolean.  Matched as text as well, because that is what
+                # a control hands back for anything it had to render.
+                if spec_field.kind == "choice":
+                    for option in spec_field.options:
+                        if option is value or str(option) == str(value):
+                            return option
+                    return spec_field.value
+                # Text falls through to float() otherwise, which made every
+                # entry revert to the default without a word.
+                if spec_field.kind == "text":
                     return str(value)
                 return float(value)
             except (TypeError, ValueError):

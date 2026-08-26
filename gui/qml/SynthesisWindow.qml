@@ -247,10 +247,14 @@ ApplicationWindow {
             onToggled: editor.edited(checked)
         }
 
+        // Named for the reader, valued for the run: a gate is registered
+        // under a key and a moment range is a boolean, and neither is
+        // anything to put in front of someone.
         ComboBox {
             visible: editor.field.kind === "choice"
-            Layout.preferredWidth: 170
-            model: editor.field.options
+            Layout.preferredWidth: 190
+            model: editor.field.labels.length > 0
+                ? editor.field.labels : editor.field.options
             currentIndex: Math.max(0, editor.field.options.indexOf(editor.value))
             onActivated: editor.edited(editor.field.options[currentIndex])
         }
@@ -338,52 +342,83 @@ ApplicationWindow {
         Item { Layout.fillWidth: true }
     }
 
-    // One form row: a single field, or a set of switches sharing a label.
-    component FormLine: RowLayout {
+    // One form row: a single field, or a set of switches sharing a label —
+    // and, under a choice, a line saying what the current pick does.
+    component FormLine: ColumnLayout {
         id: formLine
         required property var line
 
+        // What the chosen option does, or "" where there is nothing to say:
+        // a field that is not a choice, or one whose options need no gloss.
+        readonly property string optionNote: {
+            const one = formLine.line.fields[0]
+            if (formLine.line.row || one.kind !== "choice"
+                    || one.option_help.length === 0)
+                return ""
+            const at = one.options.indexOf(one.current)
+            return at >= 0 && at < one.option_help.length
+                ? one.option_help[at] : ""
+        }
+
         Layout.fillWidth: true
-        spacing: 10
+        spacing: 3
 
-        Label {
-            text: formLine.line.row ? formLine.line.row : formLine.line.fields[0].label
-            Layout.preferredWidth: root.labelWidth
-            elide: Text.ElideRight
-            font.bold: !formLine.line.row
-                && formLine.line.fields[0].prominent === true
-            ToolTip.text: formLine.line.row ? "" : formLine.line.fields[0].help
-            ToolTip.visible: !formLine.line.row && formLine.line.fields[0].help
-                ? lineHover.hovered : false
-            HoverHandler { id: lineHover }
-        }
-
-        // A set: every format on one line, each plainly a switch to turn on or
-        // off rather than a badge stating what is already chosen.
-        Repeater {
-            model: formLine.line.row ? formLine.line.fields : []
-            delegate: CheckBox {
-                required property var modelData
-                text: modelData.label
-                checked: modelData.current === true
-                ToolTip.text: modelData.help
-                ToolTip.visible: modelData.help ? hovered : false
-                onToggled: controller.setValue(modelData.id, checked)
-            }
-        }
-
-        FieldEditor {
-            visible: !formLine.line.row
+        RowLayout {
             Layout.fillWidth: true
-            field: formLine.line.fields[0]
-            value: formLine.line.fields[0].current
-            onEdited: (newValue) => controller.setValue(
-                formLine.line.fields[0].id, newValue)
-            onSized: (index, newValue) => controller.setSize(
-                formLine.line.fields[0].id, index, newValue)
+            spacing: 10
+
+            Label {
+                text: formLine.line.row ? formLine.line.row : formLine.line.fields[0].label
+                Layout.preferredWidth: root.labelWidth
+                elide: Text.ElideRight
+                font.bold: !formLine.line.row
+                    && formLine.line.fields[0].prominent === true
+                ToolTip.text: formLine.line.row ? "" : formLine.line.fields[0].help
+                ToolTip.visible: !formLine.line.row && formLine.line.fields[0].help
+                    ? lineHover.hovered : false
+                HoverHandler { id: lineHover }
+            }
+
+            // A set: every format on one line, each plainly a switch to turn on or
+            // off rather than a badge stating what is already chosen.
+            Repeater {
+                model: formLine.line.row ? formLine.line.fields : []
+                delegate: CheckBox {
+                    required property var modelData
+                    text: modelData.label
+                    checked: modelData.current === true
+                    ToolTip.text: modelData.help
+                    ToolTip.visible: modelData.help ? hovered : false
+                    onToggled: controller.setValue(modelData.id, checked)
+                }
+            }
+
+            FieldEditor {
+                visible: !formLine.line.row
+                Layout.fillWidth: true
+                field: formLine.line.fields[0]
+                value: formLine.line.fields[0].current
+                onEdited: (newValue) => controller.setValue(
+                    formLine.line.fields[0].id, newValue)
+                onSized: (index, newValue) => controller.setSize(
+                    formLine.line.fields[0].id, index, newValue)
+            }
+
+            Item { Layout.fillWidth: true; visible: formLine.line.row !== "" }
         }
 
-        Item { Layout.fillWidth: true; visible: formLine.line.row !== "" }
+        // Indented to the editor it belongs to, so it reads as part of that
+        // control rather than as a note on the whole section.
+        Label {
+            visible: formLine.optionNote !== ""
+            text: formLine.optionNote
+            Layout.fillWidth: true
+            Layout.leftMargin: root.labelWidth + 10
+            Layout.bottomMargin: 4
+            wrapMode: Text.WordWrap
+            font.pixelSize: 11
+            opacity: 0.55
+        }
     }
 
     component PreviewPane: RowLayout {
