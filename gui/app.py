@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import atexit
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -23,6 +25,10 @@ from gui import spec_builder
 _QML = os.path.join(os.path.dirname(__file__), "qml", "SynthesisWindow.qml")
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _GUI_RUN = os.path.join(_REPO_ROOT, "gui_run.py")
+_GUI_PREVIEW = os.path.join(_REPO_ROOT, "gui_preview.py")
+
+#: The frames that follow the input image until the user sets one.
+_FRAME_KEYS = ("FRAME_SIZE", "SYNTHETIC_FRAME_SIZE")
 
 #: Exit codes gui_run.py promises.
 _EXIT_MEANING = {
@@ -37,6 +43,17 @@ def _local_path(value: str) -> str:
     if value.startswith("file://"):
         return QUrl(value).toLocalFile()
     return value
+
+
+def _file_url(path: Optional[str]) -> str:
+    return QUrl.fromLocalFile(path).toString() if path else ""
+
+
+def _last_line(path: str) -> str:
+    """The tail of a failed render's stderr, short enough to show in the form."""
+    with open(path) as handle:
+        lines = [line.strip() for line in handle if line.strip()]
+    return lines[-1][:200] if lines else "no output"
 
 
 class SynthesisController(QObject):
@@ -68,6 +85,48 @@ class SynthesisController(QObject):
         self._poll.setInterval(400)
         self._poll.timeout.connect(self._tick)
 
+        # What the last run was, so a preview of its output is offered only
+        # when there is output of that kind to read.
+        self._spec_path: Optional[str] = None
+        self._run_mode = ""
+        self._ran_ok = False
+        #: Whether the frames are still the image's, or the user's own.
+        self._frame_touched = False
+
+        # Previews.  Each side is shown or not, and holds the info.json its
+        # render wrote; the layer switches choose between the original's three
+        # variants, which are all rendered at once.
+        self._shown = {"original": True, "synthetic": False}
+        self._info: Dict[str, Optional[dict]] = {"original": None, "synthetic": None}
+        self._layers = {"background": True, "network": True}
+
+        # One render at a time, and a side asked for while one is running is
+        # remembered rather than dropped.
+        self._stale: set = set()
+        self._preview_process: Optional[subprocess.Popen] = None
+        self._preview_kind = ""
+        self._preview_out = ""
+        self._preview_stderr: Optional[Any] = None
+        self._scratch: Optional[str] = None
+        self._preview_count = 0
+        self._preview_error = ""
+
+        self._preview_poll = QTimer(self)
+        self._preview_poll.setInterval(300)
+        self._preview_poll.timeout.connect(self._preview_tick)
+
+        # Editing a field fires one change per field; a single render after the
+        # typing stops beats one render per keystroke.
+        self._settle = QTimer(self)
+        self._settle.setInterval(400)
+        self._settle.setSingleShot(True)
+        self._settle.timeout.connect(lambda: self._want("original"))
+
+        # The form opens on the sample data, so say so and draw it rather than
+        # waiting for an edit that has nothing to correct.
+        self._note_ready()
+        self._touch_preview()
+
     # ---- properties bound by QML ----
 
     @Property(str, notify=changed)
@@ -98,19 +157,157 @@ class SynthesisController(QObject):
         self._values = spec_builder.default_values(self._mode)
         self._shape = 0
         self._inputs = spec_builder.default_inputs(self._mode)
+        self._info["original"] = None
+        # The other mode's run is not this mode's output.
+        self._shown["synthetic"] = False
+        self._info["synthetic"] = None
         self._note_ready()
+        # Asked for outright rather than left to settle: nothing else is
+        # coming, and without this the pane stays blank until some unrelated
+        # field is edited.
+        self._want("original")
 
     @Property("QVariantList", notify=changed)
-    def fields(self) -> list:
-        return [f.as_dict() for f in spec_builder.MODES[self._mode].fields]
+    def configSections(self) -> list:
+        """The parameter sections the form pane shows, in order.
+
+        Everything except the output section, which the window gives a pane of
+        its own beside the preview: one side is what a run is given, the other
+        is what it produces.
+        """
+        return [
+            section
+            for section in self._sections()
+            if section["name"]
+            not in (spec_builder.OUTPUT_GROUP, spec_builder.ALIGN_GROUP)
+        ]
+
+    @Property("QVariantList", notify=changed)
+    def alignLines(self) -> list:
+        """The align section's rows — only for a single network.
+
+        A folder holds networks that were traced from different images, and one
+        turn applied to all of them would be right for at most one.  Editing is
+        a thing you do to a network you are looking at.
+        """
+        if self._shapes()[self._shape].scope != spec_builder.SINGLE:
+            return []
+        return self._lines_of(spec_builder.ALIGN_GROUP)
+
+    @Slot()
+    def saveEdited(self) -> None:
+        """Write the input as it is being read now, and read it back."""
+        self._want("save_edited")
+
+    @Property("QVariantList", notify=changed)
+    def outputLines(self) -> list:
+        """The output section's rows, for the pane that holds them."""
+        return self._lines_of(spec_builder.OUTPUT_GROUP)
+
+    def _lines_of(self, group: str) -> list:
+        for section in self._sections():
+            if section["name"] == group:
+                return section["lines"]
+        return []
+
+    def _sections(self) -> list:
+        """The mode's sections, each field carrying what it is set to now.
+
+        The value travels in the model rather than being fetched by a slot: a
+        binding on a slot call is evaluated once and never again, so a control
+        went on showing whatever it was handed when it was built, however often
+        the value behind it changed.
+        """
+        fields = [
+            spec_field
+            for spec_field in spec_builder.MODES[self._mode].fields
+            if self._applies(spec_field)
+        ]
+        sections = spec_builder.sections_of(fields)
+        for section in sections:
+            for line in section["lines"]:
+                for spec_field in line["fields"]:
+                    value = self._values.get(spec_field["id"], spec_field["value"])
+                    spec_field["current"] = (
+                        list(value) if isinstance(value, tuple) else value
+                    )
+        return sections
+
+    def _applies(self, spec_field) -> bool:
+        """Whether *spec_field* bears on what is currently chosen.
+
+        A gate that measures nothing has no tolerance to be within, and only
+        the multifractal one reads weights or a moment range.  Drawing those
+        anyway offers a setting the run will ignore without saying so.  What
+        was typed into one is kept, not reset, so turning the gate back on
+        brings the row back as it was left.
+        """
+        if not spec_field.hide_when:
+            return True
+        other, hidden_by = spec_field.hide_when
+        return self._values.get(other) not in hidden_by
+
+    @Property(bool, notify=changed)
+    def hasInputChoice(self) -> bool:
+        return len(spec_builder.MODES[self._mode].input_shapes) > 1
 
     @Property("QStringList", notify=changed)
-    def inputShapes(self) -> list:
-        return [shape.label for shape in spec_builder.MODES[self._mode].input_shapes]
+    def inputScopes(self) -> list:
+        """One network, or a folder of them — said apart from the format."""
+        return [spec_builder.SCOPE_LABELS[scope] for scope in self._scopes()]
 
     @Property(int, notify=changed)
-    def inputShape(self) -> int:
-        return self._shape
+    def inputScope(self) -> int:
+        return self._scopes().index(self._shapes()[self._shape].scope)
+
+    @Slot(int)
+    def selectInputScope(self, index: int) -> None:
+        """Switch between one network and a folder, keeping the format if it
+        exists on the other side.  A folder can only be read as CSV pairs, so
+        coming back from one lands on whatever that scope does offer."""
+        scopes = self._scopes()
+        if not 0 <= index < len(scopes):
+            return
+        wanted = self._shapes()[self._shape].format
+        for position, shape in enumerate(self._shapes()):
+            if shape.scope == scopes[index] and shape.format == wanted:
+                self.selectInputShape(position)
+                return
+        for position, shape in enumerate(self._shapes()):
+            if shape.scope == scopes[index]:
+                self.selectInputShape(position)
+                return
+
+    @Property("QStringList", notify=changed)
+    def inputFormats(self) -> list:
+        """The formats this scope can actually be read as."""
+        scope = self._shapes()[self._shape].scope
+        return [shape.format for shape in self._shapes() if shape.scope == scope]
+
+    @Property(int, notify=changed)
+    def inputFormat(self) -> int:
+        return self.inputFormats.index(self._shapes()[self._shape].format)
+
+    @Slot(int)
+    def selectInputFormat(self, index: int) -> None:
+        scope = self._shapes()[self._shape].scope
+        matching = [
+            position
+            for position, shape in enumerate(self._shapes())
+            if shape.scope == scope
+        ]
+        if 0 <= index < len(matching):
+            self.selectInputShape(matching[index])
+
+    def _shapes(self) -> list:
+        return spec_builder.MODES[self._mode].input_shapes
+
+    def _scopes(self) -> list:
+        seen = []
+        for shape in self._shapes():
+            if shape.scope not in seen:
+                seen.append(shape.scope)
+        return seen
 
     @Slot(int)
     def selectInputShape(self, index: int) -> None:
@@ -125,25 +322,73 @@ class SynthesisController(QObject):
             return
         self._shape = index
         self._inputs = spec_builder.default_inputs(self._mode, index)
+        if self._shapes()[index].scope != spec_builder.SINGLE:
+            # The turn is not offered for a folder, so it must not linger in
+            # the spec and quietly turn every network in one.
+            self._values["INPUT_ORIENTATION"] = "none"
+        self._info["original"] = None
         self._note_ready()
+        self._want("original")
 
     @Property("QVariantList", notify=changed)
     def inputs(self) -> list:
-        """What this mode reads, with the paths chosen so far.
+        """What this mode reads, with the paths chosen so far and how they stand.
 
         A list rather than fixed properties: analysis takes a directory of
         finished results where generation takes a network's two CSVs, and a form
         offering the wrong one is a run that fails after it starts.
         """
         shape = spec_builder.MODES[self._mode].input_shapes[self._shape]
-        return [
-            {**spec_input.as_dict(), "value": self._inputs.get(spec_input.id, "")}
-            for spec_input in shape.inputs
-        ]
+        rows = []
+        for spec_input in shape.inputs:
+            value = self._inputs.get(spec_input.id, "")
+            state, _ = spec_builder.input_state(spec_input, value)
+            rows.append(
+                {
+                    **spec_input.as_dict(),
+                    # Shown short; stored, checked and run absolute.
+                    "value": spec_builder.display_path(value),
+                    "state": state,
+                }
+            )
+        return rows
+
+    @Property(str, notify=changed)
+    def modeBlurb(self) -> str:
+        return spec_builder.MODES[self._mode].blurb
+
+    @Property(bool, notify=changed)
+    def canRun(self) -> bool:
+        """Whether the form is complete enough to start.
+
+        The button goes dead rather than accepting a click it would only
+        refuse; what is missing is named in the status bar either way.
+        """
+        if self._process is not None:
+            return False
+        return not spec_builder.validate(
+            self._mode, self._inputs, self._output_dir, self._values
+        )
+
+    @Property(str, notify=changed)
+    def runLabel(self) -> str:
+        """Which run the window is showing, for the status bar.
+
+        Read off the directory name the run made, which already carries both:
+        ``gui_generate_results_<date>_<time>_<id>``.
+        """
+        if not self._run_root:
+            return ""
+        parts = os.path.basename(self._run_root).split("_")
+        if len(parts) < 3:
+            return ""
+        stamp = parts[-2]
+        clock = f"{stamp[:2]}:{stamp[2:4]}:{stamp[4:6]}" if len(stamp) == 6 else stamp
+        return f"run {parts[-1]}  ·  {clock}"
 
     @Property(str, notify=changed)
     def outputDir(self) -> str:
-        return self._output_dir
+        return spec_builder.display_path(self._output_dir)
 
     @Property(str, notify=changed)
     def status(self) -> str:
@@ -165,16 +410,171 @@ class SynthesisController(QObject):
     def logText(self) -> str:
         return "\n".join(self._log[-400:])
 
-    # ---- slots the form calls ----
+    # ---- preview ----
 
-    @Slot(str, result="QVariant")
-    def valueOf(self, key: str):
-        value = self._values.get(key)
-        return list(value) if isinstance(value, tuple) else value
+    @Property(bool, notify=changed)
+    def canPreview(self) -> bool:
+        """Whether this mode reads a network of its own to show.
+
+        Against every key a network shape declares, not a pair written out
+        here: the pair was ``edge_list``/``datasets_dir``, left over from when
+        those were the only formats, and it quietly took the preview *and* the
+        align card away from the NumPy and pickle shapes the loader reads
+        perfectly well.
+        """
+        shape = spec_builder.MODES[self._mode].input_shapes[self._shape]
+        return bool(spec_builder.NETWORK_INPUTS & set(shape.ids))
+
+    @Property(bool, notify=changed)
+    def offersSyntheticPreview(self) -> bool:
+        """Whether this mode's output is worth previewing at all.
+
+        ``generate`` only.  A hybrid network is assembled from thousands of
+        tiles, so drawing one is a long job with an unreadable result — and
+        hybrid and sweep write no batch of networks for a preview to read
+        either.
+        """
+        return self._mode == "generate"
+
+    @Property(bool, notify=changed)
+    def canPreviewSynthetic(self) -> bool:
+        """Whether a finished run of that mode actually left something to show."""
+        return (
+            self.offersSyntheticPreview
+            and self._ran_ok
+            and self._run_mode == "generate"
+            and self._process is None
+            and self._run_root is not None
+        )
+
+    @Slot(int)
+    def selectPreviewTab(self, index: int) -> None:
+        """Show one side of the preview, and render it if it is not drawn yet."""
+        kind = "synthetic" if index else "original"
+        self._shown[kind] = True
+        if self._info[kind] is None:
+            self._want(kind)
+        else:
+            self.changed.emit()
+
+    @Property(bool, notify=changed)
+    def hasBackground(self) -> bool:
+        """Whether the previewed input came with an image behind it.
+
+        Answered by the render, not guessed here: which file counts as a
+        dataset's image is the config's rule, and asking twice invites the two
+        answers to differ.
+        """
+        info = self._info["original"]
+        return bool(info and info["has_background"])
+
+    @Property(bool, notify=changed)
+    def showBackground(self) -> bool:
+        return self._layers["background"]
+
+    @Property(bool, notify=changed)
+    def showNetwork(self) -> bool:
+        return self._layers["network"]
+
+    @Property(str, notify=changed)
+    def originalImage(self) -> str:
+        """The variant the two layer switches select, as a URL for QML.
+
+        Empty when both are off, or when there is nothing rendered yet.
+        """
+        info = self._info["original"]
+        if not info:
+            return ""
+        images = info["images"]
+        if self._layers["network"]:
+            key = (
+                "both" if self._layers["background"] and "both" in images else "network"
+            )
+        elif self._layers["background"]:
+            key = "background"
+        else:
+            return ""
+        return _file_url(images.get(key))
+
+    @Property(str, notify=changed)
+    def originalInfo(self) -> str:
+        return self._text_of("original")
+
+    @Property(str, notify=changed)
+    def originalNote(self) -> str:
+        return self._note_of("original")
+
+    @Property(str, notify=changed)
+    def syntheticImage(self) -> str:
+        info = self._info["synthetic"]
+        return _file_url(info["images"]["network"]) if info else ""
+
+    @Property(str, notify=changed)
+    def syntheticInfo(self) -> str:
+        return self._text_of("synthetic")
+
+    @Property(str, notify=changed)
+    def syntheticNote(self) -> str:
+        return self._note_of("synthetic")
+
+    @Property(str, notify=changed)
+    def previewStatus(self) -> str:
+        if self._preview_error:
+            return self._preview_error
+        if self._preview_process is not None:
+            return "Rendering preview…"
+        return ""
+
+    @Property(bool, notify=changed)
+    def previewFailed(self) -> bool:
+        return bool(self._preview_error)
+
+    @Slot()
+    def clearOutputs(self) -> None:
+        """Write nothing beyond what a run cannot help writing.
+
+        Every format off, and the plot count to zero with them: asking for
+        images in no format is the one combination the form refuses, and
+        "none" should not walk into it.
+        """
+        for spec_field in self._output_fields():
+            self._values[spec_field.id] = False if spec_field.kind == "bool" else 0
+        self._note_ready()
+
+    @Slot()
+    def resetOutputs(self) -> None:
+        """Back to what the mode declares: networks as CSV, plots as WebP."""
+        for spec_field in self._output_fields():
+            self._values[spec_field.id] = spec_field.value
+        self._note_ready()
+
+    def _output_fields(self) -> list:
+        """Whatever the output section holds — not a list repeated here."""
+        return [
+            spec_field
+            for spec_field in spec_builder.MODES[self._mode].fields
+            if spec_field.group == spec_builder.OUTPUT_GROUP
+        ]
+
+    @Slot(bool)
+    def setShowBackground(self, on: bool) -> None:
+        self._layers["background"] = on
+        self.changed.emit()
+
+    @Slot(bool)
+    def setShowNetwork(self, on: bool) -> None:
+        self._layers["network"] = on
+        self.changed.emit()
+
+    # ---- slots the form calls ----
 
     @Slot(str, "QVariant")
     def setValue(self, key: str, value) -> None:
         self._values[key] = self._coerce(key, value)
+        # What a run writes says nothing about what its input looks like, so
+        # an output format is a change to the form without a change to the
+        # picture.
+        self._touch_preview(redraw=self._group_of(key) != spec_builder.OUTPUT_GROUP)
 
     @Slot(str, int, "QVariant")
     def setSize(self, key: str, index: int, value) -> None:
@@ -186,15 +586,20 @@ class SynthesisController(QObject):
         except (TypeError, ValueError):
             return
         self._values[key] = tuple(current)
+        if key in _FRAME_KEYS:
+            # From here the frame is theirs, and the image stops setting it.
+            self._frame_touched = True
+        self._touch_preview()
 
     @Slot(str, str)
     def setInput(self, key: str, value: str) -> None:
-        self._inputs[key] = _local_path(value)
+        self._inputs[key] = spec_builder.resolve_path(_local_path(value))
+        self._touch_preview()
         self._note_ready()
 
     @Slot(str)
     def setOutputDir(self, value: str) -> None:
-        self._output_dir = _local_path(value)
+        self._output_dir = spec_builder.resolve_path(_local_path(value))
         self.changed.emit()
 
     @Slot()
@@ -209,13 +614,12 @@ class SynthesisController(QObject):
             self._set_status("  •  ".join(problems), failed=True)
             return
 
-        spec = spec_builder.build_spec(
-            self._mode, self._inputs, self._output_dir, self._values
-        )
-        spec_path = os.path.join(
-            tempfile.mkdtemp(prefix="networksynth_gui_"), "run_spec.json"
-        )
-        spec_builder.write_spec(spec, spec_path)
+        spec_path = self._write_spec("run_spec.json")
+        # Remembered so a preview of this run's output reads the same spec the
+        # run did, whatever the form says by the time it finishes.
+        self._spec_path = spec_path
+        self._run_mode = self._mode
+        self._ran_ok = False
 
         self._log = [f"run-spec: {spec_path}"]
         self._percent = 0.0
@@ -258,6 +662,12 @@ class SynthesisController(QObject):
                 return spec_field.kind
         return ""
 
+    def _group_of(self, key: str) -> str:
+        for spec_field in spec_builder.MODES[self._mode].fields:
+            if spec_field.id == key:
+                return spec_field.group
+        return ""
+
     def _coerce(self, key: str, value):
         for spec_field in spec_builder.MODES[self._mode].fields:
             if spec_field.id != key:
@@ -267,6 +677,17 @@ class SynthesisController(QObject):
                     return int(float(value))
                 if spec_field.kind == "bool":
                     return bool(value)
+                # A choice is one of the values the field declares, whatever
+                # type those are: a gate is named by a string, a moment range
+                # by a boolean.  Matched as text as well, because that is what
+                # a control hands back for anything it had to render.
+                if spec_field.kind == "choice":
+                    for option in spec_field.options:
+                        if option is value or str(option) == str(value):
+                            return option
+                    return spec_field.value
+                # Text falls through to float() otherwise, which made every
+                # entry revert to the default without a word.
                 if spec_field.kind == "text":
                     return str(value)
                 return float(value)
@@ -341,6 +762,9 @@ class SynthesisController(QObject):
         self._set_status(message, failed=code not in (0, 130))
         if code == 0:
             self._percent = 100.0
+            self._ran_ok = True
+            if self._shown["synthetic"]:
+                self._want("synthetic")
 
     def _read_manifest(self) -> Optional[dict]:
         if not self._run_root:
@@ -351,6 +775,179 @@ class SynthesisController(QObject):
                 return json.load(handle)
         except (OSError, json.JSONDecodeError):
             return None
+
+    def _scratch_dir(self) -> str:
+        """This session's scratch directory, made once and swept up at exit.
+
+        One directory rather than a fresh ``mkdtemp`` per spec and per render:
+        the form writes a spec every time the edits settle, and those were
+        outliving the window — a session left behind one directory per edit,
+        for good.
+        """
+        if self._scratch is None:
+            self._scratch = tempfile.mkdtemp(prefix="networksynth_gui_")
+            atexit.register(shutil.rmtree, self._scratch, ignore_errors=True)
+        return self._scratch
+
+    def _write_spec(self, name: str) -> str:
+        """This form as a run-spec, on disk where a subprocess can read it.
+
+        The two names in use — ``run_spec.json`` and ``preview_spec.json`` —
+        are distinct, so sharing a directory cannot have a preview overwrite
+        the spec a run is still being read from.
+        """
+        spec = spec_builder.build_spec(
+            self._mode, self._inputs, self._output_dir, self._values
+        )
+        return spec_builder.write_spec(spec, os.path.join(self._scratch_dir(), name))
+
+    def _text_of(self, kind: str) -> str:
+        info = self._info[kind]
+        return info["text"] if info else ""
+
+    def _note_of(self, kind: str) -> str:
+        info = self._info[kind]
+        return info["note"] if info else ""
+
+    def _read_edited(self, info: dict) -> None:
+        """Point the form at the copy that was just written.
+
+        The turn goes back to none with it: the saved data already has it, and
+        leaving it set would turn the network a second time on the next read.
+        """
+        shape = spec_builder.shape_for(self._mode, self._inputs)
+        for key, path in info["inputs"].items():
+            if key in shape.all_ids:
+                self._inputs[key] = path
+        self._values["INPUT_ORIENTATION"] = "none"
+        self._info["original"] = None
+        self._stale.add("original")
+        self._set_status(f"Saved {info['count']} edited network(s) to {info['dir']}")
+
+    def _adopt_image_size(self, info: dict) -> None:
+        """Take the frames from the image the input came with.
+
+        Only until the user sets one of their own: after that the image is
+        just what gets drawn behind the network.  Re-renders once, because the
+        picture that arrived was drawn in the frame this replaces.
+        """
+        size = info.get("image_size")
+        if not size or self._frame_touched:
+            return
+
+        frame = (int(size[0]), int(size[1]))
+        present = [key for key in _FRAME_KEYS if key in self._values]
+        if all(self._values[key] == frame for key in present):
+            return
+        for key in present:
+            self._values[key] = frame
+        self._stale.add("original")
+
+    def _touch_preview(self, redraw: bool = True) -> None:
+        """The form changed, so what is drawn from it is out of date.
+
+        Two things follow it, at different speeds.  The model the form itself
+        draws from has to be right at once — a row shown for only one quality
+        gate has to appear the moment that gate is picked — so that is emitted
+        here.  The picture waits for the edits to settle instead: every field
+        reports separately, and a render per keystroke would be mostly waste.
+        """
+        self.changed.emit()
+        if redraw and self._shown["original"]:
+            self._settle.start()
+
+    def _want(self, kind: str) -> None:
+        self._stale.add(kind)
+        self._pump_preview()
+
+    def _pump_preview(self) -> None:
+        """Start the next render, one at a time.
+
+        A side asked for while another is rendering waits here instead of
+        cancelling it, so turning both on shows both.
+        """
+        while self._preview_process is None and self._stale:
+            kind = next(
+                name
+                for name in ("save_edited", "original", "synthetic")
+                if name in self._stale
+            )
+            self._stale.discard(kind)
+            # Saving is asked for outright; a preview only runs for a side that
+            # is on screen to receive it.
+            if kind == "save_edited" or self._shown[kind]:
+                self._launch_preview(kind)
+        self.changed.emit()
+
+    def _launch_preview(self, kind: str) -> None:
+        if kind in ("original", "save_edited"):
+            problems = spec_builder.validate(
+                self._mode, self._inputs, self._output_dir, self._values
+            )
+            if problems:
+                self._preview_error = problems[0]
+                return
+            spec_path, run_root = self._write_spec("preview_spec.json"), None
+        else:
+            if not self.canPreviewSynthetic:
+                self._preview_error = "Nothing generated yet to show."
+                return
+            spec_path, run_root = self._spec_path, self._run_root
+
+        # A fresh directory per render, so a new picture never arrives at a path
+        # QML has already cached an old one for.
+        self._preview_count += 1
+        out_dir = os.path.join(self._scratch_dir(), f"{kind}_{self._preview_count}")
+        os.makedirs(out_dir)
+
+        command = [sys.executable, _GUI_PREVIEW, spec_path, kind, out_dir]
+        if run_root:
+            command.append(run_root)
+
+        self._preview_kind = kind
+        self._preview_out = out_dir
+        self._preview_error = ""
+        # Kept rather than discarded: a failed render's traceback is the only
+        # account of why, and the form shows its last line.
+        self._preview_stderr = open(os.path.join(out_dir, "stderr.txt"), "w")
+        self._preview_process = subprocess.Popen(
+            command,
+            stdout=subprocess.DEVNULL,
+            stderr=self._preview_stderr,
+            stdin=subprocess.DEVNULL,
+            cwd=_REPO_ROOT,
+        )
+        self._preview_poll.start()
+
+    def _preview_tick(self) -> None:
+        process = self._preview_process
+        if process is None or process.poll() is None:
+            return
+
+        code = process.returncode
+        self._preview_process = None
+        self._preview_poll.stop()
+        self._preview_stderr.close()
+
+        if code == 0:
+            # Exit 0 promises info.json, so a missing one is a bug worth
+            # hearing about rather than an empty panel.
+            with open(os.path.join(self._preview_out, "info.json")) as handle:
+                info = json.load(handle)
+            if self._preview_kind == "save_edited":
+                self._read_edited(info)
+            else:
+                self._info[self._preview_kind] = info
+                if self._preview_kind == "original":
+                    self._adopt_image_size(info)
+            self._preview_error = ""
+        else:
+            self._info[self._preview_kind] = None
+            self._preview_error = (
+                f"Preview failed: {_last_line(self._preview_stderr.name)}"
+            )
+
+        self._pump_preview()
 
     def _note_ready(self) -> None:
         problems = spec_builder.validate(

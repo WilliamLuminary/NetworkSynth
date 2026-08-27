@@ -3,6 +3,7 @@ from .graph_ops import (
     build_graph,
     calculate_frame,
     largest_connected_component,
+    orient_positions,
     transpose_positions,
     trim_graph,
 )
@@ -25,6 +26,7 @@ from .runtime import apply_seed, log_memory, spawn_context, timer
 __all__ = [
     "trim_image",
     "transpose_positions",
+    "orient_positions",
     "resize_image",
     "find_file_with_pattern",
     "apply_seed",
