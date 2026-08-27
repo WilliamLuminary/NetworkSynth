@@ -154,6 +154,50 @@ def trim_graph(graph: SynthGraph, tar_avg_deg: float) -> SynthGraph:
     return graph
 
 
+#: The quarter turns a network can be given, plus the axis swap that is not a
+#: rotation at all.  "none" is the identity and the default.
+ORIENTATIONS = ("none", "rot90", "rot180", "rot270", "transpose")
+
+
+def orient_positions(graph, orientation: str) -> None:
+    """Turn a network's positions in place, a quarter turn at a time.
+
+    The turn happens inside the positions' own bounding box: the corner the
+    data starts at stays where it is, and only the extents swap.  Anchoring on
+    the frame instead would throw a network that does not fill its frame off
+    the edge, and there is no reliable frame before the data has been squared
+    up anyway.
+
+    Only the network moves.  The image it was traced from is left exactly as
+    it is — an image is aligned by preparing it, not by guessing here.
+    """
+    if not orientation or orientation == "none":
+        return
+    if orientation == "transpose":
+        transpose_positions(graph)
+        return
+    if orientation not in ORIENTATIONS:
+        raise ValueError(
+            f"unknown orientation {orientation!r}; one of {list(ORIENTATIONS)}"
+        )
+
+    positions = graph.positions()
+    x = positions[:, 0].copy()
+    y = positions[:, 1].copy()
+    x_min, x_max = x.min(), x.max()
+    y_min, y_max = y.min(), y.max()
+
+    if orientation == "rot90":
+        positions[:, 0] = x_min + (y_max - y)
+        positions[:, 1] = y_min + (x - x_min)
+    elif orientation == "rot180":
+        positions[:, 0] = x_min + (x_max - x)
+        positions[:, 1] = y_min + (y_max - y)
+    else:  # rot270
+        positions[:, 0] = x_min + (y - y_min)
+        positions[:, 1] = y_min + (x_max - x)
+
+
 def transpose_positions(graph) -> None:
     """Swap x and y for every node, in place.
 
