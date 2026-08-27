@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import atexit
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -105,7 +107,7 @@ class SynthesisController(QObject):
         self._preview_kind = ""
         self._preview_out = ""
         self._preview_stderr: Optional[Any] = None
-        self._preview_root: Optional[str] = None
+        self._scratch: Optional[str] = None
         self._preview_count = 0
         self._preview_error = ""
 
@@ -160,6 +162,10 @@ class SynthesisController(QObject):
         self._shown["synthetic"] = False
         self._info["synthetic"] = None
         self._note_ready()
+        # Asked for outright rather than left to settle: nothing else is
+        # coming, and without this the pane stays blank until some unrelated
+        # field is edited.
+        self._want("original")
 
     @Property("QVariantList", notify=changed)
     def configSections(self) -> list:
@@ -322,6 +328,7 @@ class SynthesisController(QObject):
             self._values["INPUT_ORIENTATION"] = "none"
         self._info["original"] = None
         self._note_ready()
+        self._want("original")
 
     @Property("QVariantList", notify=changed)
     def inputs(self) -> list:
@@ -407,9 +414,16 @@ class SynthesisController(QObject):
 
     @Property(bool, notify=changed)
     def canPreview(self) -> bool:
-        """Whether this mode reads a network of its own to show."""
+        """Whether this mode reads a network of its own to show.
+
+        Against every key a network shape declares, not a pair written out
+        here: the pair was ``edge_list``/``datasets_dir``, left over from when
+        those were the only formats, and it quietly took the preview *and* the
+        align card away from the NumPy and pickle shapes the loader reads
+        perfectly well.
+        """
         shape = spec_builder.MODES[self._mode].input_shapes[self._shape]
-        return bool({"edge_list", "datasets_dir"} & set(shape.all_ids))
+        return bool(spec_builder.NETWORK_INPUTS & set(shape.ids))
 
     @Property(bool, notify=changed)
     def offersSyntheticPreview(self) -> bool:
@@ -557,7 +571,10 @@ class SynthesisController(QObject):
     @Slot(str, "QVariant")
     def setValue(self, key: str, value) -> None:
         self._values[key] = self._coerce(key, value)
-        self._touch_preview()
+        # What a run writes says nothing about what its input looks like, so
+        # an output format is a change to the form without a change to the
+        # picture.
+        self._touch_preview(redraw=self._group_of(key) != spec_builder.OUTPUT_GROUP)
 
     @Slot(str, int, "QVariant")
     def setSize(self, key: str, index: int, value) -> None:
@@ -643,6 +660,12 @@ class SynthesisController(QObject):
         for spec_field in spec_builder.MODES[self._mode].fields:
             if spec_field.id == key:
                 return spec_field.kind
+        return ""
+
+    def _group_of(self, key: str) -> str:
+        for spec_field in spec_builder.MODES[self._mode].fields:
+            if spec_field.id == key:
+                return spec_field.group
         return ""
 
     def _coerce(self, key: str, value):
@@ -753,14 +776,30 @@ class SynthesisController(QObject):
         except (OSError, json.JSONDecodeError):
             return None
 
+    def _scratch_dir(self) -> str:
+        """This session's scratch directory, made once and swept up at exit.
+
+        One directory rather than a fresh ``mkdtemp`` per spec and per render:
+        the form writes a spec every time the edits settle, and those were
+        outliving the window — a session left behind one directory per edit,
+        for good.
+        """
+        if self._scratch is None:
+            self._scratch = tempfile.mkdtemp(prefix="networksynth_gui_")
+            atexit.register(shutil.rmtree, self._scratch, ignore_errors=True)
+        return self._scratch
+
     def _write_spec(self, name: str) -> str:
-        """This form as a run-spec, on disk where a subprocess can read it."""
+        """This form as a run-spec, on disk where a subprocess can read it.
+
+        The two names in use — ``run_spec.json`` and ``preview_spec.json`` —
+        are distinct, so sharing a directory cannot have a preview overwrite
+        the spec a run is still being read from.
+        """
         spec = spec_builder.build_spec(
             self._mode, self._inputs, self._output_dir, self._values
         )
-        return spec_builder.write_spec(
-            spec, os.path.join(tempfile.mkdtemp(prefix="networksynth_gui_"), name)
-        )
+        return spec_builder.write_spec(spec, os.path.join(self._scratch_dir(), name))
 
     def _text_of(self, kind: str) -> str:
         info = self._info[kind]
@@ -804,14 +843,17 @@ class SynthesisController(QObject):
             self._values[key] = frame
         self._stale.add("original")
 
-    def _touch_preview(self) -> None:
-        """The form changed, so a shown preview is of something else now.
+    def _touch_preview(self, redraw: bool = True) -> None:
+        """The form changed, so what is drawn from it is out of date.
 
-        Re-rendered once the edits settle rather than corrected on the spot:
-        every field reports separately, and a render per keystroke would be
-        most of them wasted.
+        Two things follow it, at different speeds.  The model the form itself
+        draws from has to be right at once — a row shown for only one quality
+        gate has to appear the moment that gate is picked — so that is emitted
+        here.  The picture waits for the edits to settle instead: every field
+        reports separately, and a render per keystroke would be mostly waste.
         """
-        if self._shown["original"]:
+        self.changed.emit()
+        if redraw and self._shown["original"]:
             self._settle.start()
 
     def _want(self, kind: str) -> None:
@@ -852,12 +894,10 @@ class SynthesisController(QObject):
                 return
             spec_path, run_root = self._spec_path, self._run_root
 
-        if self._preview_root is None:
-            self._preview_root = tempfile.mkdtemp(prefix="networksynth_preview_")
         # A fresh directory per render, so a new picture never arrives at a path
         # QML has already cached an old one for.
         self._preview_count += 1
-        out_dir = os.path.join(self._preview_root, f"{kind}_{self._preview_count}")
+        out_dir = os.path.join(self._scratch_dir(), f"{kind}_{self._preview_count}")
         os.makedirs(out_dir)
 
         command = [sys.executable, _GUI_PREVIEW, spec_path, kind, out_dir]

@@ -23,6 +23,7 @@ import json
 import logging
 import os
 import pickle
+import re
 import sys
 from dataclasses import replace
 
@@ -44,6 +45,15 @@ PREVIEW_DPI = 90
 #: synthetic network from the run, in the order they were collected.
 _BATCH_SUFFIX = ".pkl"
 _BATCH_MARKER = "synthetic_network"
+
+#: What that same method writes for each network on its own, straight after
+#: the batch.  The two share a name — ``SAVE_SYNTHETIC_EXPORT``'s detail is
+#: also "synthetic_network" — and differ only by this ``_n<i>_`` infix.  It
+#: only started to matter when the form began offering the pickle network
+#: format: before that the exports were CSVs and the suffix told them apart,
+#: after it they are pickles too and the newest file in the directory is one
+#: of them rather than the batch.
+_EXPORT_INFIX = re.compile(r"_n\d+_" + _BATCH_MARKER)
 
 _LABEL_WIDTH = 21
 
@@ -176,7 +186,12 @@ def preview_original(config, out_dir: str) -> dict:
         # (width, height).  The form takes its frame from this: position data
         # need not reach the corners of what it was traced from, so the image
         # is the only reliable statement of how big the input really is.
-        "image_size": None if image is None else [image.shape[1], image.shape[0]],
+        #
+        # Read from the config rather than measured off `image`: the loader
+        # returns the picture already scaled into FRAME_SIZE, so measuring it
+        # would hand the form back the frame it started with and pin it there
+        # for good.  IMAGE_SIZE is the file's own size, in (height, width).
+        "image_size": None if image is None else list(reversed(config.IMAGE_SIZE)),
         "images": images,
         "note": note,
         "text": _info_text("Original network", graph, attributes),
@@ -194,6 +209,8 @@ def _find_batch(run_root: str) -> str:
     found = []
     for directory, _, names in os.walk(run_root):
         for name in names:
+            if _EXPORT_INFIX.search(name):
+                continue
             if _BATCH_MARKER in name and name.endswith(_BATCH_SUFFIX):
                 found.append(os.path.join(directory, name))
     if not found:

@@ -732,6 +732,13 @@ def _sweep_fields() -> List[Field]:
 #: ``BaseConfig`` does not define.  Those extras are not optional: the pipeline
 #: reads them as plain attributes, so a missing one is an ``AttributeError``
 #: partway through a run rather than a rejected spec.
+#: Every key a network shape names.  Derived from the shapes themselves, so a
+#: format added there is previewable and editable without a second list here
+#: remembering to allow it — which is exactly how the NumPy and pickle shapes
+#: came to be offered but not previewable.
+NETWORK_INPUTS = frozenset(key for shape in _network_shapes() for key in shape.ids)
+
+
 MODES: Dict[str, ModeSpec] = {
     "generate": ModeSpec(
         "generate",
