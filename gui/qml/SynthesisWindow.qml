@@ -574,7 +574,7 @@ ApplicationWindow {
 
                 // what the run is given
                 ScrollView {
-                    SplitView.preferredWidth: 460
+                    SplitView.preferredWidth: 500
                     SplitView.minimumWidth: 420
                     contentWidth: availableWidth
 
@@ -779,6 +779,11 @@ ApplicationWindow {
 
                                 Label {
                                     Layout.fillWidth: true
+                                    // Wrap at the card, not at the layout: a
+                                    // row too wide to shrink widens the column
+                                    // it is in, and a note left to fill that
+                                    // runs out past the card's own edge.
+                                    Layout.maximumWidth: sectionCard.width - 24
                                     wrapMode: Text.WordWrap
                                     opacity: 0.6
                                     visible: text !== ""

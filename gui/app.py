@@ -240,10 +240,11 @@ class SynthesisController(QObject):
         the multifractal one reads weights or a moment range.  Drawing those
         anyway offers a setting the run will ignore without saying so.  What
         was typed into one is kept, not reset, so turning the gate back on
-        brings the row back as it was left.
+        brings the row back as it was left.  A field marked hidden is never
+        drawn at all, and still travels in the spec at its default.
         """
-        if not spec_field.hide_when:
-            return True
+        if spec_field.hidden or not spec_field.hide_when:
+            return not spec_field.hidden
         other, hidden_by = spec_field.hide_when
         return self._values.get(other) not in hidden_by
 

@@ -55,6 +55,14 @@ OUTPUT_GROUP = "Output"
 #: A line under a section's heading, for what a tooltip should not have to be
 #: hunted for.  Keyed by group name; a section without one shows nothing.
 SECTION_NOTES = {
+    "Tiling": (
+        "A large network is assembled rather than grown in one piece: seed "
+        "points are scattered over the output area, a patch is generated "
+        "around each of them, and growth then carries on from the patches' "
+        "edges until the gaps between them close. The area is measured in "
+        "backgrounds: a target scale of 100 × 100 is 100 of them down by 100 "
+        "across."
+    ),
     "Tracking": (
         "wandb needs a login: run `wandb login` once, or set WANDB_API_KEY in "
         "the environment. Switched off, nothing is contacted — the sweep "
@@ -97,6 +105,9 @@ class Field:
     #: one of those.  A setting the chosen algorithm never reads is worse than
     #: absent, because it looks as though it were doing something.
     hide_when: tuple = ()
+    #: Never drawn, but still part of the spec: a parameter the pipeline
+    #: reads and a run has no business changing.
+    hidden: bool = False
     #: The one number in its section that a run is usually about, drawn larger.
     prominent: bool = False
     #: What the number is counted in, shown after the editor.  Not every size
@@ -120,6 +131,7 @@ class Field:
         # Resolved before the form is built, so nothing crosses that the window
         # would have to know how to read.
         data.pop("hide_when")
+        data.pop("hidden")
         return data
 
 
@@ -456,7 +468,9 @@ def _hybrid_fields() -> List[Field]:
             "Target scale",
             (100, 100),
             kind="size",
-            unit="× the background",
+            # No unit beside the boxes: "× the background" does not fit the
+            # form pane at its default width, and a unit clipped in half is
+            # worse than one left to the note and the tooltip.
             # `scale_rows, scale_cols = config.TARGET_SCALE` — down first,
             # across second, which is the opposite way round to every frame.
             axes=("rows", "cols"),
@@ -469,13 +483,19 @@ def _hybrid_fields() -> List[Field]:
         ),
         Field(
             "PHASE2_MAX_ROUNDS",
-            "Phase 2 max rounds",
+            "Stitching rounds",
             500,
             kind="integer",
             minimum=1,
             maximum=10000,
             step=50,
-            help="Frontier continuation after the seed tiles are placed.",
+            unit="at most",
+            help=(
+                "Once the patches are grown, growth carries on from their\n"
+                "edges to close the gaps between them. This is the ceiling\n"
+                "on how many rounds of that are run — it stops sooner when\n"
+                "there is nowhere left to grow."
+            ),
             group="Tiling",
         ),
         Field(
@@ -485,17 +505,28 @@ def _hybrid_fields() -> List[Field]:
             minimum=0.1,
             maximum=2.0,
             step=0.1,
-            help="Tile frame side = nearest-neighbour distance x this.",
             group="Tiling",
+            # How much of the gap between two seeds a patch is allowed to fill
+            # before stitching takes over.  Kept out of the form because the
+            # answer is a property of the method rather than of a run, and
+            # still listed here because the pipeline reads it as an attribute.
+            hidden=True,
         ),
         Field(
             "MIN_TILE_FRAME",
-            "Minimum tile frame",
+            "Smallest patch",
             382.0,
             unit="px",
             minimum=1.0,
             maximum=5000.0,
             step=10.0,
+            help=(
+                "Each patch grows inside a square of its own, sized from how\n"
+                "far its seed landed from the nearest other seed — about half\n"
+                "that distance. This is the floor on that side: seeds that\n"
+                "landed close together still get a square this big to grow in,\n"
+                "so no patch comes out too small to be a network."
+            ),
             group="Tiling",
         ),
     ]
@@ -751,7 +782,9 @@ MODES: Dict[str, ModeSpec] = {
         "hybrid",
         "Hybrid",
         "Assemble a large network by tiling generated patches together.",
-        _common_fields() + _hybrid_fields(),
+        # Tiling first: it is what a hybrid run is about, and the rest is
+        # the same generation every mode does.
+        _hybrid_fields() + _common_fields(),
         _network_shapes(),
     ),
     "sweep": ModeSpec(
