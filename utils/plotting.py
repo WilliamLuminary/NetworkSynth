@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 import numpy as np
 from numpy import ndarray
@@ -69,6 +69,95 @@ def recommend_dpi_cv2(num_nodes: int) -> int:
 _WEBP_MAX_PX = 16383
 
 
+#: Segments per ``cv2.polylines`` call.  A multi-million-edge network is drawn
+#: a batch at a time rather than as one array of every segment.
+_SEGMENT_BATCH = 1_000_000
+_EDGE_COLOR_BGR = (0, 0, 255)
+_NODE_COLOR_BGR = (255, 0, 0)
+
+
+class _CvCanvas(NamedTuple):
+    """A blank canvas and the projection onto it.
+
+    Shared by the two OpenCV renderers — the whole-network one and the hybrid
+    snapshot — which agree on every pixel and differ only in where their extent
+    comes from and what they do with the result.
+    """
+
+    image: ndarray
+    x_min: float
+    y_max: float
+    sx: float
+    sy: float
+    dpi: int
+
+    def project(self, xs, ys):
+        """Data coordinates to pixels.  y flips: a plot counts up, an image down."""
+        return (
+            ((xs - self.x_min) * self.sx).astype(np.int32),
+            ((self.y_max - ys) * self.sy).astype(np.int32),
+        )
+
+
+def _cv2_canvas(extent, style, node_count: int) -> _CvCanvas:
+    """The canvas to draw *extent* on, at the size *style* asks for.
+
+    *extent* is ``((x_min, x_max), (y_min, y_max))`` before margins: this
+    widens it by ``style.margin_frac`` of each span.  Because both margins are
+    a fraction of their own span, widening leaves the aspect ratio alone.
+    """
+    dpi = style.dpi if style.dpi is not None else recommend_dpi_cv2(node_count)
+
+    (x_min, x_max), (y_min, y_max) = extent
+    mx = (x_max - x_min) * style.margin_frac
+    my = (y_max - y_min) * style.margin_frac
+    x_min, x_max = x_min - mx, x_max + mx
+    y_min, y_max = y_min - my, y_max + my
+
+    # Guard against a degenerate extent — every node at one position, or a
+    # frame with no height: the aspect and both scales divide by these.
+    frame_w = max(x_max - x_min, 1e-12)
+    frame_h = max(y_max - y_min, 1e-12)
+
+    # Max pixel size of the render, always capped at the WebP 16383px hard
+    # limit. A large network at that limit produces a ~190MP image most viewers
+    # cannot open, so callers can pass a lower max_px.
+    max_px = min(style.max_px or _WEBP_MAX_PX, _WEBP_MAX_PX)
+    img_h = int(12 * dpi)
+    img_w = int(12 * dpi * frame_w / frame_h)
+    # Clamp to max_px while preserving aspect: when either axis exceeds the
+    # cap, scale both by the same factor (clamping each axis independently
+    # would square a rectangular network).
+    clamp = min(1.0, max_px / max(img_h, img_w))
+    img_h = max(1, int(img_h * clamp))
+    img_w = max(1, int(img_w * clamp))
+
+    return _CvCanvas(
+        image=np.full((img_h, img_w, 3), 255, dtype=np.uint8),
+        x_min=x_min,
+        y_max=y_max,
+        sx=(img_w - 1) / frame_w,
+        sy=(img_h - 1) / frame_h,
+        dpi=dpi,
+    )
+
+
+def _draw_nodes(canvas: _CvCanvas, px, py, style) -> None:
+    """Every node inside the canvas as a blue dot."""
+    import cv2
+
+    img_h, img_w = canvas.image.shape[:2]
+    valid = (px >= 0) & (px < img_w) & (py >= 0) & (py < img_h)
+    radius = _points_to_px(style.node_size, canvas.dpi, minimum=0) // 2
+    if radius < 1:
+        # A single pixel per node: cheaper than a circle of radius 0, and
+        # the same result.
+        canvas.image[py[valid], px[valid]] = np.array(_NODE_COLOR_BGR, dtype=np.uint8)
+    else:
+        for x, y in zip(px[valid], py[valid]):
+            cv2.circle(canvas.image, (int(x), int(y)), radius, _NODE_COLOR_BGR, -1)
+
+
 def render_network(graph: SynthGraph, style):
     """Render a SynthGraph to a BGR ndarray using OpenCV.
 
@@ -80,78 +169,40 @@ def render_network(graph: SynthGraph, style):
     """
     import cv2
 
-    margin_frac = style.margin_frac
-    dpi = style.dpi
-    if dpi is None:
-        dpi = recommend_dpi_cv2(graph.number_of_nodes())
-    max_px = style.max_px
-
     pos_arr = graph.positions()
     x_min, y_min = pos_arr.min(axis=0)
     x_max, y_max = pos_arr.max(axis=0)
-    mx = (x_max - x_min) * margin_frac
-    my = (y_max - y_min) * margin_frac
-    x_min -= mx
-    x_max += mx
-    y_min -= my
-    y_max += my
+    canvas = _cv2_canvas(
+        ((x_min, x_max), (y_min, y_max)), style, graph.number_of_nodes()
+    )
+    px, py = canvas.project(pos_arr[:, 0], pos_arr[:, 1])
 
-    frame_w = x_max - x_min
-    frame_h = y_max - y_min
-    # Guard against degenerate bounding boxes (all nodes at same position)
-    frame_w = max(frame_w, 1e-12)
-    frame_h = max(frame_h, 1e-12)
-    aspect = frame_w / frame_h
-
-    # Max pixel size of the render, always capped at the WebP 16383px hard
-    # limit. A large network at that limit produces a ~190MP image most viewers
-    # cannot open, so callers can pass a lower max_px.
-    max_px = min(max_px or _WEBP_MAX_PX, _WEBP_MAX_PX)
-    img_h = int(12 * dpi)
-    img_w = int(12 * dpi * aspect)
-    # Clamp to max_px while preserving aspect: when either axis exceeds the
-    # cap, scale both by the same factor (clamping each axis independently
-    # would square a rectangular network).
-    clamp = min(1.0, max_px / max(img_h, img_w))
-    img_h = max(1, int(img_h * clamp))
-    img_w = max(1, int(img_w * clamp))
-
-    canvas = np.full((img_h, img_w, 3), 255, dtype=np.uint8)
-
-    sx = (img_w - 1) / frame_w
-    sy = (img_h - 1) / frame_h
-    px = ((pos_arr[:, 0] - x_min) * sx).astype(np.int32)
-    py = ((y_max - pos_arr[:, 1]) * sy).astype(np.int32)
-
-    # Edges (red, batched)
-    edge_color = (0, 0, 255)  # BGR
-    BATCH = 1_000_000
-    thickness = _points_to_px(style.line_width, dpi, minimum=1)
+    # Segments are built per batch from indices into the projected nodes, not
+    # once for the whole graph: an array of every segment is what runs out of
+    # memory on a network this renderer exists to handle.
+    thickness = _points_to_px(style.line_width, canvas.dpi, minimum=1)
     edge_list = np.asarray(list(graph.edges()), dtype=np.int64)
-    for start in range(0, len(edge_list), BATCH):
-        batch = edge_list[start : start + BATCH]
+    for start in range(0, len(edge_list), _SEGMENT_BATCH):
+        batch = edge_list[start : start + _SEGMENT_BATCH]
         pts_u = np.column_stack([px[batch[:, 0]], py[batch[:, 0]]])
         pts_v = np.column_stack([px[batch[:, 1]], py[batch[:, 1]]])
         segments = np.stack([pts_u, pts_v], axis=1).astype(np.int32)
         cv2.polylines(
-            canvas, segments, isClosed=False, color=edge_color, thickness=thickness
+            canvas.image,
+            segments,
+            isClosed=False,
+            color=_EDGE_COLOR_BGR,
+            thickness=thickness,
         )
     del edge_list
 
-    # Nodes (blue)
-    node_color_bgr = np.array([255, 0, 0], dtype=np.uint8)
-    valid = (px >= 0) & (px < img_w) & (py >= 0) & (py < img_h)
-    radius = _points_to_px(style.node_size, dpi, minimum=0) // 2
-    if radius < 1:
-        canvas[py[valid], px[valid]] = node_color_bgr
-    else:
-        for x, y in zip(px[valid], py[valid]):
-            cv2.circle(canvas, (int(x), int(y)), radius, (255, 0, 0), thickness=-1)
+    _draw_nodes(canvas, px, py, style)
 
     if style.border:
-        cv2.rectangle(canvas, (0, 0), (img_w - 1, img_h - 1), (0, 0, 0), 2)
+        img_h, img_w = canvas.image.shape[:2]
+        cv2.rectangle(canvas.image, (0, 0), (img_w - 1, img_h - 1), (0, 0, 0), 2)
 
-    return canvas
+    return canvas.image
 
 
 def save_figure_as_webp(fig, filepath: str, *, dpi: int = None, lossless: bool = True):
@@ -298,101 +349,41 @@ def save_hybrid_snapshot(
 ) -> None:
     """Render one hybrid Phase 2 snapshot with OpenCV.
 
-    Sizes are in points, converted to pixels at *style.dpi*; unset draws a 1px
-    line and a single-pixel node.
+    Drawn on the whole *frame* rather than on what has grown so far, so a
+    sequence of snapshots is a sequence of the same view.  Sizes are in points,
+    converted to pixels at *style.dpi*; unset draws a 1px line and a
+    single-pixel node.
     """
     import os
 
     import cv2
 
-    margin_frac = style.margin_frac
-    dpi = style.dpi
-    max_px = style.max_px
-    node_size = style.node_size
-    line_width = style.line_width
+    canvas = _cv2_canvas(frame, style, len(node_positions))
 
-    if dpi is None:
-        dpi = recommend_dpi_cv2(len(node_positions))
-
-    frame_w = frame[0][1] - frame[0][0]
-    frame_h = frame[1][1] - frame[1][0]
-    mx = frame_w * margin_frac
-    my = frame_h * margin_frac
-    aspect = frame_w / frame_h if frame_h > 0 else 1.0
-
-    x_min = frame[0][0] - mx
-    x_max = frame[0][1] + mx
-    y_min = frame[1][0] - my
-    y_max = frame[1][1] + my
-    total_w = x_max - x_min
-    total_h = y_max - y_min
-
-    # Max pixel size of the render, always capped at the WebP 16383px hard
-    # limit. A large network at that limit produces a ~190MP image most viewers
-    # cannot open, so callers can pass a lower max_px.
-    max_px = min(max_px or _WEBP_MAX_PX, _WEBP_MAX_PX)
-    img_h = int(12 * dpi)
-    img_w = int(12 * dpi * aspect)
-    # Clamp to max_px while preserving aspect: when either axis exceeds the
-    # cap, scale both by the same factor (clamping each axis independently
-    # would square a rectangular network).
-    clamp = min(1.0, max_px / max(img_h, img_w))
-    img_h = max(1, int(img_h * clamp))
-    img_w = max(1, int(img_w * clamp))
-
-    canvas = np.full((img_h, img_w, 3), 255, dtype=np.uint8)
-
-    sx = (img_w - 1) / total_w
-    sy = (img_h - 1) / total_h
-
-    # Draw edges
     if edges:
         edge_arr = np.asarray(
             [((e[0][0], e[0][1]), (e[1][0], e[1][1])) for e in edges],
             dtype=np.float64,
         )
-        pts_u = np.column_stack(
-            [
-                ((edge_arr[:, 0, 0] - x_min) * sx).astype(np.int32),
-                ((y_max - edge_arr[:, 0, 1]) * sy).astype(np.int32),
-            ]
-        )
-        pts_v = np.column_stack(
-            [
-                ((edge_arr[:, 1, 0] - x_min) * sx).astype(np.int32),
-                ((y_max - edge_arr[:, 1, 1]) * sy).astype(np.int32),
-            ]
-        )
+        pts_u = np.column_stack(canvas.project(edge_arr[:, 0, 0], edge_arr[:, 0, 1]))
+        pts_v = np.column_stack(canvas.project(edge_arr[:, 1, 0], edge_arr[:, 1, 1]))
         segments = np.stack([pts_u, pts_v], axis=1).astype(np.int32)
-        BATCH = 1_000_000
-        thickness = _points_to_px(line_width, dpi, minimum=1)
-        for start in range(0, len(segments), BATCH):
+        thickness = _points_to_px(style.line_width, canvas.dpi, minimum=1)
+        for start in range(0, len(segments), _SEGMENT_BATCH):
             cv2.polylines(
-                canvas,
-                segments[start : start + BATCH],
+                canvas.image,
+                segments[start : start + _SEGMENT_BATCH],
                 isClosed=False,
-                color=(0, 0, 255),
+                color=_EDGE_COLOR_BGR,
                 thickness=thickness,
             )
 
-    # Draw nodes
     if node_positions:
         pos_arr = np.asarray(node_positions, dtype=np.float64)
-        px = ((pos_arr[:, 0] - x_min) * sx).astype(np.int32)
-        py = ((y_max - pos_arr[:, 1]) * sy).astype(np.int32)
-        valid = (px >= 0) & (px < img_w) & (py >= 0) & (py < img_h)
-        node_color = np.array([255, 0, 0], dtype=np.uint8)
-        radius = _points_to_px(node_size, dpi, minimum=0) // 2
-        if radius < 1:
-            # A single pixel per node: cheaper than a circle of radius 0, and
-            # the same result.
-            canvas[py[valid], px[valid]] = node_color
-        else:
-            for x, y in zip(px[valid], py[valid]):
-                cv2.circle(canvas, (int(x), int(y)), radius, (255, 0, 0), thickness=-1)
+        _draw_nodes(canvas, *canvas.project(pos_arr[:, 0], pos_arr[:, 1]), style)
 
     path = os.path.join(output_dir, f"snapshot_{index:05d}.png")
-    cv2.imwrite(path, canvas)
+    cv2.imwrite(path, canvas.image)
 
 
 def plot_network(
