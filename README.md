@@ -429,8 +429,10 @@ There are two ways to set it, selected in `configs/hybrid_mode/config_sample.py`
 **Auto** (default, `TILE_FRAME_SIZE = None`) — each tile is sized from the distance `d` to its nearest neighboring center:
 
 ```
-frame side = max(d * TILE_FRAME_FACTOR, MIN_TILE_FRAME)
+frame side = max(d, MIN_CENTER_DISTANCE_FACTOR * max(FRAME_SIZE)) * TILE_FRAME_FACTOR
 ```
+
+The floor is the same rule at the closest spacing the sampler will allow, so it is measured rather than configured — there is no pixel count to keep in step with the frame. Centers are never placed closer than `MIN_CENTER_DISTANCE_FACTOR * max(FRAME_SIZE)` apart, which makes the floor a guard rather than something a run normally meets.
 
 Tiles in crowded regions get smaller frames and tiles in open space get larger ones — each scaled to the room it actually has.
 
@@ -438,9 +440,29 @@ Tiles in crowded regions get smaller frames and tiles in open space get larger o
 | --- | --- | --- |
 | `TILE_FRAME_SIZE` | `None` | Fixed frame `(w, h)` for every tile. `None` enables auto mode. |
 | `TILE_FRAME_FACTOR` | `0.5` | Auto mode: frame side as a fraction of the nearest-neighbor distance. Lower = wider seam for Phase 2 to stitch; higher = tiles nearly touch. |
-| `MIN_TILE_FRAME` | `382.0` | Auto mode: floor on the frame side, so closely-spaced centers still produce tiles large enough to clear `MIN_TILE_NODES`. |
 
 The Phase 1 log (tag `PHASE1`) prints the resulting frame-side min/max for each run, so you can confirm tiles aren't being shrunk below a usable size.
+
+Where the centers land follows the run's `SEED`, like everything else a run draws: a seed replays the same scatter, `None` scatters differently every time.
+
+
+## GUI vs CLI
+
+`gui_run.py` and `run.py` end in the same two lines — `load_pipeline(config.MODE)` then `pipeline.main(config_cls=config)` — so a GUI run and a CLI run execute identical pipeline, generator, quality-gate and save code. They differ only in where the config comes from: a `configs/*_mode/config_*.py` module, or a `GuiConfig` subclass built from the run-spec the form writes.
+
+The form is a deliberate subset. What only a CLI config can do:
+
+| Only on the CLI | Why it matters |
+| --- | --- |
+| `mosaic`, `scaling`, `compare` | The GUI offers `generate`, `hybrid` and `sweep`; the other three pipelines are CLI-only. |
+| `DATASET_FACTORS` | Per-dataset `(CLOSED_NODES_FACTOR, CLOSED_EDGES_FACTOR)` overrides. A GUI directory run applies one pair to every dataset in the folder. |
+| `TILE_FRAME_SIZE` | Fixed tile frames. Every shipped hybrid config uses auto sizing, so the form offers auto only. |
+| `SNAPSHOT_INTERVAL < 0` | Log-spaced snapshots (~\|N\| in total, hybrid only). The form takes a positive interval and a switch. |
+| `SELECT_BEST`, `MIN_TILE_NODES`, `LOG_MEMORY`, `DISABLE_SAVING` | Left at their `BaseConfig` defaults for a GUI run. |
+
+The other way round, `INPUT_ORIENTATION` — a quarter turn applied to the input network as it is read — belongs to the form's Align card and has no CLI equivalent; CLI configs transpose inside their own loaders instead.
+
+Drawing is shared but not single-source: matplotlib output goes through `plot_network` (runs and previews alike) and `save_bfs_snapshot`; OpenCV output through `render_network` and `save_hybrid_snapshot`. The GUI adds no network renderer of its own — the preview builds only its background figure.
 
 
 ## Sweep Best Parameters

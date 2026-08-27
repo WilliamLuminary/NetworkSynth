@@ -12,7 +12,7 @@ from concurrent.futures import (
     as_completed,
 )
 from dataclasses import replace
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import networkit as nk
 import numpy as np
@@ -54,12 +54,21 @@ SIGINT_INFO = "SIGINT received. Terminating…"
 # ------------------------------------------------------------------ #
 
 
+def center_min_distance(config) -> float:
+    """How close two seed centers are allowed to land.
+
+    Read both by the sampler that places them and by the frame sizing that
+    measures the gaps afterwards, so the two cannot drift apart.
+    """
+    return config.MIN_CENTER_DISTANCE_FACTOR * max(config.FRAME_SIZE)
+
+
 def generate_random_centers(
     whiteboard_w: float,
     whiteboard_h: float,
     min_distance: float,
     max_centers: int = 0,
-    rng_seed: int = 42,
+    rng_seed: Optional[int] = None,
     max_rejections: int = 50_000,
 ) -> List[Tuple[float, float]]:
     """Place centers randomly with a minimum pairwise distance.
@@ -68,6 +77,10 @@ def generate_random_centers(
     is at least *min_distance* from every existing centre, otherwise
     discard.  Stops after *max_rejections* consecutive failures or
     when *max_centers* is reached (0 = no limit).
+
+    *rng_seed* is the run's ``SEED``, so where the centers land follows the
+    same switch as everything else a run draws: a seed replays the same
+    scatter, ``None`` scatters differently every time.
     """
     gen = np.random.RandomState(rng_seed)
     centers: List[Tuple[float, float]] = []
@@ -110,8 +123,11 @@ def compute_center_frames(
       frame. Fully deterministic, no measurement.
     * **Auto** — otherwise, each tile is sized from the distance ``d`` to
       its nearest neighboring center: frame side = ``d * TILE_FRAME_FACTOR``
-      (default 0.5), clamped to a floor of ``MIN_TILE_FRAME`` so no tile
-      ends up too small to produce a usable network.
+      (default 0.5), with a floor of the same rule applied to the closest
+      two centers the sampler will place — ``center_min_distance *
+      TILE_FRAME_FACTOR`` — so no tile ends up smaller than the spacing
+      allows.  Measured rather than configured: a floor in pixels means
+      nothing without knowing the frame it is a fraction of.
 
     Falls back to ``SYNTHETIC_FRAME_SIZE`` when fewer than two centers
     exist (no neighbor to measure).
@@ -125,7 +141,7 @@ def compute_center_frames(
         return [config.SYNTHETIC_FRAME_SIZE] * len(centers)
 
     factor = config.TILE_FRAME_FACTOR
-    floor = config.MIN_TILE_FRAME
+    floor = center_min_distance(config) * factor
 
     from scipy.spatial import cKDTree
 
@@ -563,7 +579,6 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
 
     scale_rows, scale_cols = config.TARGET_SCALE
     max_rounds = config.PHASE2_MAX_ROUNDS
-    min_dist_factor = config.MIN_CENTER_DISTANCE_FACTOR
 
     # The frame, not IMAGE_SIZE.  A tile's coordinates are in frame space, and
     # every config that declared both set IMAGE_SIZE to the frame transposed —
@@ -573,13 +588,17 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
     frame_w, frame_h = config.FRAME_SIZE
     whiteboard_w = scale_cols * frame_w
     whiteboard_h = scale_rows * frame_h
-    min_distance = min_dist_factor * max(frame_w, frame_h)
+    min_distance = center_min_distance(config)
 
     max_centers = config.NUM_CENTERS
 
     # --- Generate random centers ---
     centers = generate_random_centers(
-        whiteboard_w, whiteboard_h, min_distance, max_centers=max_centers
+        whiteboard_w,
+        whiteboard_h,
+        min_distance,
+        max_centers=max_centers,
+        rng_seed=config.SEED,
     )
     frames = compute_center_frames(centers, config)
 

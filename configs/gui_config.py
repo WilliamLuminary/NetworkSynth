@@ -240,8 +240,6 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
     INPUT_ORIENTATION: str = "none"
 
     TILE_FRAME_SIZE = None
-    MIN_CENTER_DISTANCE_FACTOR: float = 1.5
-    NUM_CENTERS: int = 2000
     DATASET_FACTORS: dict = {}
 
     @classmethod
@@ -312,6 +310,7 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
             setattr(config, key, value)
 
         config._apply_output_formats()
+        config._apply_snapshots()
 
         logger.info(
             f"Run-spec loaded: mode={config.MODE} "
@@ -353,6 +352,18 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
                 logger.info(f"{group} outputs will be written as: {', '.join(chosen)}")
             else:
                 logger.info(f"No {group} files will be written: every format is off.")
+
+    @classmethod
+    def _apply_snapshots(cls) -> None:
+        """The form's switch, as the interval the pipelines actually read.
+
+        They take one number where the form takes a switch and a number: zero
+        is off, and an interval left set behind a switch turned off would take
+        snapshots anyway.  A spec that says nothing about the switch is left
+        alone, so a hand-written one still means what it says.
+        """
+        if hasattr(cls, "WRITE_SNAPSHOTS") and not cls.WRITE_SNAPSHOTS:
+            cls.SNAPSHOT_INTERVAL = 0
 
     @classmethod
     def initialize(cls) -> None:

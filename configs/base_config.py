@@ -87,7 +87,6 @@ class BaseConfig:
     # rather than picking up a number buried in the pipeline body.
     TILE_FRAME_SIZE: Optional[Tuple[int, int]]
     TILE_FRAME_FACTOR: float
-    MIN_TILE_FRAME: float
     MIN_CENTER_DISTANCE_FACTOR: float
     NUM_CENTERS: int
     DATASET_FACTORS: dict

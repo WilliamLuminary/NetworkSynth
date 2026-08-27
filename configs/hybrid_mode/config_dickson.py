@@ -39,7 +39,6 @@ class ConfigDickson(BaseConfig):
     # --- Phase 1 tile frame sizing (auto) ---
     TILE_FRAME_SIZE: Tuple[int, int] = None
     TILE_FRAME_FACTOR: float = 0.5
-    MIN_TILE_FRAME: float = 382.0
 
     # --- Network generation parameters ---
     # Positions are transposed to landscape (see load_original_network) so the

@@ -45,13 +45,13 @@ class SampleConfig(BaseConfig):
     # frame. Leave it None to size each tile automatically.
     #
     # Auto mode (TILE_FRAME_SIZE = None): each tile's frame side =
-    # nearest-neighbor distance * TILE_FRAME_FACTOR, clamped up to
-    # MIN_TILE_FRAME so tiles never get too small to produce a usable
-    # network. Factor 0.5 leaves a gap (~half the spacing) for Phase 2 to
-    # stitch; smaller factor = wider gap.
+    # nearest-neighbor distance * TILE_FRAME_FACTOR. Factor 0.5 leaves a gap
+    # (~half the spacing) for Phase 2 to stitch; smaller factor = wider gap.
+    # The floor is the same rule at the closest spacing the sampler allows
+    # (MIN_CENTER_DISTANCE_FACTOR * max(FRAME_SIZE) * TILE_FRAME_FACTOR), so
+    # there is no pixel count here to keep in step with the frame.
     TILE_FRAME_SIZE: Tuple[int, int] = None
     TILE_FRAME_FACTOR: float = 0.5
-    MIN_TILE_FRAME: float = 382.0
 
     # --- Network generation parameters ---
     IMAGE_SIZE: Tuple[int, int] = (510, 510)

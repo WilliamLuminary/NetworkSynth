@@ -105,9 +105,6 @@ class Field:
     #: one of those.  A setting the chosen algorithm never reads is worse than
     #: absent, because it looks as though it were doing something.
     hide_when: tuple = ()
-    #: Never drawn, but still part of the spec: a parameter the pipeline
-    #: reads and a run has no business changing.
-    hidden: bool = False
     #: The one number in its section that a run is usually about, drawn larger.
     prominent: bool = False
     #: What the number is counted in, shown after the editor.  Not every size
@@ -131,7 +128,6 @@ class Field:
         # Resolved before the form is built, so nothing crosses that the window
         # would have to know how to read.
         data.pop("hide_when")
-        data.pop("hidden")
         return data
 
 
@@ -455,6 +451,35 @@ def _common_fields() -> List[Field]:
                 group=OUTPUT_GROUP,
                 help="How many of the generated networks get a saved plot.",
             ),
+            Field(
+                "WRITE_SNAPSHOTS",
+                "Snapshots",
+                False,
+                kind="bool",
+                group=OUTPUT_GROUP,
+                help=(
+                    "Save the network as it grows, into a 'snapshots' folder\n"
+                    "beside the results. Generate makes one network when this\n"
+                    "is on, rather than the batch above."
+                ),
+            ),
+            Field(
+                "SNAPSHOT_INTERVAL",
+                "Snapshot every",
+                50,
+                kind="integer",
+                minimum=1,
+                maximum=10000,
+                step=10,
+                unit="growth steps",
+                group=OUTPUT_GROUP,
+                hide_when=("WRITE_SNAPSHOTS", (False,)),
+                help=(
+                    "What a step is depends on the mode: Generate counts\n"
+                    "nodes added to the network, Hybrid counts rounds of\n"
+                    "stitching between the patches."
+                ),
+            ),
         ]
         + _format_fields("network", NETWORK_FORMATS, "csv")
         + _format_fields("plot", PLOT_FORMATS, "webp")
@@ -482,6 +507,58 @@ def _hybrid_fields() -> List[Field]:
             group="Tiling",
         ),
         Field(
+            "MIN_CENTER_DISTANCE_FACTOR",
+            "Seed spacing",
+            1.5,
+            minimum=0.5,
+            maximum=10.0,
+            step=0.1,
+            unit="× the background",
+            help=(
+                "How far apart the seeds are scattered, as a multiple of the\n"
+                "background frame. It sets the scale of everything below it:\n"
+                "the patch size is a fraction of this gap, and whatever is\n"
+                "left of the gap is what stitching has to close."
+            ),
+            group="Tiling",
+        ),
+        Field(
+            "NUM_CENTERS",
+            "Patches",
+            2000,
+            kind="integer",
+            minimum=1,
+            maximum=100000,
+            step=100,
+            unit="at most",
+            help=(
+                "A ceiling on how many patches are placed. The spacing above\n"
+                "decides how many actually fit, and scattering stops at\n"
+                "whichever comes first — so a low ceiling leaves the far end\n"
+                "of a large area empty, whatever the spacing says."
+            ),
+            group="Tiling",
+        ),
+        Field(
+            "TILE_FRAME_FACTOR",
+            "Patch size",
+            0.5,
+            minimum=0.1,
+            maximum=2.0,
+            step=0.1,
+            unit="× the gap between seeds",
+            help=(
+                "Each patch grows inside a square of its own, sized from the\n"
+                "gap between its seed and the nearest other seed. At 0.5 a\n"
+                "patch takes half that gap and stitching closes the rest;\n"
+                "larger patches meet sooner and leave less to stitch.\n"
+                "There is no size in pixels to set: no two seeds are closer\n"
+                "than the spacing above, so the same fraction of that gap is\n"
+                "the smallest a patch can be."
+            ),
+            group="Tiling",
+        ),
+        Field(
             "PHASE2_MAX_ROUNDS",
             "Stitching rounds",
             500,
@@ -495,37 +572,6 @@ def _hybrid_fields() -> List[Field]:
                 "edges to close the gaps between them. This is the ceiling\n"
                 "on how many rounds of that are run — it stops sooner when\n"
                 "there is nowhere left to grow."
-            ),
-            group="Tiling",
-        ),
-        Field(
-            "TILE_FRAME_FACTOR",
-            "Tile frame factor",
-            0.5,
-            minimum=0.1,
-            maximum=2.0,
-            step=0.1,
-            group="Tiling",
-            # How much of the gap between two seeds a patch is allowed to fill
-            # before stitching takes over.  Kept out of the form because the
-            # answer is a property of the method rather than of a run, and
-            # still listed here because the pipeline reads it as an attribute.
-            hidden=True,
-        ),
-        Field(
-            "MIN_TILE_FRAME",
-            "Smallest patch",
-            382.0,
-            unit="px",
-            minimum=1.0,
-            maximum=5000.0,
-            step=10.0,
-            help=(
-                "Each patch grows inside a square of its own, sized from how\n"
-                "far its seed landed from the nearest other seed — about half\n"
-                "that distance. This is the floor on that side: seeds that\n"
-                "landed close together still get a square this big to grow in,\n"
-                "so no patch comes out too small to be a network."
             ),
             group="Tiling",
         ),
@@ -687,7 +733,15 @@ def _network_shapes() -> List[InputShape]:
 def _sweep_fields() -> List[Field]:
     # The factors are what a sweep varies, so they come from the ranges below
     # rather than from a fixed field, and no preview images are written.
-    swept = {"CLOSED_NODES_FACTOR", "CLOSED_EDGES_FACTOR", "SYNTHETIC_GRAPH_NUMBER"}
+    # The two factors are what a sweep varies, the plot count is per trial, and
+    # nothing in the sweep pipeline reads a snapshot interval.
+    swept = {
+        "CLOSED_NODES_FACTOR",
+        "CLOSED_EDGES_FACTOR",
+        "SYNTHETIC_GRAPH_NUMBER",
+        "WRITE_SNAPSHOTS",
+        "SNAPSHOT_INTERVAL",
+    }
     fields = []
     for spec_field in _common_fields():
         if spec_field.id in swept:
