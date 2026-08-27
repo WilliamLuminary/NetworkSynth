@@ -4,9 +4,11 @@ import atexit
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
+import time
 from typing import Any, Dict, List, Optional
 
 from PySide6.QtCore import (
@@ -36,7 +38,21 @@ _EXIT_MEANING = {
     1: "Run failed — see the log.",
     2: "The run-spec was rejected.",
     130: "Cancelled.",
+    # A run stopped by SIGKILL rather than by asking: negative because that is
+    # how Popen reports a signal.
+    -9: "Cancelled — the run had to be forced.",
 }
+
+#: Whether a signal can be aimed at a whole run rather than at its first
+#: process.  POSIX only; on Windows the run is signalled on its own, as it
+#: always was.
+_PROCESS_GROUPS = hasattr(os, "killpg") and hasattr(os, "getpgid")
+
+#: How long a cancelled run is given to stop on its own before it is killed.
+#: Phase 1 workers only look at the exit flag between attempts, so a cancel
+#: lands seconds after it is asked for; a run still here after this is not
+#: going to stop.
+_CANCEL_GRACE = 15.0
 
 
 def _local_path(value: str) -> str:
@@ -81,6 +97,8 @@ class SynthesisController(QObject):
         self._log_offset = 0
         self._run_root: Optional[str] = None
 
+        #: When the run was asked to stop, for the forced stop that follows.
+        self._cancel_at: Optional[float] = None
         self._poll = QTimer(self)
         self._poll.setInterval(400)
         self._poll.timeout.connect(self._tick)
@@ -638,20 +656,51 @@ class SynthesisController(QObject):
             # against a terminal the user is not looking at.
             stdin=subprocess.DEVNULL,
             cwd=_REPO_ROOT,
+            # Its own process group, so cancelling can signal the whole run —
+            # the dataset child, its worker pool, its manager — the way a
+            # terminal signals a job, without the window signalling itself.
+            start_new_session=_PROCESS_GROUPS,
         )
+        self._cancel_at = None
         self._poll.start()
         self._set_status("Running…")
         self.logChanged.emit()
 
     @Slot()
     def cancel(self) -> None:
-        """SIGINT, so the run shuts down the way Ctrl-C would and exits 130."""
+        """SIGINT to the whole run, so it shuts down the way Ctrl-C would.
+
+        To the process group, not to the one process: hybrid runs each dataset
+        in a child of its own, with a worker pool and a manager under that, and
+        every one of them has to hear about it.  Signalling only the top of
+        that tree left the pool orphaned and the run hanging at exit long after
+        it had written "cancelled" — cancelling appeared to do nothing.
+        """
         if self._process is None:
             return
         self._set_status("Cancelling…")
+        self._cancel_at = time.monotonic()
+        self._stop_run(force=False)
+
+    def _stop_run(self, force: bool) -> None:
+        """Ask the run to stop, or take the choice away from it.
+
+        Aimed at the group where there is one, so nothing in the run is left
+        behind; at the run's own process where there is not.
+        """
+        if self._process is None:
+            return
         try:
-            self._process.send_signal(getattr(__import__("signal"), "SIGINT", 2))
-        except (ProcessLookupError, OSError):
+            if _PROCESS_GROUPS:
+                os.killpg(
+                    os.getpgid(self._process.pid),
+                    signal.SIGKILL if force else signal.SIGINT,
+                )
+            elif force:
+                self._process.kill()
+            else:
+                self._process.send_signal(signal.SIGINT)
+        except (ProcessLookupError, PermissionError, OSError):
             pass
 
     # ---- internals ----
@@ -722,9 +771,21 @@ class SynthesisController(QObject):
         if self._process is not None and self._process.poll() is not None:
             code = self._process.returncode
             self._process = None
+            self._cancel_at = None
             self._poll.stop()
             self._drain_log()
             self._finish(code)
+        elif (
+            self._cancel_at is not None
+            and time.monotonic() - self._cancel_at > _CANCEL_GRACE
+        ):
+            self._cancel_at = None
+            self._log.append(
+                f"{'WARNING':<8}Still running {_CANCEL_GRACE:.0f}s "
+                "after cancelling. Forcing it to stop."
+            )
+            self.logChanged.emit()
+            self._stop_run(force=True)
         self.changed.emit()
 
     def _drain_log(self) -> None:

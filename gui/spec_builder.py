@@ -352,7 +352,7 @@ def _common_fields() -> List[Field]:
             Field(
                 "SYNTHETIC_NETWORK_NUMBER",
                 "Number of networks",
-                5,
+                1,
                 kind="integer",
                 minimum=1,
                 maximum=500,
@@ -750,7 +750,7 @@ def _sweep_fields() -> List[Field]:
             spec_field = replace(
                 spec_field,
                 label="Networks per trial",
-                value=20,
+                value=1,
                 help="Each factor combination generates this many networks.",
             )
         fields.append(spec_field)
