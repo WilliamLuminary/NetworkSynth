@@ -1,5 +1,6 @@
-# Covers the supported surface: run.py, analyse.py, gui_app.py / gui_run.py and
-# scripts/, including every pipeline and config they load dynamically.
+# Covers the supported surface: run.py, analyse.py, gui_app.py / gui_run.py /
+# gui_preview.py and scripts/, including every pipeline and config they load
+# dynamically.
 #
 # Python 3.11-3.13.  Every pin below has a binary wheel across that whole range.
 # 3.14 is not usable yet: NetworKit ships no cp314 wheel (INTEGRATION_PLAN.md,

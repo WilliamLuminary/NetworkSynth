@@ -10,6 +10,7 @@ from .file_definitions import (
     SYNTHETIC_DIR,
     RenderStyle,
     SaveSpec,
+    save_csv,
     save_network_csv,
     save_pickle,
     save_text,
@@ -40,7 +41,9 @@ class BaseConfig:
             raise ValueError("DATASETS must be defined in the config")
         return cls.DATASETS
 
-    # IMAGE_SIZE: Background image dimensions (height, width) in pixels
+    # IMAGE_SIZE: the input image's true size (height, width) in pixels, as it
+    # is on disk.  Recorded, never laid out by: what the network and its
+    # background are drawn in is FRAME_SIZE, which the image is scaled to.
     IMAGE_SIZE: Tuple[int, int] = None
 
     # FRAME_SIZE: Original network plotting frame (X_range, Y_range)
@@ -51,6 +54,13 @@ class BaseConfig:
 
     CLOSED_NODES_FACTOR: float
     CLOSED_EDGES_FACTOR: float
+
+    #: How far apart the values a sweep tries are, on both factors.
+    SWEEP_STEP: float = 0.1
+
+    #: Whether a sweep reports to wandb.  Off, it walks the grid itself and
+    #: contacts nothing; the local report is written either way.
+    USE_WANDB: bool = True
 
     MEASURE_WEIGHTED: bool
     FULL_Q_BAND: bool = False
@@ -133,6 +143,11 @@ class BaseConfig:
     )
     SAVE_SYNTHETIC_REPORT = (
         SaveSpec(SYNTHETIC_DIR, "report", "txt", save_text, use_timestamp=False),
+    )
+    # Written by every sweep, whether or not it talked to wandb: the trial
+    # grid is the result, and it should not live only on someone's server.
+    SAVE_SWEEP_REPORT = (
+        SaveSpec(INPLACE_DIR, "sweep_report", "csv", save_csv, use_timestamp=False),
     )
     SAVE_ANALYSIS_DATA = (
         SaveSpec(INPLACE_DIR, "analysis_data", "pkl", save_pickle, use_timestamp=False),

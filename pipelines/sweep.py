@@ -45,9 +45,19 @@ DEFAULT_NF_RANGE = (0.3, 2.0)
 DEFAULT_EF_RANGE = (0.3, 2.0)
 
 
-def _build_factors(lo, hi, step=0.1):
+DEFAULT_STEP = 0.1
+
+
+def _build_factors(lo, hi, step=DEFAULT_STEP):
+    """The values swept from *lo* to *hi*, *step* apart.
+
+    Rounded to six places rather than one: the rounding is only there to clear
+    the float noise in ``lo + step * i``, and at one place any step finer than
+    0.1 collapsed into repeats — 0.05 gave 1.0, 1.1, 1.1, 1.1, 1.2 rather than
+    1.0, 1.05, 1.1.  At 0.1 the values are unchanged.
+    """
     n = round((hi - lo) / step) + 1
-    return [round(lo + step * i, 1) for i in range(n)]
+    return [round(lo + step * i, 6) for i in range(n)]
 
 
 logger = logging.getLogger(__name__)
@@ -163,6 +173,18 @@ def generate_networks(run: GenerationRun, error_checker: ErrorChecker, nf, ef, c
     return avg_error, success_rate
 
 
+def _report_rows(results) -> list:
+    """The sweep's outcome as rows, ordered so the file reads as a grid.
+
+    The same four columns ``scripts/helpers/extract_sweep_results.py`` pulls
+    back from wandb, so anything that reads one can read the other.
+    """
+    rows = [["node_factor", "edge_factor", "error", "success_rate"]]
+    for nf, ef, error, success_rate in sorted(results):
+        rows.append([nf, ef, f"{error:.6f}", f"{success_rate:.4f}"])
+    return rows
+
+
 def run_for_dataset(
     dataset_id: DatasetId, node_factors, edge_factors, config, run_paths
 ) -> None:
@@ -189,20 +211,40 @@ def run_for_dataset(
         },
     }
 
-    def trial():
-        with wandb.init():
-            nf = wandb.config.node_factor
-            ef = wandb.config.edge_factor
-            logger.info(f"Trial: nf={nf}, ef={ef}")
+    # Every trial's outcome, kept here as well as sent anywhere, so the result
+    # of a sweep is a file on disk rather than a page on a server.
+    results = []
 
-            error, success_rate = generate_networks(run, error_checker, nf, ef, config)
-            if error is None:
-                error = float("inf")
+    def run_trial(nf, ef):
+        logger.info(f"Trial: nf={nf}, ef={ef}")
+        error, success_rate = generate_networks(run, error_checker, nf, ef, config)
+        if error is None:
+            error = float("inf")
+        results.append((nf, ef, error, success_rate))
+        return error, success_rate
 
-            wandb.log({"error": error, "success_rate": success_rate})
+    if config.USE_WANDB:
 
-    sweep_id = wandb.sweep(sweep_config, project=EXPERIMENT_PROJECT_NAME)
-    wandb.agent(sweep_id, function=trial)
+        def trial():
+            with wandb.init():
+                error, success_rate = run_trial(
+                    wandb.config.node_factor, wandb.config.edge_factor
+                )
+                wandb.log({"error": error, "success_rate": success_rate})
+
+        sweep_id = wandb.sweep(sweep_config, project=EXPERIMENT_PROJECT_NAME)
+        wandb.agent(sweep_id, function=trial)
+    else:
+        # A sweep is a grid, and the grid is already built above; wandb was
+        # handing back combinations it had been given.  Walking it here needs
+        # no server, which is the whole point of the switch.
+        logger.info("wandb is off — walking the grid locally.")
+        for nf in node_factors:
+            for ef in edge_factors:
+                run_trial(nf, ef)
+
+    run.save(_report_rows(results), "sweep_report")
+    logger.info(f"Sweep report written for {len(results)} trial(s).")
 
 
 def main(config_cls=None):
@@ -215,8 +257,9 @@ def main(config_cls=None):
     # The config's range, or the module default.
     nf_lo, nf_hi = getattr(cfg, "NF_RANGE", DEFAULT_NF_RANGE)
     ef_lo, ef_hi = getattr(cfg, "EF_RANGE", DEFAULT_EF_RANGE)
-    node_factors = _build_factors(nf_lo, nf_hi)
-    edge_factors = _build_factors(ef_lo, ef_hi)
+    step = getattr(cfg, "SWEEP_STEP", DEFAULT_STEP)
+    node_factors = _build_factors(nf_lo, nf_hi, step)
+    edge_factors = _build_factors(ef_lo, ef_hi, step)
 
     run_paths = create_run_paths(cfg)
     attach_run_log(run_paths.root, cfg.RUN_ID)
@@ -234,7 +277,10 @@ def main(config_cls=None):
         # desktop environment, and failing on a key the machine already has is
         # the least useful way to end a sweep.  With neither set, `key=None`
         # behaves exactly like a bare login() and reports that.
-        wandb.login(key=os.environ.get("WANDB_API_KEY") or os.environ.get("WANDB_KEY"))
+        if cfg.USE_WANDB:
+            wandb.login(
+                key=os.environ.get("WANDB_API_KEY") or os.environ.get("WANDB_KEY")
+            )
         for dataset_id in cfg.get_datasets():
             run_for_dataset(dataset_id, node_factors, edge_factors, cfg, run_paths)
     except KeyboardInterrupt:
