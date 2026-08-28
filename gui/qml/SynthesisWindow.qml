@@ -35,8 +35,7 @@ ApplicationWindow {
     readonly property color paneColor: palette.alternateBase
     readonly property color lineColor: palette.mid
     readonly property color railColor: Qt.darker(palette.window, 1.14)
-    readonly property color plateColor: root.darkTheme
-        ? Qt.lighter(palette.base, 1.35) : Qt.darker(palette.base, 1.05)
+    readonly property color plateColor: root.darkTheme ? Qt.lighter(palette.base, 1.35) : Qt.darker(palette.base, 1.05)
 
     //: Which way round the desktop is, for the two colours that carry a
     //: meaning rather than a role: a success green and a failure red have no
@@ -86,14 +85,13 @@ ApplicationWindow {
                     text: controller.percent.toFixed(0) + "%"
                     opacity: 0.7
                 }
-                Item { Layout.fillWidth: true }
+                Item {
+                    Layout.fillWidth: true
+                }
 
                 Button {
                     id: runButton
-                    text: controller.running
-                        ? "Cancel"
-                        : "Run " + controller.modeLabels[
-                            controller.modes.indexOf(controller.mode)]
+                    text: controller.running ? "Cancel" : "Run " + controller.modeLabels[controller.modes.indexOf(controller.mode)]
                     // Dead rather than accepting a click it would only refuse.
                     // What is missing is named in the status line below.
                     enabled: controller.running || controller.canRun
@@ -103,17 +101,11 @@ ApplicationWindow {
 
                     background: Rectangle {
                         radius: 6
-                        color: !runButton.enabled ? root.lineColor
-                             : controller.running
-                                 ? (runButton.down
-                                     ? Qt.darker(root.badColor, 1.3) : root.badColor)
-                                 : (runButton.down
-                                     ? Qt.darker(root.accent, 1.3) : root.accent)
+                        color: !runButton.enabled ? root.lineColor : controller.running ? (runButton.down ? Qt.darker(root.badColor, 1.3) : root.badColor) : (runButton.down ? Qt.darker(root.accent, 1.3) : root.accent)
                     }
                     contentItem: Label {
                         text: runButton.text
-                        color: runButton.enabled
-                            ? palette.highlightedText : palette.text
+                        color: runButton.enabled ? palette.highlightedText : palette.text
                         opacity: runButton.enabled ? 1.0 : 0.5
                         font.bold: true
                         horizontalAlignment: Text.AlignHCenter
@@ -127,9 +119,7 @@ ApplicationWindow {
                 spacing: 8
 
                 Label {
-                    text: controller.running ? "◷"
-                        : controller.failed ? "!"
-                        : controller.canRun ? "✓" : "•"
+                    text: controller.running ? "◷" : controller.failed ? "!" : controller.canRun ? "✓" : "•"
                     opacity: controller.running || !controller.canRun ? 0.6 : 1.0
                     color: controller.failed ? root.badColor : root.goodColor
                     font.bold: true
@@ -170,15 +160,14 @@ ApplicationWindow {
     }
 
     function browseFor(spec) {
-        root.pendingInput = spec.id
+        root.pendingInput = spec.id;
         if (spec.kind === "dir") {
-            dirDialog.title = "Select " + spec.label.toLowerCase()
-            dirDialog.open()
+            dirDialog.title = "Select " + spec.label.toLowerCase();
+            dirDialog.open();
         } else {
-            fileDialog.title = "Select " + spec.label.toLowerCase()
-            fileDialog.nameFilters = spec.filter
-                ? [spec.filter, "All files (*)"] : ["All files (*)"]
-            fileDialog.open()
+            fileDialog.title = "Select " + spec.label.toLowerCase();
+            fileDialog.nameFilters = spec.filter ? [spec.filter, "All files (*)"] : ["All files (*)"];
+            fileDialog.open();
         }
     }
 
@@ -213,8 +202,7 @@ ApplicationWindow {
                 visible: card.title !== ""
 
                 Label {
-                    text: (card.collapsible ? (card.expanded ? "▾  " : "▸  ") : "")
-                        + card.title.toUpperCase()
+                    text: (card.collapsible ? (card.expanded ? "▾  " : "▸  ") : "") + card.title.toUpperCase()
                     font.bold: true
                     font.pixelSize: 10
                     font.letterSpacing: 0.8
@@ -232,7 +220,9 @@ ApplicationWindow {
                     alignRight: false
                 }
 
-                Item { Layout.fillWidth: true }
+                Item {
+                    Layout.fillWidth: true
+                }
             }
             ColumnLayout {
                 id: body
@@ -275,8 +265,7 @@ ApplicationWindow {
             id: choice
             visible: editor.field.kind === "choice"
             Layout.preferredWidth: 190
-            model: editor.field.labels.length > 0
-                ? editor.field.labels : editor.field.options
+            model: editor.field.labels.length > 0 ? editor.field.labels : editor.field.options
             currentIndex: Math.max(0, editor.field.options.indexOf(editor.value))
             onActivated: editor.edited(editor.field.options[currentIndex])
 
@@ -292,11 +281,12 @@ ApplicationWindow {
                 text: option.modelData
                 highlighted: choice.highlightedIndex === option.index
 
-                HoverHandler { id: optionHover }
+                HoverHandler {
+                    id: optionHover
+                }
 
                 HoverPanel {
-                    note: option.index < editor.field.option_help.length
-                        ? editor.field.option_help[option.index] : ""
+                    note: option.index < editor.field.option_help.length ? editor.field.option_help[option.index] : ""
                     showing: optionHover.hovered
                     x: option.width + 6
                     y: 0
@@ -354,9 +344,10 @@ ApplicationWindow {
                 Layout.preferredWidth: root.numberWidth
                 // Bindings of invisible siblings still evaluate, so guard the
                 // indexing: on a scalar field this would be undefined.
-                text: editor.field.kind === "size" || editor.field.kind === "range"
-                    ? editor.value[0] : ""
-                validator: DoubleValidator { bottom: 0 }
+                text: editor.field.kind === "size" || editor.field.kind === "range" ? editor.value[0] : ""
+                validator: DoubleValidator {
+                    bottom: 0
+                }
                 onEditingFinished: editor.sized(0, text)
             }
             Label {
@@ -370,9 +361,10 @@ ApplicationWindow {
             }
             TextField {
                 Layout.preferredWidth: root.numberWidth
-                text: editor.field.kind === "size" || editor.field.kind === "range"
-                    ? editor.value[1] : ""
-                validator: DoubleValidator { bottom: 0 }
+                text: editor.field.kind === "size" || editor.field.kind === "range" ? editor.value[1] : ""
+                validator: DoubleValidator {
+                    bottom: 0
+                }
                 onEditingFinished: editor.sized(1, text)
             }
         }
@@ -386,7 +378,9 @@ ApplicationWindow {
             opacity: 0.5
         }
 
-        Item { Layout.fillWidth: true }
+        Item {
+            Layout.fillWidth: true
+        }
     }
 
     // Every explanation in the window is drawn here: ours rather than the
@@ -401,8 +395,7 @@ ApplicationWindow {
         visible: panel.showing && panel.note !== ""
         closePolicy: Popup.NoAutoClose
         y: panel.parent ? panel.parent.height + 6 : 0
-        x: panel.alignRight && panel.parent
-            ? panel.parent.width - panel.width : 0
+        x: panel.alignRight && panel.parent ? panel.parent.width - panel.width : 0
         padding: 12
         width: Math.min(380, panelText.implicitWidth + 2 * panel.padding)
 
@@ -442,7 +435,9 @@ ApplicationWindow {
             color: info.checked || infoHover.hovered ? root.lineColor : "transparent"
         }
 
-        HoverHandler { id: infoHover }
+        HoverHandler {
+            id: infoHover
+        }
 
         HoverPanel {
             note: info.note
@@ -462,19 +457,16 @@ ApplicationWindow {
         // speaks for each of them in turn, since the label they share cannot.
         readonly property string note: {
             if (formLine.line.row)
-                return formLine.line.fields
-                    .filter(each => each.help !== "")
-                    .map(each => each.label + " — " + each.help)
-                    .join("\n")
+                return formLine.line.fields.filter(each => each.help !== "").map(each => each.label + " — " + each.help).join("\n");
 
-            const one = formLine.line.fields[0]
-            let text = one.help
+            const one = formLine.line.fields[0];
+            let text = one.help;
             if (one.kind === "choice" && one.option_help.length > 0) {
-                const at = one.options.indexOf(one.current)
+                const at = one.options.indexOf(one.current);
                 if (at >= 0 && at < one.option_help.length)
-                    text += (text ? "\n\n" : "") + one.option_help[at]
+                    text += (text ? "\n\n" : "") + one.option_help[at];
             }
-            return text
+            return text;
         }
 
         Layout.fillWidth: true
@@ -489,8 +481,7 @@ ApplicationWindow {
                 // Narrower on a row whose editor is prefixed by an axis
                 // letter, by exactly what that letter takes: the boxes down
                 // the page all start at the same x either way.
-                Layout.preferredWidth: formLine.line.fields[0].kind === "size"
-                    ? root.labelWidth - root.axisWidth - 6 : root.labelWidth
+                Layout.preferredWidth: formLine.line.fields[0].kind === "size" ? root.labelWidth - root.axisWidth - 6 : root.labelWidth
                 elide: Text.ElideRight
             }
 
@@ -510,17 +501,18 @@ ApplicationWindow {
                 visible: !formLine.line.row
                 field: formLine.line.fields[0]
                 value: formLine.line.fields[0].current
-                onEdited: (newValue) => controller.setValue(
-                    formLine.line.fields[0].id, newValue)
-                onSized: (index, newValue) => controller.setSize(
-                    formLine.line.fields[0].id, index, newValue)
+                onEdited: newValue => controller.setValue(formLine.line.fields[0].id, newValue)
+                onSized: (index, newValue) => controller.setSize(formLine.line.fields[0].id, index, newValue)
             }
 
             // Only where there is no editor to take up the slack: a switch row
             // keeps its switches to the left, and every other row keeps its
             // help button out at the edge, in the column the input rows put
             // theirs in.
-            Item { Layout.fillWidth: true; visible: formLine.line.row !== "" }
+            Item {
+                Layout.fillWidth: true
+                visible: formLine.line.row !== ""
+            }
 
             InfoButton {
                 visible: formLine.note !== ""
@@ -625,8 +617,7 @@ ApplicationWindow {
                         id: modeItem
                         required property int index
                         required property var modelData
-                        readonly property bool current:
-                            controller.modes[index] === controller.mode
+                        readonly property bool current: controller.modes[index] === controller.mode
 
                         Layout.fillWidth: true
                         implicitHeight: 38
@@ -634,24 +625,22 @@ ApplicationWindow {
                         onClicked: controller.selectMode(modeItem.index)
 
                         background: Rectangle {
-                            color: modeItem.current ? root.accent
-                                 : modeItem.hovered
-                                     ? Qt.darker(root.railColor, 1.12) : "transparent"
+                            color: modeItem.current ? root.accent : modeItem.hovered ? Qt.darker(root.railColor, 1.12) : "transparent"
                         }
                         contentItem: Label {
                             leftPadding: 18
                             verticalAlignment: Text.AlignVCenter
                             text: modeItem.modelData
-                            color: modeItem.current
-                                ? palette.highlightedText : palette.text
+                            color: modeItem.current ? palette.highlightedText : palette.text
                             font.bold: modeItem.current
-                            opacity: modeItem.enabled
-                                ? (modeItem.current ? 1.0 : 0.8) : 0.4
+                            opacity: modeItem.enabled ? (modeItem.current ? 1.0 : 0.8) : 0.4
                         }
                     }
                 }
 
-                Item { Layout.fillHeight: true }
+                Item {
+                    Layout.fillHeight: true
+                }
             }
         }
 
@@ -717,7 +706,9 @@ ApplicationWindow {
                                         onClicked: controller.selectInputScope(index)
                                     }
                                 }
-                                Item { Layout.fillWidth: true }
+                                Item {
+                                    Layout.fillWidth: true
+                                }
                             }
 
                             RowLayout {
@@ -737,8 +728,7 @@ ApplicationWindow {
                                     // A folder is only read one way, so there
                                     // is nothing to choose — shown rather than
                                     // hidden, so it still says what it will be.
-                                    enabled: !controller.running
-                                        && controller.inputFormats.length > 1
+                                    enabled: !controller.running && controller.inputFormats.length > 1
                                 }
                             }
 
@@ -760,8 +750,7 @@ ApplicationWindow {
                                         Layout.fillWidth: true
                                         text: inputRow.modelData.value
                                         placeholderText: inputRow.modelData.placeholder
-                                        onEditingFinished:
-                                            controller.setInput(inputRow.modelData.id, text)
+                                        onEditingFinished: controller.setInput(inputRow.modelData.id, text)
 
                                         // An empty box asks for the file when
                                         // clicked; once it holds a path it goes
@@ -780,18 +769,14 @@ ApplicationWindow {
                                         Layout.preferredWidth: 14
                                         horizontalAlignment: Text.AlignHCenter
                                         font.bold: true
-                                        text: inputRow.modelData.state === "ok" ? "✓"
-                                            : inputRow.modelData.state === "missing"
-                                                ? "!" : ""
-                                        color: inputRow.modelData.state === "ok"
-                                            ? root.goodColor : root.badColor
-                                        HoverHandler { id: stateHover }
+                                        text: inputRow.modelData.state === "ok" ? "✓" : inputRow.modelData.state === "missing" ? "!" : ""
+                                        color: inputRow.modelData.state === "ok" ? root.goodColor : root.badColor
+                                        HoverHandler {
+                                            id: stateHover
+                                        }
                                         HoverPanel {
-                                            note: inputRow.modelData.state === "ok"
-                                                ? "Found."
-                                                : "Needed, and not found yet."
-                                            showing: stateHover.hovered
-                                                && inputRow.modelData.state !== "blank"
+                                            note: inputRow.modelData.state === "ok" ? "Found." : "Needed, and not found yet."
+                                            showing: stateHover.hovered && inputRow.modelData.state !== "blank"
                                         }
                                     }
                                     Button {
@@ -816,8 +801,7 @@ ApplicationWindow {
                             // something you do once, if ever.
                             collapsible: true
                             expanded: false
-                            visible: controller.alignLines.length > 0
-                                && controller.canPreview
+                            visible: controller.alignLines.length > 0 && controller.canPreview
 
                             Repeater {
                                 model: controller.alignLines
@@ -831,19 +815,21 @@ ApplicationWindow {
                                 Layout.fillWidth: true
                                 spacing: 8
 
-                                Item { Layout.preferredWidth: root.labelWidth }
+                                Item {
+                                    Layout.preferredWidth: root.labelWidth
+                                }
                                 Button {
                                     text: "Save as edited"
                                     enabled: controller.canRun
                                     onClicked: controller.saveEdited()
                                     HoverPanel {
-                                        note: "Write the network as it is drawn "
-                                            + "now into an 'edited' folder beside "
-                                            + "the source, and read that from here on."
+                                        note: "Write the network as it is drawn " + "now into an 'edited' folder beside " + "the source, and read that from here on."
                                         showing: parent.hovered
                                     }
                                 }
-                                Item { Layout.fillWidth: true }
+                                Item {
+                                    Layout.fillWidth: true
+                                }
                             }
                         }
 
@@ -866,7 +852,9 @@ ApplicationWindow {
                             }
                         }
 
-                        Item { Layout.fillHeight: true }
+                        Item {
+                            Layout.fillHeight: true
+                        }
                     }
                 }
 
@@ -900,15 +888,15 @@ ApplicationWindow {
                                     onClicked: outputDialog.open()
                                 }
                             }
-                            Button { text: "Browse…"; onClicked: outputDialog.open() }
+                            Button {
+                                text: "Browse…"
+                                onClicked: outputDialog.open()
+                            }
                             // Nothing is written into the chosen folder itself,
                             // so say where it does go before the run rather
                             // than in the status line afterwards.
                             InfoButton {
-                                note: "Each run makes its own timestamped "
-                                    + "folder in here, named for the mode and "
-                                    + "the run. \"latest_result\" is kept "
-                                    + "pointing at the newest."
+                                note: "Each run makes its own timestamped " + "folder in here, named for the mode and " + "the run. \"latest_result\" is kept " + "pointing at the newest."
                             }
                         }
 
@@ -926,13 +914,16 @@ ApplicationWindow {
                             Layout.topMargin: 4
                             spacing: 8
 
-                            // Top line: ---- OUTPUT FORMATS ----
+                            // Top line with embedded text links
                             RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 8
+                                Layout.fillWidth: false
+                                spacing: 14
 
-                                // Short line segment on the left
-                                Rectangle { Layout.preferredWidth: 16; height: 1; color: root.lineColor }
+                                Rectangle {
+                                    Layout.preferredWidth: 16
+                                    height: 1
+                                    color: root.lineColor
+                                }
 
                                 Label {
                                     text: "OUTPUT FORMATS"
@@ -942,11 +933,54 @@ ApplicationWindow {
                                     opacity: 0.55
                                 }
 
-                                // Long line segment filling the rest of the right side
-                                Rectangle { Layout.fillWidth: true; height: 1; color: root.lineColor }
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    height: 1
+                                    color: root.lineColor
+                                }
+
+                                Label {
+                                    text: "Select none"
+                                    font.pixelSize: 11
+                                    color: noneHover.hovered ? root.accent : palette.text
+                                    opacity: noneHover.hovered ? 1.0 : 0.55
+
+                                    HoverHandler {
+                                        id: noneHover
+                                        cursorShape: Qt.PointingHandCursor
+                                    }
+                                    TapHandler {
+                                        onTapped: controller.clearOutputs()
+                                    }
+                                    HoverPanel {
+                                        note: "Write no networks and no plots. " + "A run still leaves its report " + "and the batch a preview reads."
+                                        showing: noneHover.hovered
+                                        alignRight: true
+                                    }
+                                }
+
+                                Label {
+                                    text: "Defaults"
+                                    font.pixelSize: 11
+                                    color: defaultsHover.hovered ? root.accent : palette.text
+                                    opacity: defaultsHover.hovered ? 1.0 : 0.55
+
+                                    HoverHandler {
+                                        id: defaultsHover
+                                        cursorShape: Qt.PointingHandCursor
+                                    }
+                                    TapHandler {
+                                        onTapped: controller.resetOutputs()
+                                    }
+                                    HoverPanel {
+                                        note: "Networks as .csv, plots as .webp."
+                                        showing: defaultsHover.hovered
+                                        alignRight: true
+                                    }
+                                }
                             }
 
-                            // The dynamically generated format checkboxes and buttons
+                            // The dynamically generated format checkboxes
                             ColumnLayout {
                                 Layout.fillWidth: true
                                 spacing: 8
@@ -957,32 +991,6 @@ ApplicationWindow {
                                         required property var modelData
                                         line: modelData
                                     }
-                                }
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 8
-
-                                    Item { Layout.preferredWidth: root.labelWidth }
-                                    Button {
-                                        text: "Select none"
-                                        onClicked: controller.clearOutputs()
-                                        HoverPanel {
-                                            note: "Write no networks and no plots. "
-                                                + "A run still leaves its report "
-                                                + "and the batch a preview reads."
-                                            showing: parent.hovered
-                                        }
-                                    }
-                                    Button {
-                                        text: "Defaults"
-                                        onClicked: controller.resetOutputs()
-                                        HoverPanel {
-                                            note: "Networks as .csv, plots as .webp."
-                                            showing: parent.hovered
-                                        }
-                                    }
-                                    Item { Layout.fillWidth: true }
                                 }
                             }
 
@@ -1004,32 +1012,58 @@ ApplicationWindow {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 10
-
-                            TabBar {
+                            // Custom Rounded TabBar
+                            RowLayout {
                                 id: previewTabs
-                                onCurrentIndexChanged:
-                                    controller.selectPreviewTab(currentIndex)
+                                property int currentIndex: 0
+                                onCurrentIndexChanged: controller.selectPreviewTab(currentIndex)
+                                spacing: 4
 
                                 // A mode with nothing synthetic to show must
                                 // not be left sitting on that tab.
                                 Connections {
                                     target: controller
                                     function onChanged() {
-                                        if (!controller.offersSyntheticPreview
-                                                && previewTabs.currentIndex !== 0)
-                                            previewTabs.currentIndex = 0
+                                        if (!controller.offersSyntheticPreview && previewTabs.currentIndex !== 0)
+                                            previewTabs.currentIndex = 0;
                                     }
                                 }
 
-                                TabButton { text: "Original"; width: 112 }
-                                TabButton {
-                                    text: "Synthetic"
-                                    width: 112
-                                    // Absent outside generate: a hybrid network
-                                    // is far too large to draw, and neither it
-                                    // nor sweep writes the batch a preview reads.
+                                // Rounded Tab: Original
+                                Rectangle {
+                                    Layout.preferredWidth: 112
+                                    Layout.preferredHeight: 26
+                                    radius: 6
+                                    color: previewTabs.currentIndex === 0 ? root.paneColor : "transparent"
+
+                                    Label {
+                                        anchors.centerIn: parent
+                                        text: "Original"
+                                        opacity: previewTabs.currentIndex === 0 ? 1.0 : 0.65
+                                    }
+                                    TapHandler {
+                                        onTapped: previewTabs.currentIndex = 0
+                                    }
+                                }
+
+                                // Rounded Tab: Synthetic
+                                Rectangle {
+                                    Layout.preferredWidth: 112
+                                    Layout.preferredHeight: 26
+                                    radius: 6
                                     visible: controller.offersSyntheticPreview
                                     enabled: controller.canPreviewSynthetic
+                                    opacity: enabled ? 1.0 : 0.4
+                                    color: previewTabs.currentIndex === 1 ? root.paneColor : "transparent"
+
+                                    Label {
+                                        anchors.centerIn: parent
+                                        text: "Synthetic"
+                                        opacity: previewTabs.currentIndex === 1 ? 1.0 : 0.65
+                                    }
+                                    TapHandler {
+                                        onTapped: previewTabs.currentIndex = 1
+                                    }
                                 }
                             }
 
@@ -1040,8 +1074,7 @@ ApplicationWindow {
                                 text: "Background"
                                 checkable: true
                                 checked: controller.showBackground
-                                visible: previewTabs.currentIndex === 0
-                                    && controller.hasBackground
+                                visible: previewTabs.currentIndex === 0 && controller.hasBackground
                                 onToggled: controller.setShowBackground(checked)
                             }
                             Button {
@@ -1051,11 +1084,12 @@ ApplicationWindow {
                                 visible: previewTabs.currentIndex === 0
                                 onToggled: controller.setShowNetwork(checked)
                             }
-                            Item { Layout.fillWidth: true }
+                            Item {
+                                Layout.fillWidth: true
+                            }
                             Label {
                                 text: controller.previewStatus
-                                color: controller.previewFailed
-                                    ? root.badColor : palette.text
+                                color: controller.previewFailed ? root.badColor : palette.text
                                 opacity: controller.previewFailed ? 1.0 : 0.65
                                 elide: Text.ElideRight
                             }
@@ -1065,8 +1099,7 @@ ApplicationWindow {
                             Layout.fillWidth: true
                             wrapMode: Text.WordWrap
                             opacity: 0.65
-                            text: previewTabs.currentIndex === 0
-                                ? controller.originalNote : controller.syntheticNote
+                            text: previewTabs.currentIndex === 0 ? controller.originalNote : controller.syntheticNote
                             visible: text !== ""
                         }
 
@@ -1078,16 +1111,12 @@ ApplicationWindow {
                             PreviewPane {
                                 image: controller.originalImage
                                 info: controller.originalInfo
-                                placeholder: controller.previewStatus !== ""
-                                    ? controller.previewStatus
-                                    : "Choose an edge list and positions, and the input network is drawn here."
+                                placeholder: controller.previewStatus !== "" ? controller.previewStatus : "Choose an edge list and positions, and the input network is drawn here."
                             }
                             PreviewPane {
                                 image: controller.syntheticImage
                                 info: controller.syntheticInfo
-                                placeholder: controller.previewStatus !== ""
-                                    ? controller.previewStatus
-                                    : "Run, and the first network of the output is drawn here."
+                                placeholder: controller.previewStatus !== "" ? controller.previewStatus : "Run, and the first network of the output is drawn here."
                             }
                         }
                     }
