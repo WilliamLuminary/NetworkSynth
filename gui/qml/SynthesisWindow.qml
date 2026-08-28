@@ -27,6 +27,8 @@ ApplicationWindow {
     readonly property int numberWidth: 96
     //: The gutter an axis letter sits in, taken out of the label beside it.
     readonly property int axisWidth: 28
+    //: How big every "?" button is drawn, in pixels square.
+    readonly property int helpSize: 18
 
     readonly property color accent: palette.highlight
     readonly property color cardColor: palette.base
@@ -406,7 +408,17 @@ ApplicationWindow {
 
         text: "?"
         checkable: true
-        implicitWidth: 34
+        implicitWidth: root.helpSize
+        implicitHeight: root.helpSize
+        padding: 0
+        font.pixelSize: 11
+
+        background: Rectangle {
+            radius: width / 2
+            color: info.checked || infoHover.hovered ? root.lineColor : "transparent"
+            border.color: root.lineColor
+            border.width: 1
+        }
 
         HoverHandler { id: infoHover }
 
