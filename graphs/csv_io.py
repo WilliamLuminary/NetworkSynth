@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import csv
-import os
 from typing import List, Optional, Tuple
 
 import numpy as np
@@ -32,8 +31,6 @@ def _optional_column(header: List[str], candidates: Tuple[str, ...]) -> Optional
 
 
 def _read_rows(path: str) -> Tuple[List[str], List[List[str]]]:
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"CSV not found: {path}")
     with open(path, newline="") as handle:
         rows = [r for r in csv.reader(handle) if r and any(c.strip() for c in r)]
     if not rows:

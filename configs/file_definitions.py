@@ -57,11 +57,6 @@ def save_webp(fig_or_image, filepath: str) -> None:
         _Image.fromarray(arr).save(filepath, "webp", lossless=True)
         return
 
-    from matplotlib.figure import Figure
-
-    assert isinstance(
-        fig_or_image, Figure
-    ), f"WebP saving expects a matplotlib Figure or PIL Image, got {type(fig_or_image).__name__}."
     from utils import save_figure_as_webp
 
     save_figure_as_webp(fig_or_image, filepath)
@@ -72,11 +67,6 @@ def save_webp(fig_or_image, filepath: str) -> None:
 
 
 def save_svg(fig, filepath: str) -> None:
-    from matplotlib.figure import Figure
-
-    assert isinstance(
-        fig, Figure
-    ), f"SVG saving expects a matplotlib Figure, got {type(fig).__name__}."
     fig.savefig(filepath, format="svg", bbox_inches="tight")
 
     from matplotlib import pyplot as _plt

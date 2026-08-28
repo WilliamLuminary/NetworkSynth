@@ -83,9 +83,6 @@ def _load_positions(dataset_id: DatasetId) -> np.ndarray:
     directory = os.path.join(ConfigNanowires.BASE_INPUT_PATH, dataset_id[0])
     file_path = os.path.join(directory, "nod_pos.csv")
 
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"Positions file does not exist: {file_path}")
-
     logger.info(f"Loading positions from {file_path}")
     return np.loadtxt(file_path, delimiter=",")
 
@@ -93,9 +90,6 @@ def _load_positions(dataset_id: DatasetId) -> np.ndarray:
 def _load_edge_list(dataset_id: DatasetId) -> np.ndarray:
     directory = os.path.join(ConfigNanowires.BASE_INPUT_PATH, dataset_id[0])
     file_path = os.path.join(directory, "edls.csv")
-
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"Edge list file does not exist: {file_path}")
 
     logger.info(f"Loading edge list from {file_path}")
     return np.loadtxt(file_path, delimiter=",")

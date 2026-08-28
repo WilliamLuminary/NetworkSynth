@@ -81,16 +81,12 @@ class SnapshotConfig(BaseConfig):
 
 def _load_positions(set_name: str) -> np.ndarray:
     path = os.path.join(SnapshotConfig.BASE_INPUT_PATH, f"{set_name}_pos.npy")
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"Positions file not found: {path}")
     logger.info("Loading positions from %s", path)
     return np.load(path, allow_pickle=True)
 
 
 def _load_sparse_matrix(set_name: str):
     path = os.path.join(SnapshotConfig.BASE_INPUT_PATH, f"{set_name}_mat.npy")
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"Adjacency matrix file not found: {path}")
     logger.info("Loading adjacency matrix from %s", path)
     return np.load(path, allow_pickle=True).item()
 

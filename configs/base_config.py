@@ -182,22 +182,11 @@ class BaseConfig:
 
     @classmethod
     def render(cls, identifier: str) -> RenderStyle:
-        style = getattr(cls, f"RENDER_{identifier.upper()}", None)
-        assert style is not None, (
-            f"no render style for {identifier!r}; declare "
-            f"RENDER_{identifier.upper()} on the config or on BaseConfig"
-        )
-        return style
+        return getattr(cls, f"RENDER_{identifier.upper()}")
 
     @classmethod
     def save(cls, identifier: str) -> Tuple[SaveSpec, ...]:
-        specs = getattr(cls, f"SAVE_{identifier.upper()}", None)
-        if specs is None:
-            raise ValueError(
-                f"No save spec for '{identifier}' in {cls.__name__}. Declare "
-                f"SAVE_{identifier.upper()} on the config or on BaseConfig."
-            )
-        return specs
+        return getattr(cls, f"SAVE_{identifier.upper()}")
 
     RUN_ID: str = ""
 

@@ -85,7 +85,4 @@ def _as_synth_graph(obj) -> SynthGraph:
     if isinstance(obj, SynthGraph):
         return obj
 
-    import networkx as nx
-
-    assert isinstance(obj, nx.Graph), f"not a network: {type(obj).__name__}"
     return SynthGraph.from_networkx(obj)

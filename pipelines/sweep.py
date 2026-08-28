@@ -35,14 +35,9 @@ def _init_config():
 
 
 EXPERIMENT_PROJECT_NAME = "hyperparam-tuning"
-DEFAULT_NF_RANGE = (0.3, 2.0)
-DEFAULT_EF_RANGE = (0.3, 2.0)
 
 
-DEFAULT_STEP = 0.1
-
-
-def _build_factors(lo, hi, step=DEFAULT_STEP):
+def _build_factors(lo, hi, step):
     n = round((hi - lo) / step) + 1
     return [round(lo + step * i, 6) for i in range(n)]
 
@@ -216,9 +211,9 @@ def main(config_cls=None):
     if config_cls is not None:
         cfg.initialize()
 
-    nf_lo, nf_hi = getattr(cfg, "NF_RANGE", DEFAULT_NF_RANGE)
-    ef_lo, ef_hi = getattr(cfg, "EF_RANGE", DEFAULT_EF_RANGE)
-    step = getattr(cfg, "SWEEP_STEP", DEFAULT_STEP)
+    nf_lo, nf_hi = cfg.NF_RANGE
+    ef_lo, ef_hi = cfg.EF_RANGE
+    step = cfg.SWEEP_STEP
     node_factors = _build_factors(nf_lo, nf_hi, step)
     edge_factors = _build_factors(ef_lo, ef_hi, step)
 

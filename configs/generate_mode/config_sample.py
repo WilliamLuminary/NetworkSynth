@@ -73,22 +73,12 @@ class SampleConfig(BaseConfig):
 def _load_positions(directory: str, dataset_id: DatasetId) -> np.ndarray:
     file_path = os.path.join(directory, f"{dataset_id[0]}_pos.npy")
 
-    if not os.path.exists(file_path):
-        msg = f"Positions file does not exist: {file_path}"
-        logger.error(msg)
-        raise FileNotFoundError(msg)
-
     logger.info(f"Loading positions from {file_path}")
     return np.load(file_path, allow_pickle=True)
 
 
 def _load_sparse_matrix(directory: str, dataset_id: DatasetId):
     file_path = os.path.join(directory, f"{dataset_id[0]}_mat.npy")
-
-    if not os.path.exists(file_path):
-        msg = f"Sparse matrix file does not exist: {file_path}"
-        logger.error(msg)
-        raise FileNotFoundError(msg)
 
     logger.info(f"Loading adjacency matrix from {file_path}")
     return np.load(file_path, allow_pickle=True).item()

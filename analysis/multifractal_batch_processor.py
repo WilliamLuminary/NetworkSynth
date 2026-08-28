@@ -128,7 +128,7 @@ class MultifractalBatchProcessor:
             legend = []
 
             for data_type in ["synthetic", "original"]:
-                results = getattr(self, f"_{data_type}_data", [])
+                results = getattr(self, f"_{data_type}_data")
                 assert results, f"No {data_type} data available."
 
                 self._plot_dataset(
