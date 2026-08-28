@@ -82,6 +82,10 @@ class BaseConfig:
     )
     ERROR_TOLERANCE = 0.15  # Generally should be 0.15
     MIN_TILE_NODES = 100
+    #: The ceiling on Phase 2 stitching rounds, matching the generator's own
+    #: default.  A run reaches it only when growth has nowhere sensible left to
+    #: go, so it is a stop rather than a setting.
+    PHASE2_MAX_ROUNDS = 500
 
     # Hybrid tiling geometry: no values, so a config that omits one raises
     # rather than picking up a number buried in the pipeline body.

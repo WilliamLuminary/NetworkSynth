@@ -222,7 +222,7 @@ ApplicationWindow {
                     }
                 }
 
-                HoverNote {
+                InfoButton {
                     visible: card.note !== ""
                     note: card.note
                 }
@@ -360,45 +360,10 @@ ApplicationWindow {
         Item { Layout.fillWidth: true }
     }
 
-    // A section's note, behind a mark in its heading: what a section is about
-    // is worth having, and worth not reading again every time the form is
-    // scanned past it.
-    component HoverNote: Label {
-        id: mark
-        property string note: ""
-
-        text: "!"
-        font.bold: true
-        font.pixelSize: 11
-        opacity: markHover.hovered ? 0.9 : 0.45
-
-        HoverHandler { id: markHover }
-
-        Popup {
-            // Bound to the pointer rather than opened and closed: there is no
-            // click to close it with.
-            visible: markHover.hovered
-            closePolicy: Popup.NoAutoClose
-            y: mark.height + 6
-            width: 380
-            padding: 12
-
-            background: Rectangle {
-                color: root.cardColor
-                border.color: root.lineColor
-                border.width: 1
-                radius: 6
-            }
-            contentItem: Label {
-                text: mark.note
-                wrapMode: Text.WordWrap
-            }
-        }
-    }
-
     // What something does, behind a button rather than beside it: an
     // explanation that runs to a paragraph does not belong in the flow of rows
-    // a form is scanned down.
+    // a form is scanned down.  Shown while the pointer rests on the button,
+    // and held up by a click for anything worth reading twice.
     component InfoButton: Button {
         id: info
         property string note: ""
@@ -406,20 +371,21 @@ ApplicationWindow {
         text: "?"
         checkable: true
         implicitWidth: 34
-        // checkedChanged, not toggled: the latter fires only for a click, so
-        // anything else that sets the button would leave the panel behind it
-        // shut.
-        onCheckedChanged: info.checked ? notePopup.open() : notePopup.close()
+
+        HoverHandler { id: infoHover }
 
         Popup {
-            id: notePopup
+            // Bound rather than opened and closed: two things decide whether
+            // it is up, and an imperative close would leave the binding saying
+            // otherwise.
+            visible: info.checked || infoHover.hovered
+            closePolicy: Popup.NoAutoClose
             // Ours rather than the style's: an attached ToolTip is drawn by the
             // platform and does not show the same way on every one of them.
             y: info.height + 6
             x: -width + info.width
             width: 380
             padding: 12
-            onClosed: info.checked = false
 
             background: Rectangle {
                 color: root.cardColor
@@ -440,16 +406,24 @@ ApplicationWindow {
         id: formLine
         required property var line
 
-        // What the chosen option does, or "" where there is nothing to say:
-        // a field that is not a choice, or one whose options need no gloss.
-        readonly property string optionNote: {
+        // Everything this row has to say, as one note: what the field is for,
+        // and under a choice what the current pick does.  A row of switches
+        // speaks for each of them in turn, since the label they share cannot.
+        readonly property string note: {
+            if (formLine.line.row)
+                return formLine.line.fields
+                    .filter(each => each.help !== "")
+                    .map(each => each.label + " — " + each.help)
+                    .join("\n")
+
             const one = formLine.line.fields[0]
-            if (formLine.line.row || one.kind !== "choice"
-                    || one.option_help.length === 0)
-                return ""
-            const at = one.options.indexOf(one.current)
-            return at >= 0 && at < one.option_help.length
-                ? one.option_help[at] : ""
+            let text = one.help
+            if (one.kind === "choice" && one.option_help.length > 0) {
+                const at = one.options.indexOf(one.current)
+                if (at >= 0 && at < one.option_help.length)
+                    text += (text ? "\n\n" : "") + one.option_help[at]
+            }
+            return text
         }
 
         Layout.fillWidth: true
@@ -467,10 +441,6 @@ ApplicationWindow {
                 Layout.preferredWidth: formLine.line.fields[0].kind === "size"
                     ? root.labelWidth - root.axisWidth - 6 : root.labelWidth
                 elide: Text.ElideRight
-                ToolTip.text: formLine.line.row ? "" : formLine.line.fields[0].help
-                ToolTip.visible: !formLine.line.row && formLine.line.fields[0].help
-                    ? lineHover.hovered : false
-                HoverHandler { id: lineHover }
             }
 
             // A set: every format on one line, each plainly a switch to turn on or
@@ -481,8 +451,6 @@ ApplicationWindow {
                     required property var modelData
                     text: modelData.label
                     checked: modelData.current === true
-                    ToolTip.text: modelData.help
-                    ToolTip.visible: modelData.help ? hovered : false
                     onToggled: controller.setValue(modelData.id, checked)
                 }
             }
@@ -497,17 +465,16 @@ ApplicationWindow {
                     formLine.line.fields[0].id, index, newValue)
             }
 
-            // What the chosen option does.
-            InfoButton {
-                visible: formLine.optionNote !== ""
-                note: formLine.optionNote
-            }
-
             // Only where there is no editor to take up the slack: a switch row
             // keeps its switches to the left, and every other row keeps its
             // help button out at the edge, in the column the input rows put
             // theirs in.
             Item { Layout.fillWidth: true; visible: formLine.line.row !== "" }
+
+            InfoButton {
+                visible: formLine.note !== ""
+                note: formLine.note
+            }
         }
     }
 
@@ -880,21 +847,11 @@ ApplicationWindow {
                                 }
                             }
                             Button { text: "Browse…"; onClicked: outputDialog.open() }
-                        }
-
-                        // Nothing is written into the chosen folder itself, so
-                        // say where it does go before the run rather than in
-                        // the status line afterwards.
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 10
-
-                            Item { Layout.preferredWidth: root.labelWidth }
-                            Label {
-                                Layout.fillWidth: true
-                                wrapMode: Text.WordWrap
-                                opacity: 0.6
-                                text: "Each run makes its own timestamped "
+                            // Nothing is written into the chosen folder itself,
+                            // so say where it does go before the run rather
+                            // than in the status line afterwards.
+                            InfoButton {
+                                note: "Each run makes its own timestamped "
                                     + "folder in here, named for the mode and "
                                     + "the run. \"latest_result\" is kept "
                                     + "pointing at the newest."

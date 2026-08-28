@@ -31,7 +31,7 @@ def _format_fields(group: str, formats, default: str) -> List[Field]:
     Derived from the tables the config writes by, so the form offers exactly
     what the save layer can do — no more, and nothing it has forgotten.
     """
-    noun = {"network": "Networks", "plot": "Plots"}[group]
+    noun = {"network": "Network format", "plot": "Plot format"}[group]
     return [
         Field(
             format_param(group, name),
@@ -346,6 +346,7 @@ def _common_fields() -> List[Field]:
                 minimum=0.1,
                 maximum=5.0,
                 step=0.1,
+                help="Edge-crossing distance, relative to mean edge length.",
             ),
             Field(
                 "SYNTHETIC_NETWORK_NUMBER",
@@ -552,23 +553,6 @@ def _hybrid_fields() -> List[Field]:
                 "There is no size in pixels to set: no two seeds are closer\n"
                 "than the spacing above, so the same fraction of that gap is\n"
                 "the smallest a patch can be."
-            ),
-            group="Tiling",
-        ),
-        Field(
-            "PHASE2_MAX_ROUNDS",
-            "Stitching rounds",
-            500,
-            kind="integer",
-            minimum=1,
-            maximum=10000,
-            step=50,
-            unit="at most",
-            help=(
-                "Once the patches are grown, growth carries on from their\n"
-                "edges to close the gaps between them. This is the ceiling\n"
-                "on how many rounds of that are run — it stops sooner when\n"
-                "there is nowhere left to grow."
             ),
             group="Tiling",
         ),
@@ -788,6 +772,7 @@ def _sweep_fields() -> List[Field]:
             minimum=0.1,
             maximum=5.0,
             step=0.1,
+            help="The first and last edge factor tried.",
         ),
         Field(
             "SWEEP_STEP",
