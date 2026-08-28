@@ -17,10 +17,6 @@ class Mapper:
     def __init__(self, graph: SynthGraph):
         if graph.is_weighted():
             lengths, weights = self._compute_edge_metrics(graph)
-            # Weights are drawn from this pool with replacement, so one bad
-            # value in the source reappears in every graph built from it — but
-            # only when the sampler happens to draw it, which makes the same
-            # input pass one run and fail the next.  Reject the pool instead.
             bad = [w for w in weights if w <= 0]
             assert not bad, (
                 f"source network has {len(bad)} edge(s) with non-positive "
@@ -88,10 +84,6 @@ class Mapper:
         return length_bins
 
     def assign_weights(self, graph: SynthGraph) -> None:
-        """
-        Assigns edge weights to the graph based on edge lengths.
-        Converts the graph to weighted in-place if needed.
-        """
         if self.skipped:
             return
 
@@ -114,9 +106,6 @@ class Mapper:
 
 class EnhancedMapper(Mapper):
     def __init__(self, graph: SynthGraph, *, mix_intensity: float = 0.3):
-        """
-        :param mix_intensity: 0.0 (original) to 1.0 (full mixing)
-        """
         super().__init__(graph)
         self.mix_intensity = np.clip(mix_intensity, 0, 1)
         self._prepare_mixing_model()

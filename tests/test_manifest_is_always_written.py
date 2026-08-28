@@ -7,7 +7,6 @@ from handlers.manifest import STATUS_CANCELLED, STATUS_FAILED, STATUS_OK
 pytestmark = pytest.mark.unit
 
 
-#: (module path, the per-dataset function main() calls)
 CHECKED_PIPELINES = [
     ("pipelines.generate", "run_for_dataset"),
     ("pipelines.mosaic", "run_mosaic_for_dataset"),
@@ -19,35 +18,28 @@ CHECKED_PIPELINES = [
 
 
 class _NoWandb:
-    """Stands in for the wandb module so a sweep never reaches the network."""
 
     def login(self, *args, **kwargs):
         return True
 
 
 def _prepare(module, runner, replacement, monkeypatch):
-    """Patch the per-dataset call, plus whatever else main() would reach.
-
-    A sweep would otherwise try to authenticate.
-    """
     monkeypatch.setattr(module, runner, replacement)
     if hasattr(module, "wandb"):
         monkeypatch.setattr(module, "wandb", _NoWandb())
 
 
 def _config(tmp_path, name):
-    """A config for the pipeline under test.
-
-    MODE names the pipeline that would claim it; these tests call the module
-    directly, so it only has to be set — every config must say.
-    """
     from configs import BaseConfig, DatasetId
 
     class Config(BaseConfig):
         MODE = name.rsplit(".", 1)[-1]
         BASE_OUTPUT_PATH = str(tmp_path / f"out_{name}")
         DATASETS = [DatasetId("ds")]
-        SYNTHETIC_NETWORK_NUMBER = 1  # a sweep refuses to run without any
+        SYNTHETIC_NETWORK_NUMBER = 1
+        NF_RANGE = (1.0, 1.0)
+        EF_RANGE = (1.0, 1.0)
+        SWEEP_STEP = 0.1
 
     return Config
 

@@ -1,12 +1,3 @@
-"""NetworkSynth — analyse networks that already exist.
-
-    python analyse.py                     # uses INPUTS / OUTPUT_DIR below
-    python analyse.py <in> [<in> ...] <out>
-
-An input may be a directory of networks, a single ``*_edgelist.csv``, or a
-``.pkl`` batch.  Each input is analysed as its own labelled set.
-"""
-
 import os
 
 os.environ.setdefault("OMP_NUM_THREADS", "1")
@@ -26,11 +17,8 @@ logger = logging.getLogger("analyse")
 INPUTS = ["data/output/latest_result/sample_1/original"]
 OUTPUT_DIR = "data/output/analysis"
 
-#: Measure edge widths, or topology only.  Required rather than inferred: a
-#: weighted network measured topologically is a legitimate choice.
 MEASURE_WEIGHTED = False
 
-#: Wide q band (401 points) instead of the narrow one (61).
 FULL_Q_BAND = True
 
 EXIT_OK = 0
@@ -48,12 +36,6 @@ An input is a directory of networks, a *_edgelist.csv, or a .pkl batch.
 
 
 def _labels_for(paths) -> list:
-    """A distinct name per input.
-
-    Basenames collide constantly — two runs' own ``original`` directories are
-    the usual case — and a collision would drop a whole set, so colliding names
-    take on parent directories until they differ.
-    """
     stems = []
     for path in paths:
         parts = [p for p in os.path.normpath(path).split(os.sep) if p]
@@ -85,8 +67,6 @@ def analyse(inputs, output_dir: str) -> None:
 
     data_path = os.path.join(output_dir, "analysis_data.pkl")
     with open(data_path, "wb") as handle:
-        # Settings travel with the numbers: weighted and topological measures of
-        # the same networks differ, and nothing else in the file says which.
         pickle.dump(
             {
                 "results": results,

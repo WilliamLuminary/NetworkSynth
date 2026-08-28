@@ -7,17 +7,11 @@ import pytest
 pytestmark = pytest.mark.unit
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def _make_graph(n: int = 20, extra_edges: int = 40) -> "SynthGraph":
     from graphs.synth_graph import SynthGraph
 
     positions = np.random.RandomState(42).rand(n, 2) * 100.0
     g = nk.Graph(n, weighted=False)
-    # ring for connectivity
     for i in range(n):
         g.addEdge(i, (i + 1) % n)
     rng = np.random.RandomState(7)
@@ -28,25 +22,19 @@ def _make_graph(n: int = 20, extra_edges: int = 40) -> "SynthGraph":
     return SynthGraph(g, positions)
 
 
-# ---------------------------------------------------------------------------
-# calculate_frame
-# ---------------------------------------------------------------------------
-
-
 class TestCalculateFrame:
     def test_frame_from_center_position(self):
         from utils import calculate_frame
 
         frame = calculate_frame(center_position=(50, 50), frame_range=(100, 80))
-        assert frame[0] == (0.0, 100.0)  # x bounds: 50 ± 50
-        assert frame[1] == (10.0, 90.0)  # y bounds: 50 ± 40
+        assert frame[0] == (0.0, 100.0)
+        assert frame[1] == (10.0, 90.0)
 
     def test_frame_from_graph(self):
         from utils import calculate_frame
 
         graph = _make_graph(n=10)
         frame = calculate_frame(graph=graph, frame_range=(200, 200))
-        # The center should be the mean of positions
         positions = graph.positions()
         cx, cy = positions[:, 0].mean(), positions[:, 1].mean()
         assert frame[0][0] == pytest.approx(round(cx - 100, 2))
@@ -66,11 +54,6 @@ class TestCalculateFrame:
         graph = _make_graph(n=5)
         with pytest.raises(ValueError, match="Only"):
             calculate_frame(graph=graph, center_position=(0, 0), frame_range=(100, 100))
-
-
-# ---------------------------------------------------------------------------
-# build_graph
-# ---------------------------------------------------------------------------
 
 
 class TestBuildGraph:
@@ -94,7 +77,7 @@ class TestBuildGraph:
         col = [1, 2, 3, 4, 4]
         data = [1.0] * 5
         mat = csr_matrix((data, (row, col)), shape=(n, n))
-        mat = mat + mat.T  # make symmetric
+        mat = mat + mat.T
         graph = build_graph(positions, mat, arg_type="adjacency_matrix")
         assert graph.number_of_nodes() >= 2
         assert graph.number_of_edges() >= 1
@@ -106,11 +89,6 @@ class TestBuildGraph:
             build_graph(None, arg_type="bad_type")
 
 
-# ---------------------------------------------------------------------------
-# largest_connected_component
-# ---------------------------------------------------------------------------
-
-
 class TestLargestConnectedComponent:
     def test_connected_graph_unchanged(self):
         from utils import largest_connected_component
@@ -118,11 +96,6 @@ class TestLargestConnectedComponent:
         graph = _make_graph(n=10)
         lcc = largest_connected_component(graph)
         assert lcc.number_of_nodes() == graph.number_of_nodes()
-
-
-# ---------------------------------------------------------------------------
-# recommend_dpi
-# ---------------------------------------------------------------------------
 
 
 class TestRecommendDpi:
@@ -157,11 +130,6 @@ class TestRecommendDpi:
         assert recommend_dpi(50_000_000) == 1800
 
 
-# ---------------------------------------------------------------------------
-# figure_to_ndarray
-# ---------------------------------------------------------------------------
-
-
 class TestFigureToNdarray:
     def test_returns_rgba_array(self):
         from matplotlib.figure import Figure
@@ -173,7 +141,7 @@ class TestFigureToNdarray:
         ax.plot([0, 1], [0, 1])
         arr = figure_to_ndarray(fig)
         assert arr.ndim == 3
-        assert arr.shape[2] == 4  # RGBA
+        assert arr.shape[2] == 4
         assert arr.dtype == np.uint8
 
     def test_swap_channels(self):
@@ -185,14 +153,8 @@ class TestFigureToNdarray:
         fig.add_subplot(111)
         normal = figure_to_ndarray(fig, swap_channels=False)
         swapped = figure_to_ndarray(fig, swap_channels=True)
-        # R and B channels should be swapped
         np.testing.assert_array_equal(normal[..., 0], swapped[..., 2])
         np.testing.assert_array_equal(normal[..., 2], swapped[..., 0])
-
-
-# ---------------------------------------------------------------------------
-# save_figure_as_webp
-# ---------------------------------------------------------------------------
 
 
 class TestSaveFigureAsWebp:
@@ -221,25 +183,18 @@ class TestSaveFigureAsWebp:
         assert os.path.isfile(path)
 
 
-# ---------------------------------------------------------------------------
-# trim_graph
-# ---------------------------------------------------------------------------
-
-
 class TestTrimGraph:
     def test_reduces_average_degree(self):
         from utils import trim_graph
 
-        # Build a dense graph
         graph = _make_graph(n=50, extra_edges=200)
         original_avg = 2 * graph.number_of_edges() / graph.number_of_nodes()
 
-        # Target a lower average degree
         target = original_avg * 0.5
         trimmed = trim_graph(graph, target)
 
         actual_avg = 2 * trimmed.number_of_edges() / trimmed.number_of_nodes()
-        assert actual_avg <= 1.1 * target + 0.1  # allow small tolerance for LCC
+        assert actual_avg <= 1.1 * target + 0.1
 
     def test_no_trimming_if_already_below(self):
         from utils import trim_graph
@@ -248,7 +203,6 @@ class TestTrimGraph:
         original_edges = graph.number_of_edges()
         current_avg = 2 * original_edges / graph.number_of_nodes()
 
-        # Target higher than current → no trimming
         trimmed = trim_graph(graph, current_avg * 2)
         assert trimmed.number_of_edges() == original_edges
 
@@ -261,11 +215,6 @@ class TestTrimGraph:
         graph = SynthGraph(g, positions)
         trimmed = trim_graph(graph, 2.0)
         assert trimmed.number_of_nodes() == 0
-
-
-# ---------------------------------------------------------------------------
-# timer decorator
-# ---------------------------------------------------------------------------
 
 
 class TestTimerDecorator:

@@ -6,11 +6,6 @@ import pytest
 pytestmark = pytest.mark.unit
 
 
-# ---------------------------------------------------------------------------
-# compute_average_error  (pipelines/generate.py)
-# ---------------------------------------------------------------------------
-
-
 class TestComputeAverageError:
     def test_empty_list(self):
         from pipelines.generate import compute_average_error
@@ -30,10 +25,9 @@ class TestComputeAverageError:
     def test_removes_outliers(self):
         from pipelines.generate import compute_average_error
 
-        # 9 values around 1.0 + one massive outlier
         errors = [1.0, 1.01, 0.99, 1.02, 0.98, 1.0, 1.01, 0.99, 1.0, 100.0]
         avg = compute_average_error(errors)
-        assert avg < 1.1  # outlier should be removed
+        assert avg < 1.1
         assert avg > 0.9
 
     def test_mixed_inf_and_valid(self):
@@ -43,11 +37,6 @@ class TestComputeAverageError:
         avg = compute_average_error(errors)
         assert avg != float("inf")
         assert avg > 0
-
-
-# ---------------------------------------------------------------------------
-# _fmt_metrics  (pipelines/generate.py)
-# ---------------------------------------------------------------------------
 
 
 class TestFmtMetrics:
@@ -69,11 +58,6 @@ class TestFmtMetrics:
         assert "120.50" in s
 
 
-# ---------------------------------------------------------------------------
-# _save_metric_report  (pipelines/generate.py)
-# ---------------------------------------------------------------------------
-
-
 class TestSaveMetricReport:
     def test_creates_csv_with_header_and_rows(self, tmp_path):
         from pipelines.generate import _save_metric_report
@@ -85,7 +69,6 @@ class TestSaveMetricReport:
             "avg_length": 10.0,
             "avg_angle": 90.0,
         }
-        # ranked list: (distance, original_idx, graph_object, metrics_dict, mf_error)
         ranked = [
             (
                 0.05,
@@ -123,17 +106,11 @@ class TestSaveMetricReport:
             reader = csv.reader(f)
             rows = list(reader)
 
-        # header + original + 2 ranked = 4 rows
         assert len(rows) == 4
         assert rows[0][0] == "rank"
         assert rows[1][0] == "original"
         assert rows[2][0] == "1"
         assert rows[3][0] == "2"
-
-
-# ---------------------------------------------------------------------------
-# generate_random_centers  (pipelines/hybrid.py)
-# ---------------------------------------------------------------------------
 
 
 class TestGenerateRandomCenters:
@@ -173,13 +150,11 @@ class TestGenerateRandomCenters:
     def test_zero_max_centers(self):
         from pipelines.hybrid import generate_random_centers
 
-        # max_centers=0 means no limit; should still produce some centers
         centers = generate_random_centers(500, 500, min_distance=50, max_centers=0)
         assert len(centers) > 0
 
     def test_tight_spacing_limits_count(self):
         from pipelines.hybrid import generate_random_centers
 
-        # Very large min_distance relative to area → few centers
         centers = generate_random_centers(100, 100, min_distance=80, max_centers=0)
-        assert len(centers) <= 3  # very hard to fit many
+        assert len(centers) <= 3

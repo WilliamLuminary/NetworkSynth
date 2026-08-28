@@ -9,11 +9,6 @@ if TYPE_CHECKING:
 
 
 def compute_network_metrics(graph: SynthGraph) -> dict:
-    """Compute 5 key network metrics for quality comparison.
-
-    Returns a dict with: node_count, avg_degree, avg_clustering,
-    avg_length, avg_angle.
-    """
     import networkit as nk
     from scipy.spatial.distance import euclidean
 

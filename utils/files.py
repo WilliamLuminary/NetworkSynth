@@ -1,5 +1,3 @@
-"""Finding an input file when its exact name is not known."""
-
 import os
 import re
 from typing import Optional
@@ -8,11 +6,6 @@ from typing import Optional
 def find_file_with_pattern(
     directory_path, pattern, details="", must_exist=True
 ) -> Optional[str]:
-    """The one file in *directory_path* matching *pattern*.
-
-    Ambiguity is an error rather than a choice: two matches mean the caller
-    cannot know which file was read.
-    """
     if not os.path.exists(directory_path):
         raise FileNotFoundError(
             f"Directory not found: {directory_path}. Regex pattern: {pattern}"

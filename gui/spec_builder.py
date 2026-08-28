@@ -13,8 +13,6 @@ from configs.gui_config import (
     format_param,
 )
 
-#: What each output format is for.  Keyed by the format tables above, so a
-#: format added there without a word about it fails loudly here.
 _FORMAT_HELP = {
     "csv": "…_edgelist.csv + …_positions.csv — what every loader here reads.",
     "pkl": "The graph itself, pickled. Reloadable as a single network.",
@@ -25,13 +23,15 @@ _FORMAT_HELP = {
 }
 
 
-def _format_fields(group: str, formats, default: str) -> List[Field]:
-    """One switch per format this group can be written in.
+#: The label each group of format switches shares.  Named here because the
+#: window draws these rows on a plate of their own, apart from the other
+#: output rows, and has to know which they are.
+_FORMAT_ROWS = {"network": "Network format", "plot": "Plot format"}
+FORMAT_ROWS = tuple(_FORMAT_ROWS.values())
 
-    Derived from the tables the config writes by, so the form offers exactly
-    what the save layer can do — no more, and nothing it has forgotten.
-    """
-    noun = {"network": "Networks", "plot": "Plots"}[group]
+
+def _format_fields(group: str, formats, default: str, omit: tuple = ()) -> List[Field]:
+    noun = _FORMAT_ROWS[group]
     return [
         Field(
             format_param(group, name),
@@ -39,22 +39,31 @@ def _format_fields(group: str, formats, default: str) -> List[Field]:
             name == default,
             kind="bool",
             group=OUTPUT_GROUP,
-            # One line of switches per kind of output, rather than a line each.
             row=noun,
             help=_FORMAT_HELP[name],
         )
         for name in formats
+        if name not in omit
     ]
 
 
-#: The section holding everything about what a run writes.  Named here rather
-#: than in the window, because the window shows it in its own pane and has to
-#: know which one it is.
 OUTPUT_GROUP = "Output"
 
-#: A line under a section's heading, for what a tooltip should not have to be
-#: hunted for.  Keyed by group name; a section without one shows nothing.
 SECTION_NOTES = {
+    "Quality": (
+        "Generation draws each network at random, so candidates differ in how "
+        "closely they resemble the original. A candidate is measured against "
+        "the input and generated again until it is within tolerance, or until "
+        "the attempts run out — the closest one is kept either way."
+    ),
+    "Tiling": (
+        "A large network is assembled rather than grown in one piece: seed "
+        "points are scattered over the output area, a patch is generated "
+        "around each of them, and growth then carries on from the patches' "
+        "edges until the gaps between them close. The area is measured in "
+        "backgrounds: a target scale of 100 × 100 is 100 of them down by 100 "
+        "across."
+    ),
     "Tracking": (
         "wandb needs a login: run `wandb login` once, or set WANDB_API_KEY in "
         "the environment. Switched off, nothing is contacted — the sweep "
@@ -62,8 +71,6 @@ SECTION_NOTES = {
     ),
 }
 
-#: The section for squaring the input up with the image it was traced from.
-#: Its own pane, beside the files it is about.
 ALIGN_GROUP = "Align"
 
 
@@ -73,58 +80,34 @@ class Field:
     id: str
     label: str
     value: Any
-    kind: str = "number"  # number | integer | bool | text | choice | size | range
+    kind: str = "number"
     minimum: Optional[float] = None
     maximum: Optional[float] = None
     step: Optional[float] = None
     help: str = ""
-    #: Which section of the form this belongs under.
     group: str = "Network"
-    #: Fields sharing one render side by side under this label, as a set of
-    #: switches rather than a switch per line.
     row: str = ""
-    #: For ``kind="choice"``: everything the field accepts.  These are the
-    #: values a run is given, which are not always fit to be read: a checker is
-    #: registered under a key, and a q-band is a boolean.
     options: tuple = ()
-    #: What to call each option on screen, in the same order.  Empty shows the
-    #: options themselves.
     labels: tuple = ()
-    #: What each option does, in the same order — a line under the control,
-    #: changing with the pick, because a name alone rarely settles the choice.
     option_help: tuple = ()
-    #: ``(field id, values)``: this field is not shown while that field holds
-    #: one of those.  A setting the chosen algorithm never reads is worse than
-    #: absent, because it looks as though it were doing something.
     hide_when: tuple = ()
-    #: The one number in its section that a run is usually about, drawn larger.
-    prominent: bool = False
-    #: What the number is counted in, shown after the editor.  Not every size
-    #: is a length: a target scale counts tiles.
     unit: str = ""
-    #: What the two halves of a ``size`` are, in order.  Not every pair is a
-    #: width and a height — hybrid reads its target scale as (rows, columns).
     axes: tuple = ("w", "h")
 
     def option_names(self) -> tuple:
-        """What the options are called — for a control, or for a complaint."""
         return self.labels or tuple(str(option) for option in self.options)
 
     def as_dict(self) -> Dict[str, Any]:
         data = asdict(self)
-        # A tuple crosses into QML as an opaque wrapper rather than an array:
-        # it has no length and no indexOf, so a combo box bound to one is an
-        # invalid model, the same way a tuple value has to be listed too.
+        # Tuples cross into QML as an opaque wrapper with no length and no
+        # indexOf, which makes a combo box bound to one an invalid model.
         for key in ("options", "labels", "option_help", "axes"):
             data[key] = list(getattr(self, key))
-        # Resolved before the form is built, so nothing crosses that the window
-        # would have to know how to read.
         data.pop("hide_when")
         return data
 
 
 def lines_of(fields: List[Field]) -> List[Dict[str, Any]]:
-    """*fields* as the rows a form draws: one per field, or one per ``row``."""
     lines: List[Dict[str, Any]] = []
     shared: Dict[str, Dict[str, Any]] = {}
     for spec_field in fields:
@@ -139,7 +122,6 @@ def lines_of(fields: List[Field]) -> List[Dict[str, Any]]:
 
 
 def sections_of(fields: List[Field]) -> List[Dict[str, Any]]:
-    """*fields* grouped into sections, in the order they first appear."""
     order: List[str] = []
     grouped: Dict[str, List[Field]] = {}
     for spec_field in fields:
@@ -162,22 +144,16 @@ class Input:
 
     id: str
     label: str
-    kind: str = "file"  # file | dir
+    kind: str = "file"
     filter: str = ""
     placeholder: str = ""
-    #: A run goes ahead without it.  Left out of ``InputShape.ids``, so an
-    #: optional input never becomes something the run-spec demands.
     optional: bool = False
-    #: What this file has to contain, shown behind the row's info button.
-    #: Wrapped by hand: a tooltip does not wrap for itself.
     help: str = ""
 
     def as_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
 
-#: The two things an input can be, kept apart from what format it is in: one
-#: network to work on, or a folder of them to work through.
 SINGLE, DIRECTORY = "single", "directory"
 
 SCOPE_LABELS = {SINGLE: "Single network", DIRECTORY: "Directory"}
@@ -185,25 +161,20 @@ SCOPE_LABELS = {SINGLE: "Single network", DIRECTORY: "Directory"}
 
 @dataclass(frozen=True)
 class InputShape:
-    """One way a mode can be given its input."""
 
     label: str
     inputs: List[Input]
-    #: One network or a folder of them.  Editing is offered only for one.
     scope: str = SINGLE
-    #: What the files are, said separately from how many there are.
     format: str = "CSV pair"
 
     @property
     def ids(self) -> tuple:
-        """What this shape cannot run without — the keys ``MODE_INPUTS`` names."""
         return tuple(
             spec_input.id for spec_input in self.inputs if not spec_input.optional
         )
 
     @property
     def all_ids(self) -> tuple:
-        """Every key the form offers, optional ones included."""
         return tuple(spec_input.id for spec_input in self.inputs)
 
 
@@ -212,17 +183,11 @@ class ModeSpec:
 
     name: str
     label: str
-    #: One line under the title saying what this mode does.
     blurb: str = ""
     fields: List[Field] = field(default_factory=list)
-    #: The ways this mode can be given its input, in order.  Kept in step with
-    #: ``MODE_INPUTS``, which is what the run-spec is validated against.
     input_shapes: List[InputShape] = field(default_factory=list)
 
 
-#: Each gate as it is offered: the name ``create_error_checker`` accepts,
-#: mapped to what to call it and what it actually does.  Ordered strongest
-#: first, which is also the order a form lists them in.
 _GATES = {
     "multifractal": (
         "Multifractal spectrum",
@@ -245,26 +210,14 @@ _GATES = {
 
 
 def _registered_checkers() -> tuple:
-    """Gate names, described ones first, then anything else registered.
-
-    Read from the registry rather than listed, so a checker added there still
-    reaches the form — under its own key and undescribed, rather than not at
-    all.
-    """
     from analysis.error_checker import _CHECKERS
 
     described = [name for name in _GATES if name in _CHECKERS]
     return tuple(described + sorted(set(_CHECKERS) - set(described)))
 
 
-#: What each turn is called on screen, against the keys ``orient_positions``
-#: takes.  Listed rather than derived, because "rot270" is a name for a
-#: function argument, not for a reader.
 _ORIENTATIONS_NAMED = {
     "none": "Leave as it is",
-    # Clockwise as the preview draws it, which is what there is to go on: the
-    # y axis runs down there, so rot90 carries the top-left corner to the top
-    # right.
     "rot90": "Rotate 90° clockwise",
     "rot180": "Rotate 180°",
     "rot270": "Rotate 90° anticlockwise",
@@ -272,11 +225,9 @@ _ORIENTATIONS_NAMED = {
 }
 
 
-def _common_fields() -> List[Field]:
+def _common_fields(vector_plots: bool = True) -> List[Field]:
     from utils.graph_ops import ORIENTATIONS
 
-    # A turn added there but not named here still reaches the form, under its
-    # own key.
     _ORIENTATION_LABELS = tuple(
         _ORIENTATIONS_NAMED.get(name, name) for name in ORIENTATIONS
     )
@@ -340,16 +291,16 @@ def _common_fields() -> List[Field]:
                 minimum=0.1,
                 maximum=5.0,
                 step=0.1,
+                help="Edge-crossing distance, relative to mean edge length.",
             ),
             Field(
                 "SYNTHETIC_NETWORK_NUMBER",
                 "Number of networks",
-                5,
+                1,
                 kind="integer",
                 minimum=1,
                 maximum=500,
                 step=1,
-                prominent=True,
                 help="How many synthetic networks this run produces.",
             ),
             Field(
@@ -384,7 +335,7 @@ def _common_fields() -> List[Field]:
                 maximum=1.0,
                 step=0.01,
                 group="Quality",
-                hide_when=("ERROR_CHECKER", ("none",)),
+                hide_when=(("ERROR_CHECKER", ("none",)),),
                 help="How far from the original a candidate may be and still pass.",
             ),
             Field(
@@ -396,7 +347,7 @@ def _common_fields() -> List[Field]:
                 maximum=100,
                 step=1,
                 group="Quality",
-                hide_when=("ERROR_CHECKER", ("none",)),
+                hide_when=(("ERROR_CHECKER", ("none",)),),
                 help="Tries per network before giving up on it.",
             ),
             Field(
@@ -405,7 +356,7 @@ def _common_fields() -> List[Field]:
                 False,
                 kind="bool",
                 group="Quality",
-                hide_when=("ERROR_CHECKER", ("none", "length_angle")),
+                hide_when=(("ERROR_CHECKER", ("none", "length_angle")),),
                 help=(
                     "Measure along weighted paths rather than counting edges. "
                     "The input has to carry weights, or the run stops."
@@ -426,7 +377,7 @@ def _common_fields() -> List[Field]:
                     "for it.",
                 ),
                 group="Quality",
-                hide_when=("ERROR_CHECKER", ("none", "length_angle")),
+                hide_when=(("ERROR_CHECKER", ("none", "length_angle")),),
                 help=(
                     "The span of moments the spectrum is measured over. Wider "
                     "weighs the extremes more heavily."
@@ -443,9 +394,42 @@ def _common_fields() -> List[Field]:
                 group=OUTPUT_GROUP,
                 help="How many of the generated networks get a saved plot.",
             ),
+            Field(
+                "WRITE_SNAPSHOTS",
+                "Snapshots",
+                False,
+                kind="bool",
+                group=OUTPUT_GROUP,
+                row="Snapshots",
+                help=(
+                    "Save the network as it grows, into a 'snapshots' folder\n"
+                    "beside the results. Generate makes one network when this\n"
+                    "is on, rather than the batch above."
+                ),
+            ),
+            Field(
+                "SNAPSHOT_INTERVAL",
+                "Snapshot every",
+                10,
+                kind="integer",
+                minimum=1,
+                maximum=BaseConfig.PHASE2_MAX_ROUNDS,
+                step=1,
+                unit="rounds apart",
+                group=OUTPUT_GROUP,
+                row="Snapshots",
+                hide_when=(("WRITE_SNAPSHOTS", (False,)),),
+                help=(
+                    "A round is one frontier of growth: every node waiting at\n"
+                    "the start of it. The same in both modes — Generate grows\n"
+                    "one network, Hybrid stitches between the patches."
+                ),
+            ),
         ]
         + _format_fields("network", NETWORK_FORMATS, "csv")
-        + _format_fields("plot", PLOT_FORMATS, "webp")
+        + _format_fields(
+            "plot", PLOT_FORMATS, "webp", omit=() if vector_plots else ("svg",)
+        )
     )
 
 
@@ -456,9 +440,6 @@ def _hybrid_fields() -> List[Field]:
             "Target scale",
             (100, 100),
             kind="size",
-            unit="× the background",
-            # `scale_rows, scale_cols = config.TARGET_SCALE` — down first,
-            # across second, which is the opposite way round to every frame.
             axes=("rows", "cols"),
             help=(
                 "A multiplier, not a size. The assembled area is\n"
@@ -468,54 +449,66 @@ def _hybrid_fields() -> List[Field]:
             group="Tiling",
         ),
         Field(
-            "PHASE2_MAX_ROUNDS",
-            "Phase 2 max rounds",
-            500,
+            "MIN_CENTER_DISTANCE_FACTOR",
+            "Seed spacing",
+            1.5,
+            minimum=0.5,
+            maximum=10.0,
+            step=0.1,
+            unit="× the background",
+            help=(
+                "How far apart the seeds are scattered, as a multiple of the\n"
+                "background frame. It sets the scale of everything below it:\n"
+                "the patch size is a fraction of this gap, and whatever is\n"
+                "left of the gap is what stitching has to close."
+            ),
+            group="Tiling",
+        ),
+        Field(
+            "NUM_CENTERS",
+            "Patches",
+            2000,
             kind="integer",
             minimum=1,
-            maximum=10000,
-            step=50,
-            help="Frontier continuation after the seed tiles are placed.",
+            maximum=100000,
+            step=100,
+            unit="at most",
+            help=(
+                "A ceiling on how many patches are placed. The spacing above\n"
+                "decides how many actually fit, and scattering stops at\n"
+                "whichever comes first — so a low ceiling leaves the far end\n"
+                "of a large area empty, whatever the spacing says."
+            ),
             group="Tiling",
         ),
         Field(
             "TILE_FRAME_FACTOR",
-            "Tile frame factor",
+            "Patch size",
             0.5,
             minimum=0.1,
             maximum=2.0,
             step=0.1,
-            help="Tile frame side = nearest-neighbour distance x this.",
-            group="Tiling",
-        ),
-        Field(
-            "MIN_TILE_FRAME",
-            "Minimum tile frame",
-            382.0,
-            unit="px",
-            minimum=1.0,
-            maximum=5000.0,
-            step=10.0,
+            unit="× the gap between seeds",
+            help=(
+                "Each patch grows inside a square of its own, sized from the\n"
+                "gap between its seed and the nearest other seed. At 0.5 a\n"
+                "patch takes half that gap and stitching closes the rest;\n"
+                "larger patches meet sooner and leave less to stitch.\n"
+                "There is no size in pixels to set: no two seeds are closer\n"
+                "than the spacing above, so the same fraction of that gap is\n"
+                "the smallest a patch can be."
+            ),
             group="Tiling",
         ),
     ]
 
 
-#: Gate names ``create_error_checker`` accepts, with what to call each and
-#: what each does.  Derived, so a new checker does not have to be remembered
-#: here as well.
 _CHECKER_NAMES = _registered_checkers()
 _CHECKER_LABELS = tuple(_GATES.get(name, (name, ""))[0] for name in _CHECKER_NAMES)
 _CHECKER_HELP = tuple(_GATES.get(name, (name, ""))[1] for name in _CHECKER_NAMES)
 
 
 def _background() -> Input:
-    """The image a network was traced from, drawn behind it.
-
-    Optional everywhere: a network is plottable and analysable without one.  A
-    directory of networks gets this for free instead, by the `…_image.tif`
-    convention, so only the single-network shapes offer it.
-    """
     return Input(
         "image",
         "Image",
@@ -533,13 +526,6 @@ def _background() -> Input:
 
 
 def _network_shapes() -> List[InputShape]:
-    """Every way one of these modes can be handed the network to copy.
-
-    One entry per format the loaders read, in the order ``MODE_INPUTS`` lists
-    them.  A format the app cannot load is worse offered than absent, so
-    ``.nkbin`` is not here: it is written, and read back only by
-    ``scripts/helpers/load_network_example.py``.
-    """
     return [
         InputShape(
             "One network (CSV pair)",
@@ -577,22 +563,26 @@ def _network_shapes() -> List[InputShape]:
         InputShape(
             "A directory of networks",
             scope=DIRECTORY,
-            # The only format a folder can be read as: discover_datasets scans
-            # for `*_edgelist.csv` and its positions partner, nothing else.
-            format="CSV pair",
+            format="By file name",
             inputs=[
                 Input(
                     "datasets_dir",
                     "Networks dir",
                     kind="dir",
-                    placeholder="folder of …_edgelist.csv pairs",
+                    placeholder="folder of networks, named by prefix",
                     help=(
-                        "One dataset per …_edgelist.csv, each needing a\n"
-                        "matching …_positions.csv beside it.\n"
-                        "…_image.tif is used as the background when it\n"
-                        "is there, and skipped when it is not.\n"
-                        "An edge list with no positions stops the run\n"
-                        "rather than being passed over."
+                        "One dataset per prefix, in any of the three forms:\n"
+                        "  …_edgelist.csv  with  …_positions.csv\n"
+                        "  …_adjacency.npy with  …_positions.npy\n"
+                        "  …_network.pkl\n"
+                        "A directory may hold a mixture of them.\n"
+                        "…_image.tif is the background for whichever\n"
+                        "prefix it shares, and a dataset without one is\n"
+                        "read all the same.\n"
+                        "A half-named dataset stops the run rather than\n"
+                        "being passed over: an edge list with no\n"
+                        "positions, a matrix with no coordinates, or one\n"
+                        "prefix named as two datasets at once."
                     ),
                 )
             ],
@@ -605,25 +595,28 @@ def _network_shapes() -> List[InputShape]:
                     "adjacency",
                     "Adjacency",
                     filter="NumPy files (*.npy)",
-                    placeholder="…_mat.npy",
+                    placeholder="the adjacency .npy",
                     help=(
-                        "…_mat.npy holding a scipy sparse adjacency\n"
-                        "matrix, saved as a 0-d object array and read\n"
-                        "with np.load(...).item().\n"
+                        "A scipy sparse adjacency matrix, saved as a 0-d\n"
+                        "object array and read with np.load(...).item().\n"
                         "A plain dense array is refused rather than\n"
-                        "read as something else."
+                        "read as something else.\n"
+                        "Named as you like here; in a directory it has\n"
+                        "to end …_adjacency.npy."
                     ),
                 ),
                 Input(
                     "positions_npy",
                     "Positions",
                     filter="NumPy files (*.npy)",
-                    placeholder="…_pos.npy",
+                    placeholder="the positions .npy",
                     help=(
-                        "…_pos.npy, shape (N, 2), one row per node.\n"
-                        "Recorded as (row, column) and transposed to\n"
-                        "(x, y) when loaded — the same thing every CLI\n"
-                        "config does with a pair like this."
+                        "Shape (N, 2), one row per node. Recorded as\n"
+                        "(row, column) and transposed to (x, y) when\n"
+                        "loaded — the same thing every CLI config does\n"
+                        "with a pair like this.\n"
+                        "Named as you like here; in a directory it has\n"
+                        "to end …_positions.npy."
                     ),
                 ),
                 _background(),
@@ -654,9 +647,13 @@ def _network_shapes() -> List[InputShape]:
 
 
 def _sweep_fields() -> List[Field]:
-    # The factors are what a sweep varies, so they come from the ranges below
-    # rather than from a fixed field, and no preview images are written.
-    swept = {"CLOSED_NODES_FACTOR", "CLOSED_EDGES_FACTOR", "SYNTHETIC_GRAPH_NUMBER"}
+    swept = {
+        "CLOSED_NODES_FACTOR",
+        "CLOSED_EDGES_FACTOR",
+        "SYNTHETIC_GRAPH_NUMBER",
+        "WRITE_SNAPSHOTS",
+        "SNAPSHOT_INTERVAL",
+    }
     fields = []
     for spec_field in _common_fields():
         if spec_field.id in swept:
@@ -665,7 +662,7 @@ def _sweep_fields() -> List[Field]:
             spec_field = replace(
                 spec_field,
                 label="Networks per trial",
-                value=20,
+                value=1,
                 help="Each factor combination generates this many networks.",
             )
         fields.append(spec_field)
@@ -706,6 +703,7 @@ def _sweep_fields() -> List[Field]:
             minimum=0.1,
             maximum=5.0,
             step=0.1,
+            help="The first and last edge factor tried.",
         ),
         Field(
             "SWEEP_STEP",
@@ -724,18 +722,6 @@ def _sweep_fields() -> List[Field]:
     ]
 
 
-#: Only modes the entry point can actually dispatch.  Kept in step with
-#: ``gui_run._GUI_MODES`` — a mode offered here that cannot run is worse than one
-#: that is simply absent.
-#:
-#: Each mode gets the common fields plus whatever its pipeline reads that
-#: ``BaseConfig`` does not define.  Those extras are not optional: the pipeline
-#: reads them as plain attributes, so a missing one is an ``AttributeError``
-#: partway through a run rather than a rejected spec.
-#: Every key a network shape names.  Derived from the shapes themselves, so a
-#: format added there is previewable and editable without a second list here
-#: remembering to allow it — which is exactly how the NumPy and pickle shapes
-#: came to be offered but not previewable.
 NETWORK_INPUTS = frozenset(key for shape in _network_shapes() for key in shape.ids)
 
 
@@ -751,7 +737,10 @@ MODES: Dict[str, ModeSpec] = {
         "hybrid",
         "Hybrid",
         "Assemble a large network by tiling generated patches together.",
-        _common_fields() + _hybrid_fields(),
+        # No .svg: a hybrid network is drawn as pixels by OpenCV, both for the
+        # assembled image and for its snapshots, so there is no vector to write
+        # and asking for one only fails the run at the end of it.
+        _hybrid_fields() + _common_fields(vector_plots=False),
         _network_shapes(),
     ),
     "sweep": ModeSpec(
@@ -765,18 +754,10 @@ MODES: Dict[str, ModeSpec] = {
 
 
 def shape_for(mode: str, inputs: Dict[str, str]) -> InputShape:
-    """The shape *inputs* belongs to, identified by its keys.
-
-    The keys carry the choice, so nothing has to pass the shape alongside the
-    values and risk the two disagreeing.
-    """
     if mode not in MODES:
         raise ValueError(f"unknown mode {mode!r}; available: {sorted(MODES)}")
     keys = set(inputs)
     for shape in MODES[mode].input_shapes:
-        # Every required key, and nothing the shape does not offer: an optional
-        # key may be absent, but a key from the *other* shape must not decide
-        # this one.
         if set(shape.ids) <= keys <= set(shape.all_ids):
             return shape
     raise ValueError(
@@ -787,9 +768,6 @@ def shape_for(mode: str, inputs: Dict[str, str]) -> InputShape:
 
 _SAMPLES = os.path.join(BaseConfig.BASE_INPUT_PATH, "samples")
 
-#: What each input starts as.  Only used when the sample is actually there: a
-#: checkout has these, a release built without ``data/input`` does not, and an
-#: empty box beats one pointing at a file nobody shipped.
 _SAMPLE_INPUTS = {
     "edge_list": os.path.join(_SAMPLES, "gui_mode", "sample_1_edgelist.csv"),
     "positions": os.path.join(_SAMPLES, "gui_mode", "sample_1_positions.csv"),
@@ -797,6 +775,7 @@ _SAMPLE_INPUTS = {
     "datasets_dir": os.path.join(_SAMPLES, "gui_mode"),
     "adjacency": os.path.join(_SAMPLES, "generate_mode", "sample_1_mat.npy"),
     "positions_npy": os.path.join(_SAMPLES, "generate_mode", "sample_1_pos.npy"),
+    "network_pkl": os.path.join(_SAMPLES, "sample_1_network.pkl"),
 }
 
 
@@ -804,28 +783,16 @@ PROJECT_ROOT = BaseConfig.PROJECT_ROOT
 
 
 def display_path(path: str) -> str:
-    """*path* as the form shows it: relative to the project when it is inside.
-
-    Only how it is written, never what is stored: a spec always carries the
-    absolute path, because it is read by a subprocess and again by whatever
-    that spawns, and those do not share a working directory.
-
-    A relative path already means "relative to the project" here — the GUI
-    starts every child with the project root as its working directory — so
-    this is the shorter half of the same name, not a second convention.
-    """
     if not path:
         return ""
     try:
         inside = os.path.relpath(path, PROJECT_ROOT)
     except ValueError:
-        # Windows, different drive: there is no relative form.
         return path
     return path if inside.startswith(os.pardir) else inside
 
 
 def resolve_path(text: str) -> str:
-    """What the form was given, as the absolute path everything else uses."""
     if not text:
         return ""
     return os.path.abspath(os.path.join(PROJECT_ROOT, os.path.expanduser(text)))
@@ -837,11 +804,6 @@ def sample_for(key: str) -> str:
 
 
 def input_state(spec_input: Input, path: str) -> Tuple[str, str]:
-    """How one input stands, and what to say when it is wrong.
-
-    The single reading of it: the form marks the row from this and the run is
-    refused by this, so a row cannot show a tick while the run says otherwise.
-    """
     if not path:
         if spec_input.optional:
             return "blank", ""
@@ -901,9 +863,6 @@ def validate(
         if isinstance(span, (list, tuple)) and span[0] > span[1]:
             problems.append(f"{key.replace('_', ' ').title()}: start is above end.")
 
-    # No format at all is a choice, not a mistake: a run made only to look at
-    # the result wants nothing on disk.  Asking for plot images in no format is
-    # a different thing — that request cannot be met, so say so.
     plot_formats = [
         format_param("plot", name)
         for name in PLOT_FORMATS
@@ -916,8 +875,6 @@ def validate(
             "none would be written. Pick a format, or set plot images to 0."
         )
 
-    # Every choice field, not the quality gate alone: each one declares what
-    # it accepts, so nothing has to be listed twice here.
     for spec_field in MODES[mode].fields:
         if spec_field.kind != "choice" or spec_field.id not in values:
             continue
@@ -940,29 +897,17 @@ def build_spec(
 ) -> Dict[str, Any]:
     params = dict(values)
 
-    # A seed of 0 means "do not seed": SEED=None is how the pipelines say that,
-    # but a spin box cannot hold None.
     if params.get("SEED") in (0, None):
         params["SEED"] = None
 
-    # The frame the original is measured in matches the synthetic one unless a
-    # caller says otherwise.
     frame = params.get("SYNTHETIC_FRAME_SIZE")
     if frame is not None:
         params.setdefault("FRAME_SIZE", frame)
 
-    # IMAGE_SIZE is not derived here any more: it is the input image's true
-    # size, which only the loader can know, and it measures it as it reads.
-
-    # Every trial replaces these with the combination being scored, but
-    # SynthParams still has to be built from the config before that happens, so
-    # the sweep's own form does not offer them.
     if "NF_RANGE" in params:
         params.setdefault("CLOSED_NODES_FACTOR", params["NF_RANGE"][0])
         params.setdefault("CLOSED_EDGES_FACTOR", params["EF_RANGE"][0])
 
-    # Every size field, not a named few: modes add their own (TILE_FRAME_SIZE,
-    # TARGET_SCALE), and a list is what survives the JSON round trip.
     params = {
         key: list(value) if isinstance(value, tuple) else value
         for key, value in params.items()
@@ -978,8 +923,6 @@ def build_spec(
         for spec_input in shape.inputs
     }
     if "image" in shape.all_ids:
-        # Either source, one key: *image* for a caller that has a path in hand,
-        # the form's own optional input for the GUI.
         chosen = image or inputs.get("image")
         spec_inputs["image"] = os.path.abspath(chosen) if chosen else None
 

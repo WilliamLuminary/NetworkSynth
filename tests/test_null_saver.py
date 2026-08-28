@@ -44,11 +44,6 @@ class TestBuildSaver:
 
 
 class TestNullSaverIsSaferThanNone:
-    """``DISABLE_SAVING`` used to yield ``None``.
-
-    Two dozen ``run.saver.save(...)`` calls across the pipelines never checked
-    for it, so a disabled run raised ``AttributeError`` at the first one.
-    """
 
     @pytest.fixture
     def saver(self, tmp_path):
@@ -65,8 +60,6 @@ class TestNullSaverIsSaferThanNone:
         saver.end_batch()
 
     def test_it_still_reports_where_it_would_have_written(self, saver, tmp_path):
-        # Callers build subdirectory paths from output_dir, so it has to be a
-        # usable string even when nothing is written.
         assert saver.output_dir == str(tmp_path / "out")
 
     def test_it_is_truthy_so_nothing_treats_it_as_missing(self, saver):
@@ -81,7 +74,6 @@ class TestNullSaverIsSaferThanNone:
         config.initialize()
         run = GenerationRun(config, create_run_paths(config), DatasetId("ds"))
 
-        # The reach-through every pipeline uses; with None this raised.
         run.saver.begin_batch()
         run.save({"a": 1}, "analysis_data")
         run.saver.end_batch()

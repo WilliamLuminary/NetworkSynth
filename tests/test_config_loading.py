@@ -1,9 +1,3 @@
-"""A config is named by its file.
-
-There is no separate export name to learn: the path you pass is the file on
-disk, and only that file is imported.
-"""
-
 import sys
 
 import pytest
@@ -25,7 +19,6 @@ class TestLoadingByPath:
         assert config.SNAPSHOT_INTERVAL == 10
 
     def test_the_path_has_to_be_the_real_file(self):
-        # No suffix guessing: the argument is a path, not a name to complete.
         with pytest.raises(FileNotFoundError):
             load_config("configs/hybrid_mode/config_snapshot")
 
@@ -41,8 +34,6 @@ class TestLoadingByPath:
             load_config("configs/generate_mode/config_nope.py")
 
     def test_a_config_outside_the_project_is_refused(self, tmp_path):
-        # Loaded as a package module, not from the file, because a config
-        # reaches its base class by relative import.
         stray = tmp_path / "config_stray.py"
         stray.write_text("class StrayConfig:\n    DATASETS = []\n")
 
@@ -65,8 +56,6 @@ class TestOnlyWhatIsAskedForLoads:
 
         load_config("configs/generate_mode/config_tmp.py")
 
-        # config_tmp subclasses the sample config, so that one may come too —
-        # but nothing beyond this file's own import chain.
         newly_loaded = _config_modules_loaded() - before
         assert newly_loaded <= {
             "configs.generate_mode.config_tmp",
@@ -105,11 +94,6 @@ class TestOneConfigPerFile:
 
 
 class TestEveryConfigInTheRepoLoads:
-    """Each config file must hold exactly one loadable config.
-
-    Cheap to state and it catches the two things path-based loading can still
-    get wrong: a file that defines no config, and a file that defines two.
-    """
 
     @pytest.mark.parametrize(
         "path",

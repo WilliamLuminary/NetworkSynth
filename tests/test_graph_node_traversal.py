@@ -41,9 +41,6 @@ class TestTheRecordIsScoped:
             GraphNode((0.0, 0.0))
             assert GraphNode.node_grid, "the traversal recorded nothing"
 
-        # The spatial index over a traversal can hold millions of nodes, so it
-        # is freed where the traversal ends rather than at some later point a
-        # caller has to remember.
         assert not GraphNode.node_grid
         assert not GraphNode.edge_grid
 
@@ -58,8 +55,6 @@ class TestTheRecordIsScoped:
 
 class TestTwoTraversalsCannotInterleave:
     def test_nesting_is_refused(self, attributes, params):
-        # The record is class-level: a second traversal would silently share
-        # the first one's grids and node ids.
         with GraphNode.traversal(attributes, params):
             with pytest.raises(AssertionError, match="already open"):
                 with GraphNode.traversal(attributes, params):
@@ -70,15 +65,12 @@ class TestTwoTraversalsCannotInterleave:
             with GraphNode.traversal(attributes, params):
                 raise RuntimeError("generation failed")
 
-        # Nothing to clean up by hand: the scope closed itself.
         with GraphNode.traversal(attributes, params):
             assert GraphNode._traversal_active
 
 
 class TestTheRulesAreSeparateFromTheRecord:
     def test_a_reset_keeps_the_rules(self, attributes, params):
-        # Every BFS entry point resets before it starts, so a retry has to
-        # re-draw from the same rules rather than lose them.
         with GraphNode.traversal(attributes, params):
             rules = GraphNode._rules
             GraphNode((0.0, 0.0))
@@ -105,8 +97,6 @@ class TestPlacementCountsAreAResult:
             assert GraphNode.counts() == PlacementCounts(merged=3, aborted=4)
 
     def test_they_format_themselves_for_a_log_line(self):
-        # Five log sites used to interpolate the two private attributes each;
-        # the formatting lives here now.
         assert str(PlacementCounts(merged=1234, aborted=56)) == (
             "merged=1,234, aborted=56"
         )

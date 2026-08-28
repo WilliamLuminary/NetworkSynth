@@ -24,8 +24,6 @@ def test_pipeline_main_reraises_interruption(module_name, monkeypatch):
     def boom(*args, **kwargs):
         raise KeyboardInterrupt
 
-    # Break at the *earliest* thing main() calls, so we interrupt before any
-    # side effects (sweep reaches wandb.login() otherwise).
     patched = False
     for target in ("_init_config", "create_run_paths", "run"):
         if hasattr(module, target):
@@ -42,7 +40,6 @@ _A_CONFIG = "configs/generate_mode/config_sample.py"
 
 
 def _pipeline(monkeypatch, behaviour):
-    """Stand in for the pipeline the config's MODE selects."""
     import run
 
     module = type(sys)("fake_pipeline")
@@ -114,7 +111,7 @@ def test_real_sigint_exits_130():
         start_new_session=True,
     )
     try:
-        time.sleep(8)  # let it get into generation
+        time.sleep(8)
         if proc.poll() is not None:
             pytest.skip(f"run exited on its own with {proc.returncode}")
         os.killpg(os.getpgid(proc.pid), signal.SIGINT)

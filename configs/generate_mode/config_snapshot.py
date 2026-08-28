@@ -42,7 +42,6 @@ class SnapshotConfig(BaseConfig):
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = True
 
-    # Thinner strokes: a larger SYNTHETIC_FRAME_SIZE needs finer lines.
     RENDER_BFS_SNAPSHOT = replace(
         BaseConfig.RENDER_BFS_SNAPSHOT, node_size=0.5, line_width=0.5
     )
@@ -82,16 +81,12 @@ class SnapshotConfig(BaseConfig):
 
 def _load_positions(set_name: str) -> np.ndarray:
     path = os.path.join(SnapshotConfig.BASE_INPUT_PATH, f"{set_name}_pos.npy")
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"Positions file not found: {path}")
     logger.info("Loading positions from %s", path)
     return np.load(path, allow_pickle=True)
 
 
 def _load_sparse_matrix(set_name: str):
     path = os.path.join(SnapshotConfig.BASE_INPUT_PATH, f"{set_name}_mat.npy")
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"Adjacency matrix file not found: {path}")
     logger.info("Loading adjacency matrix from %s", path)
     return np.load(path, allow_pickle=True).item()
 

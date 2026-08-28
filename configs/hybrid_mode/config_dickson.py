@@ -28,61 +28,37 @@ class ConfigDickson(BaseConfig):
         DatasetId("gel4"),
     ]
 
-    # --- Hybrid layout parameters ---
-    # 40x40 tiling of the original frame.
     TARGET_SCALE: Tuple[int, int] = (40, 40)
 
     NUM_CENTERS: int = 500
     PHASE2_MAX_ROUNDS: int = 500
     MIN_CENTER_DISTANCE_FACTOR: float = 1.5
 
-    # --- Phase 1 tile frame sizing (auto) ---
     TILE_FRAME_SIZE: Tuple[int, int] = None
     TILE_FRAME_FACTOR: float = 0.5
-    MIN_TILE_FRAME: float = 382.0
 
-    # --- Network generation parameters ---
-    # Positions are transposed to landscape (see load_original_network) so the
-    # network aspect matches the landscape .bmp backgrounds. After transpose
-    # the extent is x up to ~1022, y up to ~722.
-    #   FRAME_SIZE / SYNTHETIC_FRAME_SIZE = (x_range, y_range)
-    #   IMAGE_SIZE = (height, width)
     IMAGE_SIZE: Tuple[int, int] = (730, 1030)
     FRAME_SIZE: Tuple[int, int] = (1030, 730)
     SYNTHETIC_FRAME_SIZE: Tuple[int, int] = (1030, 730)
 
-    # The gel networks are ~2x larger in extent but have ~half the edge
-    # length of the sample data, so the sample's edge factor (2.0) chokes
-    # Phase 2 frontier growth and tiles fail to stitch (40x40 -> hundreds of
-    # disconnected components). CLOSED_EDGES_FACTOR=1.5 unchokes growth and
-    # the whiteboard connects into a single component (verified on gel1).
     CLOSED_NODES_FACTOR = 1.2
     CLOSED_EDGES_FACTOR = 1.5
 
-    # Per-dataset overrides for (CLOSED_NODES_FACTOR, CLOSED_EDGES_FACTOR).
-    # No sweep has been run for the Dickson data yet; all use the defaults.
     DATASET_FACTORS: Dict[str, Tuple[float, float]] = {}
 
     SYNTHETIC_GRAPH_NUMBER = 0
     SYNTHETIC_NETWORK_NUMBER = 0
 
-    # Lower edge factor makes each tile denser/slower to generate, so cap
-    # retries: tiles that pass tolerance early exit immediately; the cap
-    # bounds the worst case for tiles that never pass.
     MAX_ATTEMPTS = 5
 
-    # Dense gel networks read better with smaller dots.
     RENDER_ORIGINAL_GRAPH = replace(BaseConfig.RENDER_ORIGINAL_GRAPH, node_size=3.0)
 
-    # At the 16383px WebP limit an 11M-node network is ~190MP, which most
-    # viewers refuse to open.
     RENDER_HYBRID_GRAPH = replace(BaseConfig.RENDER_HYBRID_GRAPH, max_px=8000)
     RENDER_HYBRID_SNAPSHOT = replace(BaseConfig.RENDER_HYBRID_SNAPSHOT, max_px=8000)
 
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = True
 
-    # --- Input paths ---
     BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, "dickson")
 
     @classmethod
@@ -132,14 +108,13 @@ def _load_weighted_matrix(set_name: str, n: int):
     rows, cols, weights = [], [], []
     with open(path, newline="") as f:
         reader = csv.reader(f)
-        next(reader)  # header: Source,Target,Weight,...
+        next(reader)
         for record in reader:
             u, v, w = int(record[0]), int(record[1]), float(record[2])
             rows.append(u)
             cols.append(v)
             weights.append(w)
 
-    # Symmetrize: the edge list stores each undirected edge once.
     r = np.array(rows + cols)
     c = np.array(cols + rows)
     data = np.array(weights + weights, dtype=np.float64)

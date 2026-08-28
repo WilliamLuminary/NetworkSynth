@@ -9,11 +9,6 @@ from configs.compare_mode.config_sample import SampleConfig as CompareConfig
 CompareConfig.initialize()
 
 
-# ---------------------------------------------------------------------------
-# Multifractal core (property-based, no slow reference)
-# ---------------------------------------------------------------------------
-
-
 def test_calculate_multifractal_taus(load_unweighted_test_synth_graph):
     analyzer = MultifractalAnalyzer(
         load_unweighted_test_synth_graph,
@@ -63,11 +58,6 @@ def test_n_dimension(load_unweighted_test_synth_graph):
     assert all(q != 0 for q in valid_q)
 
 
-# ---------------------------------------------------------------------------
-# Node dimension & centralities (property-based)
-# ---------------------------------------------------------------------------
-
-
 def test_node_dimension(load_unweighted_test_synth_graph):
     synth_graph = load_unweighted_test_synth_graph
     analyzer = MultifractalAnalyzer(
@@ -95,11 +85,6 @@ def test_centralities(load_unweighted_test_synth_graph):
         assert all(np.isfinite(v) for v in centralities[key]), f"{key} has non-finite"
 
 
-# ---------------------------------------------------------------------------
-# Betweenness
-# ---------------------------------------------------------------------------
-
-
 def test_betweenness(load_unweighted_test_synth_graph):
     analyzer = MultifractalAnalyzer(
         load_unweighted_test_synth_graph,
@@ -114,11 +99,6 @@ def test_betweenness(load_unweighted_test_synth_graph):
     assert all(0 <= v <= 1 for v in betweenness)
 
 
-# ---------------------------------------------------------------------------
-# Ollivier-Ricci curvature
-# ---------------------------------------------------------------------------
-
-
 def test_ricci_curvature(load_unweighted_test_synth_graph):
     synth_graph = load_unweighted_test_synth_graph
     analyzer = MultifractalAnalyzer(
@@ -129,11 +109,6 @@ def test_ricci_curvature(load_unweighted_test_synth_graph):
     assert isinstance(ricci, list)
     assert len(ricci) == synth_graph.number_of_edges()
     assert all(np.isfinite(k) for k in ricci)
-
-
-# ---------------------------------------------------------------------------
-# Assortativity
-# ---------------------------------------------------------------------------
 
 
 def test_assortativity(load_unweighted_test_synth_graph):
@@ -149,11 +124,6 @@ def test_assortativity(load_unweighted_test_synth_graph):
     assert -1 <= assortativity <= 1
 
 
-# ---------------------------------------------------------------------------
-# Eigenvector centrality
-# ---------------------------------------------------------------------------
-
-
 def test_eigenvector_centrality(load_unweighted_test_synth_graph):
     synth_graph = load_unweighted_test_synth_graph
     analyzer = MultifractalAnalyzer(
@@ -167,11 +137,6 @@ def test_eigenvector_centrality(load_unweighted_test_synth_graph):
     assert all(v >= 0 for v in eigenvector)
 
 
-# ---------------------------------------------------------------------------
-# Diameter
-# ---------------------------------------------------------------------------
-
-
 def test_diameter(load_unweighted_test_synth_graph):
     analyzer = MultifractalAnalyzer(
         load_unweighted_test_synth_graph,
@@ -182,11 +147,6 @@ def test_diameter(load_unweighted_test_synth_graph):
 
     assert isinstance(diameter, (int, float))
     assert diameter > 0
-
-
-# ---------------------------------------------------------------------------
-# Eigenvector centrality and the APSP memo
-# ---------------------------------------------------------------------------
 
 
 def _adjacency(nk_graph):
@@ -251,11 +211,6 @@ def test_curvature_uses_the_analyzer_graph_not_its_own_copy(
 
     assert len(analyzer._distances) == 1, "curvature ran a second APSP"
     assert len(ricci) == load_unweighted_test_synth_graph.number_of_edges()
-
-
-# ---------------------------------------------------------------------------
-# Neighbour mass distribution (underflow)
-# ---------------------------------------------------------------------------
 
 
 class TestNeighbourMasses:

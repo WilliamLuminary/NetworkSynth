@@ -10,7 +10,6 @@ def _write(path, rows):
     return str(path)
 
 
-# StructuralGT's exact headers, from fiber_network.save_graph_to_file
 SGT_EDGES_UNWEIGHTED = [["Source", "Target"], [0, 1], [1, 2], [2, 0]]
 SGT_EDGES_WEIGHTED = [
     ["Source", "Target", "Weight", "Length", "Width", "Angle"],
@@ -84,15 +83,6 @@ class TestOurOwnFormat:
     def test_round_trip_preserves_unweightedness(
         self, tmp_path, load_unweighted_test_synth_graph
     ):
-        """An unweighted graph must not come back weighted.
-
-        The writer used to emit the ``edge_weight`` header unconditionally, and
-        an unweighted networkit graph reports every weight as 1.0 — so the file
-        claimed weights the graph never had.  The reader takes the column's
-        presence as the answer, so the claim became true on reload, and both
-        the Mapper (which decides whether to assign widths at all) and the
-        analyzer (weighted vs topological measure) then acted on it.
-        """
         from configs.file_definitions import save_network_csv
 
         original = load_unweighted_test_synth_graph

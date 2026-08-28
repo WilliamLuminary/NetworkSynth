@@ -80,8 +80,6 @@ class TestPipelinesEmitIt:
         module = __import__(f"pipelines.{module_name}", fromlist=["x"])
         source = inspect.getsource(module)
 
-        # every logger call mentioning a percent in its message must also carry
-        # the structured field
         for match in re.finditer(r"logger\.info\((.{0,400}?)\)\n", source, re.S):
             body = match.group(1)
             if "%)" in body or "%" in body and "progress" in body:
