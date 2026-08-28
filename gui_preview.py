@@ -29,14 +29,13 @@ def _row(label: str, value: str) -> str:
 
 
 def _info_text(title: str, graph, attributes) -> str:
-    lines = [
-        title,
-        "=" * 40,
+    rows = [
         _row("Nodes", f"{graph.number_of_nodes():,}"),
         _row("Edges", f"{graph.number_of_edges():,}"),
         _row("Average degree", f"{attributes.average_degree:.4f}"),
         _row("Average edge length", f"{attributes.average_length:.4f}"),
     ]
+    lines = [title, "=" * max(len(row) for row in [title] + rows), *rows]
     if attributes.degree_distribution:
         lines.append("")
         lines.append("Degree distribution:")
