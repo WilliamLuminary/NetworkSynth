@@ -450,6 +450,21 @@ Where the centers land follows the run's `SEED`, like everything else a run draw
 
 `gui_run.py` and `run.py` end in the same two lines — `load_pipeline(config.MODE)` then `pipeline.main(config_cls=config)` — so a GUI run and a CLI run execute identical pipeline, generator, quality-gate and save code. They differ only in where the config comes from: a `configs/*_mode/config_*.py` module, or a `GuiConfig` subclass built from the run-spec the form writes.
 
+### A directory of networks
+
+The GUI can be pointed at a folder instead of a single network, and reads one dataset per **prefix**. Which files carry a prefix decides what format that dataset is in, so one folder may hold a mixture:
+
+| Files | The dataset is |
+| --- | --- |
+| `<prefix>_edgelist.csv` + `<prefix>_positions.csv` | a CSV pair |
+| `<prefix>_adjacency.npy` + `<prefix>_positions.npy` | a NumPy pair, positions transposed on load |
+| `<prefix>_network.pkl` | a pickled `SynthGraph`, or the first of a pickled batch |
+| `<prefix>_image.tif` | the background for that prefix — optional, and independent of the three above |
+
+A half-named dataset stops the run rather than being passed over: an edge list with no positions beside it, an adjacency with no coordinates, or one prefix named as two datasets at once. Datasets are read in name order, and one run writes a subdirectory per dataset under a single run root with one manifest covering them all.
+
+Two things this does *not* cover. The npy files shipped in `data/input/samples/` keep the older `_mat.npy` / `_pos.npy` names that the CLI configs load directly, so those folders are not directory-discoverable. And `analyse.py` reads a directory by its own rule — every pickle in it, or else every CSV pair — not by this contract.
+
 The form is a deliberate subset. What only a CLI config can do:
 
 | Only on the CLI | Why it matters |

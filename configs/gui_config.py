@@ -48,10 +48,7 @@ _MATRIX_SUFFIX = "_adjacency.npy"
 _NPY_POSITIONS_SUFFIX = "_positions.npy"
 _PICKLE_SUFFIX = "_network.pkl"
 
-#: How a dataset in a directory may be named: the file that finds it, and what
-#: has to be beside it.  One prefix, one dataset, whichever form it is in — so
-#: a directory may hold a mixture, and `<prefix>_image.tif` goes with any of
-#: them or with none.
+
 _DIRECTORY_FORMS = (
     (_EDGE_SUFFIX, (_POSITIONS_SUFFIX,)),
     (_MATRIX_SUFFIX, (_NPY_POSITIONS_SUFFIX,)),

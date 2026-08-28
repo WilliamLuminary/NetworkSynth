@@ -19,14 +19,14 @@ Inputs are chosen by the user, not exported on our behalf, and what a mode reads
 | Input set | Files | Modes |
 |---|---|---|
 | `edge_list` + `positions` (+ optional `image`) | one network, named directly | `generate`, `hybrid`, `sweep` |
-| `datasets_dir` | every `{name}_edgelist.csv` + `{name}_positions.csv` pair in it, plus an optional `{name}_image.tif` | `generate`, `hybrid`, `sweep` |
+| `datasets_dir` | one dataset per prefix: `{name}_edgelist.csv` + `{name}_positions.csv`, or `{name}_adjacency.npy` + `{name}_positions.npy`, or `{name}_network.pkl` — each with an optional `{name}_image.tif` | `generate`, `hybrid`, `sweep` |
 | `original_dir` + `synthetic_dir` | two directories of networks to compare, in either format we write — a pickled batch or CSV pairs | `compare` |
 
 Comparison stands alone: `compare` reads the two sets of networks the caller names, and generation never analyses what it just made. So "generate then compare" is two runs — the second pointed at the first's `original/` and `synthetic/` folders, or at any other pair. Generation's own quality gate is a separate, cheaper thing: an `ErrorChecker` chosen by `ERROR_CHECKER`, measuring two scalars rather than a full spectrum.
 
 `graphs/csv_io.py` is deliberately tolerant about columns, so either origin works: StructuralGT's `Source,Target` (plus `Weight,Length,Width,Angle` when weighted) or our own `source_index,target_index,edge_weight`, with `x,y` for positions.
 
-A `datasets_dir` becomes one dataset per pair in it, in name order, so one run writes N subdirectories under a single run root with one manifest covering them all. An edge list with no positions file beside it stops the run and names the orphan.
+A `datasets_dir` becomes one dataset per prefix in it, in name order, so one run writes N subdirectories under a single run root with one manifest covering them all. The files a prefix carries decide its format, so a directory may hold a mixture of the three. A half-named dataset stops the run and names it: an edge list with no positions beside it, an adjacency with no coordinates, or one prefix named as two datasets at once.
 
 ### The run-spec
 
