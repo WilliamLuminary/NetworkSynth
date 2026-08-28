@@ -920,19 +920,35 @@ ApplicationWindow {
                             }
                         }
 
-                        Rectangle {
+                        // Grouped formats with embedded header line to save vertical space
+                        ColumnLayout {
                             Layout.fillWidth: true
-                            Layout.topMargin: 2
-                            Layout.leftMargin: -8
-                            Layout.rightMargin: -8
-                            implicitHeight: plate.implicitHeight + 20
-                            color: root.plateColor
-                            radius: 6
+                            Layout.topMargin: 4
+                            spacing: 8
 
+                            // Top line: ---- OUTPUT FORMATS ----
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+
+                                // Short line segment on the left
+                                Rectangle { Layout.preferredWidth: 16; height: 1; color: root.lineColor }
+
+                                Label {
+                                    text: "OUTPUT FORMATS"
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                    font.letterSpacing: 0.8
+                                    opacity: 0.55
+                                }
+
+                                // Long line segment filling the rest of the right side
+                                Rectangle { Layout.fillWidth: true; height: 1; color: root.lineColor }
+                            }
+
+                            // The dynamically generated format checkboxes and buttons
                             ColumnLayout {
-                                id: plate
-                                anchors.fill: parent
-                                anchors.margins: 8
+                                Layout.fillWidth: true
                                 spacing: 8
 
                                 Repeater {
@@ -968,6 +984,14 @@ ApplicationWindow {
                                     }
                                     Item { Layout.fillWidth: true }
                                 }
+                            }
+
+                            // Bottom bounding line: -------------------------
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 1
+                                color: root.lineColor
+                                Layout.bottomMargin: 4
                             }
                         }
                     }
