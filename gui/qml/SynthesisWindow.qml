@@ -659,7 +659,7 @@ ApplicationWindow {
                             RowLayout {
                                 Layout.fillWidth: true
                                 spacing: 10
-                                visible: controller.hasInputChoice
+                                visible: controller.inputFormats.length > 1
 
                                 Label {
                                     text: "Format"
@@ -671,7 +671,7 @@ ApplicationWindow {
                                     currentIndex: controller.inputFormat
                                     onActivated: controller.selectInputFormat(currentIndex)
 
-                                    enabled: !controller.running && controller.inputFormats.length > 1
+                                    enabled: !controller.running
                                 }
                             }
 

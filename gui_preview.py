@@ -188,6 +188,7 @@ def _source(config, dataset_id):
         return paths["datasets_dir"], str(dataset_id)
     for key, suffix in (
         ("edge_list", "_edgelist.csv"),
+        ("adjacency", "_adjacency.npy"),
         ("adjacency", "_mat.npy"),
         ("network_pkl", ".pkl"),
     ):

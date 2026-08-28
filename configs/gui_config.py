@@ -44,6 +44,19 @@ MODE_INPUTS = {
 _EDGE_SUFFIX = "_edgelist.csv"
 _POSITIONS_SUFFIX = "_positions.csv"
 _IMAGE_SUFFIX = "_image.tif"
+_MATRIX_SUFFIX = "_adjacency.npy"
+_NPY_POSITIONS_SUFFIX = "_positions.npy"
+_PICKLE_SUFFIX = "_network.pkl"
+
+#: How a dataset in a directory may be named: the file that finds it, and what
+#: has to be beside it.  One prefix, one dataset, whichever form it is in — so
+#: a directory may hold a mixture, and `<prefix>_image.tif` goes with any of
+#: them or with none.
+_DIRECTORY_FORMS = (
+    (_EDGE_SUFFIX, (_POSITIONS_SUFFIX,)),
+    (_MATRIX_SUFFIX, (_NPY_POSITIONS_SUFFIX,)),
+    (_PICKLE_SUFFIX, ()),
+)
 
 _TUPLE_PARAMS = frozenset(
     {
@@ -117,22 +130,30 @@ def discover_datasets(directory: str) -> list:
     if not os.path.isdir(directory):
         raise SpecError(f"not a directory: {directory}")
 
-    names = []
+    found = {}
     for entry in sorted(os.listdir(directory)):
-        if not entry.endswith(_EDGE_SUFFIX):
-            continue
-        name = entry[: -len(_EDGE_SUFFIX)]
-        partner = os.path.join(directory, f"{name}{_POSITIONS_SUFFIX}")
-        if not os.path.exists(partner):
-            raise SpecError(
-                f"{os.path.join(directory, entry)} has no positions file "
-                f"beside it ({partner})"
-            )
-        names.append(name)
+        for lead, partners in _DIRECTORY_FORMS:
+            if not entry.endswith(lead):
+                continue
+            name = entry[: -len(lead)]
+            if name in found:
+                raise SpecError(
+                    f"{directory}: '{name}' is named as two datasets at once "
+                    f"({found[name]} and {lead}). Rename one of them."
+                )
+            for partner in partners:
+                beside = os.path.join(directory, f"{name}{partner}")
+                if not os.path.exists(beside):
+                    raise SpecError(
+                        f"{os.path.join(directory, entry)} has no {partner} "
+                        f"file beside it ({beside})"
+                    )
+            found[name] = lead
 
-    if not names:
-        raise SpecError(f"no '*{_EDGE_SUFFIX}' file found in {directory}")
-    return names
+    if not found:
+        forms = ", ".join(f"*{lead}" for lead, _ in _DIRECTORY_FORMS)
+        raise SpecError(f"no {forms} file found in {directory}")
+    return sorted(found)
 
 
 def _load_npy_pair(positions_path: str, adjacency_path: str) -> SynthGraph:
@@ -157,6 +178,20 @@ def _load_pickled(path: str) -> SynthGraph:
             "a single-network pickle to choose a different one."
         )
     return graphs[0]
+
+
+def _load_from_directory(directory: str, name: str) -> SynthGraph:
+    """One dataset out of a directory, read by the form its name is in."""
+    path = os.path.join(directory, name)
+    if os.path.exists(f"{path}{_EDGE_SUFFIX}"):
+        from graphs import read_graph_csv
+
+        return read_graph_csv(f"{path}{_EDGE_SUFFIX}", f"{path}{_POSITIONS_SUFFIX}")
+    if os.path.exists(f"{path}{_MATRIX_SUFFIX}"):
+        return _load_npy_pair(
+            f"{path}{_NPY_POSITIONS_SUFFIX}", f"{path}{_MATRIX_SUFFIX}"
+        )
+    return _load_pickled(f"{path}{_PICKLE_SUFFIX}")
 
 
 class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
@@ -279,28 +314,20 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
     def load_original_network(cls, dataset_id: DatasetId) -> SynthGraph:
         from utils import orient_positions
 
-        if cls.PATHS.get("network_pkl"):
+        directory = cls.PATHS.get("datasets_dir")
+        if directory:
+            graph = _load_from_directory(directory, str(dataset_id))
+        elif cls.PATHS.get("network_pkl"):
             graph = _load_pickled(cls.PATHS["network_pkl"])
         elif cls.PATHS.get("adjacency"):
             graph = _load_npy_pair(cls.PATHS["positions_npy"], cls.PATHS["adjacency"])
         else:
             from graphs import read_graph_csv
 
-            edge_list, positions = cls._network_paths(dataset_id)
-            graph = read_graph_csv(edge_list, positions)
+            graph = read_graph_csv(cls.PATHS["edge_list"], cls.PATHS["positions"])
 
         orient_positions(graph, cls.INPUT_ORIENTATION)
         return graph
-
-    @classmethod
-    def _network_paths(cls, dataset_id: DatasetId):
-        directory = cls.PATHS.get("datasets_dir")
-        if not directory:
-            return cls.PATHS["edge_list"], cls.PATHS["positions"]
-        return (
-            os.path.join(directory, f"{dataset_id}{_EDGE_SUFFIX}"),
-            os.path.join(directory, f"{dataset_id}{_POSITIONS_SUFFIX}"),
-        )
 
     @classmethod
     def load_original_image(cls, dataset_id: DatasetId) -> Optional[ndarray]:

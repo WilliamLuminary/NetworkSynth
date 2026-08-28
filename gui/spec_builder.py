@@ -563,20 +563,26 @@ def _network_shapes() -> List[InputShape]:
         InputShape(
             "A directory of networks",
             scope=DIRECTORY,
-            format="CSV pair",
+            format="By file name",
             inputs=[
                 Input(
                     "datasets_dir",
                     "Networks dir",
                     kind="dir",
-                    placeholder="folder of …_edgelist.csv pairs",
+                    placeholder="folder of networks, named by prefix",
                     help=(
-                        "One dataset per …_edgelist.csv, each needing a\n"
-                        "matching …_positions.csv beside it.\n"
-                        "…_image.tif is used as the background when it\n"
-                        "is there, and skipped when it is not.\n"
-                        "An edge list with no positions stops the run\n"
-                        "rather than being passed over."
+                        "One dataset per prefix, in any of the three forms:\n"
+                        "  …_edgelist.csv  with  …_positions.csv\n"
+                        "  …_adjacency.npy with  …_positions.npy\n"
+                        "  …_network.pkl\n"
+                        "A directory may hold a mixture of them.\n"
+                        "…_image.tif is the background for whichever\n"
+                        "prefix it shares, and a dataset without one is\n"
+                        "read all the same.\n"
+                        "A half-named dataset stops the run rather than\n"
+                        "being passed over: an edge list with no\n"
+                        "positions, a matrix with no coordinates, or one\n"
+                        "prefix named as two datasets at once."
                     ),
                 )
             ],
@@ -589,25 +595,28 @@ def _network_shapes() -> List[InputShape]:
                     "adjacency",
                     "Adjacency",
                     filter="NumPy files (*.npy)",
-                    placeholder="…_mat.npy",
+                    placeholder="the adjacency .npy",
                     help=(
-                        "…_mat.npy holding a scipy sparse adjacency\n"
-                        "matrix, saved as a 0-d object array and read\n"
-                        "with np.load(...).item().\n"
+                        "A scipy sparse adjacency matrix, saved as a 0-d\n"
+                        "object array and read with np.load(...).item().\n"
                         "A plain dense array is refused rather than\n"
-                        "read as something else."
+                        "read as something else.\n"
+                        "Named as you like here; in a directory it has\n"
+                        "to end …_adjacency.npy."
                     ),
                 ),
                 Input(
                     "positions_npy",
                     "Positions",
                     filter="NumPy files (*.npy)",
-                    placeholder="…_pos.npy",
+                    placeholder="the positions .npy",
                     help=(
-                        "…_pos.npy, shape (N, 2), one row per node.\n"
-                        "Recorded as (row, column) and transposed to\n"
-                        "(x, y) when loaded — the same thing every CLI\n"
-                        "config does with a pair like this."
+                        "Shape (N, 2), one row per node. Recorded as\n"
+                        "(row, column) and transposed to (x, y) when\n"
+                        "loaded — the same thing every CLI config does\n"
+                        "with a pair like this.\n"
+                        "Named as you like here; in a directory it has\n"
+                        "to end …_positions.npy."
                     ),
                 ),
                 _background(),
@@ -766,7 +775,7 @@ _SAMPLE_INPUTS = {
     "datasets_dir": os.path.join(_SAMPLES, "gui_mode"),
     "adjacency": os.path.join(_SAMPLES, "generate_mode", "sample_1_mat.npy"),
     "positions_npy": os.path.join(_SAMPLES, "generate_mode", "sample_1_pos.npy"),
-    "network_pkl": os.path.join(_SAMPLES, "gui_mode", "sample_1_network.pkl"),
+    "network_pkl": os.path.join(_SAMPLES, "sample_1_network.pkl"),
 }
 
 
