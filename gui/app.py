@@ -164,7 +164,17 @@ class SynthesisController(QObject):
 
     @Property("QVariantList", notify=changed)
     def outputLines(self) -> list:
-        return self._lines_of(spec_builder.OUTPUT_GROUP)
+        return [
+            line
+            for line in self._lines_of(spec_builder.OUTPUT_GROUP)
+            if not line["row"]
+        ]
+
+    @Property("QVariantList", notify=changed)
+    def formatLines(self) -> list:
+        return [
+            line for line in self._lines_of(spec_builder.OUTPUT_GROUP) if line["row"]
+        ]
 
     def _lines_of(self, group: str) -> list:
         for section in self._sections():

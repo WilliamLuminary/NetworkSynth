@@ -33,6 +33,8 @@ ApplicationWindow {
     readonly property color paneColor: palette.alternateBase
     readonly property color lineColor: palette.mid
     readonly property color railColor: Qt.darker(palette.window, 1.14)
+    readonly property color plateColor: root.darkTheme
+        ? Qt.lighter(palette.base, 1.35) : Qt.darker(palette.base, 1.05)
 
     //: Which way round the desktop is, for the two colours that carry a
     //: meaning rather than a role: a success green and a failure red have no
@@ -225,6 +227,7 @@ ApplicationWindow {
                 InfoButton {
                     visible: card.note !== ""
                     note: card.note
+                    alignRight: false
                 }
 
                 Item { Layout.fillWidth: true }
@@ -360,6 +363,36 @@ ApplicationWindow {
         Item { Layout.fillWidth: true }
     }
 
+    // Every explanation in the window is drawn here: ours rather than the
+    // style's, because an attached ToolTip is drawn by the platform and does
+    // not look the same on every one of them.
+    component HoverPanel: Popup {
+        id: panel
+        property string note: ""
+        property bool showing: false
+        property bool alignRight: false
+
+        visible: panel.showing && panel.note !== ""
+        closePolicy: Popup.NoAutoClose
+        y: panel.parent ? panel.parent.height + 6 : 0
+        x: panel.alignRight && panel.parent
+            ? panel.parent.width - panel.width : 0
+        padding: 12
+        width: Math.min(380, panelText.implicitWidth + 2 * panel.padding)
+
+        background: Rectangle {
+            color: root.cardColor
+            border.color: root.lineColor
+            border.width: 1
+            radius: 6
+        }
+        contentItem: Label {
+            id: panelText
+            text: panel.note
+            wrapMode: Text.WordWrap
+        }
+    }
+
     // What something does, behind a button rather than beside it: an
     // explanation that runs to a paragraph does not belong in the flow of rows
     // a form is scanned down.  Shown while the pointer rests on the button,
@@ -367,6 +400,9 @@ ApplicationWindow {
     component InfoButton: Button {
         id: info
         property string note: ""
+        //: Panels hang left from a button in the help column at the right, and
+        //: right from one beside a heading, so neither runs off the card.
+        property bool alignRight: true
 
         text: "?"
         checkable: true
@@ -374,29 +410,10 @@ ApplicationWindow {
 
         HoverHandler { id: infoHover }
 
-        Popup {
-            // Bound rather than opened and closed: two things decide whether
-            // it is up, and an imperative close would leave the binding saying
-            // otherwise.
-            visible: info.checked || infoHover.hovered
-            closePolicy: Popup.NoAutoClose
-            // Ours rather than the style's: an attached ToolTip is drawn by the
-            // platform and does not show the same way on every one of them.
-            y: info.height + 6
-            x: -width + info.width
-            width: 380
-            padding: 12
-
-            background: Rectangle {
-                color: root.cardColor
-                border.color: root.lineColor
-                border.width: 1
-                radius: 6
-            }
-            contentItem: Label {
-                text: info.note
-                wrapMode: Text.WordWrap
-            }
+        HoverPanel {
+            note: info.note
+            showing: info.checked || infoHover.hovered
+            alignRight: info.alignRight
         }
     }
 
@@ -734,12 +751,14 @@ ApplicationWindow {
                                                 ? "!" : ""
                                         color: inputRow.modelData.state === "ok"
                                             ? root.goodColor : root.badColor
-                                        ToolTip.text: inputRow.modelData.state === "ok"
-                                            ? "Found."
-                                            : "Needed, and not found yet."
-                                        ToolTip.visible: stateHover.hovered
-                                            && inputRow.modelData.state !== "blank"
                                         HoverHandler { id: stateHover }
+                                        HoverPanel {
+                                            note: inputRow.modelData.state === "ok"
+                                                ? "Found."
+                                                : "Needed, and not found yet."
+                                            showing: stateHover.hovered
+                                                && inputRow.modelData.state !== "blank"
+                                        }
                                     }
                                     Button {
                                         text: "Browse…"
@@ -783,11 +802,12 @@ ApplicationWindow {
                                     text: "Save as edited"
                                     enabled: controller.canRun
                                     onClicked: controller.saveEdited()
-                                    ToolTip.text: "Write the network as it is "
-                                        + "drawn now into an 'edited' folder "
-                                        + "beside the source, and read that "
-                                        + "from here on."
-                                    ToolTip.visible: hovered
+                                    HoverPanel {
+                                        note: "Write the network as it is drawn "
+                                            + "now into an 'edited' folder beside "
+                                            + "the source, and read that from here on."
+                                        showing: parent.hovered
+                                    }
                                 }
                                 Item { Layout.fillWidth: true }
                             }
@@ -866,26 +886,55 @@ ApplicationWindow {
                             }
                         }
 
-                        RowLayout {
+                        Rectangle {
                             Layout.fillWidth: true
-                            spacing: 8
+                            Layout.topMargin: 2
+                            Layout.leftMargin: -8
+                            Layout.rightMargin: -8
+                            implicitHeight: plate.implicitHeight + 20
+                            color: root.plateColor
+                            radius: 6
 
-                            Item { Layout.preferredWidth: root.labelWidth }
-                            Button {
-                                text: "Select none"
-                                onClicked: controller.clearOutputs()
-                                ToolTip.text: "Write no networks and no plots. "
-                                    + "A run still leaves its report and the "
-                                    + "batch a preview reads."
-                                ToolTip.visible: hovered
+                            ColumnLayout {
+                                id: plate
+                                anchors.fill: parent
+                                anchors.margins: 8
+                                spacing: 8
+
+                                Repeater {
+                                    model: controller.formatLines
+                                    delegate: FormLine {
+                                        required property var modelData
+                                        line: modelData
+                                    }
+                                }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+
+                                    Item { Layout.preferredWidth: root.labelWidth }
+                                    Button {
+                                        text: "Select none"
+                                        onClicked: controller.clearOutputs()
+                                        HoverPanel {
+                                            note: "Write no networks and no plots. "
+                                                + "A run still leaves its report "
+                                                + "and the batch a preview reads."
+                                            showing: parent.hovered
+                                        }
+                                    }
+                                    Button {
+                                        text: "Defaults"
+                                        onClicked: controller.resetOutputs()
+                                        HoverPanel {
+                                            note: "Networks as .csv, plots as .webp."
+                                            showing: parent.hovered
+                                        }
+                                    }
+                                    Item { Layout.fillWidth: true }
+                                }
                             }
-                            Button {
-                                text: "Defaults"
-                                onClicked: controller.resetOutputs()
-                                ToolTip.text: "Networks as .csv, plots as .webp."
-                                ToolTip.visible: hovered
-                            }
-                            Item { Layout.fillWidth: true }
                         }
                     }
 

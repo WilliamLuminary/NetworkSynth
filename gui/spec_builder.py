@@ -42,6 +42,12 @@ def _format_fields(group: str, formats, default: str) -> List[Field]:
 OUTPUT_GROUP = "Output"
 
 SECTION_NOTES = {
+    "Quality": (
+        "Generation draws each network at random, so candidates differ in how "
+        "closely they resemble the original. A candidate is measured against "
+        "the input and generated again until it is within tolerance, or until "
+        "the attempts run out — the closest one is kept either way."
+    ),
     "Tiling": (
         "A large network is assembled rather than grown in one piece: seed "
         "points are scattered over the output area, a patch is generated "
