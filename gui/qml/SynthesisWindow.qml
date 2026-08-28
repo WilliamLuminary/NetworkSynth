@@ -187,6 +187,8 @@ ApplicationWindow {
         //: now and then.  The heading keeps saying it is there.
         property bool collapsible: false
         property bool expanded: true
+        //: What this section is about, behind the mark beside its heading.
+        property string note: ""
 
         Layout.fillWidth: true
         implicitHeight: shell.implicitHeight + 24
@@ -201,19 +203,31 @@ ApplicationWindow {
             anchors.margins: 12
             spacing: 10
 
-            Label {
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 6
                 visible: card.title !== ""
-                text: (card.collapsible ? (card.expanded ? "▾  " : "▸  ") : "")
-                    + card.title.toUpperCase()
-                font.bold: true
-                font.pixelSize: 10
-                font.letterSpacing: 0.8
-                opacity: 0.55
 
-                TapHandler {
-                    enabled: card.collapsible
-                    onTapped: card.expanded = !card.expanded
+                Label {
+                    text: (card.collapsible ? (card.expanded ? "▾  " : "▸  ") : "")
+                        + card.title.toUpperCase()
+                    font.bold: true
+                    font.pixelSize: 10
+                    font.letterSpacing: 0.8
+                    opacity: 0.55
+
+                    TapHandler {
+                        enabled: card.collapsible
+                        onTapped: card.expanded = !card.expanded
+                    }
                 }
+
+                HoverNote {
+                    visible: card.note !== ""
+                    note: card.note
+                }
+
+                Item { Layout.fillWidth: true }
             }
             ColumnLayout {
                 id: body
@@ -344,6 +358,42 @@ ApplicationWindow {
         }
 
         Item { Layout.fillWidth: true }
+    }
+
+    // A section's note, behind a mark in its heading: what a section is about
+    // is worth having, and worth not reading again every time the form is
+    // scanned past it.
+    component HoverNote: Label {
+        id: mark
+        property string note: ""
+
+        text: "!"
+        font.bold: true
+        font.pixelSize: 11
+        opacity: markHover.hovered ? 0.9 : 0.45
+
+        HoverHandler { id: markHover }
+
+        Popup {
+            // Bound to the pointer rather than opened and closed: there is no
+            // click to close it with.
+            visible: markHover.hovered
+            closePolicy: Popup.NoAutoClose
+            y: mark.height + 6
+            width: 380
+            padding: 12
+
+            background: Rectangle {
+                color: root.cardColor
+                border.color: root.lineColor
+                border.width: 1
+                radius: 6
+            }
+            contentItem: Label {
+                text: mark.note
+                wrapMode: Text.WordWrap
+            }
+        }
     }
 
     // What something does, behind a button rather than beside it: an
@@ -783,19 +833,7 @@ ApplicationWindow {
                                 id: sectionCard
                                 required property var modelData
                                 title: sectionCard.modelData.name
-
-                                Label {
-                                    Layout.fillWidth: true
-                                    // Wrap at the card, not at the layout: a
-                                    // row too wide to shrink widens the column
-                                    // it is in, and a note left to fill that
-                                    // runs out past the card's own edge.
-                                    Layout.maximumWidth: sectionCard.width - 24
-                                    wrapMode: Text.WordWrap
-                                    opacity: 0.6
-                                    visible: text !== ""
-                                    text: sectionCard.modelData.note
-                                }
+                                note: sectionCard.modelData.note
 
                                 Repeater {
                                     model: sectionCard.modelData.lines
