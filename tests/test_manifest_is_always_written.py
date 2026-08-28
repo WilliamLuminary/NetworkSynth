@@ -37,6 +37,9 @@ def _config(tmp_path, name):
         BASE_OUTPUT_PATH = str(tmp_path / f"out_{name}")
         DATASETS = [DatasetId("ds")]
         SYNTHETIC_NETWORK_NUMBER = 1
+        NF_RANGE = (1.0, 1.0)
+        EF_RANGE = (1.0, 1.0)
+        SWEEP_STEP = 0.1
 
     return Config
 

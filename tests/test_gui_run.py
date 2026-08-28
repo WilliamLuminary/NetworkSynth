@@ -180,7 +180,7 @@ class TestDirectoryInput:
         self._pair(tmp_path, "alpha")
         (tmp_path / "beta_edgelist.csv").write_text("source_index,target_index\n0,1\n")
 
-        with pytest.raises(SpecError, match="has no positions file"):
+        with pytest.raises(SpecError, match="has no _positions.csv file beside it"):
             discover_datasets(str(tmp_path))
 
     def test_a_directory_with_no_pairs_is_rejected(self, tmp_path):
@@ -188,7 +188,7 @@ class TestDirectoryInput:
 
         (tmp_path / "notes.txt").write_text("nothing to load here")
 
-        with pytest.raises(SpecError, match="no '\\*_edgelist.csv' file found"):
+        with pytest.raises(SpecError, match=r"no \*_edgelist.csv, .* file found"):
             discover_datasets(str(tmp_path))
 
     def test_the_datasets_reach_the_config(self, tmp_path):
@@ -207,15 +207,59 @@ class TestDirectoryInput:
         datasets = tmp_path / "many"
         datasets.mkdir()
         self._pair(datasets, "alpha")
-        self._pair(datasets, "beta")
+        (datasets / "beta_edgelist.csv").write_text(
+            "source_index,target_index\n0,1\n1,2\n"
+        )
+        (datasets / "beta_positions.csv").write_text("x,y\n0,0\n1,1\n2,2\n")
 
         config = GuiConfig.from_spec(
             _spec(tmp_path, inputs={"datasets_dir": str(datasets)})
         )
-        edge_list, positions = config._network_paths(config.DATASETS[1])
+        config.initialize()
 
-        assert edge_list.endswith("beta_edgelist.csv")
-        assert positions.endswith("beta_positions.csv")
+        alpha = config.ORIGINAL_NETWORK_FUNC(config.DATASETS[0])
+        beta = config.ORIGINAL_NETWORK_FUNC(config.DATASETS[1])
+
+        assert alpha.number_of_nodes() == 2
+        assert beta.number_of_nodes() == 3
+
+    def test_a_directory_may_mix_the_three_forms(self, tmp_path):
+        import pickle
+
+        import numpy as np
+        from scipy.sparse import csr_matrix
+
+        from configs.gui_config import discover_datasets
+        from graphs import read_graph_csv
+
+        self._pair(tmp_path, "as_csv")
+        np.save(
+            tmp_path / "as_npy_adjacency.npy",
+            np.array(csr_matrix([[0, 1], [1, 0]]), dtype=object),
+        )
+        np.save(tmp_path / "as_npy_positions.npy", np.array([[0.0, 0.0], [1.0, 1.0]]))
+        with open(tmp_path / "as_pkl_network.pkl", "wb") as handle:
+            pickle.dump(
+                read_graph_csv(
+                    str(tmp_path / "as_csv_edgelist.csv"),
+                    str(tmp_path / "as_csv_positions.csv"),
+                ),
+                handle,
+            )
+
+        assert discover_datasets(str(tmp_path)) == ["as_csv", "as_npy", "as_pkl"]
+
+    def test_one_prefix_named_twice_stops_the_run(self, tmp_path):
+        import numpy as np
+
+        from configs.gui_config import discover_datasets
+
+        self._pair(tmp_path, "twice")
+        np.save(tmp_path / "twice_adjacency.npy", np.array([[0, 1], [1, 0]]))
+        np.save(tmp_path / "twice_positions.npy", np.array([[0.0, 0.0], [1.0, 1.0]]))
+
+        with pytest.raises(SpecError, match="named as two datasets at once"):
+            discover_datasets(str(tmp_path))
 
 
 class TestEntryPointExitCodes:

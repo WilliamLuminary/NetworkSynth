@@ -54,7 +54,7 @@ class TestDispatcher:
         assert specs[0].extension == "webp"
 
     def test_missing_identifier_raises(self):
-        with pytest.raises(ValueError, match="No save spec"):
+        with pytest.raises(AttributeError, match="SAVE_THIS_DOES_NOT_EXIST"):
             BaseConfig.save("this_does_not_exist")
 
     def test_every_declared_spec_is_valid(self):
