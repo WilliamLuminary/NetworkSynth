@@ -105,8 +105,6 @@ class Field:
     #: one of those.  A setting the chosen algorithm never reads is worse than
     #: absent, because it looks as though it were doing something.
     hide_when: tuple = ()
-    #: The one number in its section that a run is usually about, drawn larger.
-    prominent: bool = False
     #: What the number is counted in, shown after the editor.  Not every size
     #: is a length: a target scale counts tiles.
     unit: str = ""
@@ -357,7 +355,6 @@ def _common_fields() -> List[Field]:
                 minimum=1,
                 maximum=500,
                 step=1,
-                prominent=True,
                 help="How many synthetic networks this run produces.",
             ),
             Field(

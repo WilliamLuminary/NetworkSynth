@@ -25,6 +25,8 @@ ApplicationWindow {
 
     readonly property int labelWidth: 162
     readonly property int numberWidth: 96
+    //: The gutter an axis letter sits in, taken out of the label beside it.
+    readonly property int axisWidth: 28
 
     readonly property color accent: palette.highlight
     readonly property color cardColor: palette.base
@@ -271,9 +273,7 @@ ApplicationWindow {
         // the form complaining afterwards.
         SpinBox {
             visible: editor.field.kind === "integer"
-            Layout.preferredWidth: editor.field.prominent === true ? 180 : 132
-            Layout.preferredHeight: editor.field.prominent === true ? 40 : -1
-            font.bold: editor.field.prominent === true
+            Layout.preferredWidth: 132
             editable: true
             // Loose `!=`, because an unset bound arrives from Python as
             // undefined rather than null, and a strict test lets it through.
@@ -301,6 +301,10 @@ ApplicationWindow {
             Label {
                 visible: editor.field.kind === "size"
                 text: editor.field.axes[0]
+                // A slot of its own, so the box after it starts where every
+                // other editor does rather than one word further right.
+                Layout.preferredWidth: root.axisWidth
+                horizontalAlignment: Text.AlignRight
                 opacity: 0.5
             }
             TextField {
@@ -342,8 +346,46 @@ ApplicationWindow {
         Item { Layout.fillWidth: true }
     }
 
+    // What something does, behind a button rather than beside it: an
+    // explanation that runs to a paragraph does not belong in the flow of rows
+    // a form is scanned down.
+    component InfoButton: Button {
+        id: info
+        property string note: ""
+
+        text: "?"
+        checkable: true
+        implicitWidth: 34
+        // checkedChanged, not toggled: the latter fires only for a click, so
+        // anything else that sets the button would leave the panel behind it
+        // shut.
+        onCheckedChanged: info.checked ? notePopup.open() : notePopup.close()
+
+        Popup {
+            id: notePopup
+            // Ours rather than the style's: an attached ToolTip is drawn by the
+            // platform and does not show the same way on every one of them.
+            y: info.height + 6
+            x: -width + info.width
+            width: 380
+            padding: 12
+            onClosed: info.checked = false
+
+            background: Rectangle {
+                color: root.cardColor
+                border.color: root.lineColor
+                border.width: 1
+                radius: 6
+            }
+            contentItem: Label {
+                text: info.note
+                wrapMode: Text.WordWrap
+            }
+        }
+    }
+
     // One form row: a single field, or a set of switches sharing a label —
-    // and, under a choice, a line saying what the current pick does.
+    // and, for a choice, a button holding what the current pick does.
     component FormLine: ColumnLayout {
         id: formLine
         required property var line
@@ -369,10 +411,12 @@ ApplicationWindow {
 
             Label {
                 text: formLine.line.row ? formLine.line.row : formLine.line.fields[0].label
-                Layout.preferredWidth: root.labelWidth
+                // Narrower on a row whose editor is prefixed by an axis
+                // letter, by exactly what that letter takes: the boxes down
+                // the page all start at the same x either way.
+                Layout.preferredWidth: formLine.line.fields[0].kind === "size"
+                    ? root.labelWidth - root.axisWidth - 6 : root.labelWidth
                 elide: Text.ElideRight
-                font.bold: !formLine.line.row
-                    && formLine.line.fields[0].prominent === true
                 ToolTip.text: formLine.line.row ? "" : formLine.line.fields[0].help
                 ToolTip.visible: !formLine.line.row && formLine.line.fields[0].help
                     ? lineHover.hovered : false
@@ -395,7 +439,6 @@ ApplicationWindow {
 
             FieldEditor {
                 visible: !formLine.line.row
-                Layout.fillWidth: true
                 field: formLine.line.fields[0]
                 value: formLine.line.fields[0].current
                 onEdited: (newValue) => controller.setValue(
@@ -404,20 +447,17 @@ ApplicationWindow {
                     formLine.line.fields[0].id, index, newValue)
             }
 
-            Item { Layout.fillWidth: true; visible: formLine.line.row !== "" }
-        }
+            // What the chosen option does.
+            InfoButton {
+                visible: formLine.optionNote !== ""
+                note: formLine.optionNote
+            }
 
-        // Indented to the editor it belongs to, so it reads as part of that
-        // control rather than as a note on the whole section.
-        Label {
-            visible: formLine.optionNote !== ""
-            text: formLine.optionNote
-            Layout.fillWidth: true
-            Layout.leftMargin: root.labelWidth + 10
-            Layout.bottomMargin: 4
-            wrapMode: Text.WordWrap
-            font.pixelSize: 11
-            opacity: 0.55
+            // Only where there is no editor to take up the slack: a switch row
+            // keeps its switches to the left, and every other row keeps its
+            // help button out at the edge, in the column the input rows put
+            // theirs in.
+            Item { Layout.fillWidth: true; visible: formLine.line.row !== "" }
         }
     }
 
@@ -692,42 +732,9 @@ ApplicationWindow {
                                     // Each shape reads a different one, and the
                                     // wrong file fails deep inside a run rather
                                     // than here.
-                                    Button {
-                                        id: contract
-                                        text: "?"
-                                        checkable: true
-                                        implicitWidth: 34
+                                    InfoButton {
                                         visible: inputRow.modelData.help !== ""
-                                        // checkedChanged, not toggled: the
-                                        // latter fires only for a click, so
-                                        // anything else that sets the button
-                                        // would leave the panel behind it shut.
-                                        onCheckedChanged: contract.checked
-                                            ? contractPopup.open() : contractPopup.close()
-
-                                        Popup {
-                                            id: contractPopup
-                                            // Ours rather than the style's: an
-                                            // attached ToolTip is drawn by the
-                                            // platform and does not show the
-                                            // same way on every one of them.
-                                            y: contract.height + 6
-                                            x: -width + contract.width
-                                            width: 380
-                                            padding: 12
-                                            onClosed: contract.checked = false
-
-                                            background: Rectangle {
-                                                color: root.cardColor
-                                                border.color: root.lineColor
-                                                border.width: 1
-                                                radius: 6
-                                            }
-                                            contentItem: Label {
-                                                text: inputRow.modelData.help
-                                                wrapMode: Text.WordWrap
-                                            }
-                                        }
+                                        note: inputRow.modelData.help
                                     }
                                 }
                             }
