@@ -143,7 +143,7 @@ ApplicationWindow {
                 Label {
                     text: controller.runLabel
                     visible: controller.runLabel !== ""
-                    font.family: "monospace"
+                    font.family: "menlo"
                     font.pixelSize: 11
                     opacity: 0.55
                 }
@@ -578,7 +578,7 @@ ApplicationWindow {
                     id: details
                     readOnly: true
                     wrapMode: TextArea.NoWrap
-                    font.family: "monospace"
+                    font.family: "menlo"
                     font.pixelSize: 11
                     background: null
                 }
@@ -1105,7 +1105,7 @@ ApplicationWindow {
                                 id: logArea
                                 readOnly: true
                                 wrapMode: TextArea.NoWrap
-                                font.family: "monospace"
+                                font.family: "menlo"
                                 font.pixelSize: 11
                                 text: controller.logText
                                 background: null
