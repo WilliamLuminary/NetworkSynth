@@ -416,8 +416,6 @@ ApplicationWindow {
         background: Rectangle {
             radius: width / 2
             color: info.checked || infoHover.hovered ? root.lineColor : "transparent"
-            border.color: root.lineColor
-            border.width: 1
         }
 
         HoverHandler { id: infoHover }
