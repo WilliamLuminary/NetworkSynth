@@ -25,7 +25,6 @@ avg_eig = []
 
 
 def wnfd_nk(G, Q, weight=True, draw=False, fdigi=0):
-    ## Find radius
     N_list = []
     r_g_all_set = set()
     num_nodes_all = nx.number_of_nodes(G)
@@ -43,30 +42,24 @@ def wnfd_nk(G, Q, weight=True, draw=False, fdigi=0):
             if s > 0 and s < 99999:
                 grow.append(s)
         grow.sort()
-        # upf = (1/pow(10,fdigi+1)*5)
-        # grow = [round(d+upf,fdigi) for d in grow]
         if fdigi == 0:
             grow = [math.ceil(d) for d in grow]
         else:
             grow = [round(d, fdigi) for d in grow if round(d, fdigi) != 0]
-        #         grow = grow[1:]
         num = Counter(grow)
         r_g_all_set.update(num.keys())
         N_list.append(num)
 
     r_g_all = np.array(sorted(list(r_g_all_set)))
-    # noinspection DuplicatedCode
     Nw_mat = np.ones(
         (len(N_list), len(r_g_all))
-    )  # Num_r matrix: column: node, row: radius
+    )
 
     for i, num in enumerate(N_list):
         for j, r in enumerate(r_g_all):
             Nw_mat[i, j] += sum(count for radius, count in num.items() if radius <= r)
 
-    ## Distortion factor q: get Zq_mat
     diameter = r_g_all[-1]
-    # print('diameter:',diameter)
 
     Zq_list = []
 
@@ -74,7 +67,6 @@ def wnfd_nk(G, Q, weight=True, draw=False, fdigi=0):
         Zq_mat = np.power(Nw_mat / Nw_mat[:, -1, None], q)
         Zq_list.append(np.sum(Zq_mat, axis=0))
 
-    ## Get tau(slope)
     tau_list = []
     if draw == True:
         plt.figure(figsize=(7, 7))
@@ -84,10 +76,7 @@ def wnfd_nk(G, Q, weight=True, draw=False, fdigi=0):
             y = np.log(Zq_list[idx])
             q = format(q, ".0f")
             plt.plot(x, y, "*", label="q=" + str(q))
-            #         # plt.plot(x,y,'*',label='q='+str(q))
-            #         # plt.legend(fontsize=10)
             slope, intercept, _, _, _ = stats.linregress(x, y)
-            #             plt.plot(x,intercept + slope*x,alpha=0.5)
             tau_list.append(slope)
             plt.xlabel("ln(r/d)")
             plt.ylabel("ln(sum function)")
@@ -95,11 +84,9 @@ def wnfd_nk(G, Q, weight=True, draw=False, fdigi=0):
         for idx, q in enumerate(Q):
             r_g_all_np = np.array(r_g_all)
             x = np.log(r_g_all_np / diameter)
-            # print('x:',x)
             y = np.log(Zq_list[idx])
             slope, intercept, _, _, _ = stats.linregress(x, y)
             tau_list.append(slope)
-    # print('tau_list:',tau_list)
 
     return tau_list, r_g_all, diameter, Zq_list
 
@@ -107,7 +94,6 @@ def wnfd_nk(G, Q, weight=True, draw=False, fdigi=0):
 def nspectrum(tau_list, q_list, k, color):
     al_list = []
     fal_list = []
-    # noinspection DuplicatedCode
     for i in range(1, len(q_list)):
         al = (tau_list[i] - tau_list[i - 1]) / (q_list[i] - q_list[i - 1])
         al_list.append(al)
@@ -117,8 +103,6 @@ def nspectrum(tau_list, q_list, k, color):
     plt.plot(al_list, fal_list, label=k, linewidth=3, color=color)
     plt.xlabel("Lipschitz-Hölder exponent, " r"$\alpha$")
     plt.ylabel("Multi-fractal spectrum, " r"$f(\alpha)$")
-    # plt.legend()
-    # plt.savefig('/Users/xiongyex/Downloads'+'/Spec_{}.png'.format(k),bbox_inches = 'tight',dpi=600)
     alpha_0 = al_list[np.argmax(fal_list)]
     width = np.max(al_list) - np.min(al_list)
     print("Holder Exponent:", alpha_0)
@@ -142,7 +126,6 @@ def ndimension(tau_list, q_list, k, color):
     plt.plot(qd_list, dim_list, label=k, linewidth=3, color=color)
     plt.xlabel("Distorting exponent, " r"$q$")
     plt.ylabel("Generalized fractal dimension, " r"$D(q)$")
-    # plt.legend()
     print("Dim_max: ", np.max(dim_list))
     print("Dim_min: ", np.min(dim_list))
     print("Dim_max-min: ", np.max(dim_list) - np.min(dim_list))
@@ -196,7 +179,7 @@ def calculate_centralities(graph, weight_flag):
     if weight_flag:
         nfd_centrality = node_dimension(graph, weight=True)
     else:
-        nfd_centrality = node_dimension(graph, weight=None)  # Peiyu: weight=None
+        nfd_centrality = node_dimension(graph, weight=None)
     if weight_flag:
         closeness_centrality = nx.closeness_centrality(
             graph, distance=lambda u, v, d: 1 / d["weight"]
@@ -223,10 +206,10 @@ def calculate_betweenness(G_nx, weight_flag):
     if weight_flag == "True":
         G_nx = deepcopy(G_nx)
         for u, v, d in G_nx.edges(data=True):
-            if d["weight"] != 0:  # 确保权重不为 0
+            if d["weight"] != 0:
                 d["weight"] = 1.0 / d["weight"]
             else:
-                d["weight"] = float("inf")  # 如果权重为 0，设置为无穷大
+                d["weight"] = float("inf")
         G = nk.nxadapter.nx2nk(G_nx, weightAttr="weight")
     else:
         G_nx = deepcopy(G_nx)
@@ -236,7 +219,6 @@ def calculate_betweenness(G_nx, weight_flag):
 
 
 def calculate_orc(G, weight_flag):
-    """Ollivier-Ricci curvature via networkx + scipy LP (no external library)."""
     G = deepcopy(G)
     G = nx.convert_node_labels_to_integers(G)
     alpha = 0.5

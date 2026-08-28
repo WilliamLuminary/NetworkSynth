@@ -23,7 +23,7 @@ def _generate_new_datasets() -> List[DatasetId]:
 class Config2(BaseConfig):
     MODE = "generate"
 
-    DATASETS = [DatasetId("004")]  # Default: single dataset for testing
+    DATASETS = [DatasetId("004")]
 
     IMAGE_SIZE = (1887, 2048)
     FRAME_SIZE = (1887 // 4, 2048 // 4)
@@ -70,7 +70,6 @@ class Config2(BaseConfig):
 def _load_positions(dataset_id: DatasetId) -> np.ndarray:
     set_name = dataset_id[0]
     directory_path = Config2.POSITION_DATA_DIR
-    # noinspection SpellCheckingInspection
     file_path = find_file_with_pattern(
         directory_path,
         rf"W-\d+-\d+-\d+_{re.escape(set_name)}_postion\.npy",

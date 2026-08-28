@@ -13,17 +13,6 @@ from configs import SynthParams
 
 @dataclass(frozen=True)
 class TraversalRules:
-    """What the BFS compares a candidate placement against.
-
-    Derived, not chosen: the distributions are measured from the original
-    network and the thresholds come from those times the run's factors, so this
-    holds only what an inner loop reads — squared thresholds and integer cell
-    radii, in the form the comparison needs.  What the *caller* chose lives in
-    :class:`~configs.params.SynthParams`, which is the single source of the
-    factors and the only one of the two that crosses a process boundary.
-
-    Fixed for the whole traversal: nothing here changes as the BFS proceeds.
-    """
 
     degree_dist: Dict[int, float]
     degree_trans_probs: dict
@@ -32,8 +21,6 @@ class TraversalRules:
 
     closed_nodes_thr_sq: float
     closed_edges_thr_sq: float
-    #: One grid cell is one mean edge length, so a close-node search only has
-    #: to look at the cells within ``closed_nodes_factor`` of the candidate.
     grid_size: float
     node_search_radius: int
     edge_search_radius: int
@@ -58,11 +45,6 @@ class TraversalRules:
 
 @dataclass(frozen=True)
 class PlacementCounts:
-    """How a traversal's candidate placements turned out.
-
-    A result of the traversal rather than part of it: read it while the
-    traversal is open, since leaving the scope clears the record it came from.
-    """
 
     merged: int
     aborted: int
@@ -72,26 +54,7 @@ class PlacementCounts:
 
 
 class GraphNode:
-    """One node of a BFS traversal, plus the traversal itself.
 
-    Generation records a single BFS rather than placing nodes on a board that
-    several callers share, so the record — the id counter, the node and edge
-    grids, and the placement counts — lives on the class.  Two consequences
-    worth knowing before changing anything here:
-
-    - Exactly one traversal exists per process, so generation parallelises
-      across *processes* only, never threads.  Every generation pool in
-      ``pipelines/`` is a ``ProcessPoolExecutor`` for this reason; the thread
-      pools there render snapshots, which never touch this class.
-    - :meth:`traversal` is the scope that owns the record.  The static BFS
-      entry points on ``GraphGenerator`` read it straight off the class, so
-      they are only callable from inside that block.
-
-    The rules the traversal follows are separate and immutable: see
-    :class:`TraversalRules`.
-    """
-
-    #: The record: rebuilt by :meth:`reset` for every traversal.
     id_counter = None
     node_grid: Dict[tuple[float, float], set]
     edge_grid: Dict[
@@ -100,7 +63,6 @@ class GraphNode:
     _aborted_edge: int
     _merged_edge: int
 
-    #: The rules: installed once per traversal, read-only thereafter.
     _rules: Optional[TraversalRules] = None
 
     _traversal_active = False
@@ -108,13 +70,6 @@ class GraphNode:
     @classmethod
     @contextmanager
     def traversal(cls, attrs, params: SynthParams):
-        """Scope one BFS traversal: install its rules, drop its record.
-
-        Leaving the block drops the node and edge grids, so the spatial index
-        over a multi-million-node traversal is freed where the traversal ends
-        rather than wherever a caller remembers to reset.  Only one may be open
-        at a time, for the reason given in the class docstring.
-        """
         assert not cls._traversal_active, (
             "a traversal is already open: the record is class-level, so two "
             "cannot be interleaved in one process"
@@ -129,17 +84,11 @@ class GraphNode:
 
     @classmethod
     def initialize(cls, attrs, params: SynthParams):
-        """Install the rules, then start an empty record."""
         cls._rules = TraversalRules.build(attrs, params)
         cls.reset()
 
     @classmethod
     def reset(cls):
-        """Start a fresh record, keeping the rules in place.
-
-        Called at the top of every BFS entry point, so a retry re-draws from
-        the same rules rather than reinstalling them.
-        """
         cls.id_counter = itertools.count()
         cls.node_grid = defaultdict(set)
         cls.edge_grid = defaultdict(set)
@@ -152,15 +101,6 @@ class GraphNode:
 
     @classmethod
     def create_interior_node(cls, position):
-        """Node for pre-existing tile interior positions.
-
-        Added to ``node_grid`` so Phase 2 frontier expansion can
-        discover and merge with existing tile nodes — matching the
-        same close-node interaction that Phase 1 BFS has internally.
-
-        Will not expand (``len(children) == 2`` causes
-        ``generate_children()`` to return immediately).
-        """
         node = object.__new__(cls)
         node.id = next(cls.id_counter)
         node.position = position
@@ -194,13 +134,9 @@ class GraphNode:
             cls.edge_grid[key].add(edge)
 
     def __init__(self, position, parent=None, parent_angle=None):
-        """
-        PRE: param parent and parent_angle must be provided together or not at all.
-        POST: The first child of a non-root node is the parent.
-        """
         self.id: int = next(GraphNode.id_counter)
 
-        self.position: Tuple[float, float] = position  # position <- (x, y)
+        self.position: Tuple[float, float] = position
         self.clockwise: bool = random.choice([True, False])
         self.parent: GraphNode = parent
         self.children: List[GraphNode] = []
@@ -258,9 +194,7 @@ class GraphNode:
             GraphNode.edge_grid[key].add(edge)
 
     def generate_children(self) -> bool:
-        if (
-            len(self.children) > 1 or self.degree == 1
-        ):  # Skip visited nodes or Endpoint has no other child
+        if len(self.children) > 1 or self.degree == 1:
             return False
 
         angles, lengths = self._generate_angles_and_lengths()
@@ -272,16 +206,6 @@ class GraphNode:
         return True
 
     def _place_child(self, child_position, angle) -> None:
-        """Place a candidate child node.
-
-        Order of checks (same in Phase 1 and Phase 2):
-          1. Close-node merge — if there is an existing node within the
-             merge threshold, add an edge to it (counts as a child but
-             the merged node is NOT re-queued for expansion).
-          2. Close-edge avoidance — if the candidate position is too
-             close to an existing edge, abort.
-          3. Otherwise create a new child node at the candidate position.
-        """
         close_node = self._get_closest_valid_node(child_position)
         if close_node is not None:
             new_edge = (self.position, close_node.position)
@@ -392,7 +316,7 @@ class GraphNode:
         for edge_frac in edge_fractions:
             for edge in GraphNode.edge_grid.get(edge_frac, ()):
                 if new_edge[0] in edge or new_edge[1] in edge:
-                    continue  # Skip edges with the same endpoint
+                    continue
                 if _do_intersect(new_edge[0], new_edge[1], edge[0], edge[1]):
                     return True
         return False

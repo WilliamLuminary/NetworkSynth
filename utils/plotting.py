@@ -41,7 +41,7 @@ _DPI_TIERS = [
     (20_000_000, 1200),
 ]
 
-_DPI_BOOST = 300  # extra DPI headroom for CV2-based rendering
+_DPI_BOOST = 300
 
 
 def recommend_dpi(num_nodes: int) -> int:
@@ -52,37 +52,24 @@ def recommend_dpi(num_nodes: int) -> int:
 
 
 def _points_to_px(points: float | None, dpi: int, *, minimum: int) -> int:
-    """Points to pixels at *dpi*, floored at *minimum*.  A point is 1/72 inch."""
     if points is None:
         return minimum
     return max(minimum, round(points * dpi / 72))
 
 
 def recommend_dpi_cv2(num_nodes: int) -> int:
-    """Pick DPI for the CV2/OpenCV renderer (+300 over matplotlib tiers).
-
-    Returns one of 450, 600, 900, 1200, 1500, or 2100.
-    """
     return recommend_dpi(num_nodes) + _DPI_BOOST
 
 
 _WEBP_MAX_PX = 16383
 
 
-#: Segments per ``cv2.polylines`` call.  A multi-million-edge network is drawn
-#: a batch at a time rather than as one array of every segment.
 _SEGMENT_BATCH = 1_000_000
 _EDGE_COLOR_BGR = (0, 0, 255)
 _NODE_COLOR_BGR = (255, 0, 0)
 
 
 class _CvCanvas(NamedTuple):
-    """A blank canvas and the projection onto it.
-
-    Shared by the two OpenCV renderers — the whole-network one and the hybrid
-    snapshot — which agree on every pixel and differ only in where their extent
-    comes from and what they do with the result.
-    """
 
     image: ndarray
     x_min: float
@@ -92,7 +79,6 @@ class _CvCanvas(NamedTuple):
     dpi: int
 
     def project(self, xs, ys):
-        """Data coordinates to pixels.  y flips: a plot counts up, an image down."""
         return (
             ((xs - self.x_min) * self.sx).astype(np.int32),
             ((self.y_max - ys) * self.sy).astype(np.int32),
@@ -100,12 +86,6 @@ class _CvCanvas(NamedTuple):
 
 
 def _cv2_canvas(extent, style, node_count: int) -> _CvCanvas:
-    """The canvas to draw *extent* on, at the size *style* asks for.
-
-    *extent* is ``((x_min, x_max), (y_min, y_max))`` before margins: this
-    widens it by ``style.margin_frac`` of each span.  Because both margins are
-    a fraction of their own span, widening leaves the aspect ratio alone.
-    """
     dpi = style.dpi if style.dpi is not None else recommend_dpi_cv2(node_count)
 
     (x_min, x_max), (y_min, y_max) = extent
@@ -114,20 +94,14 @@ def _cv2_canvas(extent, style, node_count: int) -> _CvCanvas:
     x_min, x_max = x_min - mx, x_max + mx
     y_min, y_max = y_min - my, y_max + my
 
-    # Guard against a degenerate extent — every node at one position, or a
-    # frame with no height: the aspect and both scales divide by these.
     frame_w = max(x_max - x_min, 1e-12)
     frame_h = max(y_max - y_min, 1e-12)
 
-    # Max pixel size of the render, always capped at the WebP 16383px hard
-    # limit. A large network at that limit produces a ~190MP image most viewers
-    # cannot open, so callers can pass a lower max_px.
+    # Capped at WebP's 16383px limit, and clamped on both axes by the same
+    # factor: clamping each on its own would square a rectangular network.
     max_px = min(style.max_px or _WEBP_MAX_PX, _WEBP_MAX_PX)
     img_h = int(12 * dpi)
     img_w = int(12 * dpi * frame_w / frame_h)
-    # Clamp to max_px while preserving aspect: when either axis exceeds the
-    # cap, scale both by the same factor (clamping each axis independently
-    # would square a rectangular network).
     clamp = min(1.0, max_px / max(img_h, img_w))
     img_h = max(1, int(img_h * clamp))
     img_w = max(1, int(img_w * clamp))
@@ -143,15 +117,12 @@ def _cv2_canvas(extent, style, node_count: int) -> _CvCanvas:
 
 
 def _draw_nodes(canvas: _CvCanvas, px, py, style) -> None:
-    """Every node inside the canvas as a blue dot."""
     import cv2
 
     img_h, img_w = canvas.image.shape[:2]
     valid = (px >= 0) & (px < img_w) & (py >= 0) & (py < img_h)
     radius = _points_to_px(style.node_size, canvas.dpi, minimum=0) // 2
     if radius < 1:
-        # A single pixel per node: cheaper than a circle of radius 0, and
-        # the same result.
         canvas.image[py[valid], px[valid]] = np.array(_NODE_COLOR_BGR, dtype=np.uint8)
     else:
         for x, y in zip(px[valid], py[valid]):
@@ -159,14 +130,6 @@ def _draw_nodes(canvas: _CvCanvas, px, py, style) -> None:
 
 
 def render_network(graph: SynthGraph, style):
-    """Render a SynthGraph to a BGR ndarray using OpenCV.
-
-    Only allocates a fixed-size pixel buffer (H × W × 3 bytes) regardless
-    of the number of nodes/edges, avoiding OOM on multi-million-element
-    graphs.
-
-    *style* supplies dpi, max_px, margin_frac, border and the node/edge sizes.
-    """
     import cv2
 
     pos_arr = graph.positions()
@@ -177,9 +140,6 @@ def render_network(graph: SynthGraph, style):
     )
     px, py = canvas.project(pos_arr[:, 0], pos_arr[:, 1])
 
-    # Segments are built per batch from indices into the projected nodes, not
-    # once for the whole graph: an array of every segment is what runs out of
-    # memory on a network this renderer exists to handle.
     thickness = _points_to_px(style.line_width, canvas.dpi, minimum=1)
     edge_list = np.asarray(list(graph.edges()), dtype=np.int64)
     for start in range(0, len(edge_list), _SEGMENT_BATCH):
@@ -206,20 +166,6 @@ def render_network(graph: SynthGraph, style):
 
 
 def save_figure_as_webp(fig, filepath: str, *, dpi: int = None, lossless: bool = True):
-    """Rasterise a matplotlib Figure and save as WebP via Pillow.
-
-    If the rasterised image exceeds the WebP 16 383-pixel limit in
-    either dimension it is downscaled proportionally before encoding.
-
-    Parameters
-    ----------
-    fig : matplotlib.figure.Figure
-    filepath : str
-    dpi : int, optional
-        Override the figure's native DPI for rasterisation.
-    lossless : bool
-        True for lossless WebP (default), False for lossy (smaller).
-    """
     import logging
     from io import BytesIO
 
@@ -248,11 +194,6 @@ def save_figure_as_webp(fig, filepath: str, *, dpi: int = None, lossless: bool =
 
 
 def figure_to_ndarray(fig, swap_channels: bool = False) -> ndarray:
-    """Render a matplotlib Figure to an RGBA ndarray via the Agg canvas.
-
-    This is thread-safe: it attaches a fresh FigureCanvasAgg to the
-    figure and never touches pyplot global state.
-    """
     from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
     canvas = FigureCanvas(fig)
@@ -272,19 +213,6 @@ def save_bfs_snapshot(
     output_dir: str,
     style,
 ) -> None:
-    """Render a BFS snapshot matching the original-network plot style.
-
-    Parameters
-    ----------
-    node_positions : list of (x, y)
-    edges : set of ((x1, y1), (x2, y2))
-    frame : ((xmin, xmax), (ymin, ymax))
-    index : int
-        Snapshot sequence number (used in filename).
-    output_dir : str
-    style : RenderStyle
-        Supplies dpi and the node/edge sizes, in points.
-    """
     dpi = style.dpi
     node_size = style.node_size
     line_width = style.line_width
@@ -347,13 +275,6 @@ def save_hybrid_snapshot(
     output_dir: str,
     style,
 ) -> None:
-    """Render one hybrid Phase 2 snapshot with OpenCV.
-
-    Drawn on the whole *frame* rather than on what has grown so far, so a
-    sequence of snapshots is a sequence of the same view.  Sizes are in points,
-    converted to pixels at *style.dpi*; unset draws a 1px line and a
-    single-pixel node.
-    """
     import os
 
     import cv2
@@ -394,7 +315,6 @@ def plot_network(
     synthetic_frame_size=None,
     background=None,
 ):
-    """Plot a network with matplotlib, styled by ``config.render(data_type)``."""
     from matplotlib.figure import Figure
     from matplotlib.patches import Rectangle
 

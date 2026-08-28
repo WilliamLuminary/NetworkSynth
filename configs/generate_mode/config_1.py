@@ -31,7 +31,6 @@ class Config1(BaseConfig):
     SYNTHETIC_FRAME_SIZE = FRAME_SIZE
     CLOSED_NODES_FACTOR = 1.0
     CLOSED_EDGES_FACTOR = 1.5
-    # For the 10_kx image, node fac should be 1.5, and edge fac should be 1; 2 ~ 0.6 is also good
     MAX_ATTEMPTS = 100
 
     SYNTHETIC_GRAPH_NUMBER = 1

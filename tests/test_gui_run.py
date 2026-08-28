@@ -8,13 +8,10 @@ from configs.gui_config import GuiConfig, SpecError
 
 pytestmark = pytest.mark.unit
 
-#: Derived, never restated: a mode list written out by hand goes stale the moment
-#: one is wired or unwired, and then the tests quietly stop covering it.
 _MODE_NAMES = set(gui_run._GUI_MODES)
 
 
 def _inputs_for(mode, tmp_path, shape_index=0):
-    """The paths one of *mode*'s input shapes needs, created so they exist."""
     from gui import spec_builder
 
     shape = spec_builder.MODES[mode].input_shapes[shape_index]
@@ -23,7 +20,6 @@ def _inputs_for(mode, tmp_path, shape_index=0):
         target = tmp_path / spec_input.id
         if spec_input.kind == "dir":
             target.mkdir(exist_ok=True)
-            # A datasets directory is only valid with a pair in it.
             if spec_input.id == "datasets_dir":
                 (target / "one_edgelist.csv").write_text(
                     "source_index,target_index\n0,1\n"
@@ -36,7 +32,6 @@ def _inputs_for(mode, tmp_path, shape_index=0):
 
 
 def _every_shape():
-    """(mode, shape index) for every input shape the GUI offers."""
     from gui import spec_builder
 
     return [
@@ -177,7 +172,6 @@ class TestDirectoryInput:
         for name in ("gamma", "alpha", "beta"):
             self._pair(tmp_path, name)
 
-        # Sorted, so a run's dataset order does not depend on the filesystem.
         assert discover_datasets(str(tmp_path)) == ["alpha", "beta", "gamma"]
 
     def test_an_edge_list_without_positions_stops_the_run(self, tmp_path):
@@ -240,7 +234,6 @@ class TestEntryPointExitCodes:
     def test_reads_the_spec_from_the_environment(self, tmp_path, monkeypatch):
         monkeypatch.setenv("NETWORKSYNTH_RUN_SPEC", _spec(tmp_path, mode="nope"))
 
-        # mode is rejected, which proves the env var was read at all
         assert gui_run.main(["gui_run.py"]) == 2
 
     def test_pipeline_failure_exits_1(self, tmp_path, monkeypatch):
@@ -365,7 +358,6 @@ class TestDirectoryFullRun:
         assert len(roots) == 1, f"a directory is one run, got {roots}"
         root = out / roots[0]
 
-        # One subdirectory per dataset, one manifest covering all of them.
         assert sorted(d for d in os.listdir(root) if (root / d).is_dir()) == [
             "alpha",
             "beta",
@@ -437,7 +429,6 @@ class TestModeSelection:
 
         assert config.MODE == mode
 
-    #: Attributes each mode's pipeline reads that BaseConfig does not define.
     _MODE_EXTRAS = {
         "scaling": [
             "SCALE_ROWS",

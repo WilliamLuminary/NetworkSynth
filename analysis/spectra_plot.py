@@ -1,5 +1,3 @@
-"""Multifractal spectra and dimension curves for any number of labelled sets."""
-
 from __future__ import annotations
 
 import logging
@@ -16,7 +14,6 @@ from utils import finalize_plot
 
 logger = logging.getLogger(__name__)
 
-# Applied per-figure via rc_context, never to global rcParams.
 _PLOT_CONFIG = {
     "font.size": 24,
     "axes.linewidth": 2,

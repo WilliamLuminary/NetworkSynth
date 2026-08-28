@@ -1,12 +1,3 @@
-"""NetworkSynth — run a config.
-
-    python run.py configs/generate_mode/config_sample.py
-
-The config is the whole instruction: it names its datasets, its parameters, and
-the pipeline that runs it (``MODE``).  There is no mode argument to keep in step
-with it, and nothing to remember but the path.
-"""
-
 import logging
 import sys
 from pathlib import Path
@@ -20,7 +11,6 @@ logger = logging.getLogger("run")
 EXIT_OK = 0
 EXIT_FAILED = 1
 EXIT_BAD_ARGS = 2
-# 128 + SIGINT(2), the conventional value for a process stopped by Ctrl-C.
 EXIT_INTERRUPTED = 130
 
 _USAGE = f"""usage: python run.py <path/to/config.py>

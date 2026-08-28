@@ -76,11 +76,6 @@ def read_edge_list_csv(path: str) -> Tuple[np.ndarray, Optional[np.ndarray]]:
 
 
 def read_graph_csv(edge_list_path: str, positions_path: str) -> SynthGraph:
-    """Build a :class:`SynthGraph` from an edge-list CSV and a positions CSV.
-
-    Raises rather than guessing: an edge referencing a node with no position
-    would otherwise yield a graph whose geometry is quietly wrong.
-    """
     positions = read_positions_csv(positions_path)
     edges, weights = read_edge_list_csv(edge_list_path)
 

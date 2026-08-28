@@ -9,34 +9,14 @@ logger = logging.getLogger(__name__)
 
 
 class Saver:
-    """Writes one dataset's outputs into one directory.
-
-    Where the run writes is passed in as a value, so nothing here is global and
-    many runs can coexist.  A Saver always writes: whether a run saves at all is
-    decided once by :func:`build_saver`, which returns a :class:`NullSaver`
-    instead when ``DISABLE_SAVING`` is set.
-    """
 
     def __init__(self, config, out_dir: str):
-        """
-        :param config: The active config, supplying the save specs
-        :param out_dir: The directory this saver writes into
-
-        Postconditions:
-            - ``out_dir`` exists.
-        """
         self.output_dir = out_dir
         _ensure_directory(self.output_dir, exist_ok=True)
         self._save_func = config.save
         self._batch_timestamp: Optional[str] = None
 
     def begin_batch(self) -> str:
-        """Set a shared timestamp for a group of related saves.
-
-        All ``save`` calls until ``end_batch`` will share this
-        timestamp.  Returns the generated timestamp so callers can
-        log it.
-        """
         self._batch_timestamp = _time_id()
         return self._batch_timestamp
 
@@ -44,13 +24,6 @@ class Saver:
         self._batch_timestamp = None
 
     def save(self, content: Any, identifier: str, prefix: str = "") -> None:
-        """Save *content* according to the specs returned by the config.
-
-        :param content: The data to be saved.
-        :param identifier: String identifier (e.g. ``"original_network"``).
-            Resolves to ``SAVE_<IDENTIFIER>`` on the active config.
-        :param prefix: Optional prefix for the generated file name.
-        """
         if content is None:
             logger.warning("Content is None.")
             return
@@ -72,12 +45,6 @@ class Saver:
 
 
 class NullSaver(Saver):
-    """A Saver that accepts everything and writes nothing.
-
-    ``DISABLE_SAVING`` used to yield ``None``, which every caller had to
-    remember to check.  Keeps ``output_dir`` only, because callers build
-    subdirectory paths from it; nothing is created on disk.
-    """
 
     def __init__(self, out_dir: str):
         self.output_dir = out_dir
@@ -93,12 +60,6 @@ class NullSaver(Saver):
 
 
 def build_saver(config, out_dir: str) -> Saver:
-    """The saver this run should use: a real one, or a no-op.
-
-    The single place ``DISABLE_SAVING`` decides anything about saving.  The
-    other place it is read is :func:`~handlers.run_paths.create_run_paths`,
-    which decides whether the directory is created at all.
-    """
     if config.DISABLE_SAVING:
         logger.info(
             f"Saving is disabled; nothing will be written. {config.DISABLE_SAVING_NOTE}"
@@ -123,7 +84,7 @@ _IS_WINDOWS = sys.platform == "win32"
 
 def _create_junction(link_path: str, target_path: str) -> None:
     try:
-        import _winapi  # CPython C extension, available on all Windows builds
+        import _winapi
 
         _winapi.CreateJunction(target_path, link_path)
         return

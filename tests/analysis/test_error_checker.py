@@ -110,12 +110,6 @@ class TestAnalyzerHonoursExplicitSettings:
     def test_weighted_setting_rejected_for_unweighted_graph(
         self, load_unweighted_test_synth_graph
     ):
-        """Asking for weights a graph does not have is a misconfiguration.
-
-        This used to downgrade to an unweighted measure with only a debug line,
-        so a run configured for a weighted analysis reported unweighted numbers
-        under a weighted label.
-        """
         from analysis.multifractal_analyzer import MultifractalAnalyzer
 
         with pytest.raises(AssertionError, match="carries no edge weights"):
@@ -124,11 +118,6 @@ class TestAnalyzerHonoursExplicitSettings:
                 measure_weighted=True,
                 full_q_band=False,
             )
-
-
-# ---------------------------------------------------------------------------
-# Length + angle gate
-# ---------------------------------------------------------------------------
 
 
 class TestLengthAngleErrorChecker:

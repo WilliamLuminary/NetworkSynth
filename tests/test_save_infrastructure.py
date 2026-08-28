@@ -9,9 +9,6 @@ import pytest
 
 pytestmark = pytest.mark.unit
 
-# ---------------------------------------------------------------------------
-# Stub networkit so the full import chain works without the C extension.
-# ---------------------------------------------------------------------------
 _nk = types.ModuleType("networkit")
 _nk.Graph = type("Graph", (), {})
 _nk.Format = type("Format", (), {"NetworkitBinary": 0})
@@ -26,10 +23,6 @@ from configs.file_definitions import (
 )
 from configs.file_definitions import save_pickle as _save_pickle
 from handlers.saver import Saver  # noqa: E402
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 class FakeGraph:
@@ -54,11 +47,6 @@ class FakeGraph:
         return self._positions
 
 
-# ---------------------------------------------------------------------------
-# 1. Dispatcher tests
-# ---------------------------------------------------------------------------
-
-
 class TestDispatcher:
     def test_known_identifier(self):
         specs = BaseConfig.save("original_image")
@@ -79,11 +67,6 @@ class TestDispatcher:
                 assert isinstance(spec, SaveSpec), f"{name} holds {type(spec)}"
                 assert callable(spec.save_fn), f"save_fn not callable for {name}"
                 assert spec.extension, f"no extension for {name}"
-
-
-# ---------------------------------------------------------------------------
-# 2. Spec content tests
-# ---------------------------------------------------------------------------
 
 
 class TestSpecs:
@@ -108,12 +91,7 @@ class TestSpecs:
 
     def test_analysis_figure_has_timestamp(self):
         specs = BaseConfig.save("analysis_figure")
-        assert specs[0].use_timestamp is True  # the SaveSpec default
-
-
-# ---------------------------------------------------------------------------
-# 3. Mode config override tests
-# ---------------------------------------------------------------------------
+        assert specs[0].use_timestamp is True
 
 
 class TestModeOverrides:
@@ -142,7 +120,7 @@ class TestModeOverrides:
     def test_override_does_not_leak_to_other_configs(self):
         from configs.mosaic_mode.config_sample import SampleConfig as MosaicConfig
 
-        MosaicConfig.save("synthetic_graph")  # mosaic overrides this identifier
+        MosaicConfig.save("synthetic_graph")
 
         assert len(BaseConfig.save("synthetic_graph")) == 1
 
@@ -153,11 +131,6 @@ class TestModeOverrides:
         assert specs[0].use_timestamp is False
         specs = CompareConfig.save("analysis_figure")
         assert specs[0].extension == "webp"
-
-
-# ---------------------------------------------------------------------------
-# 4. Saver path-construction tests
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture
@@ -236,7 +209,7 @@ class TestSaverPaths:
 
     def test_none_content_skipped(self, saver_in_tmpdir):
         saver = saver_in_tmpdir
-        saver.save(None, "original_image")  # should not raise
+        saver.save(None, "original_image")
 
     def test_prefix_normalization_in_run_agent(self):
         prefix = "test"
@@ -270,11 +243,6 @@ class TestSaverPaths:
         assert len(recorded) == 1
         parent = os.path.dirname(recorded[0])
         assert os.path.isdir(parent)
-
-
-# ---------------------------------------------------------------------------
-# 5. Serializer tests
-# ---------------------------------------------------------------------------
 
 
 class TestSerializers:
@@ -320,11 +288,6 @@ class TestSerializers:
         assert len(rows) == 1 + graph._n
 
     def test_save_network_csv_omits_weight_column_when_unweighted(self, tmp_path):
-        """No weight column for an unweighted graph.
-
-        An unweighted networkit graph reports every weight as 1.0, so writing
-        the column anyway produced a file that read back as weighted.
-        """
         graph = FakeGraph(n_nodes=4, weighted=False)
         path = str(tmp_path / "network.csv")
         save_network_csv(graph, path)
@@ -334,11 +297,6 @@ class TestSerializers:
         assert rows[0] == ["source_index", "target_index"]
         assert len(rows) == 1 + len(graph._edges)
         assert all(len(r) == 2 for r in rows[1:])
-
-
-# ---------------------------------------------------------------------------
-# 6. End-to-end integration
-# ---------------------------------------------------------------------------
 
 
 class TestEndToEnd:
@@ -382,11 +340,6 @@ class TestEndToEnd:
         assert any("positions" in n for n in names)
 
 
-# ---------------------------------------------------------------------------
-# Disabled saving
-# ---------------------------------------------------------------------------
-
-
 class TestDisabledSaving:
 
     def test_a_saver_that_exists_always_writes(self, tmp_path):
@@ -397,9 +350,6 @@ class TestDisabledSaving:
         saver = Saver(Disabled, str(tmp_path))
 
         assert isinstance(saver, Saver)
-
-    # Which saver a run gets is build_saver's decision now; both branches are
-    # covered in tests/test_null_saver.py.
 
     def test_the_flag_is_never_set_on_base_config(self):
 

@@ -48,7 +48,6 @@ class TestClassification:
         assert "sample_1/snapshots/step_00001.png" in buckets["snapshots"]
         assert "sample_1/synthetic/graph.webp" in buckets["previews"]
         assert "sample_1/original/net.nkbin" in buckets["networks"]
-        # An analysis output is neither a network to load nor a render of one.
         assert "sample_1/analysis_data.pkl" in buckets["analysis"]
         assert "sample_1/spectra_analysis_figure.webp" in buckets["analysis"]
         assert "sample_1/analysis_data.pkl" not in buckets.get("networks", [])
@@ -131,7 +130,7 @@ class TestWriteManifest:
         path = write_manifest(RunPaths(root=str(tmp_path)), status=STATUS_OK)
 
         with open(path) as fh:
-            json.load(fh)  # must not raise
+            json.load(fh)
 
 
 @pytest.mark.integration
@@ -164,5 +163,4 @@ class TestManifestFromARealRun:
         assert data["status"] == STATUS_OK
         assert data["file_count"] > 0
         assert data["outputs"], "manifest listed no outputs"
-        # the GUI's primary need: locate the generated network
         assert data["outputs"].get("edge_lists"), data["outputs"]

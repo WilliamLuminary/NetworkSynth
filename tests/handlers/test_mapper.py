@@ -29,13 +29,11 @@ def profile_mapper_time(mapper, graph, iterations=10):
 
 
 def compute_quality(mapper, graph):
-    # noinspection PyProtectedMember
     original_lengths, original_weights = Mapper._compute_edge_metrics(graph)
     graph_copy = graph.copy()
     graph_copy.make_unweighted()
     mapper.assign_weights(graph_copy)
 
-    # noinspection PyProtectedMember
     new_lengths, new_weights = Mapper._compute_edge_metrics(graph_copy)
     mae = np.mean(np.abs(np.array(new_weights) - np.array(original_weights)))
     corr, _ = pearsonr(original_weights, new_weights)
@@ -47,13 +45,11 @@ def test_mapper(load_weighted_test_synth_graph, tmp_path):
     sample_graph = load_weighted_test_synth_graph
     mapper = Mapper(sample_graph)
 
-    # noinspection PyProtectedMember
     ori_lengths, ori_weights = Mapper._compute_edge_metrics(sample_graph)
 
     new_graph = sample_graph.copy()
     new_graph.make_unweighted()
     mapper.assign_weights(new_graph)
-    # noinspection PyProtectedMember
     new_lengths, new_weights = Mapper._compute_edge_metrics(new_graph)
 
     plt.figure(figsize=(8, 6))

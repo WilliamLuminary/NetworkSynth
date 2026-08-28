@@ -42,7 +42,6 @@ class SnapshotConfig(BaseConfig):
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = True
 
-    # Thinner strokes: a larger SYNTHETIC_FRAME_SIZE needs finer lines.
     RENDER_BFS_SNAPSHOT = replace(
         BaseConfig.RENDER_BFS_SNAPSHOT, node_size=0.5, line_width=0.5
     )

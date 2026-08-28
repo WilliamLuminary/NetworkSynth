@@ -62,10 +62,8 @@ class ConfigNanowires(BaseConfig):
 
     @staticmethod
     def load_original_image(dataset_id: DatasetId) -> Optional[np.ndarray]:
-        # For nanowires, dataset_id has single level: "1-0", "1-1", etc.
         directory = os.path.join(ConfigNanowires.BASE_INPUT_PATH, dataset_id[0])
 
-        # Find any .tif file in the directory (naming varies: 1.tif, 1-1.tif, etc.)
         tif_files = [f for f in os.listdir(directory) if f.lower().endswith(".tif")]
         if not tif_files:
             logger.warning(f"No .tif image found in {directory}. Returning None.")

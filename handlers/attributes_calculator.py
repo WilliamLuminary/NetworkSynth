@@ -106,9 +106,6 @@ class AttributesCalculator:
 
     @staticmethod
     def _compute_average_degree(num_edges: int, num_nodes: int) -> float:
-        """
-        For undirected graphs, average_degree = (2 * E) / N.
-        """
         return 2.0 * num_edges / num_nodes
 
     @staticmethod
@@ -131,10 +128,6 @@ class AttributesCalculator:
     def _compute_average_edge_length(
         degree_to_lengths: Dict[int, List[float]],
     ) -> float:
-        """
-        Compute the mean edge length from the 'degree_to_lengths' dictionary.
-        Note: each edge length is counted twice (once from each node endpoint).
-        """
         total_length = 0.0
         total_count = 0
         for length_list in degree_to_lengths.values():

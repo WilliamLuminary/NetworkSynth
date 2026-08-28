@@ -1,24 +1,3 @@
-"""Render what a run reads, or what one produced, without running anything.
-
-A separate process for the same reason ``gui_run.py`` is one: loading a
-network, measuring it and rendering it takes seconds, and the window must stay
-answerable while that happens.
-
-It is handed the run-spec the form has already built, so a preview is drawn by
-the same loader, the same style and the same frame as the run's own output —
-"background and network" is the figure the run writes as ``original_graph``,
-not an imitation of it.  Nothing is written into the run's output directory:
-everything lands in the directory named on the command line.
-
-    gui_preview.py <run_spec.json> original    <out_dir>
-    gui_preview.py <run_spec.json> synthetic   <out_dir> <run_root>
-    gui_preview.py <run_spec.json> save_edited <out_dir>
-
-The last one writes rather than draws: the input network as the spec is
-currently reading it, turn included, so a correction made in the form can be
-kept.
-"""
-
 import json
 import logging
 import os
@@ -33,26 +12,13 @@ from utils import plot_network
 
 logger = logging.getLogger("gui_preview")
 
-#: Previews are shown in a panel a few hundred pixels wide.  Node and line
-#: sizes are in points, so a lower DPI is the same picture with fewer pixels —
-#: at 90 a render is ~900px and takes about half as long as the 300 the run
-#: saves at, nearly all of it in encoding the PNG.  Lower buys little: below
-#: this the per-edge cost of building the figure dominates, and it does not
-#: change with DPI.
 PREVIEW_DPI = 90
 
-#: The batch file ``GenerationRun.save_synthetic_outputs`` writes: every
-#: synthetic network from the run, in the order they were collected.
 _BATCH_SUFFIX = ".pkl"
 _BATCH_MARKER = "synthetic_network"
 
-#: What that same method writes for each network on its own, straight after
-#: the batch.  The two share a name — ``SAVE_SYNTHETIC_EXPORT``'s detail is
-#: also "synthetic_network" — and differ only by this ``_n<i>_`` infix.  It
-#: only started to matter when the form began offering the pickle network
-#: format: before that the exports were CSVs and the suffix told them apart,
-#: after it they are pickles too and the newest file in the directory is one
-#: of them rather than the batch.
+# The per-network exports share the batch's name — SAVE_SYNTHETIC_EXPORT's
+# detail is also "synthetic_network" — and differ only by this infix.
 _EXPORT_INFIX = re.compile(r"_n\d+_" + _BATCH_MARKER)
 
 _LABEL_WIDTH = 21
@@ -87,22 +53,10 @@ def _write(fig, out_dir: str, name: str) -> str:
 
 
 def _preview_style(config, identifier: str):
-    """The run's own style, at preview size and without an OpenCV window.
-
-    ``show_on_the_fly`` is on for some outputs, which would pop up a cv2
-    window from a process the user cannot see.
-    """
     return replace(config.render(identifier), dpi=PREVIEW_DPI, show_on_the_fly=False)
 
 
 def _background_figure(image, frame_size, style):
-    """The background on its own, in the frame the network is drawn in.
-
-    Mirrors ``plot_network``'s geometry for ``original_graph`` so the three
-    original previews are one picture with layers removed, not three
-    framings of the same data.  ``plot_network`` itself always draws the
-    nodes and edges, which is exactly what this variant leaves out.
-    """
     from matplotlib.figure import Figure
 
     width, height = frame_size
@@ -127,13 +81,6 @@ def _background_figure(image, frame_size, style):
 
 
 def preview_original(config, out_dir: str) -> dict:
-    """The input network: with its background, without it, and the background.
-
-    All three are rendered now rather than one per request, so switching
-    between them costs nothing.  Only the first dataset is drawn: a directory
-    of networks is many runs' worth of input, and a preview is a look at what
-    was chosen, not a contact sheet.
-    """
     datasets = config.get_datasets()
     dataset_id = datasets[0]
 
@@ -172,8 +119,6 @@ def preview_original(config, out_dir: str) -> dict:
             "background.png",
         )
 
-    # Named only when the name means something: a directory's datasets are
-    # named after their files, where a single CSV pair takes the run's name.
     note = ""
     if len(datasets) > 1:
         note = (
@@ -183,14 +128,6 @@ def preview_original(config, out_dir: str) -> dict:
     return {
         "kind": "original",
         "has_background": image is not None,
-        # (width, height).  The form takes its frame from this: position data
-        # need not reach the corners of what it was traced from, so the image
-        # is the only reliable statement of how big the input really is.
-        #
-        # Read from the config rather than measured off `image`: the loader
-        # returns the picture already scaled into FRAME_SIZE, so measuring it
-        # would hand the form back the frame it started with and pin it there
-        # for good.  IMAGE_SIZE is the file's own size, in (height, width).
         "image_size": None if image is None else list(reversed(config.IMAGE_SIZE)),
         "images": images,
         "note": note,
@@ -199,13 +136,6 @@ def preview_original(config, out_dir: str) -> dict:
 
 
 def _find_batch(run_root: str) -> str:
-    """The run's synthetic batch file, newest first when a run held several.
-
-    Raises rather than reporting an empty preview: the caller only asks after a
-    run finished, so a missing batch means the run did not write one — which is
-    true of every mode except ``generate`` — and saying so is more use than an
-    empty panel.
-    """
     found = []
     for directory, _, names in os.walk(run_root):
         for name in names:
@@ -223,12 +153,6 @@ def _find_batch(run_root: str) -> str:
 
 
 def preview_synthetic(config, run_root: str, out_dir: str) -> dict:
-    """The first network in the run's output list.
-
-    The first, deliberately, and labelled as such: the list is in the order
-    the workers finished, so it is not ranked, and calling it the best would
-    claim a comparison nobody made.
-    """
     batch_path = _find_batch(run_root)
     with open(batch_path, "rb") as handle:
         graphs = pickle.load(handle)
@@ -260,7 +184,6 @@ def preview_synthetic(config, run_root: str, out_dir: str) -> dict:
 
 
 def _source(config, dataset_id):
-    """Where the input came from, and what to call an edited copy of it."""
     paths = config.PATHS
     if paths.get("datasets_dir"):
         return paths["datasets_dir"], str(dataset_id)
@@ -278,15 +201,6 @@ def _source(config, dataset_id):
 
 
 def save_edited(config, out_dir: str) -> dict:
-    """Write the input network as it is being read, turn and all.
-
-    Into an ``edited`` folder beside the source rather than alongside it: a
-    directory of networks is discovered by scanning for ``*_edgelist.csv``, so
-    a copy dropped in there would quietly double every later run.
-
-    The image is copied across untouched when there is one, so the result is a
-    complete dataset — nothing about the image is edited here, or anywhere.
-    """
     import shutil
 
     from configs.file_definitions import save_network_csv
@@ -314,8 +228,6 @@ def save_edited(config, out_dir: str) -> dict:
         "kind": "save_edited",
         "dir": target_dir,
         "count": len(written),
-        # What the form should read from now: the edited copies, which already
-        # have the turn baked in.
         "inputs": (
             {"datasets_dir": target_dir}
             if config.PATHS.get("datasets_dir")
@@ -328,7 +240,6 @@ def save_edited(config, out_dir: str) -> dict:
 
 
 def _image_path(config, dataset_id):
-    """The image file behind *dataset_id*, if the spec has one."""
     directory = config.PATHS.get("datasets_dir")
     if directory:
         candidate = os.path.join(directory, f"{dataset_id}_image.tif")

@@ -16,8 +16,6 @@ class SampleConfig(BaseConfig):
 
     MEASURE_WEIGHTED = False
 
-    #: One dataset per run: analysis compares the two sets below, and which two
-    #: they are is the point of the mode, not something to discover.
     DATASETS = [DatasetId("analysis")]
 
     _RESULTS = os.path.join(BaseConfig.BASE_OUTPUT_PATH, "latest_result", "sample_1")
@@ -31,13 +29,6 @@ class SampleConfig(BaseConfig):
 
 
 def _load_networks(folder: str) -> list:
-    """Every network in *folder*, in whichever format it was written.
-
-    Pickles first, because one holds a whole batch, then the CSV pairs — the
-    original network is only ever written as CSV, so a results directory cannot
-    be read at all without both.  Either format goes through the same readers
-    the generate mode uses; nothing here parses a graph itself.
-    """
     pickled = _load_network_pkl(folder)
     if pickled:
         return pickled
@@ -54,8 +45,6 @@ def _load_network_csv(folder: str) -> list:
         positions = os.path.join(
             folder, name.replace("_edgelist.csv", "_positions.csv")
         )
-        # Named and stopped rather than skipped: half a results directory
-        # analysed as if it were whole is a wrong answer, not a smaller one.
         assert os.path.exists(positions), (
             f"{os.path.join(folder, name)} has no positions file "
             f"beside it ({positions})"
@@ -65,11 +54,6 @@ def _load_network_csv(folder: str) -> list:
 
 
 def _load_network_pkl(folder: str) -> list:
-    """Load network pkl files with backward compatibility for nx.Graph.
-
-    If the pickle contains legacy ``nx.Graph`` objects, *networkx*
-    must be installed so ``pickle.load`` can deserialize them.
-    """
     from graphs.synth_graph import SynthGraph
 
     try:

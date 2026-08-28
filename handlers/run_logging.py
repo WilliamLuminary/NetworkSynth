@@ -4,7 +4,6 @@ import logging
 import os
 from typing import Optional
 
-# Handlers we installed, so repeat calls replace rather than duplicate them.
 _CONSOLE_FLAG = "_networksynth_console"
 _RUN_LOG_FLAG = "_networksynth_run_log"
 
@@ -19,11 +18,6 @@ def _existing(flag: str) -> Optional[logging.Handler]:
 
 
 def configure_console(level: int = logging.INFO) -> None:
-    """Attach a plain-text console handler to the root logger.
-
-    Idempotent: calling it again adjusts the level rather than adding a second
-    handler and double-printing every line.
-    """
     root = logging.getLogger()
     root.setLevel(level)
 
@@ -42,12 +36,6 @@ def configure_console(level: int = logging.INFO) -> None:
 def attach_run_log(
     run_root: str, run_id: str, level: int = logging.INFO
 ) -> Optional[str]:
-    """Write this run's JSON-lines log inside *run_root*.  Returns its path.
-
-    Replaces any previously attached run log, so a second run in the same
-    process gets its own file instead of silently continuing to write to the
-    first one's — or, as before, getting no file at all.
-    """
     from utils import JsonFormatter
 
     root = logging.getLogger()
@@ -59,8 +47,6 @@ def attach_run_log(
         previous.close()
 
     if not os.path.isdir(run_root):
-        # create_run_paths() does not create the directory when saving is
-        # disabled, and a disabled run should leave no trace — including no log.
         return None
 
     path = os.path.join(run_root, "run.jsonl")

@@ -88,12 +88,6 @@ def largest_connected_component(graph: SynthGraph) -> SynthGraph:
 
 
 def trim_graph(graph: SynthGraph, tar_avg_deg: float) -> SynthGraph:
-    """Trim edges from high-degree nodes until average degree <= 1.1 * target.
-
-    Uses vectorised NumPy to score all edges and ``argpartition`` to
-    select which to keep in O(E), then rebuilds the graph and extracts
-    the LCC.  Repeats if LCC shifts the average degree above target.
-    """
     import networkit as nk
 
     logger = logging.getLogger(__name__)
@@ -154,23 +148,10 @@ def trim_graph(graph: SynthGraph, tar_avg_deg: float) -> SynthGraph:
     return graph
 
 
-#: The quarter turns a network can be given, plus the axis swap that is not a
-#: rotation at all.  "none" is the identity and the default.
 ORIENTATIONS = ("none", "rot90", "rot180", "rot270", "transpose")
 
 
 def orient_positions(graph, orientation: str) -> None:
-    """Turn a network's positions in place, a quarter turn at a time.
-
-    The turn happens inside the positions' own bounding box: the corner the
-    data starts at stays where it is, and only the extents swap.  Anchoring on
-    the frame instead would throw a network that does not fill its frame off
-    the edge, and there is no reliable frame before the data has been squared
-    up anyway.
-
-    Only the network moves.  The image it was traced from is left exactly as
-    it is — an image is aligned by preparing it, not by guessing here.
-    """
     if not orientation or orientation == "none":
         return
     if orientation == "transpose":
@@ -193,16 +174,11 @@ def orient_positions(graph, orientation: str) -> None:
     elif orientation == "rot180":
         positions[:, 0] = x_min + (x_max - x)
         positions[:, 1] = y_min + (y_max - y)
-    else:  # rot270
+    else:
         positions[:, 0] = x_min + (y - y_min)
         positions[:, 1] = y_min + (x_max - x)
 
 
 def transpose_positions(graph) -> None:
-    """Swap x and y for every node, in place.
-
-    Some inputs record positions row-major (row, column) where the rest of the
-    toolkit expects (x, y).
-    """
     positions = graph.positions()
     positions[:, [0, 1]] = positions[:, [1, 0]]
