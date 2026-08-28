@@ -272,12 +272,36 @@ ApplicationWindow {
         // under a key and a moment range is a boolean, and neither is
         // anything to put in front of someone.
         ComboBox {
+            id: choice
             visible: editor.field.kind === "choice"
             Layout.preferredWidth: 190
             model: editor.field.labels.length > 0
                 ? editor.field.labels : editor.field.options
             currentIndex: Math.max(0, editor.field.options.indexOf(editor.value))
             onActivated: editor.edited(editor.field.options[currentIndex])
+
+            // What each option does, while the list is open and the pointer is
+            // on it: picking between them is when it is wanted, and the row's
+            // own button can only speak for the one already chosen.
+            delegate: ItemDelegate {
+                id: option
+                required property var modelData
+                required property int index
+
+                width: choice.width
+                text: option.modelData
+                highlighted: choice.highlightedIndex === option.index
+
+                HoverHandler { id: optionHover }
+
+                HoverPanel {
+                    note: option.index < editor.field.option_help.length
+                        ? editor.field.option_help[option.index] : ""
+                    showing: optionHover.hovered
+                    x: option.width + 6
+                    y: 0
+                }
+            }
         }
 
         TextField {

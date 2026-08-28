@@ -751,6 +751,7 @@ _SAMPLE_INPUTS = {
     "datasets_dir": os.path.join(_SAMPLES, "gui_mode"),
     "adjacency": os.path.join(_SAMPLES, "generate_mode", "sample_1_mat.npy"),
     "positions_npy": os.path.join(_SAMPLES, "generate_mode", "sample_1_pos.npy"),
+    "network_pkl": os.path.join(_SAMPLES, "gui_mode", "sample_1_network.pkl"),
 }
 
 
