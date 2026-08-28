@@ -47,7 +47,7 @@ class GraphGenerator:
     def generate_network_with_snapshots(
         self,
         snapshot_callback,
-        snapshot_interval: int = 50,
+        snapshot_round_interval: int = 10,
         frame_range: Optional[Tuple[int, int]] = None,
         regenerate_times: int = 100,
     ):
@@ -57,7 +57,7 @@ class GraphGenerator:
             nodes, edges = self._bfs_network(
                 frame_range,
                 snapshot_callback=snapshot_callback,
-                snapshot_interval=snapshot_interval,
+                snapshot_round_interval=snapshot_round_interval,
             )
             if nodes and len(nodes) > 100:
                 break
@@ -122,7 +122,7 @@ class GraphGenerator:
         frame_range: Tuple[int, int],
         *,
         snapshot_callback=None,
-        snapshot_interval: int = 0,
+        snapshot_round_interval: int = 0,
     ) -> Tuple[set, set]:
         GraphNode.reset()
         root_node = GraphNode((0, 0))
@@ -134,7 +134,7 @@ class GraphGenerator:
 
         from collections import deque
 
-        take_snapshots = snapshot_callback is not None and snapshot_interval > 0
+        take_snapshots = snapshot_callback is not None and snapshot_round_interval > 0
         snapshot_idx = 0
 
         if take_snapshots:
@@ -143,28 +143,38 @@ class GraphGenerator:
             )
             snapshot_idx += 1
 
-        next_snapshot_at = snapshot_interval if take_snapshots else float("inf")
-
         node_queue = deque([root_node])
+        # A round is one frontier: as many pops as the queue held when it
+        # began.  Snapshots are counted in rounds here as they are in Phase 2,
+        # so an interval means the same thing in both modes.
+        pops_left = len(node_queue)
+        rounds = 0
+
         while node_queue:
             current_node = node_queue.popleft()
-            if not _within_frame(current_node.position, frame):
-                continue
-            if current_node.generate_children():
+            pops_left -= 1
+            if (
+                _within_frame(current_node.position, frame)
+                and current_node.generate_children()
+            ):
                 for child in current_node.children:
                     if child != current_node:
                         node_set.add(child)
                         edge_set.add((current_node.position, child.position))
                         node_queue.append(child)
 
-            if take_snapshots and len(node_set) >= next_snapshot_at:
+            if pops_left > 0:
+                continue
+
+            rounds += 1
+            pops_left = len(node_queue)
+            if take_snapshots and rounds % snapshot_round_interval == 0:
                 result = snapshot_callback(
                     [n.position for n in node_set], set(edge_set), frame, snapshot_idx
                 )
                 if result is False:
                     return node_set, edge_set
                 snapshot_idx += 1
-                next_snapshot_at += snapshot_interval
 
         if take_snapshots:
             snapshot_callback(

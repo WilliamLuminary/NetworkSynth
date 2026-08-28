@@ -428,11 +428,28 @@ ApplicationWindow {
 
             Repeater {
                 model: formLine.line.row ? formLine.line.fields : []
-                delegate: CheckBox {
+                delegate: RowLayout {
+                    id: shared
                     required property var modelData
-                    text: modelData.label
-                    checked: modelData.current === true
-                    onToggled: controller.setValue(modelData.id, checked)
+                    spacing: 6
+
+                    CheckBox {
+                        visible: shared.modelData.kind === "bool"
+                        text: shared.modelData.label === formLine.line.row
+                            ? "" : shared.modelData.label
+                        checked: shared.modelData.current === true
+                        onToggled: controller.setValue(shared.modelData.id, checked)
+                    }
+
+                    FieldEditor {
+                        visible: shared.modelData.kind !== "bool"
+                        field: shared.modelData
+                        value: shared.modelData.current
+                        onEdited: (newValue) => controller.setValue(
+                            shared.modelData.id, newValue)
+                        onSized: (index, newValue) => controller.setSize(
+                            shared.modelData.id, index, newValue)
+                    }
                 }
             }
 

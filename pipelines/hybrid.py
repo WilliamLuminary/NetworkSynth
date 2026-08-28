@@ -399,6 +399,7 @@ def run_phase2(
                 idx,
                 snapshot_dir,
                 snapshot_style,
+                config.snapshot_formats(),
             )
             pending.append(future)
             logger.info(

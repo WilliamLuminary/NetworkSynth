@@ -23,8 +23,15 @@ _FORMAT_HELP = {
 }
 
 
-def _format_fields(group: str, formats, default: str) -> List[Field]:
-    noun = {"network": "Network format", "plot": "Plot format"}[group]
+#: The label each group of format switches shares.  Named here because the
+#: window draws these rows on a plate of their own, apart from the other
+#: output rows, and has to know which they are.
+_FORMAT_ROWS = {"network": "Network format", "plot": "Plot format"}
+FORMAT_ROWS = tuple(_FORMAT_ROWS.values())
+
+
+def _format_fields(group: str, formats, default: str, omit: tuple = ()) -> List[Field]:
+    noun = _FORMAT_ROWS[group]
     return [
         Field(
             format_param(group, name),
@@ -36,6 +43,7 @@ def _format_fields(group: str, formats, default: str) -> List[Field]:
             help=_FORMAT_HELP[name],
         )
         for name in formats
+        if name not in omit
     ]
 
 
@@ -217,7 +225,7 @@ _ORIENTATIONS_NAMED = {
 }
 
 
-def _common_fields() -> List[Field]:
+def _common_fields(vector_plots: bool = True) -> List[Field]:
     from utils.graph_ops import ORIENTATIONS
 
     _ORIENTATION_LABELS = tuple(
@@ -327,7 +335,7 @@ def _common_fields() -> List[Field]:
                 maximum=1.0,
                 step=0.01,
                 group="Quality",
-                hide_when=("ERROR_CHECKER", ("none",)),
+                hide_when=(("ERROR_CHECKER", ("none",)),),
                 help="How far from the original a candidate may be and still pass.",
             ),
             Field(
@@ -339,7 +347,7 @@ def _common_fields() -> List[Field]:
                 maximum=100,
                 step=1,
                 group="Quality",
-                hide_when=("ERROR_CHECKER", ("none",)),
+                hide_when=(("ERROR_CHECKER", ("none",)),),
                 help="Tries per network before giving up on it.",
             ),
             Field(
@@ -348,7 +356,7 @@ def _common_fields() -> List[Field]:
                 False,
                 kind="bool",
                 group="Quality",
-                hide_when=("ERROR_CHECKER", ("none", "length_angle")),
+                hide_when=(("ERROR_CHECKER", ("none", "length_angle")),),
                 help=(
                     "Measure along weighted paths rather than counting edges. "
                     "The input has to carry weights, or the run stops."
@@ -369,7 +377,7 @@ def _common_fields() -> List[Field]:
                     "for it.",
                 ),
                 group="Quality",
-                hide_when=("ERROR_CHECKER", ("none", "length_angle")),
+                hide_when=(("ERROR_CHECKER", ("none", "length_angle")),),
                 help=(
                     "The span of moments the spectrum is measured over. Wider "
                     "weighs the extremes more heavily."
@@ -392,6 +400,7 @@ def _common_fields() -> List[Field]:
                 False,
                 kind="bool",
                 group=OUTPUT_GROUP,
+                row="Snapshots",
                 help=(
                     "Save the network as it grows, into a 'snapshots' folder\n"
                     "beside the results. Generate makes one network when this\n"
@@ -401,23 +410,26 @@ def _common_fields() -> List[Field]:
             Field(
                 "SNAPSHOT_INTERVAL",
                 "Snapshot every",
-                50,
+                10,
                 kind="integer",
                 minimum=1,
-                maximum=10000,
-                step=10,
-                unit="growth steps",
+                maximum=BaseConfig.PHASE2_MAX_ROUNDS,
+                step=1,
+                unit="rounds apart",
                 group=OUTPUT_GROUP,
-                hide_when=("WRITE_SNAPSHOTS", (False,)),
+                row="Snapshots",
+                hide_when=(("WRITE_SNAPSHOTS", (False,)),),
                 help=(
-                    "What a step is depends on the mode: Generate counts\n"
-                    "nodes added to the network, Hybrid counts rounds of\n"
-                    "stitching between the patches."
+                    "A round is one frontier of growth: every node waiting at\n"
+                    "the start of it. The same in both modes — Generate grows\n"
+                    "one network, Hybrid stitches between the patches."
                 ),
             ),
         ]
         + _format_fields("network", NETWORK_FORMATS, "csv")
-        + _format_fields("plot", PLOT_FORMATS, "webp")
+        + _format_fields(
+            "plot", PLOT_FORMATS, "webp", omit=() if vector_plots else ("svg",)
+        )
     )
 
 
@@ -716,7 +728,10 @@ MODES: Dict[str, ModeSpec] = {
         "hybrid",
         "Hybrid",
         "Assemble a large network by tiling generated patches together.",
-        _hybrid_fields() + _common_fields(),
+        # No .svg: a hybrid network is drawn as pixels by OpenCV, both for the
+        # assembled image and for its snapshots, so there is no vector to write
+        # and asking for one only fails the run at the end of it.
+        _hybrid_fields() + _common_fields(vector_plots=False),
         _network_shapes(),
     ),
     "sweep": ModeSpec(

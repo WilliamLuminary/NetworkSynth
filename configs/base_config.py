@@ -147,6 +147,10 @@ class BaseConfig:
         return max_workers
 
     @classmethod
+    def snapshot_formats(cls) -> tuple:
+        return tuple(spec.extension for spec in cls.SAVE_SYNTHETIC_GRAPH)
+
+    @classmethod
     def get_snapshot_plot_workers(cls) -> int:
         cpu_count = os.cpu_count() or 1
         return min(max(1, cpu_count // 2), cls.SNAPSHOT_PLOT_WORKERS)

@@ -458,6 +458,7 @@ The form is a deliberate subset. What only a CLI config can do:
 | `DATASET_FACTORS` | Per-dataset `(CLOSED_NODES_FACTOR, CLOSED_EDGES_FACTOR)` overrides. A GUI directory run applies one pair to every dataset in the folder. |
 | `TILE_FRAME_SIZE` | Fixed tile frames. Every shipped hybrid config uses auto sizing, so the form offers auto only. |
 | `SNAPSHOT_INTERVAL < 0` | Log-spaced snapshots (~\|N\| in total, hybrid only). The form takes a positive interval and a switch. |
+| `.svg` for a hybrid run | The GUI omits that switch in Hybrid: the assembled image and its snapshots are drawn as pixels by OpenCV, so there is no vector to write. A CLI config that puts `save_svg` in `SAVE_SYNTHETIC_GRAPH` for hybrid fails when it saves. |
 | `PHASE2_MAX_ROUNDS`, `SELECT_BEST`, `MIN_TILE_NODES`, `LOG_MEMORY`, `DISABLE_SAVING` | Left at their `BaseConfig` defaults for a GUI run. |
 
 The other way round, `INPUT_ORIENTATION` — a quarter turn applied to the input network as it is read — belongs to the form's Align card and has no CLI equivalent; CLI configs transpose inside their own loaders instead.

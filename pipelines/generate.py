@@ -186,7 +186,7 @@ def _generate_single_network_collecting_snapshots(
 
             graph = generator.generate_network_with_snapshots(
                 snapshot_callback=on_snapshot,
-                snapshot_interval=snapshot_interval,
+                snapshot_round_interval=snapshot_interval,
             )
 
             if early_aborted:
@@ -317,6 +317,7 @@ def generate_with_snapshots(run: GenerationRun, config):
             step_idx,
             snapshot_dir,
             style,
+            config.snapshot_formats(),
         )
         plot_futures.append(fut)
 
@@ -325,7 +326,7 @@ def generate_with_snapshots(run: GenerationRun, config):
     generator = GraphGenerator(run.attributes, params)
     synthetic_graph = generator.generate_network_with_snapshots(
         snapshot_callback=on_snapshot,
-        snapshot_interval=interval,
+        snapshot_round_interval=interval,
     )
     synthetic_graph = trim_graph(synthetic_graph, run.attributes.average_degree)
     run.mapper.assign_weights(synthetic_graph)
@@ -342,7 +343,7 @@ def generate_with_snapshots(run: GenerationRun, config):
     logger.info(f"Snapshot generation complete. Snapshots saved to {snapshot_dir}")
 
 
-def _render_snapshots(snapshot_data, output_dir, style, plot_workers: int):
+def _render_snapshots(snapshot_data, output_dir, style, formats, plot_workers: int):
     from concurrent.futures import ProcessPoolExecutor
 
     os.makedirs(output_dir, exist_ok=True)
@@ -362,6 +363,7 @@ def _render_snapshots(snapshot_data, output_dir, style, plot_workers: int):
                 step_idx,
                 output_dir,
                 style,
+                formats,
             )
             for positions, edges, frame, step_idx in snapshot_data
         ]
@@ -577,7 +579,13 @@ def generate_and_select(run: GenerationRun, config):
                 f"rank{rank:02d}_network_{orig_idx:02d}",
                 "snapshots",
             )
-            _render_snapshots(snaps, snap_dir, snapshot_style)
+            _render_snapshots(
+                snaps,
+                snap_dir,
+                snapshot_style,
+                config.snapshot_formats(),
+                config.get_snapshot_plot_workers(),
+            )
 
     report_path = os.path.join(run.saver.output_dir, "metric_report.csv")
     _save_metric_report(ranked, ref_metrics, report_path)

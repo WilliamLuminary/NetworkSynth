@@ -205,6 +205,38 @@ def figure_to_ndarray(fig, swap_channels: bool = False) -> ndarray:
     return image_array
 
 
+_SNAPSHOT_FORMATS = ("png",)
+
+
+def _snapshot_paths(output_dir: str, index: int, formats) -> list:
+    import os
+
+    base = os.path.join(output_dir, f"snapshot_{index:05d}")
+    return [(ext, f"{base}.{ext}") for ext in formats]
+
+
+def _write_snapshot_figure(fig, output_dir: str, index: int, formats) -> None:
+    for ext, path in _snapshot_paths(output_dir, index, formats):
+        if ext == "webp":
+            save_figure_as_webp(fig, path)
+        else:
+            fig.savefig(path, format=ext, bbox_inches="tight")
+
+
+def _write_snapshot_canvas(canvas, output_dir: str, index: int, formats) -> None:
+    import cv2
+
+    for ext, path in _snapshot_paths(output_dir, index, formats):
+        if ext == "webp":
+            from PIL import Image as _Image
+
+            _Image.fromarray(cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB)).save(
+                path, "webp", lossless=True
+            )
+        else:
+            cv2.imwrite(path, canvas)
+
+
 def save_bfs_snapshot(
     node_positions,
     edges,
@@ -212,6 +244,7 @@ def save_bfs_snapshot(
     index: int,
     output_dir: str,
     style,
+    formats=_SNAPSHOT_FORMATS,
 ) -> None:
     dpi = style.dpi
     node_size = style.node_size
@@ -219,8 +252,6 @@ def save_bfs_snapshot(
     assert (
         node_size is not None and line_width is not None
     ), "bfs_snapshot needs node_size and line_width"
-
-    import os
 
     from matplotlib.figure import Figure
     from matplotlib.patches import Rectangle
@@ -261,8 +292,7 @@ def save_bfs_snapshot(
     ax.set_yticks([])
     ax.axis("off")
 
-    path = os.path.join(output_dir, f"snapshot_{index:05d}.png")
-    fig.savefig(path, dpi=dpi, bbox_inches="tight")
+    _write_snapshot_figure(fig, output_dir, index, formats)
     fig.clear()
     del fig
 
@@ -274,9 +304,8 @@ def save_hybrid_snapshot(
     index: int,
     output_dir: str,
     style,
+    formats=_SNAPSHOT_FORMATS,
 ) -> None:
-    import os
-
     import cv2
 
     canvas = _cv2_canvas(frame, style, len(node_positions))
@@ -303,8 +332,7 @@ def save_hybrid_snapshot(
         pos_arr = np.asarray(node_positions, dtype=np.float64)
         _draw_nodes(canvas, *canvas.project(pos_arr[:, 0], pos_arr[:, 1]), style)
 
-    path = os.path.join(output_dir, f"snapshot_{index:05d}.png")
-    cv2.imwrite(path, canvas.image)
+    _write_snapshot_canvas(canvas.image, output_dir, index, formats)
 
 
 def plot_network(

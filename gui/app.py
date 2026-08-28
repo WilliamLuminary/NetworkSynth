@@ -167,13 +167,15 @@ class SynthesisController(QObject):
         return [
             line
             for line in self._lines_of(spec_builder.OUTPUT_GROUP)
-            if not line["row"]
+            if line["row"] not in spec_builder.FORMAT_ROWS
         ]
 
     @Property("QVariantList", notify=changed)
     def formatLines(self) -> list:
         return [
-            line for line in self._lines_of(spec_builder.OUTPUT_GROUP) if line["row"]
+            line
+            for line in self._lines_of(spec_builder.OUTPUT_GROUP)
+            if line["row"] in spec_builder.FORMAT_ROWS
         ]
 
     def _lines_of(self, group: str) -> list:
@@ -199,10 +201,10 @@ class SynthesisController(QObject):
         return sections
 
     def _applies(self, spec_field) -> bool:
-        if not spec_field.hide_when:
-            return True
-        other, hidden_by = spec_field.hide_when
-        return self._values.get(other) not in hidden_by
+        return all(
+            self._values.get(other) not in hidden_by
+            for other, hidden_by in spec_field.hide_when
+        )
 
     @Property(bool, notify=changed)
     def hasInputChoice(self) -> bool:
