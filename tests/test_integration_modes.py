@@ -256,7 +256,7 @@ class TestSnapshotMode:
         )
         synth = generator.generate_network_with_snapshots(
             snapshot_callback=on_snapshot,
-            snapshot_interval=Snapshot1x1Config.SNAPSHOT_INTERVAL,
+            snapshot_round_interval=Snapshot1x1Config.SNAPSHOT_INTERVAL,
         )
         synth = trim_graph(synth, agent.attributes.average_degree)
         agent.mapper.assign_weights(synth)
