@@ -7,7 +7,6 @@ pytestmark = pytest.mark.unit
 
 
 BASE = dict(
-    # Large enough for the BFS to clear its 100-node minimum on the fixture.
     synthetic_frame_size=(512, 512),
     closed_nodes_factor=1.2,
     closed_edges_factor=0.8,
@@ -40,7 +39,7 @@ class TestApplySeed:
 
         apply_seed(5)
         first = random.random()
-        apply_seed(None)  # must NOT reseed
+        apply_seed(None)
         second = random.random()
 
         assert (first, second) == expected

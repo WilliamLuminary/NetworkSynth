@@ -14,8 +14,6 @@ class SynthGraph:
         self._graph: nk.Graph = graph
         self._positions: np.ndarray = np.asarray(positions, dtype=np.float64)
 
-    # ---- graph properties ----
-
     @property
     def nk(self) -> nk.Graph:
         return self._graph
@@ -29,8 +27,6 @@ class SynthGraph:
     def is_weighted(self) -> bool:
         return self._graph.isWeighted()
 
-    # ---- position access ----
-
     def positions(self) -> np.ndarray:
         return self._positions
 
@@ -39,8 +35,6 @@ class SynthGraph:
 
     def set_position(self, node: int, pos) -> None:
         self._positions[node] = pos
-
-    # ---- degree helpers ----
 
     def degree(self, node: int) -> int:
         return self._graph.degree(node)
@@ -54,18 +48,10 @@ class SynthGraph:
     def weighted_degree(self, node: int) -> float:
         return self._graph.weightedDegree(node)
 
-    # ---- edge / weight helpers ----
-
     def weight(self, u: int, v: int) -> float:
         return self._graph.weight(u, v)
 
     def set_weight(self, u: int, v: int, w: float) -> None:
-        # An edge that exists but carries no width is not a graph we can
-        # measure: analysis inverts weights into distances, so a zero becomes an
-        # infinite distance that detaches the edge and only surfaces much later,
-        # as a NaN inside the curvature solver.  The Mapper samples weights from
-        # the source network with replacement, so a zero in the input data is
-        # reproduced verbatim — catch it here, on the edge that carries it.
         assert w > 0, f"edge ({u}, {v}) has non-positive weight {w!r}"
         self._graph.setWeight(u, v, w)
 
@@ -74,8 +60,6 @@ class SynthGraph:
 
     def remove_edge(self, u: int, v: int) -> None:
         self._graph.removeEdge(u, v)
-
-    # ---- iteration ----
 
     def nodes(self) -> Iterator[int]:
         return self._graph.iterNodes()
@@ -88,8 +72,6 @@ class SynthGraph:
 
     def edges_with_weights(self) -> Iterator[Tuple[int, int, float]]:
         return self._graph.iterEdgesWeights()
-
-    # ---- structural queries ----
 
     def is_connected(self) -> bool:
         cc = nk.components.ConnectedComponents(self._graph)
@@ -145,11 +127,8 @@ class SynthGraph:
             new_graph.addEdge(u, v)
         self._graph = new_graph
 
-    # ---- conversion: from networkx (legacy pickle loading) ----
-
     @classmethod
     def from_networkx(cls, G) -> SynthGraph:
-        """Create SynthGraph from an nx.Graph (backward-compatible loading)."""
         import networkx as nx
 
         G = nx.convert_node_labels_to_integers(G)
@@ -163,15 +142,8 @@ class SynthGraph:
                 positions[i] = pos_dict[i]
         return cls(nk_graph, positions)
 
-    # ---- factory: from sparse matrix ----
-
     @classmethod
     def from_sparse_matrix(cls, positions: np.ndarray, adjacency_matrix) -> SynthGraph:
-        """Build from a scipy sparse adjacency matrix and a positions array.
-
-        Always creates a weighted graph (matching nx.from_scipy_sparse_array
-        which always stores edge weights).
-        """
         import scipy.sparse as sp
 
         coo = (
@@ -183,16 +155,12 @@ class SynthGraph:
         nk_graph = nk.Graph(n, weighted=True)
         for i, j, v in zip(coo.row, coo.col, coo.data):
             if i != j and not nk_graph.hasEdge(int(i), int(j)):
-                # A sparse matrix can store an explicit zero, so "an edge with
-                # no width" is representable here even though it is meaningless.
                 assert v > 0, f"edge ({i}, {j}) has non-positive weight {v!r}"
                 nk_graph.addEdge(int(i), int(j), float(v))
         pos = np.asarray(positions, dtype=np.float64)
         if pos.ndim == 1:
             pos = pos.reshape(-1, 2)
         return cls(nk_graph, pos.copy())
-
-    # ---- factory: from GraphNode objects ----
 
     @classmethod
     def from_graph_nodes(cls, nodes: set, edges: set) -> SynthGraph:
@@ -219,8 +187,6 @@ class SynthGraph:
                     nk_graph.addEdge(uid, vid)
         return cls(nk_graph, positions)
 
-    # ---- factory: from edge list ----
-
     @classmethod
     def from_edge_list(cls, positions: np.ndarray, edge_list: np.ndarray) -> SynthGraph:
         pos = np.asarray(positions, dtype=np.float64)
@@ -233,8 +199,6 @@ class SynthGraph:
             if not nk_graph.hasEdge(u, v):
                 nk_graph.addEdge(u, v)
         return cls(nk_graph, pos.copy())
-
-    # ---- repr ----
 
     def __repr__(self) -> str:
         return (

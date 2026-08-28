@@ -27,33 +27,15 @@ class SampleConfig(BaseConfig):
         DatasetId("sample_D"),
     ]
 
-    # --- Hybrid layout parameters ---
-
-    # Desired output scale relative to the original frame, per axis.
-    # E.g. (100, 100) means the whiteboard is 100× the original frame
-    # width and 100× the original frame height.
     TARGET_SCALE: Tuple[int, int] = (100, 100)
 
     NUM_CENTERS: int = 2000
     PHASE2_MAX_ROUNDS: int = 500
     MIN_CENTER_DISTANCE_FACTOR: float = 1.5
 
-    # --- Phase 1 tile frame sizing ---
-    # How big each seed tile is allowed to grow before Phase 2 takes over.
-    #
-    # Fixed mode: set TILE_FRAME_SIZE = (w, h) to give every tile the same
-    # frame. Leave it None to size each tile automatically.
-    #
-    # Auto mode (TILE_FRAME_SIZE = None): each tile's frame side =
-    # nearest-neighbor distance * TILE_FRAME_FACTOR, clamped up to
-    # MIN_TILE_FRAME so tiles never get too small to produce a usable
-    # network. Factor 0.5 leaves a gap (~half the spacing) for Phase 2 to
-    # stitch; smaller factor = wider gap.
     TILE_FRAME_SIZE: Tuple[int, int] = None
     TILE_FRAME_FACTOR: float = 0.5
-    MIN_TILE_FRAME: float = 382.0
 
-    # --- Network generation parameters ---
     IMAGE_SIZE: Tuple[int, int] = (510, 510)
     FRAME_SIZE: Tuple[int, int] = (510, 510)
     SYNTHETIC_FRAME_SIZE: Tuple[int, int] = (510, 510)
@@ -61,14 +43,7 @@ class SampleConfig(BaseConfig):
     CLOSED_NODES_FACTOR = 1.4
     CLOSED_EDGES_FACTOR = 2.0
 
-    # Per-dataset overrides for (CLOSED_NODES_FACTOR, CLOSED_EDGES_FACTOR).
-    # Datasets not listed here use the defaults above.
     DATASET_FACTORS: Dict[str, Tuple[float, float]] = {
-        # "sample_A": (1.0, 1.5),
-        # "sample_B": (1.8, 1.5),
-        # "sample_C": (1.3, 1.6),
-        # "sample_D": (1.5, 1.3),
-        # These are the values from the sweep
         "sample_A": (1.0, 1.4),
         "sample_B": (1.2, 0.9),
         "sample_C": (1.0, 1.2),
@@ -82,7 +57,6 @@ class SampleConfig(BaseConfig):
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = True
 
-    # --- Input paths ---
     BASE_INPUT_PATH = os.path.join(
         BaseConfig.BASE_INPUT_PATH,
         "samples",
@@ -124,16 +98,12 @@ class SampleConfig(BaseConfig):
 
 def _load_positions(set_name: str) -> np.ndarray:
     path = os.path.join(SampleConfig.BASE_INPUT_PATH, f"{set_name}_pos.npy")
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"Positions file not found: {path}")
     logger.info("Loading positions from %s", path)
     return np.load(path, allow_pickle=True)
 
 
 def _load_sparse_matrix(set_name: str):
     path = os.path.join(SampleConfig.BASE_INPUT_PATH, f"{set_name}_mat.npy")
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"Adjacency matrix file not found: {path}")
     logger.info("Loading adjacency matrix from %s", path)
     return np.load(path, allow_pickle=True).item()
 

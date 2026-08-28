@@ -14,7 +14,7 @@ def _small_graph(side=8, spacing=10.0, seed=3):
     rng = np.random.default_rng(seed)
     coords = [(x * spacing, y * spacing) for y in range(side) for x in range(side)]
     positions = np.asarray(coords, dtype=float)
-    positions += rng.normal(0, spacing * 0.05, size=positions.shape)  # slight jitter
+    positions += rng.normal(0, spacing * 0.05, size=positions.shape)
 
     graph = nk.Graph(len(coords), weighted=False)
     for y in range(side):
@@ -27,18 +27,8 @@ def _small_graph(side=8, spacing=10.0, seed=3):
     return SynthGraph(graph, positions)
 
 
-# ---------------------------------------------------------------------------
-# compare — measures two sets of networks the caller names
-# ---------------------------------------------------------------------------
-
-
 class TestGenerationDoesNotAnalyse:
     def test_generation_has_no_analysis_of_its_own(self):
-        """Generation makes networks; measuring them is compare's job.
-
-        Structural, not behavioural: the point is that this cannot grow back by
-        someone reaching for the batch processor inside the generate pipeline.
-        """
         import inspect
 
         import pipelines.generate
@@ -54,8 +44,6 @@ class TestGenerationDoesNotAnalyse:
     def test_the_generation_run_has_no_analysis_methods(self):
         from handlers import GenerationRun
 
-        # analyse/save_analysis belong to ComparisonRun; a generating run is a
-        # sibling of it, not a subclass, so it cannot inherit them by accident.
         for forbidden in ("multifractal_analysis", "analyse", "save_analysis"):
             assert not hasattr(GenerationRun, forbidden), forbidden
 
@@ -84,8 +72,6 @@ class TestAnalyzeReadsEveryFormatWeWrite:
         with open(folder / "synthetic_network.pkl", "wb") as handle:
             pickle.dump([_small_graph(), _small_graph(seed=9)], handle)
 
-        # Both formats hold the same run; counting them twice would inflate
-        # every statistic the analysis reports.
         assert len(_load_networks(str(folder))) == 2
 
     def test_an_edge_list_without_its_positions_stops_the_run(self, tmp_path):
@@ -133,14 +119,12 @@ class TestComparisonLoadsTheTwoSetsItIsGiven:
         with open(synthetic / "synthetic_network.pkl", "wb") as handle:
             pickle.dump([_small_graph(), _small_graph(seed=4)], handle)
 
-        # Ready on construction: there is no second step to forget.
         run = self._run(self._config(tmp_path, original, synthetic))
 
         assert len(run.synthetic) == 2
         assert len(run.original) == 1
 
     def test_the_two_sets_can_be_any_directories(self, tmp_path):
-        """Nothing about a results layout is assumed — the caller chooses."""
         from configs.file_definitions import save_network_csv
 
         left, right = tmp_path / "monday", tmp_path / "tuesday"

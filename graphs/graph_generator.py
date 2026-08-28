@@ -47,29 +47,17 @@ class GraphGenerator:
     def generate_network_with_snapshots(
         self,
         snapshot_callback,
-        snapshot_interval: int = 50,
+        snapshot_round_interval: int = 10,
         frame_range: Optional[Tuple[int, int]] = None,
         regenerate_times: int = 100,
     ):
-        """Generate a network while taking periodic BFS snapshots.
-
-        Parameters
-        ----------
-        snapshot_callback : callable
-            ``callback(positions, edges, frame, step_index)`` where
-            *positions* is a list of ``(x, y)`` tuples and *edges* is a
-            set of ``((x1, y1), (x2, y2))`` tuples.
-        snapshot_interval : int
-            Take a snapshot every time the network grows by this many
-            nodes.
-        """
         frame_range = frame_range or self._params.synthetic_frame_size
 
         for _ in range(regenerate_times):
             nodes, edges = self._bfs_network(
                 frame_range,
                 snapshot_callback=snapshot_callback,
-                snapshot_interval=snapshot_interval,
+                snapshot_round_interval=snapshot_round_interval,
             )
             if nodes and len(nodes) > 100:
                 break
@@ -90,17 +78,6 @@ class GraphGenerator:
         max_rounds: int = 500,
         root_spacing_factor: float = 0.7,
     ) -> SynthGraph:
-        """Generate a large network via synchronized multi-root BFS.
-
-        Places ``scale_rows × scale_cols`` root nodes on a grid and grows
-        them all simultaneously, one generation at a time, with random
-        iteration order per round.  Components merge naturally through the
-        existing close-node logic.
-
-        ``root_spacing_factor`` controls root distance relative to
-        ``SYNTHETIC_FRAME_SIZE``.  Values < 1.0 make components overlap
-        sooner, promoting cross-root merges.
-        """
         frame_w, frame_h = self._params.synthetic_frame_size
         spacing_w = frame_w * root_spacing_factor
         spacing_h = frame_h * root_spacing_factor
@@ -145,7 +122,7 @@ class GraphGenerator:
         frame_range: Tuple[int, int],
         *,
         snapshot_callback=None,
-        snapshot_interval: int = 0,
+        snapshot_round_interval: int = 0,
     ) -> Tuple[set, set]:
         GraphNode.reset()
         root_node = GraphNode((0, 0))
@@ -157,7 +134,7 @@ class GraphGenerator:
 
         from collections import deque
 
-        take_snapshots = snapshot_callback is not None and snapshot_interval > 0
+        take_snapshots = snapshot_callback is not None and snapshot_round_interval > 0
         snapshot_idx = 0
 
         if take_snapshots:
@@ -166,28 +143,38 @@ class GraphGenerator:
             )
             snapshot_idx += 1
 
-        next_snapshot_at = snapshot_interval if take_snapshots else float("inf")
-
         node_queue = deque([root_node])
+        # A round is one frontier: as many pops as the queue held when it
+        # began.  Snapshots are counted in rounds here as they are in Phase 2,
+        # so an interval means the same thing in both modes.
+        pops_left = len(node_queue)
+        rounds = 0
+
         while node_queue:
             current_node = node_queue.popleft()
-            if not _within_frame(current_node.position, frame):
-                continue
-            if current_node.generate_children():
+            pops_left -= 1
+            if (
+                _within_frame(current_node.position, frame)
+                and current_node.generate_children()
+            ):
                 for child in current_node.children:
                     if child != current_node:
                         node_set.add(child)
                         edge_set.add((current_node.position, child.position))
                         node_queue.append(child)
 
-            if take_snapshots and len(node_set) >= next_snapshot_at:
+            if pops_left > 0:
+                continue
+
+            rounds += 1
+            pops_left = len(node_queue)
+            if take_snapshots and rounds % snapshot_round_interval == 0:
                 result = snapshot_callback(
                     [n.position for n in node_set], set(edge_set), frame, snapshot_idx
                 )
                 if result is False:
                     return node_set, edge_set
                 snapshot_idx += 1
-                next_snapshot_at += snapshot_interval
 
         if take_snapshots:
             snapshot_callback(
@@ -200,22 +187,6 @@ class GraphGenerator:
     def _bfs_network_with_frontier(
         frame_range: Tuple[int, int],
     ) -> Tuple[set, set, List, List[Tuple[float, float]], list]:
-        """BFS that also captures frontier descriptors for Phase-2 continuation.
-
-        Returns
-        -------
-        inner_nodes : set[GraphNode]
-            Nodes inside the generation frame (for quality checking).
-        inner_edges : set
-            Edges whose *both* endpoints are inside the generation frame.
-        frontier_descriptors : list[FrontierDescriptor]
-            Serializable descriptors for nodes just outside the frame that
-            can be continued in Phase 2.
-        all_positions : list[tuple[float, float]]
-            Every node's position (inner + margin + outside).
-        all_edges : list[tuple]
-            Every edge tuple (inner + boundary).
-        """
         GraphNode.reset()
         root_node = GraphNode((0, 0))
         node_set, edge_set = {root_node}, set()
@@ -282,31 +253,6 @@ class GraphGenerator:
         snapshot_callback=None,
         snapshot_round_interval: int = 0,
     ) -> SynthGraph:
-        """Phase 2: populate grids from tiles, then BFS from frontier nodes.
-
-        Tile edges are added to ``edge_grid`` and interior nodes to
-        ``node_grid`` so the same close-node merge and close-edge
-        avoidance logic used in Phase 1 applies identically here.
-
-        Uses the same ``_place_child`` logic as Phase 1 to ensure
-        gap-fill regions have the same distributional properties as
-        tile interiors.
-
-        Each element of *tile_data_list* must have:
-          - ``positions``: list of (x, y) in **global** coordinates
-          - ``edges``:     list of ((x1,y1),(x2,y2)) in global coordinates
-          - ``frontier``:  list of :class:`FrontierDescriptor` in global coords
-
-        Parameters
-        ----------
-        snapshot_callback : callable, optional
-            ``callback(positions, edges, global_frame, index)`` called
-            after assembly and every *snapshot_round_interval* rounds.
-        snapshot_round_interval : int
-            >0: fire *snapshot_callback* every N rounds (linear).
-            <0: fire ~|N| log-spaced snapshots across all rounds.
-            0: disable snapshots.
-        """
         GraphNode.reset()
 
         take_snapshots = snapshot_callback is not None and snapshot_round_interval != 0
@@ -402,23 +348,6 @@ class GraphGenerator:
 
         signal.signal(signal.SIGINT, _on_sigint)
 
-        # Randomized-pop frontier expansion.
-        #
-        # The classic round-based BFS processes all frontier nodes of
-        # generation N before any of generation N+1, which deposits a
-        # concentric shell of new nodes at each round and creates a
-        # visible "ripple" artifact centered on every seed tile.
-        #
-        # To break the synchronized wavefront, we pop a *uniformly
-        # random* element from the frontier on every step (O(1) via
-        # swap-to-end) and append new children back into the same list.
-        # Children from different generations get interleaved, so the
-        # radial coherence that produced the ripples is lost.
-        #
-        # ``max_rounds``, logging, and snapshots are preserved by
-        # tracking a "virtual round": each virtual round processes a
-        # number of pops equal to the frontier size at the start of
-        # that round, mirroring the old per-round work budget.
         try:
             virtual_round = 0
             pops_this_round = 0
@@ -432,8 +361,9 @@ class GraphGenerator:
                     )
                     break
 
-                # O(1) random pop: swap chosen index with the tail,
-                # then pop the tail.
+                # A uniformly random pop, not the next in line: round-based BFS
+                # lays a concentric shell per round and leaves a visible ripple
+                # around every seed. Rounds survive as a pop budget only.
                 last = len(frontier) - 1
                 idx = rng.randint(0, last)
                 if idx != last:
@@ -450,8 +380,6 @@ class GraphGenerator:
                             seen_frontier_ids.add(id(child))
                             frontier.append(child)
 
-                # Virtual-round boundary: we've processed as many pops
-                # as there were nodes at the start of this round.
                 if pops_this_round >= round_size:
                     if not frontier:
                         logger.info(
@@ -519,20 +447,12 @@ class GraphGenerator:
         global_frame: Tuple[Tuple[float, float], Tuple[float, float]],
         max_rounds: int,
     ) -> Tuple[set, set]:
-        """Synchronized multi-root BFS.
-
-        All roots share a single ``node_grid`` / ``edge_grid`` so the
-        standard close-node and edge-intersection checks work across
-        roots automatically.  Each round shuffles the frontier randomly
-        before expanding, ensuring no systematic bias.
-        """
         GraphNode.reset()
 
         all_nodes: set = set()
         all_edges: set = set()
         seen_ids: set = set()
 
-        # --- Phase 1: create every root (each also spawns its first child) ---
         frontier: list = []
         n_roots = len(root_positions)
         for i, pos in enumerate(root_positions):
@@ -558,7 +478,6 @@ class GraphGenerator:
             extra=tagged("BFS"),
         )
 
-        # --- Phase 2: round-by-round expansion ---
         for round_num in range(max_rounds):
             rng.shuffle(frontier)
             next_frontier: list = []
@@ -619,11 +538,6 @@ def _filter_graph(graph: SynthGraph, frame: Union[list, tuple]) -> SynthGraph:
 
 
 def _filter_to_frame(graph: SynthGraph, frame: Union[list, tuple]) -> SynthGraph:
-    """Keep all nodes within the frame (no LCC filtering).
-
-    Used by the scaling mode where multiple root components may not
-    fully merge but should all be retained.
-    """
     positions = graph.positions()
     nodes_to_keep = set()
     for node in graph.nodes():

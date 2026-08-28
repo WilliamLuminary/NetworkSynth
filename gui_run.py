@@ -13,9 +13,6 @@ EXIT_FAILED = 1
 EXIT_BAD_SPEC = 2
 EXIT_INTERRUPTED = 130
 
-#: Only the modes the GUI actually offers.  A subset of ``pipelines.PIPELINES``,
-#: which is the full table: add to this deliberately, since each entry needs its
-#: loader slots and its input shapes checked, not just a name.
 _GUI_MODES = frozenset({"generate", "hybrid", "sweep"})
 
 

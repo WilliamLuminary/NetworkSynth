@@ -27,10 +27,7 @@ def load_idle(*_, **__):
 
 
 class BaseConfig:
-    """Define base paths, this config file must be in the subdirectory of the project root"""
 
-    #: Which pipeline runs this config.  One of ``pipelines.PIPELINES``; a
-    #: config that does not say cannot be run, because nothing else decides.
     MODE: str = ""
 
     DATASETS: Optional[List[DatasetId]] = None
@@ -41,25 +38,17 @@ class BaseConfig:
             raise ValueError("DATASETS must be defined in the config")
         return cls.DATASETS
 
-    # IMAGE_SIZE: the input image's true size (height, width) in pixels, as it
-    # is on disk.  Recorded, never laid out by: what the network and its
-    # background are drawn in is FRAME_SIZE, which the image is scaled to.
     IMAGE_SIZE: Tuple[int, int] = None
 
-    # FRAME_SIZE: Original network plotting frame (X_range, Y_range)
     FRAME_SIZE: Tuple[int, int] = None
 
-    # SYNTHETIC_FRAME_SIZE: Synthetic network generation frame (X_range, Y_range)
     SYNTHETIC_FRAME_SIZE: Tuple[int, int] = None
 
     CLOSED_NODES_FACTOR: float
     CLOSED_EDGES_FACTOR: float
 
-    #: How far apart the values a sweep tries are, on both factors.
     SWEEP_STEP: float = 0.1
 
-    #: Whether a sweep reports to wandb.  Off, it walks the grid itself and
-    #: contacts nothing; the local report is written either way.
     USE_WANDB: bool = True
 
     MEASURE_WEIGHTED: bool
@@ -77,39 +66,25 @@ class BaseConfig:
     SYNTHETIC_NETWORKS_PATH = None
 
     MAX_ATTEMPTS = 10
-    ERROR_CHECKER: str = (
-        "multifractal"  # quality-gate algorithm; "none" disables checking
-    )
-    ERROR_TOLERANCE = 0.15  # Generally should be 0.15
+    ERROR_CHECKER: str = "multifractal"
+    ERROR_TOLERANCE = 0.15
     MIN_TILE_NODES = 100
+    PHASE2_MAX_ROUNDS = 500
 
-    # Hybrid tiling geometry: no values, so a config that omits one raises
-    # rather than picking up a number buried in the pipeline body.
+    # Annotated with no value: a config that omits one raises on access rather
+    # than picking up a number buried in the pipeline body.
     TILE_FRAME_SIZE: Optional[Tuple[int, int]]
     TILE_FRAME_FACTOR: float
-    MIN_TILE_FRAME: float
     MIN_CENTER_DISTANCE_FACTOR: float
     NUM_CENTERS: int
     DATASET_FACTORS: dict
 
-    # Master seed for reproducible generation.  None = unseeded, i.e. a
-    # different network on every run (the historical behaviour).  When set,
-    # each worker is given a distinct derived seed (SEED + worker index) so
-    # candidates still differ from one another but the whole run repeats
-    # identically.
     SEED: Optional[int] = None
 
-    # Snapshots of generation in progress.  The only switch: a mode does not
-    # get its own pipeline for them, it sets these.
-    #   0      disabled
-    #   N > 0  every N (new nodes in generate, Phase 2 rounds in hybrid)
-    #   N < 0  hybrid only — roughly |N| log-spaced snapshots across the run
     SNAPSHOT_INTERVAL: int = 0
     SNAPSHOT_PLOT_WORKERS: int = 20
-    SELECT_BEST: int = 0  # 0 = disabled; N = keep N best networks by metric distance
+    SELECT_BEST: int = 0
 
-    # How each output is drawn.  Override with replace(BaseConfig.RENDER_X, ...).
-    # The OpenCV renderers leave node_size/line_width unset: one pixel each.
     RENDER_ORIGINAL_GRAPH = RenderStyle(node_size=6.0, line_width=3.0, dpi=300)
     RENDER_SYNTHETIC_GRAPH = RenderStyle(
         node_size=6.0, line_width=3.0, dpi=300, show_on_the_fly=False
@@ -120,7 +95,6 @@ class BaseConfig:
     RENDER_MOSAIC_GRAPH = RenderStyle(border=True)
     RENDER_SCALED_GRAPH = RenderStyle()
 
-    # What each output is written as.  Several specs = several files.
     SAVE_ORIGINAL_IMAGE = (SaveSpec(ORIGINAL_DIR, "original_image", "webp", save_webp),)
     SAVE_ORIGINAL_GRAPH = (SaveSpec(ORIGINAL_DIR, "original_graph", "webp", save_webp),)
     SAVE_ORIGINAL_NETWORK = (
@@ -144,8 +118,6 @@ class BaseConfig:
     SAVE_SYNTHETIC_REPORT = (
         SaveSpec(SYNTHETIC_DIR, "report", "txt", save_text, use_timestamp=False),
     )
-    # Written by every sweep, whether or not it talked to wandb: the trial
-    # grid is the result, and it should not live only on someone's server.
     SAVE_SWEEP_REPORT = (
         SaveSpec(INPLACE_DIR, "sweep_report", "csv", save_csv, use_timestamp=False),
     )
@@ -157,9 +129,6 @@ class BaseConfig:
     )
 
     LOG_MEMORY: bool = False
-    # Declared per config, never toggled at runtime: a mutator here would set
-    # the flag on BaseConfig for every config in the process, and for every
-    # forked child with it.
     DISABLE_SAVING: bool = False
     DISABLE_SAVING_NOTE: str = ""
 
@@ -178,18 +147,16 @@ class BaseConfig:
         return max_workers
 
     @classmethod
+    def snapshot_formats(cls) -> tuple:
+        return tuple(spec.extension for spec in cls.SAVE_SYNTHETIC_GRAPH)
+
+    @classmethod
     def get_snapshot_plot_workers(cls) -> int:
         cpu_count = os.cpu_count() or 1
         return min(max(1, cpu_count // 2), cls.SNAPSHOT_PLOT_WORKERS)
 
     @classmethod
     def initialize(cls) -> None:
-        """Establish this run's identity.  Logging is set up by the entry point.
-
-        ``RUN_ID`` is generated here rather than as a side effect of logging
-        setup, because it names the run's output directory (see
-        ``handlers.run_paths``) and is needed whether or not anything logs.
-        """
         from handlers.run_logging import configure_console
 
         if not cls.MODE:
@@ -198,9 +165,6 @@ class BaseConfig:
                 "MODE to the pipeline that runs this config."
             )
 
-        # Snapshots are written straight to disk by the render pool, bypassing
-        # the Saver, so DISABLE_SAVING cannot suppress them.  Rather than let a
-        # "disabled" run litter the output directory, refuse the combination.
         if cls.DISABLE_SAVING and cls.SNAPSHOT_INTERVAL:
             raise ValueError(
                 f"SNAPSHOT_INTERVAL={cls.SNAPSHOT_INTERVAL} needs saving enabled: "
@@ -218,33 +182,11 @@ class BaseConfig:
 
     @classmethod
     def render(cls, identifier: str) -> RenderStyle:
-        """Return the :class:`RenderStyle` for *identifier*.
-
-        Reads ``RENDER_<IDENTIFIER>``, so a mode's override resolves through the
-        normal MRO.  Call this on the active config, not on ``BaseConfig``.
-        """
-        style = getattr(cls, f"RENDER_{identifier.upper()}", None)
-        assert style is not None, (
-            f"no render style for {identifier!r}; declare "
-            f"RENDER_{identifier.upper()} on the config or on BaseConfig"
-        )
-        return style
+        return getattr(cls, f"RENDER_{identifier.upper()}")
 
     @classmethod
     def save(cls, identifier: str) -> Tuple[SaveSpec, ...]:
-        """Return the :class:`SaveSpec` tuple for *identifier*.
-
-        Reads ``SAVE_<IDENTIFIER>``, so a mode's override resolves through the
-        normal MRO.  The twin of :meth:`render`; call it on the active config,
-        not on ``BaseConfig``.
-        """
-        specs = getattr(cls, f"SAVE_{identifier.upper()}", None)
-        if specs is None:
-            raise ValueError(
-                f"No save spec for '{identifier}' in {cls.__name__}. Declare "
-                f"SAVE_{identifier.upper()} on the config or on BaseConfig."
-            )
-        return specs
+        return getattr(cls, f"SAVE_{identifier.upper()}")
 
     RUN_ID: str = ""
 

@@ -20,13 +20,11 @@ class SampleConfig(BaseConfig):
 
     DATASETS = [DatasetId("sample_1")]
 
-    # --- Scaling grid parameters ---
     SCALE_ROWS: int = 3
     SCALE_COLS: int = 3
     MAX_GENERATION_ROUNDS: int = 500
     ROOT_SPACING_FACTOR: float = 1.0
 
-    # --- Network generation parameters ---
     IMAGE_SIZE: Tuple[int, int] = (510, 510)
     FRAME_SIZE: Tuple[int, int] = (510, 510)
     SYNTHETIC_FRAME_SIZE: Tuple[int, int] = (510, 510)
@@ -41,7 +39,6 @@ class SampleConfig(BaseConfig):
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = True
 
-    # --- Input paths (reuse mosaic sample data) ---
     BASE_INPUT_PATH = os.path.join(
         BaseConfig.BASE_INPUT_PATH,
         "samples",

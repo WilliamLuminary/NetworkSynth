@@ -12,7 +12,6 @@ from .multifractal_processor import MultifractalProcessor
 
 logger = logging.getLogger(__name__)
 
-# Plot style applied per-figure via rc_context (never mutates globals).
 _PLOT_CONFIG = {
     "font.size": 24,
     "axes.linewidth": 2,
@@ -123,15 +122,13 @@ class MultifractalBatchProcessor:
         )
 
     def _create_plot(self, x_key, y_key, x_label, y_label):
-        # Use rc_context so _PLOT_CONFIG is local to this figure
-        # and never mutates global rcParams.
         with matplotlib.rc_context(_PLOT_CONFIG):
             fig = Figure(figsize=(10, 8), dpi=150)
             ax = fig.add_subplot(111)
             legend = []
 
             for data_type in ["synthetic", "original"]:
-                results = getattr(self, f"_{data_type}_data", [])
+                results = getattr(self, f"_{data_type}_data")
                 assert results, f"No {data_type} data available."
 
                 self._plot_dataset(

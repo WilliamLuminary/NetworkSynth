@@ -7,31 +7,19 @@ import pytest
 pytestmark = pytest.mark.unit
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def _make_synth_graph(n: int = 20, avg_edges: int = 3):
     from graphs.synth_graph import SynthGraph
 
     positions = np.random.RandomState(42).rand(n, 2) * 100.0
     g = nk.Graph(n, weighted=False)
-    # ring to guarantee connectivity
     for i in range(n):
         g.addEdge(i, (i + 1) % n)
-    # extra random edges
     rng = np.random.RandomState(7)
     for _ in range(avg_edges * n // 2):
         u, v = rng.randint(0, n, size=2)
         if u != v and not g.hasEdge(u, v):
             g.addEdge(u, v)
     return SynthGraph(g, positions)
-
-
-# ---------------------------------------------------------------------------
-# compute_network_metrics
-# ---------------------------------------------------------------------------
 
 
 class TestComputeNetworkMetrics:
@@ -72,11 +60,6 @@ class TestComputeNetworkMetrics:
             assert np.isfinite(val), f"{key} is not finite: {val}"
 
 
-# ---------------------------------------------------------------------------
-# metric_distance
-# ---------------------------------------------------------------------------
-
-
 class TestMetricDistance:
     def test_identical_is_zero(self):
         from utils import metric_distance
@@ -97,17 +80,10 @@ class TestMetricDistance:
         ref = {"a": 0.0, "b": 10.0}
         syn = {"a": 2.0, "b": 10.0}
         dist = metric_distance(syn, ref)
-        # (abs(2) + 0) / 2 = 1.0
         assert dist == pytest.approx(1.0)
 
 
-# ---------------------------------------------------------------------------
-# save_bfs_snapshot
-# ---------------------------------------------------------------------------
-
-
 def _style(**overrides):
-    """A RenderStyle with the sizes the matplotlib renderer requires."""
     from configs import RenderStyle
 
     return RenderStyle(node_size=6.0, line_width=3.0, **overrides)
@@ -139,11 +115,6 @@ class TestSaveBfsSnapshot:
 
         for i in range(3):
             assert os.path.isfile(os.path.join(str(tmp_path), f"snapshot_{i:05d}.png"))
-
-
-# ---------------------------------------------------------------------------
-# save_hybrid_snapshot
-# ---------------------------------------------------------------------------
 
 
 class TestSaveHybridSnapshot:

@@ -11,11 +11,6 @@ logger = logging.getLogger(__name__)
 SAMPLE_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "input", "samples")
 
 
-# ------------------------------------------------------------------ #
-# Generate mode
-# ------------------------------------------------------------------ #
-
-
 class TestGenerateMode:
     def test_load_original_and_save(self, tmp_path):
         from configs.generate_mode.config_sample import SampleConfig
@@ -86,11 +81,6 @@ class TestGenerateMode:
         )
 
 
-# ------------------------------------------------------------------ #
-# Mosaic mode
-# ------------------------------------------------------------------ #
-
-
 class TestMosaicMode:
     def test_mosaic_2x2(self, tmp_path):
         from configs.mosaic_mode.config_sample import SampleConfig
@@ -152,11 +142,6 @@ class TestMosaicMode:
         )
 
 
-# ------------------------------------------------------------------ #
-# Scaling mode
-# ------------------------------------------------------------------ #
-
-
 class TestScalingMode:
     def test_scaling_2x2(self, tmp_path):
         from configs.scaling_mode.config_sample import SampleConfig
@@ -203,11 +188,6 @@ class TestScalingMode:
         )
 
 
-# ------------------------------------------------------------------ #
-# Analyze mode
-# ------------------------------------------------------------------ #
-
-
 class TestAnalyzeMode:
     def test_analyze_graph(self, tmp_path):
         from configs.generate_mode.config_sample import SampleConfig
@@ -242,11 +222,6 @@ class TestAnalyzeMode:
         )
 
 
-# ------------------------------------------------------------------ #
-# Snapshot mode
-# ------------------------------------------------------------------ #
-
-
 class TestSnapshotMode:
     def test_generate_with_snapshots(self, tmp_path):
         from configs.generate_mode.config_snapshot_1x1 import Snapshot1x1Config
@@ -269,7 +244,6 @@ class TestSnapshotMode:
 
         from dataclasses import replace
 
-        # The config's own style, at a low dpi for speed.
         style = replace(Snapshot1x1Config.render("bfs_snapshot"), dpi=72)
         recorded_calls = []
 
@@ -282,7 +256,7 @@ class TestSnapshotMode:
         )
         synth = generator.generate_network_with_snapshots(
             snapshot_callback=on_snapshot,
-            snapshot_interval=Snapshot1x1Config.SNAPSHOT_INTERVAL,
+            snapshot_round_interval=Snapshot1x1Config.SNAPSHOT_INTERVAL,
         )
         synth = trim_graph(synth, agent.attributes.average_degree)
         agent.mapper.assign_weights(synth)
@@ -290,11 +264,8 @@ class TestSnapshotMode:
         assert synth.number_of_nodes() > 50
         assert synth.number_of_edges() > 50
 
-        # Verify snapshot callback was invoked
         assert len(recorded_calls) > 0, "No snapshots were recorded"
 
-        # Verify PNG files were created (fewer than calls due to BFS retries
-        # overwriting snapshots from failed attempts)
         snapshot_files = [f for f in os.listdir(snapshot_dir) if f.endswith(".png")]
         assert len(snapshot_files) > 0, "No snapshot PNGs found"
 
@@ -323,11 +294,9 @@ class TestSnapshotMode:
         original = agent.original
         ref_metrics = compute_network_metrics(original)
 
-        # Metrics should be well-formed
         assert ref_metrics["node_count"] > 0
         assert ref_metrics["avg_degree"] > 0
 
-        # Distance to self should be zero
         assert metric_distance(ref_metrics, ref_metrics) == pytest.approx(0.0)
 
         logger.info(

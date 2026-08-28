@@ -28,11 +28,6 @@ def _tune(base, tmp_path, **overrides):
     return config
 
 
-# ------------------------------------------------------------------ #
-# mosaic
-# ------------------------------------------------------------------ #
-
-
 class TestMosaicPipeline:
     def test_run_mosaic_for_dataset(self, tmp_path):
         from configs.mosaic_mode.config_sample import SampleConfig
@@ -55,12 +50,7 @@ class TestMosaicPipeline:
         tile_gen_frame, tile_offsets = compute_tile_layout(config)
 
         assert len(tile_offsets) == 2
-        assert tile_gen_frame[0] > config.TILE_FRAME_SIZE[0]  # includes overlap
-
-
-# ------------------------------------------------------------------ #
-# scaling
-# ------------------------------------------------------------------ #
+        assert tile_gen_frame[0] > config.TILE_FRAME_SIZE[0]
 
 
 class TestScalingPipeline:
@@ -81,11 +71,6 @@ class TestScalingPipeline:
         run_scaling_for_dataset(config.get_datasets()[0], config, run_paths)
 
         assert _outputs(str(tmp_path)), "scaling produced no output files"
-
-
-# ------------------------------------------------------------------ #
-# hybrid
-# ------------------------------------------------------------------ #
 
 
 class TestHybridPipeline:
@@ -155,18 +140,7 @@ class TestHybridPipeline:
         )
 
 
-# ------------------------------------------------------------------ #
-# hybrid, with snapshots
-# ------------------------------------------------------------------ #
-
-
 class TestHybridSnapshots:
-    """Snapshots are a config setting, not a pipeline of their own.
-
-    ``hybrid_snapshot.py`` used to be a second copy of Phase 2 reached only by
-    a runner script.  The same run is now ``hybrid`` with SNAPSHOT_INTERVAL
-    set, so this asserts the images actually appear on that path.
-    """
 
     def test_hybrid_writes_snapshots_when_the_config_asks_for_them(self, tmp_path):
         from configs.hybrid_mode.config_sample import SampleConfig
@@ -180,9 +154,7 @@ class TestHybridSnapshots:
             NUM_CENTERS=2,
             PHASE2_MAX_ROUNDS=6,
             TILE_FRAME_SIZE=(510, 510),
-            # Larger than the round count, so exactly the first snapshot fires.
             SNAPSHOT_INTERVAL=100,
-            # Low dpi for speed.
             RENDER_HYBRID_SNAPSHOT=replace(BaseConfig.RENDER_HYBRID_SNAPSHOT, dpi=72),
         )
         run_paths = create_run_paths(config)
@@ -194,11 +166,6 @@ class TestHybridSnapshots:
         assert any(
             name.startswith("snapshot_") for name in outputs
         ), f"SNAPSHOT_INTERVAL was set but nothing was rendered: {outputs}"
-
-
-# ------------------------------------------------------------------ #
-# sweep
-# ------------------------------------------------------------------ #
 
 
 class TestSweepPipeline:
@@ -220,5 +187,4 @@ class TestSweepPipeline:
 
         assert 0.0 <= success_rate <= 1.0
         assert avg_error is not None
-        # The trial factors must NOT have been written into global config.
         assert config.CLOSED_NODES_FACTOR == nodes_before

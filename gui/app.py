@@ -4,9 +4,11 @@ import atexit
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
+import time
 from typing import Any, Dict, List, Optional
 
 from PySide6.QtCore import (
@@ -27,16 +29,19 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _GUI_RUN = os.path.join(_REPO_ROOT, "gui_run.py")
 _GUI_PREVIEW = os.path.join(_REPO_ROOT, "gui_preview.py")
 
-#: The frames that follow the input image until the user sets one.
 _FRAME_KEYS = ("FRAME_SIZE", "SYNTHETIC_FRAME_SIZE")
 
-#: Exit codes gui_run.py promises.
 _EXIT_MEANING = {
     0: "Finished.",
     1: "Run failed — see the log.",
     2: "The run-spec was rejected.",
     130: "Cancelled.",
+    -9: "Cancelled — the run had to be forced.",
 }
+
+_PROCESS_GROUPS = hasattr(os, "killpg") and hasattr(os, "getpgid")
+
+_CANCEL_GRACE = 15.0
 
 
 def _local_path(value: str) -> str:
@@ -50,7 +55,6 @@ def _file_url(path: Optional[str]) -> str:
 
 
 def _last_line(path: str) -> str:
-    """The tail of a failed render's stderr, short enough to show in the form."""
     with open(path) as handle:
         lines = [line.strip() for line in handle if line.strip()]
     return lines[-1][:200] if lines else "no output"
@@ -62,10 +66,6 @@ class SynthesisController(QObject):
     logChanged = Signal()
 
     def __init__(self, parent: Optional[QObject] = None, *, mode: str = "generate"):
-        # `parent` MUST be the first positional parameter.  With any extra
-        # positional argument ahead of it, PySide6 still builds a valid QObject
-        # — metaObject and Python access work — but QML resolves the context
-        # property to null and every binding silently fails.
         super().__init__(parent)
         self._mode = mode
         self._values: Dict[str, Any] = spec_builder.default_values(mode)
@@ -81,27 +81,20 @@ class SynthesisController(QObject):
         self._log_offset = 0
         self._run_root: Optional[str] = None
 
+        self._cancel_at: Optional[float] = None
         self._poll = QTimer(self)
         self._poll.setInterval(400)
         self._poll.timeout.connect(self._tick)
 
-        # What the last run was, so a preview of its output is offered only
-        # when there is output of that kind to read.
         self._spec_path: Optional[str] = None
         self._run_mode = ""
         self._ran_ok = False
-        #: Whether the frames are still the image's, or the user's own.
         self._frame_touched = False
 
-        # Previews.  Each side is shown or not, and holds the info.json its
-        # render wrote; the layer switches choose between the original's three
-        # variants, which are all rendered at once.
         self._shown = {"original": True, "synthetic": False}
         self._info: Dict[str, Optional[dict]] = {"original": None, "synthetic": None}
         self._layers = {"background": True, "network": True}
 
-        # One render at a time, and a side asked for while one is running is
-        # remembered rather than dropped.
         self._stale: set = set()
         self._preview_process: Optional[subprocess.Popen] = None
         self._preview_kind = ""
@@ -115,19 +108,13 @@ class SynthesisController(QObject):
         self._preview_poll.setInterval(300)
         self._preview_poll.timeout.connect(self._preview_tick)
 
-        # Editing a field fires one change per field; a single render after the
-        # typing stops beats one render per keystroke.
         self._settle = QTimer(self)
         self._settle.setInterval(400)
         self._settle.setSingleShot(True)
         self._settle.timeout.connect(lambda: self._want("original"))
 
-        # The form opens on the sample data, so say so and draw it rather than
-        # waiting for an edit that has nothing to correct.
         self._note_ready()
         self._touch_preview()
-
-    # ---- properties bound by QML ----
 
     @Property(str, notify=changed)
     def mode(self) -> str:
@@ -143,13 +130,6 @@ class SynthesisController(QObject):
 
     @Slot(int)
     def selectMode(self, index: int) -> None:
-        """Switch mode and reload its fields.
-
-        Values are rebuilt from the new mode's defaults rather than carried over:
-        modes share names for the common fields but not for their own, and a
-        stale value from another mode would be written into the run-spec and
-        silently set on the config.
-        """
         names = list(spec_builder.MODES)
         if not 0 <= index < len(names) or names[index] == self._mode:
             return
@@ -158,23 +138,13 @@ class SynthesisController(QObject):
         self._shape = 0
         self._inputs = spec_builder.default_inputs(self._mode)
         self._info["original"] = None
-        # The other mode's run is not this mode's output.
         self._shown["synthetic"] = False
         self._info["synthetic"] = None
         self._note_ready()
-        # Asked for outright rather than left to settle: nothing else is
-        # coming, and without this the pane stays blank until some unrelated
-        # field is edited.
         self._want("original")
 
     @Property("QVariantList", notify=changed)
     def configSections(self) -> list:
-        """The parameter sections the form pane shows, in order.
-
-        Everything except the output section, which the window gives a pane of
-        its own beside the preview: one side is what a run is given, the other
-        is what it produces.
-        """
         return [
             section
             for section in self._sections()
@@ -184,25 +154,29 @@ class SynthesisController(QObject):
 
     @Property("QVariantList", notify=changed)
     def alignLines(self) -> list:
-        """The align section's rows — only for a single network.
-
-        A folder holds networks that were traced from different images, and one
-        turn applied to all of them would be right for at most one.  Editing is
-        a thing you do to a network you are looking at.
-        """
         if self._shapes()[self._shape].scope != spec_builder.SINGLE:
             return []
         return self._lines_of(spec_builder.ALIGN_GROUP)
 
     @Slot()
     def saveEdited(self) -> None:
-        """Write the input as it is being read now, and read it back."""
         self._want("save_edited")
 
     @Property("QVariantList", notify=changed)
     def outputLines(self) -> list:
-        """The output section's rows, for the pane that holds them."""
-        return self._lines_of(spec_builder.OUTPUT_GROUP)
+        return [
+            line
+            for line in self._lines_of(spec_builder.OUTPUT_GROUP)
+            if line["row"] not in spec_builder.FORMAT_ROWS
+        ]
+
+    @Property("QVariantList", notify=changed)
+    def formatLines(self) -> list:
+        return [
+            line
+            for line in self._lines_of(spec_builder.OUTPUT_GROUP)
+            if line["row"] in spec_builder.FORMAT_ROWS
+        ]
 
     def _lines_of(self, group: str) -> list:
         for section in self._sections():
@@ -211,13 +185,6 @@ class SynthesisController(QObject):
         return []
 
     def _sections(self) -> list:
-        """The mode's sections, each field carrying what it is set to now.
-
-        The value travels in the model rather than being fetched by a slot: a
-        binding on a slot call is evaluated once and never again, so a control
-        went on showing whatever it was handed when it was built, however often
-        the value behind it changed.
-        """
         fields = [
             spec_field
             for spec_field in spec_builder.MODES[self._mode].fields
@@ -234,18 +201,10 @@ class SynthesisController(QObject):
         return sections
 
     def _applies(self, spec_field) -> bool:
-        """Whether *spec_field* bears on what is currently chosen.
-
-        A gate that measures nothing has no tolerance to be within, and only
-        the multifractal one reads weights or a moment range.  Drawing those
-        anyway offers a setting the run will ignore without saying so.  What
-        was typed into one is kept, not reset, so turning the gate back on
-        brings the row back as it was left.
-        """
-        if not spec_field.hide_when:
-            return True
-        other, hidden_by = spec_field.hide_when
-        return self._values.get(other) not in hidden_by
+        return all(
+            self._values.get(other) not in hidden_by
+            for other, hidden_by in spec_field.hide_when
+        )
 
     @Property(bool, notify=changed)
     def hasInputChoice(self) -> bool:
@@ -253,7 +212,6 @@ class SynthesisController(QObject):
 
     @Property("QStringList", notify=changed)
     def inputScopes(self) -> list:
-        """One network, or a folder of them — said apart from the format."""
         return [spec_builder.SCOPE_LABELS[scope] for scope in self._scopes()]
 
     @Property(int, notify=changed)
@@ -262,9 +220,6 @@ class SynthesisController(QObject):
 
     @Slot(int)
     def selectInputScope(self, index: int) -> None:
-        """Switch between one network and a folder, keeping the format if it
-        exists on the other side.  A folder can only be read as CSV pairs, so
-        coming back from one lands on whatever that scope does offer."""
         scopes = self._scopes()
         if not 0 <= index < len(scopes):
             return
@@ -280,7 +235,6 @@ class SynthesisController(QObject):
 
     @Property("QStringList", notify=changed)
     def inputFormats(self) -> list:
-        """The formats this scope can actually be read as."""
         scope = self._shapes()[self._shape].scope
         return [shape.format for shape in self._shapes() if shape.scope == scope]
 
@@ -311,20 +265,12 @@ class SynthesisController(QObject):
 
     @Slot(int)
     def selectInputShape(self, index: int) -> None:
-        """Switch between a single network and a directory of them.
-
-        The keys change with the shape, so the values are rebuilt rather than
-        carried over: a path left behind from the other shape would be written
-        into the run-spec and reach a loader that never asked for it.
-        """
         shapes = spec_builder.MODES[self._mode].input_shapes
         if not 0 <= index < len(shapes) or index == self._shape:
             return
         self._shape = index
         self._inputs = spec_builder.default_inputs(self._mode, index)
         if self._shapes()[index].scope != spec_builder.SINGLE:
-            # The turn is not offered for a folder, so it must not linger in
-            # the spec and quietly turn every network in one.
             self._values["INPUT_ORIENTATION"] = "none"
         self._info["original"] = None
         self._note_ready()
@@ -332,12 +278,6 @@ class SynthesisController(QObject):
 
     @Property("QVariantList", notify=changed)
     def inputs(self) -> list:
-        """What this mode reads, with the paths chosen so far and how they stand.
-
-        A list rather than fixed properties: analysis takes a directory of
-        finished results where generation takes a network's two CSVs, and a form
-        offering the wrong one is a run that fails after it starts.
-        """
         shape = spec_builder.MODES[self._mode].input_shapes[self._shape]
         rows = []
         for spec_input in shape.inputs:
@@ -346,7 +286,6 @@ class SynthesisController(QObject):
             rows.append(
                 {
                     **spec_input.as_dict(),
-                    # Shown short; stored, checked and run absolute.
                     "value": spec_builder.display_path(value),
                     "state": state,
                 }
@@ -359,11 +298,6 @@ class SynthesisController(QObject):
 
     @Property(bool, notify=changed)
     def canRun(self) -> bool:
-        """Whether the form is complete enough to start.
-
-        The button goes dead rather than accepting a click it would only
-        refuse; what is missing is named in the status bar either way.
-        """
         if self._process is not None:
             return False
         return not spec_builder.validate(
@@ -372,11 +306,6 @@ class SynthesisController(QObject):
 
     @Property(str, notify=changed)
     def runLabel(self) -> str:
-        """Which run the window is showing, for the status bar.
-
-        Read off the directory name the run made, which already carries both:
-        ``gui_generate_results_<date>_<time>_<id>``.
-        """
         if not self._run_root:
             return ""
         parts = os.path.basename(self._run_root).split("_")
@@ -410,35 +339,17 @@ class SynthesisController(QObject):
     def logText(self) -> str:
         return "\n".join(self._log[-400:])
 
-    # ---- preview ----
-
     @Property(bool, notify=changed)
     def canPreview(self) -> bool:
-        """Whether this mode reads a network of its own to show.
-
-        Against every key a network shape declares, not a pair written out
-        here: the pair was ``edge_list``/``datasets_dir``, left over from when
-        those were the only formats, and it quietly took the preview *and* the
-        align card away from the NumPy and pickle shapes the loader reads
-        perfectly well.
-        """
         shape = spec_builder.MODES[self._mode].input_shapes[self._shape]
         return bool(spec_builder.NETWORK_INPUTS & set(shape.ids))
 
     @Property(bool, notify=changed)
     def offersSyntheticPreview(self) -> bool:
-        """Whether this mode's output is worth previewing at all.
-
-        ``generate`` only.  A hybrid network is assembled from thousands of
-        tiles, so drawing one is a long job with an unreadable result — and
-        hybrid and sweep write no batch of networks for a preview to read
-        either.
-        """
         return self._mode == "generate"
 
     @Property(bool, notify=changed)
     def canPreviewSynthetic(self) -> bool:
-        """Whether a finished run of that mode actually left something to show."""
         return (
             self.offersSyntheticPreview
             and self._ran_ok
@@ -449,7 +360,6 @@ class SynthesisController(QObject):
 
     @Slot(int)
     def selectPreviewTab(self, index: int) -> None:
-        """Show one side of the preview, and render it if it is not drawn yet."""
         kind = "synthetic" if index else "original"
         self._shown[kind] = True
         if self._info[kind] is None:
@@ -459,12 +369,6 @@ class SynthesisController(QObject):
 
     @Property(bool, notify=changed)
     def hasBackground(self) -> bool:
-        """Whether the previewed input came with an image behind it.
-
-        Answered by the render, not guessed here: which file counts as a
-        dataset's image is the config's rule, and asking twice invites the two
-        answers to differ.
-        """
         info = self._info["original"]
         return bool(info and info["has_background"])
 
@@ -478,10 +382,6 @@ class SynthesisController(QObject):
 
     @Property(str, notify=changed)
     def originalImage(self) -> str:
-        """The variant the two layer switches select, as a URL for QML.
-
-        Empty when both are off, or when there is nothing rendered yet.
-        """
         info = self._info["original"]
         if not info:
             return ""
@@ -531,25 +431,17 @@ class SynthesisController(QObject):
 
     @Slot()
     def clearOutputs(self) -> None:
-        """Write nothing beyond what a run cannot help writing.
-
-        Every format off, and the plot count to zero with them: asking for
-        images in no format is the one combination the form refuses, and
-        "none" should not walk into it.
-        """
         for spec_field in self._output_fields():
             self._values[spec_field.id] = False if spec_field.kind == "bool" else 0
         self._note_ready()
 
     @Slot()
     def resetOutputs(self) -> None:
-        """Back to what the mode declares: networks as CSV, plots as WebP."""
         for spec_field in self._output_fields():
             self._values[spec_field.id] = spec_field.value
         self._note_ready()
 
     def _output_fields(self) -> list:
-        """Whatever the output section holds — not a list repeated here."""
         return [
             spec_field
             for spec_field in spec_builder.MODES[self._mode].fields
@@ -566,19 +458,13 @@ class SynthesisController(QObject):
         self._layers["network"] = on
         self.changed.emit()
 
-    # ---- slots the form calls ----
-
     @Slot(str, "QVariant")
     def setValue(self, key: str, value) -> None:
         self._values[key] = self._coerce(key, value)
-        # What a run writes says nothing about what its input looks like, so
-        # an output format is a change to the form without a change to the
-        # picture.
         self._touch_preview(redraw=self._group_of(key) != spec_builder.OUTPUT_GROUP)
 
     @Slot(str, int, "QVariant")
     def setSize(self, key: str, index: int, value) -> None:
-        """One half of a two-part field: a frame size, or a swept range."""
         current = list(self._values.get(key) or (0, 0))
         as_float = self._kind_of(key) == "range"
         try:
@@ -587,7 +473,6 @@ class SynthesisController(QObject):
             return
         self._values[key] = tuple(current)
         if key in _FRAME_KEYS:
-            # From here the frame is theirs, and the image stops setting it.
             self._frame_touched = True
         self._touch_preview()
 
@@ -615,8 +500,6 @@ class SynthesisController(QObject):
             return
 
         spec_path = self._write_spec("run_spec.json")
-        # Remembered so a preview of this run's output reads the same spec the
-        # run did, whatever the form says by the time it finishes.
         self._spec_path = spec_path
         self._run_mode = self._mode
         self._ran_ok = False
@@ -633,28 +516,41 @@ class SynthesisController(QObject):
             [sys.executable, _GUI_RUN, spec_path],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            # Closed, not inherited: a pipeline that asks for input (wandb
-            # prompting for an API key) would otherwise stall the run forever
-            # against a terminal the user is not looking at.
             stdin=subprocess.DEVNULL,
             cwd=_REPO_ROOT,
+            start_new_session=_PROCESS_GROUPS,
         )
+        self._cancel_at = None
         self._poll.start()
         self._set_status("Running…")
         self.logChanged.emit()
 
     @Slot()
     def cancel(self) -> None:
-        """SIGINT, so the run shuts down the way Ctrl-C would and exits 130."""
         if self._process is None:
             return
         self._set_status("Cancelling…")
-        try:
-            self._process.send_signal(getattr(__import__("signal"), "SIGINT", 2))
-        except (ProcessLookupError, OSError):
-            pass
+        # To the group, not to the one process: a hybrid run has a dataset
+        # child, a worker pool and a manager under it, and signalling only the
+        # top orphans the pool and hangs the run at exit.
+        self._cancel_at = time.monotonic()
+        self._stop_run(force=False)
 
-    # ---- internals ----
+    def _stop_run(self, force: bool) -> None:
+        if self._process is None:
+            return
+        try:
+            if _PROCESS_GROUPS:
+                os.killpg(
+                    os.getpgid(self._process.pid),
+                    signal.SIGKILL if force else signal.SIGINT,
+                )
+            elif force:
+                self._process.kill()
+            else:
+                self._process.send_signal(signal.SIGINT)
+        except (ProcessLookupError, PermissionError, OSError):
+            pass
 
     def _kind_of(self, key: str) -> str:
         for spec_field in spec_builder.MODES[self._mode].fields:
@@ -677,17 +573,11 @@ class SynthesisController(QObject):
                     return int(float(value))
                 if spec_field.kind == "bool":
                     return bool(value)
-                # A choice is one of the values the field declares, whatever
-                # type those are: a gate is named by a string, a moment range
-                # by a boolean.  Matched as text as well, because that is what
-                # a control hands back for anything it had to render.
                 if spec_field.kind == "choice":
                     for option in spec_field.options:
                         if option is value or str(option) == str(value):
                             return option
                     return spec_field.value
-                # Text falls through to float() otherwise, which made every
-                # entry revert to the default without a word.
                 if spec_field.kind == "text":
                     return str(value)
                 return float(value)
@@ -722,13 +612,24 @@ class SynthesisController(QObject):
         if self._process is not None and self._process.poll() is not None:
             code = self._process.returncode
             self._process = None
+            self._cancel_at = None
             self._poll.stop()
             self._drain_log()
             self._finish(code)
+        elif (
+            self._cancel_at is not None
+            and time.monotonic() - self._cancel_at > _CANCEL_GRACE
+        ):
+            self._cancel_at = None
+            self._log.append(
+                f"{'WARNING':<8}Still running {_CANCEL_GRACE:.0f}s "
+                "after cancelling. Forcing it to stop."
+            )
+            self.logChanged.emit()
+            self._stop_run(force=True)
         self.changed.emit()
 
     def _drain_log(self) -> None:
-        """Read new JSON lines; each is one record, so partial writes are safe."""
         if not self._log_path or not os.path.exists(self._log_path):
             return
         try:
@@ -777,25 +678,12 @@ class SynthesisController(QObject):
             return None
 
     def _scratch_dir(self) -> str:
-        """This session's scratch directory, made once and swept up at exit.
-
-        One directory rather than a fresh ``mkdtemp`` per spec and per render:
-        the form writes a spec every time the edits settle, and those were
-        outliving the window — a session left behind one directory per edit,
-        for good.
-        """
         if self._scratch is None:
             self._scratch = tempfile.mkdtemp(prefix="networksynth_gui_")
             atexit.register(shutil.rmtree, self._scratch, ignore_errors=True)
         return self._scratch
 
     def _write_spec(self, name: str) -> str:
-        """This form as a run-spec, on disk where a subprocess can read it.
-
-        The two names in use — ``run_spec.json`` and ``preview_spec.json`` —
-        are distinct, so sharing a directory cannot have a preview overwrite
-        the spec a run is still being read from.
-        """
         spec = spec_builder.build_spec(
             self._mode, self._inputs, self._output_dir, self._values
         )
@@ -810,11 +698,6 @@ class SynthesisController(QObject):
         return info["note"] if info else ""
 
     def _read_edited(self, info: dict) -> None:
-        """Point the form at the copy that was just written.
-
-        The turn goes back to none with it: the saved data already has it, and
-        leaving it set would turn the network a second time on the next read.
-        """
         shape = spec_builder.shape_for(self._mode, self._inputs)
         for key, path in info["inputs"].items():
             if key in shape.all_ids:
@@ -825,12 +708,6 @@ class SynthesisController(QObject):
         self._set_status(f"Saved {info['count']} edited network(s) to {info['dir']}")
 
     def _adopt_image_size(self, info: dict) -> None:
-        """Take the frames from the image the input came with.
-
-        Only until the user sets one of their own: after that the image is
-        just what gets drawn behind the network.  Re-renders once, because the
-        picture that arrived was drawn in the frame this replaces.
-        """
         size = info.get("image_size")
         if not size or self._frame_touched:
             return
@@ -844,14 +721,6 @@ class SynthesisController(QObject):
         self._stale.add("original")
 
     def _touch_preview(self, redraw: bool = True) -> None:
-        """The form changed, so what is drawn from it is out of date.
-
-        Two things follow it, at different speeds.  The model the form itself
-        draws from has to be right at once — a row shown for only one quality
-        gate has to appear the moment that gate is picked — so that is emitted
-        here.  The picture waits for the edits to settle instead: every field
-        reports separately, and a render per keystroke would be mostly waste.
-        """
         self.changed.emit()
         if redraw and self._shown["original"]:
             self._settle.start()
@@ -861,11 +730,6 @@ class SynthesisController(QObject):
         self._pump_preview()
 
     def _pump_preview(self) -> None:
-        """Start the next render, one at a time.
-
-        A side asked for while another is rendering waits here instead of
-        cancelling it, so turning both on shows both.
-        """
         while self._preview_process is None and self._stale:
             kind = next(
                 name
@@ -873,8 +737,6 @@ class SynthesisController(QObject):
                 if name in self._stale
             )
             self._stale.discard(kind)
-            # Saving is asked for outright; a preview only runs for a side that
-            # is on screen to receive it.
             if kind == "save_edited" or self._shown[kind]:
                 self._launch_preview(kind)
         self.changed.emit()
@@ -894,8 +756,6 @@ class SynthesisController(QObject):
                 return
             spec_path, run_root = self._spec_path, self._run_root
 
-        # A fresh directory per render, so a new picture never arrives at a path
-        # QML has already cached an old one for.
         self._preview_count += 1
         out_dir = os.path.join(self._scratch_dir(), f"{kind}_{self._preview_count}")
         os.makedirs(out_dir)
@@ -907,8 +767,6 @@ class SynthesisController(QObject):
         self._preview_kind = kind
         self._preview_out = out_dir
         self._preview_error = ""
-        # Kept rather than discarded: a failed render's traceback is the only
-        # account of why, and the form shows its last line.
         self._preview_stderr = open(os.path.join(out_dir, "stderr.txt"), "w")
         self._preview_process = subprocess.Popen(
             command,
@@ -930,8 +788,6 @@ class SynthesisController(QObject):
         self._preview_stderr.close()
 
         if code == 0:
-            # Exit 0 promises info.json, so a missing one is a bug worth
-            # hearing about rather than an empty panel.
             with open(os.path.join(self._preview_out, "info.json")) as handle:
                 info = json.load(handle)
             if self._preview_kind == "save_edited":

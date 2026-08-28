@@ -12,9 +12,6 @@ from .saver import Saver, build_saver
 
 logger = logging.getLogger(__name__)
 
-#: One layout for every network report, so ``report.txt`` reads the same
-#: whichever pipeline wrote it.  Counts get thousands separators, measurements
-#: four decimals, and labels share a column.
 _REPORT_RULE = "=" * 40
 _REPORT_LABEL_WIDTH = 21
 
@@ -43,12 +40,6 @@ def _report(title: str, graph: SynthGraph, attributes=None) -> str:
 
 
 class Run:
-    """One dataset being processed, and the directory it writes to.
-
-    Subclasses say what kind of run it is by what they load in their
-    constructor.  There is no mode flag: a run is ready the moment it exists,
-    and a method that only makes sense for one kind lives only on that kind.
-    """
 
     def __init__(self, config, run_paths: RunPaths, dataset_id: DatasetId):
         self._config = config
@@ -60,14 +51,6 @@ class Run:
 
 
 class GenerationRun(Run):
-    """One original network, and the synthetic networks made from it.
-
-    Everything about the input is measured in the constructor, so there is no
-    half-built state and no ``prepare_data()`` step a pipeline can forget.
-    Nothing here analyses the result: the quality gate is an
-    :class:`~analysis.error_checker.ErrorChecker`, and a full spectrum belongs
-    to :class:`ComparisonRun`.
-    """
 
     def __init__(self, config, run_paths: RunPaths, dataset_id: DatasetId):
         super().__init__(config, run_paths, dataset_id)
@@ -82,16 +65,9 @@ class GenerationRun(Run):
         self.synthetic: List[SynthGraph] = []
 
     def add_synthetic_graph(self, graph: SynthGraph) -> None:
-        """NOT THREAD-SAFE."""
         self.synthetic.append(graph)
 
     def save_original(self) -> None:
-        """Record the input: its image, the network, its measurements, a plot.
-
-        One batch, so the four files share a timestamp and read as the group
-        they are.  The image is skipped when the dataset has none — an input
-        given as a CSV pair usually does not.
-        """
         import dataclasses
 
         self.saver.begin_batch()
@@ -103,7 +79,6 @@ class GenerationRun(Run):
         self.saver.end_batch()
 
     def save_synthetic_outputs(self, prefix: str) -> None:
-        """The whole batch as one file, then each network on its own."""
         self.save(self.synthetic, "synthetic_network", f"{prefix}_")
         for i, graph in enumerate(self.synthetic):
             self.saver.begin_batch()
@@ -132,25 +107,13 @@ class GenerationRun(Run):
         )
 
     def original_report(self) -> str:
-        """The input, measured: counts plus the attributes generation reads."""
         return _report("Original Network", self.original, self.attributes)
 
     def synthetic_report(self, graph: SynthGraph) -> str:
-        """Counts only.
-
-        Generation deliberately does not measure what it produced — that is
-        ``ComparisonRun``'s job — so there are no averages to report here.
-        """
         return _report("Synthetic Network", graph)
 
 
 class ComparisonRun(Run):
-    """Two sets of networks, measured against each other.
-
-    Both sets are named by the caller; nothing is discovered and nothing is
-    generated here.  Comparing a generate run against its input means pointing
-    this at that run's two folders.
-    """
 
     def __init__(
         self,

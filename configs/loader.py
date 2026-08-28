@@ -7,17 +7,6 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 def load_config(path: str) -> Type:
-    """Return the config class defined in the config file at *path*.
-
-    The config is named by the file that holds it — ``configs/generate_mode/
-    config_snapshot_1x1.py`` — so what you type is what is on disk, and ``ls``
-    is the list of what you can run.  Nothing is imported but that file.
-
-    Imported as a module of its package rather than loaded from the file
-    directly, because a config module reaches its base class with a relative
-    import (``from ..base_config import BaseConfig``), which only resolves
-    inside the package.
-    """
     module_path = Path(path).resolve()
     if not module_path.is_file():
         raise FileNotFoundError(f"No config file at {path}")
@@ -35,11 +24,6 @@ def load_config(path: str) -> Type:
 
 
 def config_class_in(module) -> Type:
-    """The one config class *module* defines.
-
-    A config file holds exactly one config: anything else makes "the config in
-    this file" ambiguous, so say so rather than picking one.
-    """
     candidates = [
         obj
         for _, obj in inspect.getmembers(module, inspect.isclass)
