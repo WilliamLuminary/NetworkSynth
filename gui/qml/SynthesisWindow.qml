@@ -11,23 +11,14 @@ ApplicationWindow {
     minimumWidth: 1000
     minimumHeight: 620
     title: "NetworkSynth — Synthesis"
-    // Every surface below comes from the system palette, so light and dark
-    // both follow the desktop.  A colour written here would be frozen at one
-    // of them, and mixing the two is what makes a window unreadable.
-    color: palette.window
 
-    // `controller` is exposed from Python as a context property.
-    //
-    // A rail of modes on the left, the chosen mode's page beside it, and that
-    // page split into what a run is given and what it produces.  Run and state
-    // live in the footer, so the button pressed every time is never scrolled
-    // off and the last run stays named.
+    color: palette.window
 
     readonly property int labelWidth: 162
     readonly property int numberWidth: 96
-    //: The gutter an axis letter sits in, taken out of the label beside it.
+
     readonly property int axisWidth: 28
-    //: How big every "?" button is drawn, in pixels square.
+
     readonly property int helpSize: 18
 
     readonly property color accent: palette.highlight
@@ -37,18 +28,12 @@ ApplicationWindow {
     readonly property color railColor: Qt.darker(palette.window, 1.14)
     readonly property color plateColor: root.darkTheme ? Qt.lighter(palette.base, 1.35) : Qt.darker(palette.base, 1.05)
 
-    //: Which way round the desktop is, for the two colours that carry a
-    //: meaning rather than a role: a success green and a failure red have no
-    //: palette entry, and one pair cannot be legible on both.
     readonly property bool darkTheme: palette.window.hsvValue < 0.5
     readonly property color goodColor: darkTheme ? "#5ac97f" : "#1e8e4c"
     readonly property color badColor: darkTheme ? "#f0796d" : "#c0392b"
 
     footer: Rectangle {
-        // root.cardColor, not `palette.base` read here: a bare Rectangle is not
-        // a Control, and Qt resolves its palette from a different source than
-        // the one the controls use.  Reading both is how a window ends up
-        // half-themed, which is the whole bug this file used to have.
+
         color: root.cardColor
         implicitHeight: 88
 
@@ -71,8 +56,7 @@ ApplicationWindow {
                 spacing: 14
 
                 ProgressBar {
-                    // Only while there is progress to show: an empty trough
-                    // beside the button reads as something broken.
+
                     visible: controller.running
                     Layout.preferredWidth: 260
                     from: 0
@@ -92,8 +76,7 @@ ApplicationWindow {
                 Button {
                     id: runButton
                     text: controller.running ? "Cancel" : "Run " + controller.modeLabels[controller.modes.indexOf(controller.mode)]
-                    // Dead rather than accepting a click it would only refuse.
-                    // What is missing is named in the status line below.
+
                     enabled: controller.running || controller.canRun
                     implicitWidth: 190
                     implicitHeight: 40
@@ -141,8 +124,6 @@ ApplicationWindow {
         }
     }
 
-    // One dialog pair reused by every input row: which one opens, and which
-    // input receives the answer, is decided when Browse is clicked.
     property string pendingInput: ""
 
     FileDialog {
@@ -171,16 +152,14 @@ ApplicationWindow {
         }
     }
 
-    // A titled panel.  Children go straight inside it.
     component Card: Rectangle {
         id: card
         default property alias content: body.data
         property string title: ""
-        //: A card that can be folded away, for one whose rows are only wanted
-        //: now and then.  The heading keeps saying it is there.
+
         property bool collapsible: false
         property bool expanded: true
-        //: What this section is about, behind the mark beside its heading.
+
         property string note: ""
 
         Layout.fillWidth: true
@@ -226,8 +205,7 @@ ApplicationWindow {
             }
             ColumnLayout {
                 id: body
-                // Layouts skip an invisible child, so a folded card shrinks to
-                // its heading rather than leaving the gap behind.
+
                 visible: card.expanded
                 Layout.fillWidth: true
                 Layout.fillHeight: true
@@ -236,10 +214,6 @@ ApplicationWindow {
         }
     }
 
-    // One editor per field kind, as siblings gated on `visible` rather than a
-    // Loader with inline Components: those get a context where neither
-    // `controller` nor `modelData` resolves.  QtQuick.Layouts skips invisible
-    // items, so only the relevant one takes space.
     component FieldEditor: RowLayout {
         id: editor
         required property var field
@@ -251,16 +225,12 @@ ApplicationWindow {
 
         CheckBox {
             visible: editor.field.kind === "bool"
-            // No indent of its own: the indicator lines up with the editors
-            // above and below it.
+
             leftPadding: 0
             checked: editor.value === true
             onToggled: editor.edited(checked)
         }
 
-        // Named for the reader, valued for the run: a gate is registered
-        // under a key and a moment range is a boolean, and neither is
-        // anything to put in front of someone.
         ComboBox {
             id: choice
             visible: editor.field.kind === "choice"
@@ -269,9 +239,6 @@ ApplicationWindow {
             currentIndex: Math.max(0, editor.field.options.indexOf(editor.value))
             onActivated: editor.edited(editor.field.options[currentIndex])
 
-            // What each option does, while the list is open and the pointer is
-            // on it: picking between them is when it is wanted, and the row's
-            // own button can only speak for the one already chosen.
             delegate: ItemDelegate {
                 id: option
                 required property var modelData
@@ -301,15 +268,11 @@ ApplicationWindow {
             onEditingFinished: editor.edited(text)
         }
 
-        // Whole numbers get a spin box: the bounds and the step are already
-        // declared on the field, so the control can hold to them rather than
-        // the form complaining afterwards.
         SpinBox {
             visible: editor.field.kind === "integer"
             Layout.preferredWidth: 132
             editable: true
-            // Loose `!=`, because an unset bound arrives from Python as
-            // undefined rather than null, and a strict test lets it through.
+
             from: editor.field.minimum != null ? editor.field.minimum : 0
             to: editor.field.maximum != null ? editor.field.maximum : 2147483647
             stepSize: editor.field.step != null ? editor.field.step : 1
@@ -329,21 +292,17 @@ ApplicationWindow {
             visible: editor.field.kind === "size" || editor.field.kind === "range"
             spacing: 6
 
-            // Which box is which, rather than leaving it to the order.  A
-            // range is a start and an end, so it gets no letters.
             Label {
                 visible: editor.field.kind === "size"
                 text: editor.field.axes[0]
-                // A slot of its own, so the box after it starts where every
-                // other editor does rather than one word further right.
+
                 Layout.preferredWidth: root.axisWidth
                 horizontalAlignment: Text.AlignRight
                 opacity: 0.5
             }
             TextField {
                 Layout.preferredWidth: root.numberWidth
-                // Bindings of invisible siblings still evaluate, so guard the
-                // indexing: on a scalar field this would be undefined.
+
                 text: editor.field.kind === "size" || editor.field.kind === "range" ? editor.value[0] : ""
                 validator: DoubleValidator {
                     bottom: 0
@@ -369,9 +328,6 @@ ApplicationWindow {
             }
         }
 
-        // What the number is counted in.  Positions are image pixels, which
-        // is why a frame is too — the two have to be the same space for the
-        // network to land on its background.
         Label {
             visible: editor.field.unit !== ""
             text: editor.field.unit
@@ -383,9 +339,6 @@ ApplicationWindow {
         }
     }
 
-    // Every explanation in the window is drawn here: ours rather than the
-    // style's, because an attached ToolTip is drawn by the platform and does
-    // not look the same on every one of them.
     component HoverPanel: Popup {
         id: panel
         property string note: ""
@@ -412,15 +365,10 @@ ApplicationWindow {
         }
     }
 
-    // What something does, behind a button rather than beside it: an
-    // explanation that runs to a paragraph does not belong in the flow of rows
-    // a form is scanned down.  Shown while the pointer rests on the button,
-    // and held up by a click for anything worth reading twice.
     component InfoButton: Button {
         id: info
         property string note: ""
-        //: Panels hang left from a button in the help column at the right, and
-        //: right from one beside a heading, so neither runs off the card.
+
         property bool alignRight: true
 
         text: "?"
@@ -446,15 +394,10 @@ ApplicationWindow {
         }
     }
 
-    // One form row: a single field, or a set of switches sharing a label —
-    // and, for a choice, a button holding what the current pick does.
     component FormLine: ColumnLayout {
         id: formLine
         required property var line
 
-        // Everything this row has to say, as one note: what the field is for,
-        // and under a choice what the current pick does.  A row of switches
-        // speaks for each of them in turn, since the label they share cannot.
         readonly property string note: {
             if (formLine.line.row)
                 return formLine.line.fields.filter(each => each.help !== "").map(each => each.label + " — " + each.help).join("\n");
@@ -478,15 +421,11 @@ ApplicationWindow {
 
             Label {
                 text: formLine.line.row ? formLine.line.row : formLine.line.fields[0].label
-                // Narrower on a row whose editor is prefixed by an axis
-                // letter, by exactly what that letter takes: the boxes down
-                // the page all start at the same x either way.
+
                 Layout.preferredWidth: formLine.line.fields[0].kind === "size" ? root.labelWidth - root.axisWidth - 6 : root.labelWidth
                 elide: Text.ElideRight
             }
 
-            // A set: every format on one line, each plainly a switch to turn on or
-            // off rather than a badge stating what is already chosen.
             Repeater {
                 model: formLine.line.row ? formLine.line.fields : []
                 delegate: CheckBox {
@@ -505,10 +444,6 @@ ApplicationWindow {
                 onSized: (index, newValue) => controller.setSize(formLine.line.fields[0].id, index, newValue)
             }
 
-            // Only where there is no editor to take up the slack: a switch row
-            // keeps its switches to the left, and every other row keeps its
-            // help button out at the edge, in the column the input rows put
-            // theirs in.
             Item {
                 Layout.fillWidth: true
                 visible: formLine.line.row !== ""
@@ -582,7 +517,6 @@ ApplicationWindow {
         anchors.fill: parent
         spacing: 0
 
-        // ---- the modes, as a rail ----
         Rectangle {
             Layout.preferredWidth: 196
             Layout.fillHeight: true
@@ -644,7 +578,6 @@ ApplicationWindow {
             }
         }
 
-        // ---- the chosen mode's page ----
         ColumnLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -669,7 +602,6 @@ ApplicationWindow {
                 Layout.fillHeight: true
                 orientation: Qt.Horizontal
 
-                // what the run is given
                 ScrollView {
                     SplitView.preferredWidth: 500
                     SplitView.minimumWidth: 420
@@ -682,10 +614,6 @@ ApplicationWindow {
                         Card {
                             title: "Input"
 
-                            // How many, and what of, as two questions rather
-                            // than one list of every combination.  Only where
-                            // the mode offers a choice: analysis reads a pair
-                            // of results folders and nothing else.
                             RowLayout {
                                 Layout.fillWidth: true
                                 spacing: 10
@@ -725,9 +653,7 @@ ApplicationWindow {
                                     model: controller.inputFormats
                                     currentIndex: controller.inputFormat
                                     onActivated: controller.selectInputFormat(currentIndex)
-                                    // A folder is only read one way, so there
-                                    // is nothing to choose — shown rather than
-                                    // hidden, so it still says what it will be.
+
                                     enabled: !controller.running && controller.inputFormats.length > 1
                                 }
                             }
@@ -752,19 +678,13 @@ ApplicationWindow {
                                         placeholderText: inputRow.modelData.placeholder
                                         onEditingFinished: controller.setInput(inputRow.modelData.id, text)
 
-                                        // An empty box asks for the file when
-                                        // clicked; once it holds a path it goes
-                                        // back to being editable, so a typed or
-                                        // pasted one is still possible.
                                         MouseArea {
                                             anchors.fill: parent
                                             enabled: inputField.text === ""
                                             onClicked: root.browseFor(inputRow.modelData)
                                         }
                                     }
-                                    // Whether this file is settled, beside the
-                                    // field rather than only in the run's
-                                    // refusal at the foot of the window.
+
                                     Label {
                                         Layout.preferredWidth: 14
                                         horizontalAlignment: Text.AlignHCenter
@@ -783,10 +703,7 @@ ApplicationWindow {
                                         text: "Browse…"
                                         onClicked: root.browseFor(inputRow.modelData)
                                     }
-                                    // What this input's format has to contain.
-                                    // Each shape reads a different one, and the
-                                    // wrong file fails deep inside a run rather
-                                    // than here.
+
                                     InfoButton {
                                         visible: inputRow.modelData.help !== ""
                                         note: inputRow.modelData.help
@@ -797,8 +714,7 @@ ApplicationWindow {
 
                         Card {
                             title: "Align"
-                            // Folded: squaring the input up with its image is
-                            // something you do once, if ever.
+
                             collapsible: true
                             expanded: false
                             visible: controller.alignLines.length > 0 && controller.canPreview
@@ -858,7 +774,6 @@ ApplicationWindow {
                     }
                 }
 
-                // what the run produces
                 ColumnLayout {
                     SplitView.fillWidth: true
                     SplitView.minimumWidth: 470
@@ -892,9 +807,7 @@ ApplicationWindow {
                                 text: "Browse…"
                                 onClicked: outputDialog.open()
                             }
-                            // Nothing is written into the chosen folder itself,
-                            // so say where it does go before the run rather
-                            // than in the status line afterwards.
+
                             InfoButton {
                                 note: "Each run makes its own timestamped " + "folder in here, named for the mode and " + "the run. \"latest_result\" is kept " + "pointing at the newest."
                             }
@@ -908,13 +821,11 @@ ApplicationWindow {
                             }
                         }
 
-                        // Grouped formats with embedded header line to save vertical space
                         ColumnLayout {
                             Layout.fillWidth: true
                             Layout.topMargin: 4
                             spacing: 8
 
-                            // Top line with embedded text links
                             RowLayout {
                                 Layout.fillWidth: false
                                 spacing: 14
@@ -980,7 +891,6 @@ ApplicationWindow {
                                 }
                             }
 
-                            // The dynamically generated format checkboxes
                             ColumnLayout {
                                 Layout.fillWidth: true
                                 spacing: 8
@@ -994,7 +904,6 @@ ApplicationWindow {
                                 }
                             }
 
-                            // Bottom bounding line: -------------------------
                             Rectangle {
                                 Layout.fillWidth: true
                                 height: 1
@@ -1012,15 +921,13 @@ ApplicationWindow {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 10
-                            // Custom Rounded TabBar
+
                             RowLayout {
                                 id: previewTabs
                                 property int currentIndex: 0
                                 onCurrentIndexChanged: controller.selectPreviewTab(currentIndex)
                                 spacing: 4
 
-                                // A mode with nothing synthetic to show must
-                                // not be left sitting on that tab.
                                 Connections {
                                     target: controller
                                     function onChanged() {
@@ -1029,7 +936,6 @@ ApplicationWindow {
                                     }
                                 }
 
-                                // Rounded Tab: Original
                                 Rectangle {
                                     Layout.preferredWidth: 112
                                     Layout.preferredHeight: 26
@@ -1046,7 +952,6 @@ ApplicationWindow {
                                     }
                                 }
 
-                                // Rounded Tab: Synthetic
                                 Rectangle {
                                     Layout.preferredWidth: 112
                                     Layout.preferredHeight: 26
@@ -1067,9 +972,6 @@ ApplicationWindow {
                                 }
                             }
 
-                            // Absent when the input came without an image: with
-                            // nothing behind the network there is nothing to
-                            // switch.
                             Button {
                                 text: "Background"
                                 checkable: true
