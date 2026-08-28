@@ -10,8 +10,6 @@ logger = logging.getLogger(__name__)
 MANIFEST_NAME = "manifest.json"
 MANIFEST_VERSION = 1
 
-#: Run outcomes.  ``cancelled`` is distinct from ``failed`` because a GUI
-#: should not show an error for a user pressing Cancel.
 STATUS_OK = "ok"
 STATUS_FAILED = "failed"
 STATUS_CANCELLED = "cancelled"
@@ -20,7 +18,6 @@ _IMAGE_SUFFIXES = (".webp", ".png", ".svg", ".jpg", ".jpeg", ".tif", ".tiff")
 
 
 def _classify(relative_path: str) -> str:
-    """Bucket a file by its location and name, not by which call wrote it."""
     lowered = relative_path.lower()
     parts = lowered.split("/")
 
@@ -28,14 +25,8 @@ def _classify(relative_path: str) -> str:
         return "edge_lists"
     if lowered.endswith("_positions.csv") or lowered.endswith("_positions.npy"):
         return "positions"
-    # Before the image check: a snapshot is an image too, but it belongs to an
-    # animation sequence rather than being a final render, and a consumer wants
-    # to tell them apart.
     if "snapshots" in parts:
         return "snapshots"
-    # Before the image and pickle checks, or the analyse mode's own outputs get
-    # filed as previews and networks — a spectrum plot is not a render of a
-    # network, and its data pickle is not a network to load.
     if "analysis" in lowered:
         return "analysis"
     if lowered.endswith(_IMAGE_SUFFIXES):

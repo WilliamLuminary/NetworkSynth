@@ -19,18 +19,14 @@ logger = logging.getLogger(__name__)
 class Config1(BaseConfig):
     MODE = "mosaic"
 
-    # --- Dataset ---
     DATASETS = [DatasetId("A", "20kX")]
 
-    # --- Mosaic grid parameters ---
     GRID_ROWS: int = 100
     GRID_COLS: int = 100
     TILE_FRAME_SIZE: Tuple[int, int] = (510, 510)
 
-    # Per-side overlap (px) = fraction × tile_frame_size[dim]
     OVERLAP_MARGIN_FRACTION: float = 0.15
 
-    # --- Network generation parameters (per tile) ---
     IMAGE_SIZE: Tuple[int, int] = (510, 510)
     FRAME_SIZE: Tuple[int, int] = (510, 510)
     SYNTHETIC_FRAME_SIZE: Tuple[int, int] = TILE_FRAME_SIZE
@@ -45,7 +41,6 @@ class Config1(BaseConfig):
     ERROR_TOLERANCE = 0.15
     MEASURE_WEIGHTED = True
 
-    # --- Input paths (old_input format) ---
     BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, "old_input")
     POSITION_DATA_DIR = os.path.join(BASE_INPUT_PATH, "position")
     ADJ_MATRIX_DATA_DIR = os.path.join(BASE_INPUT_PATH, "sparse_matrices")
@@ -80,11 +75,6 @@ class Config1(BaseConfig):
         image = trim_image(image)
         image = resize_image(image, Config1.FRAME_SIZE)
         return image
-
-
-# ------------------------------------------------------------------ #
-# Data loaders (old_input format, two-level DatasetId)
-# ------------------------------------------------------------------ #
 
 
 def _load_positions(dataset_id: DatasetId) -> np.ndarray:

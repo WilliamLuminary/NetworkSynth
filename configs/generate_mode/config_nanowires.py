@@ -62,10 +62,8 @@ class ConfigNanowires(BaseConfig):
 
     @staticmethod
     def load_original_image(dataset_id: DatasetId) -> Optional[np.ndarray]:
-        # For nanowires, dataset_id has single level: "1-0", "1-1", etc.
         directory = os.path.join(ConfigNanowires.BASE_INPUT_PATH, dataset_id[0])
 
-        # Find any .tif file in the directory (naming varies: 1.tif, 1-1.tif, etc.)
         tif_files = [f for f in os.listdir(directory) if f.lower().endswith(".tif")]
         if not tif_files:
             logger.warning(f"No .tif image found in {directory}. Returning None.")
@@ -85,9 +83,6 @@ def _load_positions(dataset_id: DatasetId) -> np.ndarray:
     directory = os.path.join(ConfigNanowires.BASE_INPUT_PATH, dataset_id[0])
     file_path = os.path.join(directory, "nod_pos.csv")
 
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"Positions file does not exist: {file_path}")
-
     logger.info(f"Loading positions from {file_path}")
     return np.loadtxt(file_path, delimiter=",")
 
@@ -95,9 +90,6 @@ def _load_positions(dataset_id: DatasetId) -> np.ndarray:
 def _load_edge_list(dataset_id: DatasetId) -> np.ndarray:
     directory = os.path.join(ConfigNanowires.BASE_INPUT_PATH, dataset_id[0])
     file_path = os.path.join(directory, "edls.csv")
-
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"Edge list file does not exist: {file_path}")
 
     logger.info(f"Loading edge list from {file_path}")
     return np.loadtxt(file_path, delimiter=",")

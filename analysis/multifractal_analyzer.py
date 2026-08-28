@@ -17,29 +17,12 @@ from graphs.synth_graph import SynthGraph
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Wasserstein distance via optimal transport
-# ---------------------------------------------------------------------------
-
-
 def _wasserstein_lp(p: np.ndarray, q: np.ndarray, cost: np.ndarray) -> float:
-    """Exact 1-Wasserstein distance between discrete measures.
-
-    ``ot.emd2`` is a network simplex in C.  This was a hand-built sparse LP fed
-    to ``scipy.optimize.linprog``; on the supports that arise here — 2x3 up to
-    6x6 — scipy's per-call setup dominated, and it measured 14.4x slower over
-    the 1052 problems one curvature run solves, for answers identical to 4e-16.
-    """
     return ot.emd2(
         np.ascontiguousarray(p, dtype=np.float64),
         np.ascontiguousarray(q, dtype=np.float64),
         np.ascontiguousarray(cost, dtype=np.float64),
     )
-
-
-# ---------------------------------------------------------------------------
-# Native Ollivier-Ricci curvature (NetworKit + POT, no networkx needed)
-# ---------------------------------------------------------------------------
 
 
 def _ollivier_ricci_curvature(
@@ -51,24 +34,6 @@ def _ollivier_ricci_curvature(
     base: float = math.e,
     exp_power: float = 2,
 ) -> List[float]:
-    """Compute Ollivier-Ricci curvature for every edge.
-
-    For each edge (u, v) the curvature is
-
-        κ(u, v) = 1 − W₁(μ_u, μ_v) / d(u, v)
-
-    where μ_x places mass *alpha* on x and spreads (1 − alpha) over x's
-    neighbours (weighted by ``base ** (-dist ** exp_power)`` when *weighted*,
-    uniformly otherwise), W₁ is the 1-Wasserstein distance under the
-    shortest-path metric, and d(u,v) is the direct edge distance.
-
-    *dist_graph* and its *dist_matrix* come from the caller.  This used to build
-    an equivalent graph itself and run its own all-pairs shortest path, making
-    curvature the third full APSP of a single analysis.
-
-    The default ``base`` / ``exp_power`` values match the convention used by
-    the GraphRicciCurvature library.
-    """
     nk_graph = graph.nk
 
     nbrs = [list(nk_graph.iterNeighbors(u)) for u in range(nk_graph.numberOfNodes())]
@@ -123,37 +88,12 @@ def _ollivier_ricci_curvature(
 def _neighbour_masses(
     distances: np.ndarray, alpha: float, base: float, exp_power: float
 ) -> np.ndarray:
-    """Spread ``1 - alpha`` over neighbours in proportion to ``base ** -d**p``.
-
-    Written as a shifted softmax rather than the literal expression, which
-    underflows on real data: edge widths are of the order 0.03, so the inverted
-    distance ``1/w`` reaches ~30, and ``e ** -(30**2)`` is exactly 0 in double
-    precision.  Once every neighbour of a node underflows the normalisation
-    divides 0 by 0, and the resulting NaN aborts the transport solver — which is
-    why weighted analysis could not complete at all.
-
-    Subtracting the largest exponent scales numerator and denominator by the
-    same constant, so it cancels exactly.  This is the same number, kept inside
-    the representable range; nothing is clamped or defaulted.
-    """
     exponents = -(distances**exp_power) * math.log(base)
     affinities = np.exp(exponents - exponents.max())
     return (1.0 - alpha) * affinities / affinities.sum()
 
 
 def _principal_eigenvector(nk_graph: nk.Graph) -> List[float]:
-    """Eigenvector centrality: the principal eigenvector of the adjacency matrix.
-
-    Lanczos rather than power iteration.  ``nk.centrality.EigenvectorCentrality``
-    iterates, and on a graph with a small spectral gap it is both slow *and*
-    inaccurate: 22s at ``tol=1e-9`` for 705 nodes, and still 2.5% (max relative)
-    away from the ``tol=1e-12`` answer.  ``eigsh`` matches that answer to ~7e-6
-    in 0.01s, so tightening the tolerance stopped being a trade-off at all.
-
-    Returned unit-L2-normalised and non-negative, matching networkit's
-    convention.  Perron-Frobenius makes the principal eigenvector of a connected
-    graph single-signed, so whichever sign ``eigsh`` returns carries no meaning.
-    """
     n = nk_graph.numberOfNodes()
     weighted = nk_graph.isWeighted()
 
@@ -192,12 +132,6 @@ class MultifractalAnalyzer:
         measure_weighted: bool,
         full_q_band: bool,
     ):
-        """Analyze *graph*.
-
-        Both settings are required: a spawned child re-imports ``configs``
-        unmutated, so a ``BaseConfig`` fallback here would silently analyze
-        with the wrong q-band rather than fail.
-        """
         self.graph = graph
         self.f_digit = 0
         self.q_ = None
@@ -212,18 +146,10 @@ class MultifractalAnalyzer:
         self._uw_graph: nk.Graph | None = None
         self._distances: Dict[int, list] = {}
 
-    # ---- helpers ----
-
     def _get_nk_graph(self) -> nk.Graph:
         return self.graph.nk
 
     def _get_analysis_graph(self) -> nk.Graph:
-        """Return a graph matching the current analysis mode.
-
-        When ``self.weighted`` is False but the underlying graph carries
-        edge weights, returns a cached unweighted copy so that algorithms
-        like APSP and betweenness ignore the stored weights.
-        """
         g = self.graph.nk
         if not self.weighted and g.isWeighted():
             if self._uw_graph is None:
@@ -236,12 +162,6 @@ class MultifractalAnalyzer:
         return g
 
     def _get_distances(self, nk_graph: nk.Graph) -> list:
-        """All-pairs shortest paths for *nk_graph*, computed at most once.
-
-        A full ``analyze_graph`` asked for the same distances three times.  Both
-        graphs this is ever called with are cached attributes, so their identity
-        is stable for the analyzer's lifetime and safe to key on.
-        """
         key = id(nk_graph)
         if key not in self._distances:
             apsp = nk.distance.APSP(nk_graph)
@@ -291,8 +211,6 @@ class MultifractalAnalyzer:
             result[i] = (2.0 * wt_tri) / (deg * (deg - 1))
         return result
 
-    # ---- public ----
-
     def analyze_error_features(self) -> MultifractalErrorFeatures:
         q_band = self.full_q if self._full_q_band else self.small_q
         with self.set_q(q_band):
@@ -306,8 +224,6 @@ class MultifractalAnalyzer:
         from scipy.spatial.distance import euclidean
 
         return euclidean(astuple(this), astuple(other))
-
-    # ---- multifractal core ----
 
     def _compute_multifractal_taus(self):
         nk_graph = self._get_analysis_graph()
@@ -336,7 +252,6 @@ class MultifractalAnalyzer:
         diameter = r_g_all[-1]
         R = len(r_g_all)
 
-        # --- vectorised ntw_mat via cumsum + searchsorted ---
         ntw_mat = np.ones((len(n_list), R))
         for i, num_counter in enumerate(n_list):
             if not num_counter:
@@ -348,20 +263,17 @@ class MultifractalAnalyzer:
             idx = np.searchsorted(dists, r_g_all, side="right")
             ntw_mat[i] += np.where(idx > 0, cum[idx - 1], 0)
 
-        # --- vectorised partition function Z(q) ---
-        norm_mat = ntw_mat / ntw_mat[:, -1:]  # (V, R)
-        log_norm = np.log(norm_mat)  # (V, R)
-        q_arr = np.asarray(self.q_)  # (Q,)
-        # (Q,1,1) * (1,V,R) -> (Q,V,R)  then sum over V -> (Q,R)
+        norm_mat = ntw_mat / ntw_mat[:, -1:]
+        log_norm = np.log(norm_mat)
+        q_arr = np.asarray(self.q_)
         zq_arr = np.exp(q_arr[:, None, None] * log_norm[None, :, :]).sum(axis=1)
 
-        # --- batch OLS (same formula as scipy.stats.linregress) ---
-        log_r = np.log(r_g_all / diameter)  # (R,)
-        log_zq = np.log(zq_arr)  # (Q, R)
+        log_r = np.log(r_g_all / diameter)
+        log_zq = np.log(zq_arr)
         x_c = log_r - log_r.mean()
         y_c = log_zq - log_zq.mean(axis=1, keepdims=True)
         ss_xx = (x_c * x_c).sum()
-        tau_arr = (y_c * x_c).sum(axis=1) / ss_xx  # (Q,)
+        tau_arr = (y_c * x_c).sum(axis=1) / ss_xx
 
         return tau_arr.tolist(), zq_arr.tolist()
 
@@ -533,9 +445,6 @@ class MultifractalAnalyzer:
                 uw.addEdge(u, v)
             nk_graph = uw
 
-        # nk.distance.Diameter returns an int, silently flooring weighted
-        # distances (4.7 -> 4, 0.3 -> 0).  Safe only because the graph above
-        # is unweighted, making the hop diameter integral by definition.
         assert not nk_graph.isWeighted(), "hop diameter needs an unweighted graph"
 
         algo = (

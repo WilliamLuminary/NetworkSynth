@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import csv
-import os
 from typing import List, Optional, Tuple
 
 import numpy as np
@@ -32,8 +31,6 @@ def _optional_column(header: List[str], candidates: Tuple[str, ...]) -> Optional
 
 
 def _read_rows(path: str) -> Tuple[List[str], List[List[str]]]:
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"CSV not found: {path}")
     with open(path, newline="") as handle:
         rows = [r for r in csv.reader(handle) if r and any(c.strip() for c in r)]
     if not rows:
@@ -76,11 +73,6 @@ def read_edge_list_csv(path: str) -> Tuple[np.ndarray, Optional[np.ndarray]]:
 
 
 def read_graph_csv(edge_list_path: str, positions_path: str) -> SynthGraph:
-    """Build a :class:`SynthGraph` from an edge-list CSV and a positions CSV.
-
-    Raises rather than guessing: an edge referencing a node with no position
-    would otherwise yield a graph whose geometry is quietly wrong.
-    """
     positions = read_positions_csv(positions_path)
     edges, weights = read_edge_list_csv(edge_list_path)
 

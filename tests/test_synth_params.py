@@ -84,7 +84,6 @@ class TestParamsWinOverBaseConfig:
             degree_lengths = {2: [10.0]}
             average_length = 10.0
 
-        # BaseConfig says 1.2 / 0.8; params say something else entirely.
         params = SynthParams(
             (512, 512),
             closed_nodes_factor=5.0,
@@ -94,9 +93,6 @@ class TestParamsWinOverBaseConfig:
         )
         GraphNode.initialize(Attrs(), params)
 
-        # Asserted on the squared thresholds because those are what the inner
-        # loops actually compare against; the factors themselves stay in
-        # SynthParams rather than being copied onto the rules.
         assert GraphNode._rules.closed_nodes_thr_sq == (10.0 * 5.0) ** 2
         assert GraphNode._rules.closed_edges_thr_sq == (10.0 * 4.0) ** 2
 
@@ -137,7 +133,7 @@ class TestNoDefaults:
         with pytest.raises(TypeError):
             SynthParams()
         with pytest.raises(TypeError):
-            SynthParams((10, 10), 1.0, 1.0)  # missing max_attempts
+            SynthParams((10, 10), 1.0, 1.0)
 
     def test_from_config_requires_a_config(self):
         with pytest.raises(TypeError):
@@ -147,7 +143,6 @@ class TestNoDefaults:
         class Incomplete:
             SYNTHETIC_FRAME_SIZE = (10, 10)
             CLOSED_NODES_FACTOR = 1.0
-            # CLOSED_EDGES_FACTOR and MAX_ATTEMPTS missing
 
         with pytest.raises(AttributeError):
             SynthParams.from_config(Incomplete)

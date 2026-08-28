@@ -60,7 +60,6 @@ def test_pickle_io(load_unweighted_test_synth_graph, tmp_path):
     import dataclasses
 
     with open(pickle_file_path, "wb") as f:
-        # noinspection PyTypeChecker
         pickle.dump(dataclasses.asdict(attr_cal), f)
     assert (tmp_path / "attr_dict.pkl").exists()
 

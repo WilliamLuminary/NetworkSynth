@@ -21,7 +21,6 @@ def _generate_sample_datasets() -> List[DatasetId]:
 class SampleConfig(BaseConfig):
     MODE = "generate"
 
-    # Use DATASETS with single-level DatasetId
     DATASETS = _generate_sample_datasets()
 
     IMAGE_SIZE = (1887, 2048)
@@ -45,11 +44,6 @@ class SampleConfig(BaseConfig):
     ADJ_MATRIX_DATA_DIR = os.path.join(BASE_INPUT_PATH, "")
     IMAGES_DIR = os.path.join(BASE_INPUT_PATH, "")
 
-    # BASE_INPUT_PATH
-    # ├── POSITION_DATA_DIR
-    # ├── ADJ_MATRIX_DATA_DIR
-    # └── IMAGES_DIR
-
     @classmethod
     def initialize(cls) -> None:
         super().initialize()
@@ -58,12 +52,6 @@ class SampleConfig(BaseConfig):
 
     @classmethod
     def load_original_network(cls, dataset_id: DatasetId) -> SynthGraph:
-        """Load original network. dataset_id has single level: [set_name]
-
-        A classmethod, not a static one, so a subclass reads *its own*
-        directories.  Referring to ``SampleConfig.POSITION_DATA_DIR`` by name
-        would silently send every subclass to this config's data.
-        """
         positions = _load_positions(cls.POSITION_DATA_DIR, dataset_id)
         mat = _load_sparse_matrix(cls.ADJ_MATRIX_DATA_DIR, dataset_id)
         from utils import build_graph
@@ -85,22 +73,12 @@ class SampleConfig(BaseConfig):
 def _load_positions(directory: str, dataset_id: DatasetId) -> np.ndarray:
     file_path = os.path.join(directory, f"{dataset_id[0]}_pos.npy")
 
-    if not os.path.exists(file_path):
-        msg = f"Positions file does not exist: {file_path}"
-        logger.error(msg)
-        raise FileNotFoundError(msg)
-
     logger.info(f"Loading positions from {file_path}")
     return np.load(file_path, allow_pickle=True)
 
 
 def _load_sparse_matrix(directory: str, dataset_id: DatasetId):
     file_path = os.path.join(directory, f"{dataset_id[0]}_mat.npy")
-
-    if not os.path.exists(file_path):
-        msg = f"Sparse matrix file does not exist: {file_path}"
-        logger.error(msg)
-        raise FileNotFoundError(msg)
 
     logger.info(f"Loading adjacency matrix from {file_path}")
     return np.load(file_path, allow_pickle=True).item()

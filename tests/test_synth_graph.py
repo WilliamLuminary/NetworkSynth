@@ -6,10 +6,6 @@ pytestmark = pytest.mark.unit
 
 from graphs.synth_graph import SynthGraph
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 def _make_chain_graph(n: int = 5, weighted: bool = False) -> SynthGraph:
     g = nk.Graph(n, weighted=weighted)
@@ -29,11 +25,6 @@ def _make_disconnected_graph() -> SynthGraph:
     g.addEdge(3, 4)
     positions = np.array([[0, 0], [1, 0], [2, 0], [10, 10], [11, 10]], dtype=np.float64)
     return SynthGraph(g, positions)
-
-
-# ---------------------------------------------------------------------------
-# Core properties
-# ---------------------------------------------------------------------------
 
 
 class TestCoreProperties:
@@ -58,11 +49,6 @@ class TestCoreProperties:
         assert isinstance(g.nk, nk.Graph)
 
 
-# ---------------------------------------------------------------------------
-# Position access
-# ---------------------------------------------------------------------------
-
-
 class TestPositionAccess:
     def test_positions_shape(self):
         g = _make_chain_graph(5)
@@ -79,16 +65,11 @@ class TestPositionAccess:
         np.testing.assert_array_equal(g.position(0), [99.0, 88.0])
 
 
-# ---------------------------------------------------------------------------
-# Degree helpers
-# ---------------------------------------------------------------------------
-
-
 class TestDegreeHelpers:
     def test_degree_endpoints(self):
         g = _make_chain_graph(5)
-        assert g.degree(0) == 1  # endpoint
-        assert g.degree(2) == 2  # middle
+        assert g.degree(0) == 1
+        assert g.degree(2) == 2
 
     def test_degrees(self):
         g = _make_chain_graph(4)
@@ -104,13 +85,7 @@ class TestDegreeHelpers:
 
     def test_weighted_degree(self):
         g = _make_chain_graph(3, weighted=True)
-        # edge 0-1 has weight 1, edge 1-2 has weight 2
         assert g.weighted_degree(1) == pytest.approx(3.0)
-
-
-# ---------------------------------------------------------------------------
-# Edge / weight helpers
-# ---------------------------------------------------------------------------
 
 
 class TestEdgeWeightHelpers:
@@ -136,11 +111,6 @@ class TestEdgeWeightHelpers:
         assert g.number_of_edges() == 2
 
 
-# ---------------------------------------------------------------------------
-# Iteration
-# ---------------------------------------------------------------------------
-
-
 class TestIteration:
     def test_nodes(self):
         g = _make_chain_graph(4)
@@ -161,15 +131,9 @@ class TestIteration:
         g = _make_chain_graph(3, weighted=True)
         eww = list(g.edges_with_weights())
         assert len(eww) == 2
-        # Each entry is (u, v, w)
         weights = {w for _, _, w in eww}
         assert 1.0 in weights
         assert 2.0 in weights
-
-
-# ---------------------------------------------------------------------------
-# Structural queries
-# ---------------------------------------------------------------------------
 
 
 class TestStructuralQueries:
@@ -184,7 +148,7 @@ class TestStructuralQueries:
     def test_largest_connected_component(self):
         g = _make_disconnected_graph()
         lcc = g.largest_connected_component()
-        assert lcc.number_of_nodes() == 3  # {0, 1, 2}
+        assert lcc.number_of_nodes() == 3
         assert lcc.is_connected() is True
 
     def test_lcc_single_component_unchanged(self):
@@ -196,7 +160,6 @@ class TestStructuralQueries:
         g = _make_chain_graph(5)
         sub = g.subgraph({1, 2, 3})
         assert sub.number_of_nodes() == 3
-        # edges 1-2 and 2-3 should be preserved
         assert sub.number_of_edges() == 2
 
     def test_copy(self):
@@ -204,14 +167,8 @@ class TestStructuralQueries:
         g2 = g.copy()
         assert g2.number_of_nodes() == g.number_of_nodes()
         assert g2.number_of_edges() == g.number_of_edges()
-        # Mutation of copy should not affect original
         g2.remove_edge(0, 1)
         assert g.has_edge(0, 1) is True
-
-
-# ---------------------------------------------------------------------------
-# Weight conversions
-# ---------------------------------------------------------------------------
 
 
 class TestWeightConversions:
@@ -224,7 +181,7 @@ class TestWeightConversions:
 
     def test_make_weighted_noop(self):
         g = _make_chain_graph(3, weighted=True)
-        g.make_weighted()  # should not raise
+        g.make_weighted()
         assert g.is_weighted() is True
 
     def test_make_unweighted(self):
@@ -234,13 +191,8 @@ class TestWeightConversions:
 
     def test_make_unweighted_noop(self):
         g = _make_chain_graph(3, weighted=False)
-        g.make_unweighted()  # should not raise
+        g.make_unweighted()
         assert g.is_weighted() is False
-
-
-# ---------------------------------------------------------------------------
-# Factory methods
-# ---------------------------------------------------------------------------
 
 
 class TestFactoryMethods:
@@ -267,11 +219,6 @@ class TestFactoryMethods:
         assert g.is_weighted() is False
 
 
-# ---------------------------------------------------------------------------
-# __repr__
-# ---------------------------------------------------------------------------
-
-
 class TestRepr:
     def test_repr_format(self):
         g = _make_chain_graph(3)
@@ -280,11 +227,6 @@ class TestRepr:
         assert "nodes=3" in r
         assert "edges=2" in r
         assert "weighted=False" in r
-
-
-# ---------------------------------------------------------------------------
-# Weight validity
-# ---------------------------------------------------------------------------
 
 
 class TestWeightsMustBePositive:

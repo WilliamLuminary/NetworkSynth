@@ -36,12 +36,6 @@ class TestDatasetIdCrossesProcesses:
         "dataset_id", [DatasetId("a"), DatasetId("A", "10kX"), DatasetId("x", "y", "z")]
     )
     def test_it_survives_a_pickle_round_trip(self, dataset_id):
-        """A variadic constructor must not cost picklability.
-
-        Rebuilding a tuple subclass hands the whole tuple to ``__new__`` as one
-        argument, so without ``__getnewargs__`` the levels come back nested and
-        a DatasetId sent to a spawned child never arrives intact.
-        """
         restored = pickle.loads(pickle.dumps(dataset_id))
 
         assert restored == dataset_id
@@ -51,7 +45,6 @@ class TestDatasetIdCrossesProcesses:
 
 class TestTheChildSetsItselfUp:
     def test_it_initializes_the_config_it_receives(self, tmp_path, config, monkeypatch):
-        """Nothing the parent did to the config class travels to the child."""
         import pipelines.hybrid as hybrid
 
         ran = []
@@ -75,8 +68,6 @@ class TestTheChildSetsItselfUp:
             DatasetId("ds"), config, RunPaths(root=str(tmp_path)), "abc123"
         )
 
-        # Same id and same file as the parent, or the GUI tailing run.jsonl sees
-        # nothing at all while a dataset is being built.
         assert config.RUN_ID == "abc123"
         assert (tmp_path / "run.jsonl").exists()
 

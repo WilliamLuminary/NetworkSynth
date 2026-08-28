@@ -10,9 +10,6 @@ from .synth_graph import SynthGraph
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Union-Find (Disjoint Set) helper
-# ---------------------------------------------------------------------------
 class _UnionFind:
 
     __slots__ = ("parent", "rank")
@@ -42,9 +39,6 @@ class _UnionFind:
             self.rank[ra] = rank_a + 1
 
 
-# ---------------------------------------------------------------------------
-# Stitcher
-# ---------------------------------------------------------------------------
 class MosaicStitcher:
 
     def __init__(self, merge_threshold: float):
@@ -52,18 +46,6 @@ class MosaicStitcher:
         self.grid_size = merge_threshold
 
     def stitch(self, tile_graphs: Dict[Tuple[int, int], SynthGraph]) -> SynthGraph:
-        """
-        Stitch all tile graphs into one large graph.
-
-        Parameters
-        ----------
-        tile_graphs : dict[(row, col), SynthGraph]
-
-        Returns
-        -------
-        SynthGraph
-            The stitched network (largest connected component, re-indexed).
-        """
         logger.info(f"Stitching {len(tile_graphs)} tiles …")
 
         combined, node_tile_ids = self._combine_tiles(tile_graphs)
@@ -89,17 +71,6 @@ class MosaicStitcher:
     def _combine_tiles(
         tile_graphs: Dict[Tuple[int, int], SynthGraph],
     ) -> Tuple[SynthGraph, np.ndarray]:
-        """
-        Merge every tile graph into *one* SynthGraph, giving each node a
-        globally unique integer id.
-
-        Returns
-        -------
-        combined : SynthGraph
-        node_tile_ids : np.ndarray of shape (N,)
-            Integer tile index for each global node (used to identify
-            cross-tile pairs during merging).
-        """
         total_nodes = sum(g.number_of_nodes() for g in tile_graphs.values())
         all_positions = np.zeros((total_nodes, 2), dtype=np.float64)
         node_tile_ids = np.zeros(total_nodes, dtype=np.int32)
@@ -125,13 +96,11 @@ class MosaicStitcher:
     ) -> SynthGraph:
         positions = graph.positions()
 
-        # --- spatial hash ---
         spatial_hash: Dict[Tuple[int, int], list] = defaultdict(list)
         for node in graph.nodes():
             key = self._spatial_hash(positions[node])
             spatial_hash[key].append(node)
 
-        # --- discover merge candidates ---
         merge_pairs = []
         seen: Set[Tuple[int, int]] = set()
 
@@ -167,12 +136,10 @@ class MosaicStitcher:
 
         merge_pairs.sort()
 
-        # --- union-find ---
         uf = _UnionFind()
         for _, a, b in merge_pairs:
             uf.union(a, b)
 
-        # --- contract graph: map old nodes to canonical representatives ---
         canonical = {node: uf.find(node) for node in graph.nodes()}
         kept_nodes = sorted(set(canonical.values()))
         new_id_map = {old: new for new, old in enumerate(kept_nodes)}

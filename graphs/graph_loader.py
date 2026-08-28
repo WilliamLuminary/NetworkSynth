@@ -1,5 +1,3 @@
-"""Read networks off disk in whichever format they were written."""
-
 from __future__ import annotations
 
 import logging
@@ -17,7 +15,6 @@ _POSITIONS_SUFFIX = "_positions.csv"
 
 
 def load_graphs(path: str) -> List[SynthGraph]:
-    """Every network at *path*, which may be a directory or a single file."""
     if os.path.isdir(path):
         graphs = _load_dir(path)
         assert graphs, f"no networks found in {path}"
@@ -28,7 +25,6 @@ def load_graphs(path: str) -> List[SynthGraph]:
 
 
 def _load_dir(folder: str) -> List[SynthGraph]:
-    # Pickles first: one holds a whole batch, where a CSV pair holds one graph.
     pickled = _load_pickles(folder)
     if pickled:
         return pickled
@@ -89,7 +85,4 @@ def _as_synth_graph(obj) -> SynthGraph:
     if isinstance(obj, SynthGraph):
         return obj
 
-    import networkx as nx
-
-    assert isinstance(obj, nx.Graph), f"not a network: {type(obj).__name__}"
     return SynthGraph.from_networkx(obj)

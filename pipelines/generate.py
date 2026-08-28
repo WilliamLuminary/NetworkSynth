@@ -70,10 +70,6 @@ def generate_synthetic_network(
     mapper: Mapper,
     params: SynthParams,
 ):
-    # networkit defaults to one thread per core, and a forked child inherits an
-    # OpenMP runtime whose threads do not exist in it — the child then spins
-    # instead of working.  Pinning matches what hybrid's tile worker already
-    # does; without it a quality-gated run never finishes on a many-core host.
     nk.setNumberOfThreads(1)
 
     if _should_exit(exit_event):
@@ -111,8 +107,6 @@ def _generate_single_network(
     mapper: Mapper,
     params: SynthParams,
 ):
-    # See generate_synthetic_network: a forked child inherits an OpenMP runtime
-    # whose threads do not exist in it and spins instead of working.
     nk.setNumberOfThreads(1)
 
     if exit_event.is_set():
@@ -152,24 +146,6 @@ def _generate_single_network_collecting_snapshots(
     early_check_node_count: int,
     params: SynthParams,
 ):
-    """Generate one network, collecting raw snapshot data in memory.
-
-    Returns ``(graph, error, snapshots)`` where *snapshots* is a list
-    of ``(positions, edges, frame, step_idx)`` tuples.  No rendering
-    happens here — the caller decides which candidates are worth plotting.
-
-    Parameters
-    ----------
-    early_check_node_count : int
-        When > 0, run an error pre-check once the BFS reaches this many
-        nodes (typically the original network's node count).  The partial
-        network is trimmed and weighted so its features are comparable to
-        the original's.  If the check fails, the BFS is aborted immediately.
-        Has no effect on abort behavior when a ``NullErrorChecker`` is in
-        use (it never fails); callers pass 0 to skip the pre-check entirely.
-    """
-    # See generate_synthetic_network: a forked child inherits an OpenMP runtime
-    # whose threads do not exist in it and spins instead of working.
     nk.setNumberOfThreads(1)
 
     if exit_event.is_set():
@@ -210,7 +186,7 @@ def _generate_single_network_collecting_snapshots(
 
             graph = generator.generate_network_with_snapshots(
                 snapshot_callback=on_snapshot,
-                snapshot_interval=snapshot_interval,
+                snapshot_round_interval=snapshot_interval,
             )
 
             if early_aborted:
@@ -234,11 +210,6 @@ def _generate_single_network_collecting_snapshots(
 
     logger.warning("Max attempts reached. Returning None.")
     return None, float("inf"), []
-
-
-# ------------------------------------------------------------------ #
-# Batch generation (standard, no selection)
-# ------------------------------------------------------------------ #
 
 
 def compute_average_error(errors: List) -> float:
@@ -270,8 +241,6 @@ def generate_with_multiprocessing(run: GenerationRun, config):
     max_workers = config.get_max_workers(num_network)
     logger.info(f"Using {max_workers} worker(s) for {num_network} networks")
 
-    # Built here, in the parent, so workers receive their parameters explicitly
-    # rather than inheriting a mutated BaseConfig (which only works on `fork`).
     params = SynthParams.from_config(config)
 
     try:
@@ -325,24 +294,13 @@ def generate_with_multiprocessing(run: GenerationRun, config):
     run.save_synthetic_outputs(prefix)
 
 
-# ------------------------------------------------------------------ #
-# Single-network snapshot generation
-# ------------------------------------------------------------------ #
-
-
 def generate_with_snapshots(run: GenerationRun, config):
-    """Generate a single network while saving intermediate BFS snapshots.
-
-    Snapshot rendering is offloaded to a process pool so the BFS
-    generation loop is never blocked by matplotlib / PNG I/O.
-    """
     from concurrent.futures import ProcessPoolExecutor
 
     snapshot_dir = os.path.join(run.saver.output_dir, "snapshots")
     os.makedirs(snapshot_dir, exist_ok=True)
 
     interval = config.SNAPSHOT_INTERVAL
-    # Resolved in the parent: the plot pool runs in child processes.
     style = config.render("bfs_snapshot")
 
     plot_pool = ProcessPoolExecutor(
@@ -359,6 +317,7 @@ def generate_with_snapshots(run: GenerationRun, config):
             step_idx,
             snapshot_dir,
             style,
+            config.snapshot_formats(),
         )
         plot_futures.append(fut)
 
@@ -367,7 +326,7 @@ def generate_with_snapshots(run: GenerationRun, config):
     generator = GraphGenerator(run.attributes, params)
     synthetic_graph = generator.generate_network_with_snapshots(
         snapshot_callback=on_snapshot,
-        snapshot_interval=interval,
+        snapshot_round_interval=interval,
     )
     synthetic_graph = trim_graph(synthetic_graph, run.attributes.average_degree)
     run.mapper.assign_weights(synthetic_graph)
@@ -384,17 +343,7 @@ def generate_with_snapshots(run: GenerationRun, config):
     logger.info(f"Snapshot generation complete. Snapshots saved to {snapshot_dir}")
 
 
-# ------------------------------------------------------------------ #
-# Entry point
-# ------------------------------------------------------------------ #
-
-
-# ------------------------------------------------------------------ #
-# Snapshot rendering (only called for winners)
-# ------------------------------------------------------------------ #
-
-
-def _render_snapshots(snapshot_data, output_dir, style, plot_workers: int):
+def _render_snapshots(snapshot_data, output_dir, style, formats, plot_workers: int):
     from concurrent.futures import ProcessPoolExecutor
 
     os.makedirs(output_dir, exist_ok=True)
@@ -414,6 +363,7 @@ def _render_snapshots(snapshot_data, output_dir, style, plot_workers: int):
                 step_idx,
                 output_dir,
                 style,
+                formats,
             )
             for positions, edges, frame, step_idx in snapshot_data
         ]
@@ -421,11 +371,6 @@ def _render_snapshots(snapshot_data, output_dir, style, plot_workers: int):
             fut.result()
 
     logger.info(f"Rendered {len(snapshot_data)} snapshots to {output_dir}")
-
-
-# ------------------------------------------------------------------ #
-# Reporting helpers
-# ------------------------------------------------------------------ #
 
 
 def _fmt_metrics(m: dict) -> str:
@@ -501,24 +446,7 @@ def _save_metric_report(ranked, ref_metrics, path):
             )
 
 
-# ------------------------------------------------------------------ #
-# Main orchestrator
-# ------------------------------------------------------------------ #
-
-
 def generate_and_select(run: GenerationRun, config):
-    """Generate many networks, rank by metric distance to original, save best.
-
-    Each candidate is validated with the multifractal error check.
-    Workers retry up to ``MAX_ATTEMPTS`` times until a network passes
-    ``ERROR_TOLERANCE``.
-
-    When ``SNAPSHOT_INTERVAL > 0``, raw snapshot data is collected in
-    memory during BFS (no rendering).  Only the best candidates get
-    their snapshots rendered to PNGs after ranking.
-    """
-    # Callers reach this only when SELECT_BEST > 0; ranked[:0] would otherwise
-    # keep nothing, and the run would look successful with no networks saved.
     assert config.SELECT_BEST > 0, "generate_and_select needs SELECT_BEST > 0"
 
     num_network = config.SYNTHETIC_NETWORK_NUMBER
@@ -556,8 +484,6 @@ def generate_and_select(run: GenerationRun, config):
     )
     futures = []
 
-    # Built in the parent so workers get their parameters explicitly rather
-    # than inheriting a mutated BaseConfig (which only works on `fork`).
     params = SynthParams.from_config(config)
 
     try:
@@ -653,7 +579,13 @@ def generate_and_select(run: GenerationRun, config):
                 f"rank{rank:02d}_network_{orig_idx:02d}",
                 "snapshots",
             )
-            _render_snapshots(snaps, snap_dir, snapshot_style)
+            _render_snapshots(
+                snaps,
+                snap_dir,
+                snapshot_style,
+                config.snapshot_formats(),
+                config.get_snapshot_plot_workers(),
+            )
 
     report_path = os.path.join(run.saver.output_dir, "metric_report.csv")
     _save_metric_report(ranked, ref_metrics, report_path)
@@ -672,6 +604,8 @@ def run_for_dataset(dataset_id: DatasetId, config, run_paths):
 
     if config.SELECT_BEST > 0:
         generate_and_select(run, config)
+    # Snapshots replace the batch with a single network rather than adding to
+    # it: the run produces one network, saved under a snapshot_run prefix.
     elif config.SNAPSHOT_INTERVAL > 0:
         generate_with_snapshots(run, config)
     else:
@@ -694,16 +628,12 @@ def main(config_cls=None):
     except KeyboardInterrupt:
         status = STATUS_CANCELLED
         logger.critical("MAIN PROCESS: Forcing immediate shutdown!")
-        # Re-raised so the entry point can exit non-zero: a cancelled
-        # run must not look like a completed one to a caller.
         raise
     except Exception as exc:
         status = STATUS_FAILED
         error = f"{type(exc).__name__}: {exc}"
         raise
     finally:
-        # Written even on cancel/failure: a caller must be able to tell
-        # "manifest says cancelled" from "no manifest, we died hard".
         if not config_cls.DISABLE_SAVING:
             write_manifest(run_paths, status=status, error=error)
 

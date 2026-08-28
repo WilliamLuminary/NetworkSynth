@@ -3,13 +3,6 @@ from typing import Tuple
 
 
 class DatasetId(tuple):
-    """A dataset's identity: one or more path levels, innermost last.
-
-    ``DatasetId("A", "10kX")`` names a dataset stored under ``A/10kX``.  A tuple
-    subclass because that is what it is — an immutable sequence of levels — and
-    inheriting gives equality, hashing, ordering, indexing and iteration
-    without writing any of them.
-    """
 
     def __new__(cls, *levels: str):
         filtered = tuple(level for level in levels if level)
@@ -18,11 +11,6 @@ class DatasetId(tuple):
         return super().__new__(cls, filtered)
 
     def __getnewargs__(self) -> Tuple[str, ...]:
-        # The levels *are* the constructor's arguments.  Without this, pickle
-        # and copy rebuild a tuple subclass by handing the whole tuple to
-        # __new__ as a single argument, which this variadic signature would
-        # then nest one level deep.  A DatasetId crosses to every spawned
-        # child, so getting this wrong breaks the run rather than a corner.
         return tuple(self)
 
     def __repr__(self) -> str:
