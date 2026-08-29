@@ -1,0 +1,41 @@
+name: Publish dist
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-dist
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The whole history, so origin/main and the dist branch are both reachable.
+          fetch-depth: 0
+
+      - name: Refuse a tag that is not on main
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+
+      - name: Identify the commit's author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Bring dist into this checkout
+        run: |
+          if git ls-remote --exit-code --heads origin dist > /dev/null; then
+            git fetch origin dist
+            git branch -f dist FETCH_HEAD
+          fi
+
+      - name: Publish
+        run: scripts/publish_dist.sh "$GITHUB_SHA" "dist-$GITHUB_REF_NAME"
+
+      - name: Push
+        run: git push origin dist "dist-$GITHUB_REF_NAME"
