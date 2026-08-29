@@ -62,17 +62,9 @@ wandb/
 # ---------------------------------------------------------------------------
 # Project-specific
 # ---------------------------------------------------------------------------
-# Private files
-credentials/*
-!credentials/.keep
-
 # Ignore everything in the data/input and data/output directories
 data/input/*
 data/output/*
-!data/input/
-!data/output/
-!data/input/.keep
-!data/output/.keep
 
 # Keep some files in the data/input/samples directory
 !data/input/samples/

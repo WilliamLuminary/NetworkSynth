@@ -643,6 +643,45 @@ MAX_ATTEMPTS = 20           # More retry attempts
   pairing it with `DISABLE_SAVING` raises rather than silently writing nothing.
 
 
+## The `dist` Branch
+
+`dist` is a code-only copy of this repository, published so another project can carry NetworkSynth as a git submodule without dragging in 100 MB of tracked data. It is an **orphan branch** — its history has no ancestor in `main` — and its trees hold only the seven packages, the four entry points, `requirements.txt` and a README of its own. `.gitignore` ships too, so that once a consumer makes a `.venv` inside the checkout and runs something, their `git status` does not report the submodule as dirty. A shallow clone of it comes to about 780 KB — 544 KB of files and a 232 KB `.git` — against 162 MB for a full clone of this repository.
+
+Nothing is edited on `dist` directly. Every commit there is generated:
+
+```bash
+scripts/publish_dist.sh [source-ref] [tag]     # defaults to HEAD, no tag
+```
+
+The script reads the allowlisted paths out of the *source commit* through a temporary index and writes the result with `commit-tree`. The working tree is never read, so nothing untracked or ignored — `data/output`, `wandb/`, `.venv` — can reach the branch, and a publish works fine from a dirty branch or from an old tag. It stops with the name of anything on the allowlist that is missing from the source ref, says so and exits `0` when the tree is unchanged since the last publish, and never pushes.
+
+Only the first publish is an orphan commit; later ones are its children, so `dist` has an ordinary linear history. That is what lets a shallow submodule fetch and a tag between releases work without force-pushing.
+
+### The two READMEs
+
+`README.md` is this file, for people working *on* NetworkSynth. `README_dist.md` is for people who found NetworkSynth inside someone else's project: setup, the three entry points, the input contract, and where the full documentation lives. The publish script maps it to `README.md` on the branch — the `README_dist.md:README.md` entry in its `PATHS` list, which is the general form for shipping any path under another name.
+
+Keeping both here rather than committing a README onto `dist` is deliberate: a file edited on the branch would be overwritten by the next publish.
+
+### Releasing
+
+```bash
+git checkout main
+scripts/publish_dist.sh HEAD dist-v1.0.1
+git push origin dist dist-v1.0.1
+```
+
+A consumer pins a commit, not a branch, so nothing they have built moves until they move it:
+
+```bash
+git -C third_party/NetworkSynth fetch --tags
+git -C third_party/NetworkSynth checkout dist-v1.0.1
+git add third_party/NetworkSynth && git commit -m "bump NetworkSynth to dist-v1.0.1"
+```
+
+`INTEGRATION_PLAN.md` covers the other side of this — how StructuralGT finds and launches us.
+
+
 ## CI / Code Quality
 
 Every push and pull request to `main` is checked by a **GitHub Actions** workflow (`.github/workflows/pre-commit.yml`) that runs the project's [pre-commit](https://pre-commit.com/) hooks:
