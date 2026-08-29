@@ -4,7 +4,7 @@ Target: `structural-gt` v3.8.6 (`sgtlib`), branch `gen`.
 
 NetworkSynth runs as a separate process in its own Python 3.12 environment; StructuralGT never imports our code, and the two talk through files. Appendix A is the constraint that forces this.
 
-**NetworkSynth is done.** `generate`, `hybrid`, `sweep` and `compare` all run from our GUI as subprocesses, each writing a manifest, and every CLI mode runs for real on sample data. Worker processes use `spawn`, so nothing depends on the parent surviving. What is left is section 2 — the StructuralGT side — whenever we get to it.
+**NetworkSynth is done.** `generate`, `hybrid`, `sweep` and `compare` all run from our GUI as subprocesses, each writing a manifest, and every CLI mode runs for real on sample data. Worker processes use `spawn`, so nothing depends on the parent surviving. **The StructuralGT side is done too**: section 2 lists what changed on their `gen` branch.
 
 ---
 
@@ -94,14 +94,24 @@ A sweep additionally needs a wandb key, in `WANDB_API_KEY` or `WANDB_KEY` (both 
 
 ## 2. The StructuralGT side
 
-One piece of work: a button that opens our window. The user picks their inputs in our GUI, which writes its own run-spec and launches `gui_run.py`, so nothing on their side has to export files, write specs, follow progress, or read manifests.
+Done, on branch `gen`. One button on their ribbon opens our window. The user picks their inputs in our GUI, which writes its own run-spec and launches `gui_run.py`, so nothing on their side has to export files, write specs, follow progress, or read manifests.
 
 | File | Change |
 |---|---|
-| `apps/qml/layouts/RibbonLayout.qml` | button after "Extract graph" (~line 257) |
-| `sgt_configs.ini` | new `[synthesis-settings]` section: path to our interpreter, path to this repo |
+| `src/sgtlib/apps/controllers/synthesis_controller.py` | new: reads the settings, says why the button is disabled, starts our `gui_app.py` with `QProcess` |
+| `src/sgtlib/apps/controllers/main_controller.py` | holds it as `synth_ctrl` |
+| `src/sgtlib/apps/gui_app.py` | exposes it to QML as `synthesisController` |
+| `src/sgtlib/apps/qml/layouts/RibbonLayout.qml` | button after "Extract graph" |
+| `src/sgtlib/apps/qml/assets/icons/synth_icon.png` | new: node-link glyph with a plus, in the ribbon's line-art style |
+| `src/sgtlib/utils/config_loader.py` | `load_synthesis_configs` |
+| `src/sgtlib/utils/configs.ini`, `sgt_configs.ini` | new `[synthesis-settings]`: `python_interpreter`, `repo_dir` |
+| `README.md` | section 3(d) |
 
-The ini file records where our interpreter and repo live. If either is missing, disable the button with a clear message rather than failing at click time, and surface our stderr tail in their log window on a non-zero exit.
+Neither setting has to be filled in. With nothing configured the button looks for us in `third_party/NetworkSynth` — where a submodule checkout lands — and for our interpreter in the `.venv` inside it, on either platform's layout; the two ini keys are overrides, each of which stands on its own. What it never does is fall back to their own interpreter: theirs cannot have networkit, and in the frozen build `sys.executable` is StructuralGT itself, so that fallback would relaunch their app rather than ours.
+
+Until both the checkout and its environment are there the button is disabled and its tooltip names the missing step, down to the `git submodule update --init` that fetches us. Nothing fails at click time. A non-zero exit puts the tail of our stderr in their SGT Logs window.
+
+Two details worth remembering. Our process is started without the Qt plugin-path variables StructuralGT sets for itself, so our Qt loads its own plugins rather than theirs — without that the child dies on a plugin mismatch in the frozen build. And their GUI reads its settings from the `configs.ini` inside the package, not from the `sgt_configs.ini` in their repo root: that one is the copy the terminal app takes with `-c`. Both carry the section.
 
 If the separate window ever becomes annoying enough to be worth replacing, `gui/app.py` is a working reference for driving us headless instead — it writes a spec, launches the subprocess, and tails `run.jsonl` exactly as one of their controllers would. Not planned.
 
