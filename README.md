@@ -704,13 +704,19 @@ scripts/publish_dist.sh HEAD             # no tag; prints the push command
 git push origin dist
 ```
 
-A consumer pins a commit, not a branch, so nothing they have built moves until they move it:
+#### Taking a release, on the consumer side
+
+A submodule records a commit, not a branch, so a project carrying NetworkSynth keeps building against exactly what it was pinned to until someone moves the pin. Publishing a release changes nothing for them until they do:
 
 ```bash
 git -C third_party/NetworkSynth fetch --tags
 git -C third_party/NetworkSynth checkout dist-v1.0.1
 git add third_party/NetworkSynth && git commit -m "bump NetworkSynth to dist-v1.0.1"
 ```
+
+The version they name is the one you tagged on `main` — that is the point of deriving `dist-v1.0.1` from `v1.0.1` rather than numbering the two branches separately. Committing that gitlink is what pins it: any later checkout of their repository brings back the same NetworkSynth it was built against, and a release of ours can never silently change what their application runs.
+
+If a consumer would rather follow the tip of `dist` than name versions, `git submodule update --remote` does that — `.gitmodules` records `branch = dist`, so the pin moves to whatever was published last. That trades the guarantee above for one less step, which is usually the wrong trade.
 
 `INTEGRATION_PLAN.md` covers the other side of this — how StructuralGT finds and launches us.
 
