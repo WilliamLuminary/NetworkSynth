@@ -52,18 +52,24 @@ done
 tree="$(git write-tree)"
 message="dist from $(git rev-parse --short "$source_commit"): $(git log -1 --format=%s "$source_commit")"
 
+# A release whose code did not change still gets its tag, on the commit already there:
+# a tag that silently failed to appear would break whoever went looking for it.
 if parent="$(git rev-parse --verify --quiet "refs/heads/$BRANCH")"; then
     if [ "$(git rev-parse "$parent^{tree}")" = "$tree" ]; then
-        echo "publish_dist: $BRANCH already carries this tree, nothing to publish."
-        exit 0
+        echo "publish_dist: $BRANCH already carries this tree."
+        commit="$parent"
+    else
+        commit="$(git commit-tree "$tree" -p "$parent" -m "$message")"
+        git update-ref "refs/heads/$BRANCH" "$commit"
     fi
-    commit="$(git commit-tree "$tree" -p "$parent" -m "$message")"
 else
     commit="$(git commit-tree "$tree" -m "$message")"
+    git update-ref "refs/heads/$BRANCH" "$commit"
 fi
 
-git update-ref "refs/heads/$BRANCH" "$commit"
-[ -n "$TAG" ] && git tag -a "$TAG" "$commit" -m "NetworkSynth $TAG"
+if [ -n "$TAG" ]; then
+    git tag -a "$TAG" "$commit" -m "NetworkSynth $TAG"
+fi
 
 file_count="$(git ls-tree -r --name-only "$commit" | wc -l)"
 byte_count="$(git ls-tree -r -l "$commit" | awk '{total += $4} END {print total}')"

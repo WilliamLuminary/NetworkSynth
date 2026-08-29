@@ -665,19 +665,58 @@ Keeping both here rather than committing a README onto `dist` is deliberate: a f
 
 ### Releasing
 
+Tag `main` and push the tag. That is the whole release:
+
 ```bash
-git checkout main
-scripts/publish_dist.sh HEAD dist-v1.0.1
-git push origin dist dist-v1.0.1
+git tag -a v1.0.1 -m "NetworkSynth v1.0.1"
+git push origin v1.0.1
 ```
 
-A consumer pins a commit, not a branch, so nothing they have built moves until they move it:
+`.github/workflows/publish-dist.yml` picks that up, runs the publish script against the tagged commit, and pushes `dist` along with a matching `dist-v1.0.1`. Three tag shapes, each meaning one thing:
+
+| Tag | On | Made by |
+| --- | --- | --- |
+| `v1.0.1` | `main` | you, and it is what triggers everything |
+| `dist-v1.0.1` | `dist` | the workflow, one per `v` tag |
+| `submission-v1.0.0` | a code-deposit branch | you, for a journal submission — unrelated to either of the above |
+
+`dist-v*` deliberately does not match the workflow's `v*` trigger, so publishing cannot set itself off again; pushes made with `GITHUB_TOKEN` do not start workflows either, so that holds twice over.
+
+#### What the workflow does
+
+Six steps, in `.github/workflows/publish-dist.yml`:
+
+1. **Check out the tagged commit**, with `fetch-depth: 0` — the job needs `origin/main` to vet the tag and the `dist` branch to build on, neither of which a shallow checkout brings.
+2. **Refuse a tag that is not on main**, with `git merge-base --is-ancestor "$GITHUB_SHA" origin/main`. A `v` tag pushed from a feature branch fails the job instead of quietly publishing from it.
+3. **Set the committer** to `github-actions[bot]`, so the generated commit is attributable to the automation rather than to whoever tagged.
+4. **Bring `dist` into the checkout.** `actions/checkout` leaves only remote-tracking refs, and the publish script looks for the local branch `refs/heads/dist`, so the job creates it from `origin/dist` — and skips that on the very first release, when the branch does not exist anywhere yet.
+5. **Publish**, with `scripts/publish_dist.sh "$GITHUB_SHA" "dist-$GITHUB_REF_NAME"`. The dist tag's version is derived from the release tag rather than chosen, so `v1.0.1` yields `dist-v1.0.1` and the two can never drift apart.
+6. **Push** `dist` and the new tag in one command.
+
+The job holds a `publish-dist` concurrency group, so two releases pushed close together queue rather than race to write the same branch, and it asks for `contents: write` — supplied by the default `GITHUB_TOKEN`, with no secret to configure.
+
+Two behaviours worth expecting. A release whose code did not change still gets its `dist-` tag, on the `dist` commit already there: the script reports `already carries this tree` and tags that commit anyway, because a tag that silently failed to appear would strand anyone who went looking for it. And re-running the workflow for a tag that was already published fails at the tagging step, since `git tag` will not move an existing tag — which is the right outcome, as a published `dist-` tag is something a consumer may already have pinned.
+
+To publish by hand — a dry run, or a `dist` commit with no release behind it:
+
+```bash
+scripts/publish_dist.sh HEAD             # no tag; prints the push command
+git push origin dist
+```
+
+#### Taking a release, on the consumer side
+
+A submodule records a commit, not a branch, so a project carrying NetworkSynth keeps building against exactly what it was pinned to until someone moves the pin. Publishing a release changes nothing for them until they do:
 
 ```bash
 git -C third_party/NetworkSynth fetch --tags
 git -C third_party/NetworkSynth checkout dist-v1.0.1
 git add third_party/NetworkSynth && git commit -m "bump NetworkSynth to dist-v1.0.1"
 ```
+
+The version they name is the one you tagged on `main` — that is the point of deriving `dist-v1.0.1` from `v1.0.1` rather than numbering the two branches separately. Committing that gitlink is what pins it: any later checkout of their repository brings back the same NetworkSynth it was built against, and a release of ours can never silently change what their application runs.
+
+If a consumer would rather follow the tip of `dist` than name versions, `git submodule update --remote` does that — `.gitmodules` records `branch = dist`, so the pin moves to whatever was published last. That trades the guarantee above for one less step, which is usually the wrong trade.
 
 `INTEGRATION_PLAN.md` covers the other side of this — how StructuralGT finds and launches us.
 
