@@ -37,11 +37,12 @@ Synthetic Generation
        │   ├── original_image_*.webp
        │   ├── original_network_*_edgelist.csv
        │   ├── original_network_*_positions.csv
-       │   ├── original_property_*.pkl
+       │   ├── original_network_*.graphml.gz
+       │   ├── original_property_*.json
        │   └── report.txt
        └── synthetic/
            ├── synthetic_graph_*.webp
-           ├── synthetic_network_*.pkl
+           ├── synthetic_network_*.graphml.gz
            ├── synthetic_network_*_edgelist.csv
            ├── synthetic_network_*_positions.csv
            └── report.txt
@@ -149,20 +150,20 @@ Pipeline  →  Saver.save(content, identifier, prefix)
 
 | Serializer | Output | Accepts |
 | --- | --- | --- |
-| `save_pickle` | `.pkl` | any Python object |
+| `save_json` | `.json` | any JSON-shaped object (numpy scalars included) |
+| `save_pickle` | `.pkl` | any Python object — no longer used by any shipped spec |
 | `save_csv` | `.csv` | rows (list of lists) |
 | `save_text` | `.txt` | a string |
 | `save_webp` | `.webp` | matplotlib Figure **or** ndarray **or** PIL image |
 | `save_png` | `.png` | matplotlib Figure **or** ndarray **or** PIL image |
 | `save_svg` | `.svg` (vector) | matplotlib Figure only |
 | `save_network_csv` | `_edgelist.csv` + `_positions.csv` | a SynthGraph |
-| `save_network_nkbin` | `.nkbin` + `_positions.npy` | a SynthGraph |
-| `save_networkit` | `.nkbin` + companion `_positions.npy` | `nk.Graph` or `(graph, positions)` |
+| `save_network_graphml` | `.graphml` or `.graphml.gz` | a SynthGraph — positions travel inside the file |
 
 Rendered visual output comes in exactly two canonical kinds: a **matplotlib `Figure`** (the only kind that can also be saved as vector `.svg`) or a **BGR `ndarray`** (raster). `save_webp`/`save_png` accept either.
 
 `save_network_csv` writes the `edge_weight` column **only for a weighted graph**.
-An unweighted NetworKit graph reports every weight as `1.0`, so writing the
+An unweighted graph reports every weight as `1.0`, so writing the
 column unconditionally produced a file that read back as weighted — and both the
 `Mapper` (which decides whether to assign widths at all) and the analyzer
 (weighted vs topological measure) act on that answer. The reader treats the
@@ -201,18 +202,17 @@ inherits them. **Default policy: images → `.webp`, network exports → `.csv`.
 | --- | --- | --- | --- |
 | `original_image` | `SAVE_ORIGINAL_IMAGE` | `original/` | `.webp` |
 | `original_graph` | `SAVE_ORIGINAL_GRAPH` | `original/` | `.webp` |
-| `original_network` | `SAVE_ORIGINAL_NETWORK` | `original/` | `.csv` |
-| `original_property` | `SAVE_ORIGINAL_PROPERTY` | `original/` | `.pkl` |
+| `original_network` | `SAVE_ORIGINAL_NETWORK` | `original/` | `.csv` **and** `.graphml.gz` |
+| `original_property` | `SAVE_ORIGINAL_PROPERTY` | `original/` | `.json` |
 | `original_report` | `SAVE_ORIGINAL_REPORT` | `original/` | `.txt`, no timestamp |
 | `synthetic_graph` | `SAVE_SYNTHETIC_GRAPH` | `synthetic/` | `.webp` |
-| `synthetic_network` | `SAVE_SYNTHETIC_NETWORK` | `synthetic/` | `.pkl` |
-| `synthetic_export` | `SAVE_SYNTHETIC_EXPORT` | `synthetic/` | `.csv` |
+| `synthetic_network` | `SAVE_SYNTHETIC_NETWORK` | `synthetic/` | `.csv` **and** `.graphml.gz` |
 | `synthetic_report` | `SAVE_SYNTHETIC_REPORT` | `synthetic/` | `.txt`, no timestamp |
-| `analysis_data` | `SAVE_ANALYSIS_DATA` | root | `.pkl`, no timestamp |
+| `analysis_data` | `SAVE_ANALYSIS_DATA` | root | `.json`, no timestamp |
 | `analysis_figure` | `SAVE_ANALYSIS_FIGURE` | root | `.webp` |
 
-`save_svg` (vector) and `save_network_nkbin` (`.nkbin` + `.npy`) are **not**
-defaults but remain available — name them in an override.
+`save_svg` (vector) and the uncompressed `.graphml` are **not** defaults but
+remain available — name them in an override.
 
 #### Changing what a config writes
 
@@ -226,7 +226,7 @@ from ..file_definitions import (
     SYNTHETIC_DIR,
     SaveSpec,
     save_network_csv,
-    save_network_nkbin,
+    save_network_graphml,
     save_png,
     save_svg,
     save_webp,
@@ -240,10 +240,10 @@ class ConfigDickson(BaseConfig):
         SaveSpec(ORIGINAL_DIR, "original_graph", "svg", save_svg),
     )
 
-    # One save call, two files — csv and the binary .nkbin (+ .npy):
-    SAVE_SYNTHETIC_EXPORT = (
+    # One save call, two files — the CSV pair and uncompressed GraphML:
+    SAVE_SYNTHETIC_NETWORK = (
         SaveSpec(SYNTHETIC_DIR, "synthetic_network", "csv", save_network_csv),
-        SaveSpec(SYNTHETIC_DIR, "synthetic_network", "nkbin", save_network_nkbin),
+        SaveSpec(SYNTHETIC_DIR, "synthetic_network", "graphml", save_network_graphml),
     )
 
     # webp AND png:
@@ -264,7 +264,7 @@ Identifiers are plain strings — nothing to register:
 1. Declare `SAVE_MY_CUSTOM_DATA` on `BaseConfig` (or just on your config):
 
 ```python
-SAVE_MY_CUSTOM_DATA = (SaveSpec("custom_dir", "my_data", "pkl", save_pickle),)
+SAVE_MY_CUSTOM_DATA = (SaveSpec("custom_dir", "my_data", "json", save_json),)
 ```
 
 2. Call it from the pipeline with that identifier:
@@ -364,8 +364,8 @@ python analyse.py                                  # uses the constants in the s
 python analyse.py <input> [<input> ...] <out_dir>   # last argument is the output directory
 ```
 
-An input is a directory of networks, a single `*_edgelist.csv`, or a `.pkl`
-batch. Each input is analysed as **its own labelled set**, so several inputs
+An input is a directory of networks, a single `*_edgelist.csv`, or a single
+`*.graphml` / `*.graphml.gz`. Each input is analysed as **its own labelled set**, so several inputs
 produce one figure per measure with every set drawn on it. Labels come from the
 input paths, taking on parent directories as needed to stay distinct — two runs'
 own `original` directories become `sample_A_original` and `sample_B_original`
@@ -385,7 +385,7 @@ Output is a plain directory — no timestamped run root, no `latest_result`, no
 manifest:
 
 ```
-analysis_data.pkl        # {results: {label: [...]}, measure_weighted, full_q_band}
+analysis_data.json       # {results: {label: [...]}, measure_weighted, full_q_band}
 analysis_spectra.webp    # f(alpha) vs alpha, one curve per network
 analysis_dimensions.webp # D(q) vs q
 ```
@@ -458,12 +458,12 @@ The GUI can be pointed at a folder instead of a single network, and reads one da
 | --- | --- |
 | `<prefix>_edgelist.csv` + `<prefix>_positions.csv` | a CSV pair |
 | `<prefix>_adjacency.npy` + `<prefix>_positions.npy` | a NumPy pair, positions transposed on load |
-| `<prefix>_network.pkl` | a pickled `SynthGraph`, or the first of a pickled batch |
+| `<prefix>_network.graphml` or `.graphml.gz` | one network, positions carried inside the file |
 | `<prefix>_image.tif` | the background for that prefix — optional, and independent of the three above |
 
 A half-named dataset stops the run rather than being passed over: an edge list with no positions beside it, an adjacency with no coordinates, or one prefix named as two datasets at once. Datasets are read in name order, and one run writes a subdirectory per dataset under a single run root with one manifest covering them all.
 
-Two things this does *not* cover. The npy files shipped in `data/input/samples/` keep the older `_mat.npy` / `_pos.npy` names that the CLI configs load directly, so those folders are not directory-discoverable. And `analyse.py` reads a directory by its own rule — every pickle in it, or else every CSV pair — not by this contract.
+Two things this does *not* cover. The npy files shipped in `data/input/samples/` keep the older `_mat.npy` / `_pos.npy` names that the CLI configs load directly, so those folders are not directory-discoverable. And `analyse.py` reads a directory by its own rule — every GraphML file in it, or else every CSV pair — not by this contract.
 
 The form is a deliberate subset. What only a CLI config can do:
 
@@ -503,20 +503,24 @@ Best `(CLOSED_NODES_FACTOR, CLOSED_EDGES_FACTOR)` per dataset from hyperparamete
 ## Graph Architecture: SynthGraph
 
 The codebase uses `SynthGraph` (defined in `graphs/synth_graph.py`) as its
-primary graph representation. It wraps a **NetworKit** `nk.Graph` (C++ engine)
-together with a NumPy positions array, replacing the previous `nx.Graph`.
+primary graph representation. It wraps an **igraph** `Graph` (C engine) together
+with a NumPy positions array.
 
 ```
 SynthGraph
-  ├── nk.Graph          # graph structure + edge weights (C++ backed)
+  ├── igraph.Graph      # graph structure, edge weights in es["weight"]
   └── np.ndarray (N,2)  # node positions indexed by integer node ID
 ```
 
 **Key methods**: `positions()`, `degree()`, `weighted_degree()`, `neighbors()`,
 `edges()`, `edges_with_weights()`, `weight()`, `set_weight()`, `is_weighted()`,
 `make_weighted()`, `make_unweighted()`, `largest_connected_component()`,
-`subgraph()`, `copy()`, `from_networkx()`, `from_sparse_matrix()`,
-`from_edge_list()`, `from_graph_nodes()`.
+`subgraph()`, `copy()`, `component_sizes()`, `local_clustering()`,
+`from_sparse_matrix()`, `from_edge_list()`, `from_graph_nodes()`.
+
+While the migration off NetworKit finishes, `SynthGraph.nk` converts to a
+NetworKit graph on demand for `analysis/multifractal_analyzer.py`, the last
+consumer that has not moved. It is temporary and goes away with that file.
 
 Whether a graph is weighted depends on where it came from, and it matters:
 `from_sparse_matrix()` always produces a weighted graph, while
@@ -525,21 +529,14 @@ Whether a graph is weighted depends on where it came from, and it matters:
 weight column. A generated synthetic network inherits its original's answer,
 because the `Mapper` assigns widths only when the original had them.
 
-### Where NetworkX is still used
+### NetworkX is not used
 
-NetworkX is **not** a dependency and is not in `requirements.txt`. It is
-imported lazily in two places, and only to read pickles written before the
-NetworKit migration:
+NetworkX is **not** a dependency, is not in `requirements.txt`, and is no longer
+imported anywhere. It used to be reached for lazily to rebuild a legacy
+`nx.Graph` out of a pickle; both that loader and the `.pkl` input form are gone.
 
-| File | Purpose |
-| ---- | ------- |
-| `graphs/synth_graph.py` | `from_networkx()` — converts a legacy `nx.Graph` to `SynthGraph` |
-| `graphs/graph_loader.py` | Detects a legacy `nx.Graph` payload in a `.pkl` and converts it |
-
-Reading such a pickle requires `pip install networkx`; the loader says so
-explicitly if it hits one. Nothing else needs it — all graph algorithms
-(Dijkstra, betweenness, closeness, eigenvector centrality, diameter, connected
-components, clustering) use **NetworKit** natively.
+All graph algorithms — shortest paths, betweenness, closeness, eigenvector
+centrality, diameter, connected components, clustering — run on **igraph**.
 
 ## Data Loader Requirements
 

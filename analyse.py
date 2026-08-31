@@ -3,11 +3,11 @@ import os
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 import logging
-import pickle
 import sys
 
 from analysis import MultifractalProcessor
 from analysis.spectra_plot import plot_dimensions, plot_spectra
+from configs import save_json
 from graphs import load_graphs
 from handlers import configure_console
 from utils import save_figure_as_webp
@@ -65,16 +65,15 @@ def analyse(inputs, output_dir: str) -> None:
         processor.analyze()
         results[label] = processor.get_summary_data()
 
-    data_path = os.path.join(output_dir, "analysis_data.pkl")
-    with open(data_path, "wb") as handle:
-        pickle.dump(
-            {
-                "results": results,
-                "measure_weighted": MEASURE_WEIGHTED,
-                "full_q_band": FULL_Q_BAND,
-            },
-            handle,
-        )
+    data_path = os.path.join(output_dir, "analysis_data.json")
+    save_json(
+        {
+            "results": results,
+            "measure_weighted": MEASURE_WEIGHTED,
+            "full_q_band": FULL_Q_BAND,
+        },
+        data_path,
+    )
     logger.info(f"Wrote {data_path}")
 
     for name, figure in (

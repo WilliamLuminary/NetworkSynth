@@ -224,13 +224,12 @@ class TestDirectoryInput:
         assert beta.number_of_nodes() == 3
 
     def test_a_directory_may_mix_the_three_forms(self, tmp_path):
-        import pickle
-
         import numpy as np
         from scipy.sparse import csr_matrix
 
         from configs.gui_config import discover_datasets
         from graphs import read_graph_csv
+        from graphs.graphml_io import write_graph_graphml
 
         self._pair(tmp_path, "as_csv")
         np.save(
@@ -238,16 +237,15 @@ class TestDirectoryInput:
             np.array(csr_matrix([[0, 1], [1, 0]]), dtype=object),
         )
         np.save(tmp_path / "as_npy_positions.npy", np.array([[0.0, 0.0], [1.0, 1.0]]))
-        with open(tmp_path / "as_pkl_network.pkl", "wb") as handle:
-            pickle.dump(
-                read_graph_csv(
-                    str(tmp_path / "as_csv_edgelist.csv"),
-                    str(tmp_path / "as_csv_positions.csv"),
-                ),
-                handle,
-            )
+        write_graph_graphml(
+            read_graph_csv(
+                str(tmp_path / "as_csv_edgelist.csv"),
+                str(tmp_path / "as_csv_positions.csv"),
+            ),
+            str(tmp_path / "as_graphml_network.graphml"),
+        )
 
-        assert discover_datasets(str(tmp_path)) == ["as_csv", "as_npy", "as_pkl"]
+        assert discover_datasets(str(tmp_path)) == ["as_csv", "as_graphml", "as_npy"]
 
     def test_one_prefix_named_twice_stops_the_run(self, tmp_path):
         import numpy as np

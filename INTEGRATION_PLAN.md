@@ -19,8 +19,8 @@ Inputs are chosen by the user, not exported on our behalf, and what a mode reads
 | Input set | Files | Modes |
 |---|---|---|
 | `edge_list` + `positions` (+ optional `image`) | one network, named directly | `generate`, `hybrid`, `sweep` |
-| `datasets_dir` | one dataset per prefix: `{name}_edgelist.csv` + `{name}_positions.csv`, or `{name}_adjacency.npy` + `{name}_positions.npy`, or `{name}_network.pkl` — each with an optional `{name}_image.tif` | `generate`, `hybrid`, `sweep` |
-| `original_dir` + `synthetic_dir` | two directories of networks to compare, in either format we write — a pickled batch or CSV pairs | `compare` |
+| `datasets_dir` | one dataset per prefix: `{name}_edgelist.csv` + `{name}_positions.csv`, or `{name}_adjacency.npy` + `{name}_positions.npy`, or `{name}_network.graphml` (`.graphml.gz` too) — each with an optional `{name}_image.tif` | `generate`, `hybrid`, `sweep` |
+| `original_dir` + `synthetic_dir` | two directories of networks to compare, in either format we write — GraphML or CSV pairs | `compare` |
 
 Comparison stands alone: `compare` reads the two sets of networks the caller names, and generation never analyses what it just made. So "generate then compare" is two runs — the second pointed at the first's `original/` and `synthetic/` folders, or at any other pair. Generation's own quality gate is a separate, cheaper thing: an `ErrorChecker` chosen by `ERROR_CHECKER`, measuring two scalars rather than a full spectrum.
 

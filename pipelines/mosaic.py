@@ -6,8 +6,6 @@ import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Dict, Tuple
 
-import networkit as nk
-
 from configs import SynthParams
 from configs.mosaic_mode.config_sample import SampleConfig as MosaicConfig
 from graphs import GraphGenerator
@@ -40,8 +38,6 @@ def generate_single_tile(args):
         offset_y,
         params,
     ) = args
-
-    nk.setNumberOfThreads(1)
 
     if exit_event.is_set():
         return (row, col), None
@@ -196,7 +192,7 @@ def run_mosaic_for_dataset(dataset_id, config, run_paths):
     run.add_synthetic_graph(mosaic_graph)
     prefix = f"mosaic_{config.GRID_ROWS}x{config.GRID_COLS}"
     run.saver.begin_batch()
-    run.save(mosaic_graph, "synthetic_export", f"{prefix}_")
+    run.save(mosaic_graph, "synthetic_network", f"{prefix}_")
     mosaic_img = render_network(mosaic_graph, config.render("mosaic_graph"))
     run.save(mosaic_img, "synthetic_graph", f"{prefix}_")
     run.saver.end_batch()

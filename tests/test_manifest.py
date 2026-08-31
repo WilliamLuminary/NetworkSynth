@@ -36,8 +36,8 @@ class TestClassification:
             "sample_1/synthetic/graph.webp",
             "sample_1/original/orig.png",
             "sample_1/snapshots/step_00001.png",
-            "sample_1/original/net.nkbin",
-            "sample_1/analysis_data.pkl",
+            "sample_1/original/net.graphml.gz",
+            "sample_1/analysis_data.json",
             "sample_1/spectra_analysis_figure.webp",
         )
 
@@ -47,10 +47,10 @@ class TestClassification:
         assert buckets["positions"] == ["sample_1/synthetic/net_positions.csv"]
         assert "sample_1/snapshots/step_00001.png" in buckets["snapshots"]
         assert "sample_1/synthetic/graph.webp" in buckets["previews"]
-        assert "sample_1/original/net.nkbin" in buckets["networks"]
-        assert "sample_1/analysis_data.pkl" in buckets["analysis"]
+        assert "sample_1/original/net.graphml.gz" in buckets["networks"]
+        assert "sample_1/analysis_data.json" in buckets["analysis"]
         assert "sample_1/spectra_analysis_figure.webp" in buckets["analysis"]
-        assert "sample_1/analysis_data.pkl" not in buckets.get("networks", [])
+        assert "sample_1/analysis_data.json" not in buckets.get("networks", [])
 
     def test_paths_use_forward_slashes(self, tmp_path):
         _touch(str(tmp_path), "a/b/net_edgelist.csv")

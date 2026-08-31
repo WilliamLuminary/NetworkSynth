@@ -128,7 +128,7 @@ class TestMosaicMode:
         assert mosaic.number_of_edges() > 100
 
         agent.saver.begin_batch()
-        agent.saver.save(mosaic, "synthetic_export", "mosaic_2x2_")
+        agent.saver.save(mosaic, "synthetic_network", "mosaic_2x2_")
         agent.saver.end_batch()
 
         out = agent.saver.output_dir
@@ -174,7 +174,7 @@ class TestScalingMode:
         assert scaled.number_of_edges() > 200
 
         agent.saver.begin_batch()
-        agent.saver.save(scaled, "synthetic_export", "scaled_2x2_")
+        agent.saver.save(scaled, "synthetic_network", "scaled_2x2_")
         agent.saver.end_batch()
 
         out = agent.saver.output_dir

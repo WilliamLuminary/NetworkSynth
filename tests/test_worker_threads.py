@@ -1,111 +1,59 @@
-import threading
+"""Worker processes must not each grab every core.
 
-import networkit as nk
+This used to pin networkit's thread count. igraph is single-threaded, so what is
+left to guard is the environment variable that stops numpy, scipy and OpenBLAS
+from oversubscribing inside a pool worker.
+"""
+
+import importlib
+import inspect
+import os
+
 import pytest
-
-from configs.params import SynthParams
 
 pytestmark = pytest.mark.unit
 
-
-@pytest.fixture
-def restore_thread_count():
-    original = nk.getMaxNumberOfThreads()
-    yield
-    nk.setNumberOfThreads(original)
-
-
-@pytest.fixture
-def stopped_event():
-    event = threading.Event()
-    event.set()
-    return event
+_PIPELINES = (
+    "pipelines.generate",
+    "pipelines.hybrid",
+    "pipelines.mosaic",
+    "pipelines.sweep",
+    "pipelines.compare",
+)
 
 
-def _params():
-    return SynthParams(
-        synthetic_frame_size=(64, 64),
-        closed_nodes_factor=1.2,
-        closed_edges_factor=0.8,
-        max_attempts=1,
-        seed=1,
-    )
+@pytest.mark.parametrize("module_name", _PIPELINES)
+def test_pipeline_pins_omp_before_importing_anything_heavy(module_name):
+    module = importlib.import_module(module_name)
+    source = inspect.getsource(module)
+    pin = 'os.environ.setdefault("OMP_NUM_THREADS", "1")'
+    assert pin in source, f"{module_name} does not pin OMP_NUM_THREADS"
 
-
-def test_generate_worker_pins_networkit(restore_thread_count, stopped_event):
-    from pipelines.generate import generate_synthetic_network
-
-    nk.setNumberOfThreads(4)
-
-    generate_synthetic_network(stopped_event, None, None, None, _params())
-
-    assert nk.getMaxNumberOfThreads() == 1
-
-
-def test_sweep_worker_pins_networkit(restore_thread_count, stopped_event):
-    from pipelines.sweep import _generate_with_factors
-
-    nk.setNumberOfThreads(4)
-
-    _generate_with_factors(stopped_event, None, None, None, _params())
-
-    assert nk.getMaxNumberOfThreads() == 1
-
-
-def test_mosaic_worker_pins_networkit(restore_thread_count, stopped_event):
-    from pipelines.mosaic import generate_single_tile
-
-    nk.setNumberOfThreads(4)
-
-    generate_single_tile((0, 0, stopped_event, None, (64, 64), 0.0, 0.0, _params()))
-
-    assert nk.getMaxNumberOfThreads() == 1
-
-
-def test_selection_path_workers_pin_networkit(restore_thread_count, stopped_event):
-    from pipelines.generate import (
-        _generate_single_network,
-        _generate_single_network_collecting_snapshots,
-    )
-
-    nk.setNumberOfThreads(4)
-    _generate_single_network(stopped_event, None, None, None, _params())
-    assert nk.getMaxNumberOfThreads() == 1
-
-    nk.setNumberOfThreads(4)
-    _generate_single_network_collecting_snapshots(
-        stopped_event, None, None, None, 0, 0, _params()
-    )
-    assert nk.getMaxNumberOfThreads() == 1
-
-
-def test_every_pool_worker_is_covered_here():
-    import inspect
-
-    import pipelines.generate as gen
-    import pipelines.hybrid as hyb
-    import pipelines.mosaic as mos
-    import pipelines.sweep as swp
-
-    workers = [
-        gen.generate_synthetic_network,
-        gen._generate_single_network,
-        gen._generate_single_network_collecting_snapshots,
-        hyb._generate_tile_worker,
-        mos.generate_single_tile,
-        swp._generate_with_factors,
+    lines = [line for line in source.splitlines() if line.strip()]
+    position = next(i for i, line in enumerate(lines) if pin in line)
+    heavy = ("numpy", "scipy", "matplotlib", "igraph", "cv2", "sklearn", "ot")
+    too_early = [
+        line
+        for line in lines[:position]
+        if line.startswith(("import ", "from "))
+        and any(name in line.split() for name in heavy)
     ]
-    unpinned = [
-        w.__qualname__
-        for w in workers
-        if "setNumberOfThreads(1)" not in inspect.getsource(w)
-    ]
-    assert not unpinned, f"pool workers not pinning networkit: {unpinned}"
+    assert not too_early, (
+        f"{module_name} imports {too_early} before pinning OMP_NUM_THREADS; "
+        "the pin only works if it happens before the maths libraries load"
+    )
 
 
-def test_hybrid_tile_worker_still_pins_networkit(restore_thread_count):
-    import inspect
+def test_the_pin_is_in_effect_once_a_pipeline_is_imported():
+    importlib.import_module("pipelines.generate")
+    assert os.environ["OMP_NUM_THREADS"] == "1"
 
-    from pipelines.hybrid import _generate_tile_worker
 
-    assert "setNumberOfThreads(1)" in inspect.getsource(_generate_tile_worker)
+def test_no_pipeline_still_talks_to_networkit():
+    """The migration is done when this passes with networkit uninstalled."""
+    offenders = []
+    for module_name in _PIPELINES:
+        source = inspect.getsource(importlib.import_module(module_name))
+        if "networkit" in source or "nk." in source:
+            offenders.append(module_name)
+    assert not offenders, f"still referencing networkit: {offenders}"

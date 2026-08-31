@@ -1,28 +1,22 @@
 import csv
 import os
 import pickle
-import sys
-import types
 
 import numpy as np
 import pytest
 
 pytestmark = pytest.mark.unit
 
-_nk = types.ModuleType("networkit")
-_nk.Graph = type("Graph", (), {})
-_nk.Format = type("Format", (), {"NetworkitBinary": 0})
-_nk.writeGraph = lambda *a, **kw: None
-sys.modules.setdefault("networkit", _nk)
-
-from configs import BaseConfig  # noqa: E402
-from configs.file_definitions import SaveSpec  # noqa: E402
-from configs.file_definitions import save_csv as _save_csv  # noqa: E402
+from configs import BaseConfig
+from configs.file_definitions import (
+    SaveSpec,
+)
+from configs.file_definitions import save_csv as _save_csv
 from configs.file_definitions import (
     save_network_csv,
 )
 from configs.file_definitions import save_pickle as _save_pickle
-from handlers.saver import Saver  # noqa: E402
+from handlers.saver import Saver
 
 
 class FakeGraph:
@@ -73,12 +67,12 @@ class TestSpecs:
     def test_original_network_formats(self):
         specs = BaseConfig.save("original_network")
         exts = {s.extension for s in specs}
-        assert exts == {"csv"}
+        assert exts == {"csv", "graphml.gz"}
 
-    def test_synthetic_export_formats(self):
-        specs = BaseConfig.save("synthetic_export")
+    def test_synthetic_network_formats(self):
+        specs = BaseConfig.save("synthetic_network")
         exts = {s.extension for s in specs}
-        assert exts == {"csv"}
+        assert exts == {"csv", "graphml.gz"}
 
     def test_synthetic_graph_default_webp(self):
         specs = BaseConfig.save("synthetic_graph")
@@ -190,18 +184,18 @@ class TestSaverPaths:
         def fake_save_fn(content, path):
             recorded.append(path)
 
-        original = BaseConfig.SAVE_SYNTHETIC_EXPORT
-        BaseConfig.SAVE_SYNTHETIC_EXPORT = (
+        original = BaseConfig.SAVE_SYNTHETIC_NETWORK
+        BaseConfig.SAVE_SYNTHETIC_NETWORK = (
             SaveSpec("synthetic", "net", "csv", fake_save_fn),
-            SaveSpec("synthetic", "net", "nkbin", fake_save_fn),
+            SaveSpec("synthetic", "net", "graphml.gz", fake_save_fn),
         )
         try:
             saver.begin_batch()
             ts = saver._batch_timestamp
-            saver.save("graph", "synthetic_export", "b_")
+            saver.save("graph", "synthetic_network", "b_")
             saver.end_batch()
         finally:
-            BaseConfig.SAVE_SYNTHETIC_EXPORT = original
+            BaseConfig.SAVE_SYNTHETIC_NETWORK = original
 
         assert len(recorded) == 2
         for p in recorded:
@@ -231,14 +225,14 @@ class TestSaverPaths:
         def fake_save_fn(content, path):
             recorded.append(path)
 
-        original = BaseConfig.SAVE_SYNTHETIC_EXPORT
-        BaseConfig.SAVE_SYNTHETIC_EXPORT = (
+        original = BaseConfig.SAVE_SYNTHETIC_NETWORK
+        BaseConfig.SAVE_SYNTHETIC_NETWORK = (
             SaveSpec("sub/deep", "detail", "csv", fake_save_fn),
         )
         try:
-            saver.save("data", "synthetic_export", "")
+            saver.save("data", "synthetic_network", "")
         finally:
-            BaseConfig.SAVE_SYNTHETIC_EXPORT = original
+            BaseConfig.SAVE_SYNTHETIC_NETWORK = original
 
         assert len(recorded) == 1
         parent = os.path.dirname(recorded[0])
@@ -300,7 +294,9 @@ class TestSerializers:
 
 
 class TestEndToEnd:
-    def test_pickle_save_via_saver(self, tmp_path):
+    def test_json_save_via_saver(self, tmp_path):
+        import json
+
         saver = object.__new__(Saver)
         saver.output_dir = str(tmp_path)
         saver._save_func = BaseConfig.save
@@ -309,11 +305,10 @@ class TestEndToEnd:
         data = {"hello": "world"}
         saver.save(data, "original_property", "test_")
 
-        pkl_files = list(tmp_path.rglob("*.pkl"))
-        assert len(pkl_files) == 1
-        with open(pkl_files[0], "rb") as f:
-            loaded = pickle.load(f)
-        assert loaded == data
+        written = list(tmp_path.rglob("*.json"))
+        assert len(written) == 1
+        with open(written[0]) as handle:
+            assert json.load(handle) == data
 
     def test_csv_export_via_saver(self, tmp_path):
         saver = object.__new__(Saver)
@@ -323,14 +318,14 @@ class TestEndToEnd:
 
         graph = FakeGraph(n_nodes=5)
 
-        original = BaseConfig.SAVE_SYNTHETIC_EXPORT
-        BaseConfig.SAVE_SYNTHETIC_EXPORT = (
+        original = BaseConfig.SAVE_SYNTHETIC_NETWORK
+        BaseConfig.SAVE_SYNTHETIC_NETWORK = (
             SaveSpec("synthetic", "synthetic_network", "csv", save_network_csv),
         )
         try:
-            saver.save(graph, "synthetic_export", "exp_")
+            saver.save(graph, "synthetic_network", "exp_")
         finally:
-            BaseConfig.SAVE_SYNTHETIC_EXPORT = original
+            BaseConfig.SAVE_SYNTHETIC_NETWORK = original
 
         csv_files = sorted(tmp_path.rglob("*.csv"))
         assert len(csv_files) == 2

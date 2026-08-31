@@ -88,7 +88,7 @@ def largest_connected_component(graph: SynthGraph) -> SynthGraph:
 
 
 def trim_graph(graph: SynthGraph, tar_avg_deg: float) -> SynthGraph:
-    import networkit as nk
+    import igraph as ig
 
     logger = logging.getLogger(__name__)
     target = 1.1 * tar_avg_deg
@@ -120,24 +120,15 @@ def trim_graph(graph: SynthGraph, tar_avg_deg: float) -> SynthGraph:
         edge_scores = np.maximum(degrees[src], degrees[dst])
         keep_idx = np.argpartition(edge_scores, target_edges)[:target_edges]
 
-        kept_src = src[keep_idx]
-        kept_dst = dst[keep_idx]
-        weighted = graph.is_weighted()
-        new_nk = nk.Graph(n, weighted=weighted)
-        if weighted:
-            for i in range(len(kept_src)):
-                new_nk.addEdge(
-                    int(kept_src[i]),
-                    int(kept_dst[i]),
-                    graph.weight(int(kept_src[i]), int(kept_dst[i])),
-                )
-        else:
-            for i in range(len(kept_src)):
-                new_nk.addEdge(int(kept_src[i]), int(kept_dst[i]))
+        kept = [(int(u), int(v)) for u, v in zip(src[keep_idx], dst[keep_idx])]
+        weights = [graph.weight(u, v) for u, v in kept] if graph.is_weighted() else None
+        new_graph = ig.Graph(n=n, edges=kept)
+        if weights is not None:
+            new_graph.es["weight"] = weights
 
         from graphs.synth_graph import SynthGraph
 
-        graph = SynthGraph(new_nk, graph.positions())
+        graph = SynthGraph(new_graph, graph.positions())
         logger.debug(
             f"trim_graph round {round_num}: rebuilt with "
             f"{graph.number_of_edges():,} edges, extracting LCC"

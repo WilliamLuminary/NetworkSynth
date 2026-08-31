@@ -124,21 +124,21 @@ class TestLengthAngleErrorChecker:
 
     @staticmethod
     def _lattice(side=8, spacing=10.0, seed=1):
-        import networkit as nk
+        import igraph as ig
 
         rng = np.random.default_rng(seed)
         coords = [(x * spacing, y * spacing) for y in range(side) for x in range(side)]
         positions = np.asarray(coords, dtype=float)
         positions += rng.normal(0, spacing * 0.02, size=positions.shape)
-        graph = nk.Graph(len(coords), weighted=False)
+        pairs = []
         for y in range(side):
             for x in range(side):
                 here = y * side + x
                 if x + 1 < side:
-                    graph.addEdge(here, here + 1)
+                    pairs.append((here, here + 1))
                 if y + 1 < side:
-                    graph.addEdge(here, here + side)
-        return SynthGraph(graph, positions)
+                    pairs.append((here, here + side))
+        return SynthGraph(ig.Graph(n=len(coords), edges=pairs), positions)
 
     def _checker(self, tolerance=0.15):
         from analysis.error_checker import LengthAngleErrorChecker

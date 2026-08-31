@@ -1,6 +1,4 @@
-import pickle
-
-import networkit as nk
+import igraph as ig
 import numpy as np
 import pytest
 
@@ -16,15 +14,15 @@ def _small_graph(side=8, spacing=10.0, seed=3):
     positions = np.asarray(coords, dtype=float)
     positions += rng.normal(0, spacing * 0.05, size=positions.shape)
 
-    graph = nk.Graph(len(coords), weighted=False)
+    pairs = []
     for y in range(side):
         for x in range(side):
             here = y * side + x
             if x + 1 < side:
-                graph.addEdge(here, here + 1)
+                pairs.append((here, here + 1))
             if y + 1 < side:
-                graph.addEdge(here, here + side)
-    return SynthGraph(graph, positions)
+                pairs.append((here, here + side))
+    return SynthGraph(ig.Graph(n=len(coords), edges=pairs), positions)
 
 
 class TestGenerationDoesNotAnalyse:
@@ -62,15 +60,19 @@ class TestAnalyzeReadsEveryFormatWeWrite:
         assert len(loaded) == 1
         assert loaded[0].number_of_nodes() == 64
 
-    def test_a_pickle_wins_over_the_csv_pair(self, tmp_path):
+    def test_graphml_wins_over_the_csv_pair(self, tmp_path):
         from configs.compare_mode.config_sample import _load_networks
         from configs.file_definitions import save_network_csv
+        from graphs.graphml_io import write_graph_graphml
 
         folder = tmp_path / "synthetic"
         folder.mkdir()
         save_network_csv(_small_graph(), str(folder / "synthetic_network.csv"))
-        with open(folder / "synthetic_network.pkl", "wb") as handle:
-            pickle.dump([_small_graph(), _small_graph(seed=9)], handle)
+        for index in range(2):
+            write_graph_graphml(
+                _small_graph(seed=index),
+                str(folder / f"synthetic_network_n{index}.graphml"),
+            )
 
         assert len(_load_networks(str(folder))) == 2
 
@@ -114,10 +116,16 @@ class TestComparisonLoadsTheTwoSetsItIsGiven:
         original, synthetic = tmp_path / "orig", tmp_path / "synth"
         original.mkdir()
         synthetic.mkdir()
-        with open(original / "original_network.pkl", "wb") as handle:
-            pickle.dump([_small_graph(seed=5)], handle)
-        with open(synthetic / "synthetic_network.pkl", "wb") as handle:
-            pickle.dump([_small_graph(), _small_graph(seed=4)], handle)
+        from graphs.graphml_io import write_graph_graphml
+
+        write_graph_graphml(
+            _small_graph(seed=5), str(original / "original_network.graphml")
+        )
+        for index, seed in enumerate((3, 4)):
+            write_graph_graphml(
+                _small_graph(seed=seed),
+                str(synthetic / f"synthetic_network_n{index}.graphml"),
+            )
 
         run = self._run(self._config(tmp_path, original, synthetic))
 
@@ -152,7 +160,7 @@ class TestComparisonLoadsTheTwoSetsItIsGiven:
         run.save_analysis()
 
         written = list((tmp_path / "out").rglob("*"))
-        assert any(f.name.endswith("analysis_data.pkl") for f in written), written
+        assert any(f.name.endswith("analysis_data.json") for f in written), written
         assert any("analysis_figure" in f.name for f in written), written
 
 

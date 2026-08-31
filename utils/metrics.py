@@ -9,7 +9,6 @@ if TYPE_CHECKING:
 
 
 def compute_network_metrics(graph: SynthGraph) -> dict:
-    import networkit as nk
     from scipy.spatial.distance import euclidean
 
     n = graph.number_of_nodes()
@@ -18,9 +17,8 @@ def compute_network_metrics(graph: SynthGraph) -> dict:
     node_count = n
     avg_degree = 2.0 * e / n if n > 0 else 0.0
 
-    lcc = nk.centrality.LocalClusteringCoefficient(graph.nk)
-    lcc.run()
-    avg_clustering = sum(lcc.scores()) / n if n > 0 else 0.0
+    scores = graph.local_clustering()
+    avg_clustering = sum(scores) / n if n > 0 else 0.0
 
     positions = graph.positions()
     total_length = 0.0

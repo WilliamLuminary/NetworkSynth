@@ -34,20 +34,20 @@ def from_csvs():
     return g, positions
 
 
-def from_nkbin():
-    g = nk.readGraph(os.path.join(BASE, f"{PREFIX}.nkbin"), nk.Format.NetworkitBinary)
-    positions = np.load(os.path.join(BASE, f"{PREFIX}_positions.npy"))
-    assert positions.shape[0] == g.numberOfNodes()
+def from_graphml():
+    from graphs.graph_loader import load_graphs
+
+    g = load_graphs(os.path.join(BASE, f"{PREFIX}.graphml.gz"))[0]
     print(
-        f"[nkbin] nodes={g.numberOfNodes():,}  edges={g.numberOfEdges():,}"
-        f"  weighted={g.isWeighted()}"
+        f"[graphml] nodes={g.number_of_nodes():,}  edges={g.number_of_edges():,}"
+        f"  weighted={g.is_weighted()}"
     )
-    return g, positions
+    return g, g.positions()
 
 
 if __name__ == "__main__":
     print("--- CSV pair ---")
     g1, p1 = from_csvs()
 
-    print("--- Binary pair ---")
-    g2, p2 = from_nkbin()
+    print("--- GraphML ---")
+    g2, p2 = from_graphml()

@@ -45,7 +45,7 @@ class TestOnlyWhatIsAskedForLoads:
     def test_importing_configs_imports_no_config_module(self):
         before = _config_modules_loaded()
 
-        import configs  # noqa: F401
+        import configs  # noqa:F401
 
         assert _config_modules_loaded() == before
 

@@ -13,6 +13,20 @@ def save_pickle(obj: Any, filepath: str) -> None:
         pickle.dump(obj, f)
 
 
+def save_json(obj: Any, filepath: str) -> None:
+    import json
+
+    def plain(value):
+        if hasattr(value, "tolist"):
+            return value.tolist()
+        if hasattr(value, "item"):
+            return value.item()
+        raise TypeError(f"cannot serialise {type(value).__name__}")
+
+    with open(filepath, "w") as handle:
+        json.dump(obj, handle, indent=2, default=plain, sort_keys=True)
+
+
 def save_csv(content, filepath: str) -> None:
     import csv
 
@@ -20,24 +34,6 @@ def save_csv(content, filepath: str) -> None:
         writer = csv.writer(f)
         for row in content:
             writer.writerow(row)
-
-
-def save_networkit(content, filepath: str) -> None:
-    import networkit as nk
-    import numpy as np
-
-    if isinstance(content, tuple):
-        nk_graph, positions = content
-    else:
-        nk_graph = content
-        positions = None
-
-    nk.writeGraph(nk_graph, filepath, nk.Format.NetworkitBinary)
-
-    if positions is not None:
-        pos_path = filepath.rsplit(".", 1)[0] + "_positions.npy"
-        np.save(pos_path, np.asarray(positions))
-        _logger.info(f"Saved companion positions: {pos_path}")
 
 
 def save_webp(fig_or_image, filepath: str) -> None:
@@ -118,8 +114,10 @@ def save_network_csv(graph, filepath: str) -> None:
     save_csv(position_rows, f"{base}_positions{ext}")
 
 
-def save_network_nkbin(graph, filepath: str) -> None:
-    save_networkit((graph.nk, graph.positions()), filepath)
+def save_network_graphml(graph, filepath: str) -> None:
+    from graphs.graphml_io import write_graph_graphml
+
+    write_graph_graphml(graph, filepath)
 
 
 @dataclass(frozen=True)

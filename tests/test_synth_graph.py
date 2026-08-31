@@ -1,3 +1,4 @@
+import igraph as ig
 import networkit as nk
 import numpy as np
 import pytest
@@ -8,21 +9,15 @@ from graphs.synth_graph import SynthGraph
 
 
 def _make_chain_graph(n: int = 5, weighted: bool = False) -> SynthGraph:
-    g = nk.Graph(n, weighted=weighted)
-    for i in range(n - 1):
-        if weighted:
-            g.addEdge(i, i + 1, float(i + 1))
-        else:
-            g.addEdge(i, i + 1)
+    g = ig.Graph(n=n, edges=[(i, i + 1) for i in range(n - 1)])
+    if weighted:
+        g.es["weight"] = [float(i + 1) for i in range(n - 1)]
     positions = np.arange(n * 2, dtype=np.float64).reshape(n, 2)
     return SynthGraph(g, positions)
 
 
 def _make_disconnected_graph() -> SynthGraph:
-    g = nk.Graph(5, weighted=False)
-    g.addEdge(0, 1)
-    g.addEdge(1, 2)
-    g.addEdge(3, 4)
+    g = ig.Graph(n=5, edges=[(0, 1), (1, 2), (3, 4)])
     positions = np.array([[0, 0], [1, 0], [2, 0], [10, 10], [11, 10]], dtype=np.float64)
     return SynthGraph(g, positions)
 
