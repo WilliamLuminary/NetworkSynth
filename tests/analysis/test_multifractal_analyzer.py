@@ -149,14 +149,12 @@ def test_diameter(load_unweighted_test_synth_graph):
     assert diameter > 0
 
 
-def _adjacency(nk_graph):
+def _adjacency(graph):
     from scipy.sparse import coo_matrix
 
-    n = nk_graph.numberOfNodes()
-    weighted = nk_graph.isWeighted()
+    n = graph.number_of_nodes()
     rows, cols, values = [], [], []
-    for u, v in nk_graph.iterEdges():
-        w = nk_graph.weight(u, v) if weighted else 1.0
+    for u, v, w in graph.edges_with_weights():
         rows += [u, v]
         cols += [v, u]
         values += [w, w]
@@ -180,7 +178,7 @@ def test_eigenvector_centrality_solves_the_eigenproblem(
     assert len(scores) == matrix.shape[0]
     assert np.isfinite(scores).all()
     assert (scores >= 0).all(), "Perron-Frobenius: single-signed"
-    assert np.isclose(np.linalg.norm(scores), 1.0), "networkit's unit-L2 convention"
+    assert np.isclose(np.linalg.norm(scores), 1.0), "unit-L2 by construction"
 
     eigenvalue = float(scores @ (matrix @ scores))
     residual = np.linalg.norm(matrix @ scores - eigenvalue * scores)
