@@ -112,7 +112,15 @@ If the separate window ever becomes annoying enough to be worth replacing, `gui/
 
 ## 3. How our code reaches them
 
-They carry us as a git submodule at `third_party/NetworkSynth`, pinned to a commit on our `dist` branch — a generated, code-only branch of about 780 KB rather than the 162 MB a full clone costs. `.gitmodules` records `branch = dist` and `shallow = true`, so `git submodule update --init` fetches at depth 1.
+They carry us as a git submodule at `third_party/NetworkSynth`, pinned to a commit on our `dist` branch — a generated, code-only branch of about 780 KB rather than the 162 MB a full clone costs. `.gitmodules` records `branch = dist`, `shallow = true` so the fetch is depth 1, and `update = none`.
+
+`update = none` is there because we are a private repository inside a public one. Without it, anyone cloning StructuralGT with `--recurse-submodules` — a common habit — gets two `fatal:` lines and `Failed to clone 'sub' a second time, aborting`; the outer clone survives but looks broken. With it, git prints `Skipping submodule` and moves on. Cloning never touches us, no credentials are asked for, and the synthesis button simply stays disabled. Somebody who does have access opts in by name:
+
+```bash
+git submodule update --init --checkout third_party/NetworkSynth
+```
+
+`--checkout` is what overrides `update = none` — a plain `--init` silently skips — so it is the command their README gives and the one the button's own tooltip names. When we go public this can be relaxed, but nothing breaks if it never is.
 
 Publishing is automatic: tagging a commit on `main` as `v1.0.1` triggers `.github/workflows/publish-dist.yml`, which rebuilds the branch from that commit and tags it `dist-v1.0.1`. The dist version is derived from the release tag, never chosen separately, so the two cannot drift. Our `README.md`, "The `dist` Branch", is the reference for both the branch and the workflow.
 
@@ -122,11 +130,13 @@ Moving the pin stays a deliberate commit on their side. That is the property wor
 
 ## Appendix A: networkit and Python 3.14
 
-Checked 2026-07-31. StructuralGT is on 3.14; networkit publishes no cp314 wheel and no stable-ABI wheel, so it cannot be a dependency of their environment.
+Rechecked 2026-08-29. StructuralGT is on 3.14; networkit still publishes no cp314 wheel and no stable-ABI wheel, so it cannot be a dependency of their environment. **This is now close to resolving.**
 
-- networkit 11.2 (2025-11-05) and 11.2.1 (2026-01-09) both ship cp310–cp313 only; their docs still state 3.13 is the supported ceiling.
-- [Issue #1409 "Python 3.14 support"](https://github.com/networkit/networkit/issues/1409), opened 2026-05-08 by an outside user: still open, no assignee, no milestone, no maintainer response.
-- The project is actively maintained, so this will resolve eventually — historically cp312 landed ~4 months after Python 3.12 and cp313 ~5 months after 3.13. We are ~10 months past 3.14.
+- PyPI's latest is 11.2.1 (2026-01-09), cp310–cp313 only. No release of networkit has ever carried a cp314 wheel.
+- [Issue #1409 "Python 3.14 support"](https://github.com/networkit/networkit/issues/1409) is still open with no assignee or milestone, but no longer unanswered. On 2026-08-14 the maintainer `fabratu` wrote that they built the 3.14 wheels and could not attach them, because PyPI no longer allows amending a release more than 14 days old — "We will create a new patch release shortly." Fifteen days on, that release has not appeared.
+- A third party has published unofficial 3.14 wheels from a fork ([ggirelli/networkit 11.2.1-alpha](https://github.com/ggirelli/networkit/releases/tag/11.2.1-alpha-20260707-2)). Not something to depend on, but it does show the build works.
 - Nuance: `pip install networkit` does work on 3.14 by building from the sdist; only `uv` fails, which is what #1409 is really about. A source build is acceptable on a developer machine and unacceptable in a bundled end-user installer.
+
+When that patch release lands, the separate-process design stops being forced and becomes merely preferable — the two would still want separate environments, and the reasons in the last paragraph of this appendix do not depend on the wheel.
 
 Separate processes sidestep it entirely, and also mean our process pools and the `OMP_NUM_THREADS` set at import in `pipelines/generate.py` never touch their Qt worker lifecycle.
