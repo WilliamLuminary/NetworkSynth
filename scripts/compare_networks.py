@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Plot an original network and its synthetic counterparts on one figure.
 
     python scripts/compare_networks.py

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 from .base_config import BaseConfig
 from .dataset_id import DatasetId
 from .enums import AnalysisMode

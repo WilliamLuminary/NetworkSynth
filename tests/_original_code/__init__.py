@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 from ._original_network_analysis import (
     calculate_assortativity as original_calculate_assortativity,
 )

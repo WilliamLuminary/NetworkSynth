@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 import pytest
 
 from graphs.csv_io import read_edge_list_csv, read_graph_csv, read_positions_csv
