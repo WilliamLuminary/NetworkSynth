@@ -15,17 +15,17 @@ import sys
 
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 
-_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 import logging
 
-from analysis import MultifractalProcessor
-from analysis.spectra_plot import plot_dimensions, plot_spectra
-from configs import save_json
-from graphs import load_graphs
-from utils import save_figure_as_webp
+from networksynth.analysis import MultifractalProcessor
+from networksynth.analysis.spectra_plot import plot_dimensions, plot_spectra
+from networksynth.configs import save_json
+from networksynth.graphs import load_graphs
+from networksynth.utils import save_figure_as_webp
 
 logger = logging.getLogger("compare_networks")
 
@@ -92,7 +92,7 @@ def compare(original_path: str, synthetic_path: str, output_dir: str) -> None:
 
 
 def main(argv=None) -> int:
-    from handlers import configure_console
+    from networksynth.handlers import configure_console
 
     configure_console()
     argv = sys.argv if argv is None else argv

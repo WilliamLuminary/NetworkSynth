@@ -2,7 +2,9 @@
 import os
 import sys
 
-_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+_PROJECT_ROOT = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "src")
+)
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
@@ -11,7 +13,7 @@ PREFIX = "hybrid_50x50_lcc"
 
 
 def from_csvs():
-    from graphs.graph_loader import load_graphs
+    from networksynth.graphs.graph_loader import load_graphs
 
     g = load_graphs(os.path.join(BASE, f"{PREFIX}_edgelist.csv"))[0]
     print(
@@ -22,7 +24,7 @@ def from_csvs():
 
 
 def from_graphml():
-    from graphs.graph_loader import load_graphs
+    from networksynth.graphs.graph_loader import load_graphs
 
     g = load_graphs(os.path.join(BASE, f"{PREFIX}.graphml.gz"))[0]
     print(

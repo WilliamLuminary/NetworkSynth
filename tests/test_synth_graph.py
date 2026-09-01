@@ -5,7 +5,7 @@ import pytest
 
 pytestmark = pytest.mark.unit
 
-from graphs.synth_graph import SynthGraph
+from networksynth.graphs.synth_graph import SynthGraph
 
 
 def _make_chain_graph(n: int = 5, weighted: bool = False) -> SynthGraph:

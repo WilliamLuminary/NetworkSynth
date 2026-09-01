@@ -88,7 +88,8 @@ def test_an_unknown_config_path_is_rejected_with_2():
 
 def test_a_config_without_a_mode_is_rejected_with_2(monkeypatch, tmp_path):
     import run
-    from configs import BaseConfig
+
+    from networksynth.configs import BaseConfig
 
     class Modeless(BaseConfig):
         pass

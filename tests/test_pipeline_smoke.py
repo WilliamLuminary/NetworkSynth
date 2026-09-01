@@ -4,7 +4,7 @@ from dataclasses import replace
 
 import pytest
 
-from configs import BaseConfig
+from networksynth.configs import BaseConfig
 
 pytestmark = [pytest.mark.integration, pytest.mark.requires_fixture_data]
 
@@ -31,9 +31,9 @@ def _tune(base, tmp_path, **overrides):
 
 class TestMosaicPipeline:
     def test_run_mosaic_for_dataset(self, tmp_path):
-        from configs.mosaic_mode.config_sample import SampleConfig
-        from handlers import create_run_paths
-        from pipelines.mosaic import run_mosaic_for_dataset
+        from networksynth.configs.mosaic_mode.config_sample import SampleConfig
+        from networksynth.handlers import create_run_paths
+        from networksynth.pipelines.mosaic import run_mosaic_for_dataset
 
         config = _tune(SampleConfig, tmp_path, GRID_ROWS=1, GRID_COLS=2)
         run_paths = create_run_paths(config)
@@ -43,8 +43,8 @@ class TestMosaicPipeline:
         assert _outputs(str(tmp_path)), "mosaic produced no output files"
 
     def test_compute_tile_layout_uses_its_config(self, tmp_path):
-        from configs.mosaic_mode.config_sample import SampleConfig
-        from pipelines.mosaic import compute_tile_layout
+        from networksynth.configs.mosaic_mode.config_sample import SampleConfig
+        from networksynth.pipelines.mosaic import compute_tile_layout
 
         config = _tune(SampleConfig, tmp_path, GRID_ROWS=1, GRID_COLS=2)
 
@@ -56,9 +56,9 @@ class TestMosaicPipeline:
 
 class TestScalingPipeline:
     def test_run_scaling_for_dataset(self, tmp_path):
-        from configs.scaling_mode.config_sample import SampleConfig
-        from handlers import create_run_paths
-        from pipelines.scaling import run_scaling_for_dataset
+        from networksynth.configs.scaling_mode.config_sample import SampleConfig
+        from networksynth.handlers import create_run_paths
+        from networksynth.pipelines.scaling import run_scaling_for_dataset
 
         config = _tune(
             SampleConfig,
@@ -77,7 +77,7 @@ class TestScalingPipeline:
 class TestHybridPipeline:
     @staticmethod
     def _config(tmp_path):
-        from configs.hybrid_mode.config_sample import SampleConfig
+        from networksynth.configs.hybrid_mode.config_sample import SampleConfig
 
         return _tune(
             SampleConfig,
@@ -90,8 +90,8 @@ class TestHybridPipeline:
         )
 
     def test_run_hybrid_for_dataset(self, tmp_path):
-        from handlers import create_run_paths
-        from pipelines.hybrid import run_hybrid_for_dataset
+        from networksynth.handlers import create_run_paths
+        from networksynth.pipelines.hybrid import run_hybrid_for_dataset
 
         config = self._config(tmp_path)
         run_paths = create_run_paths(config)
@@ -101,7 +101,7 @@ class TestHybridPipeline:
         assert _outputs(str(tmp_path)), "hybrid produced no output files"
 
     def test_compute_center_frames_uses_its_config(self, tmp_path):
-        from pipelines.hybrid import compute_center_frames
+        from networksynth.pipelines.hybrid import compute_center_frames
 
         config = self._config(tmp_path)
 
@@ -111,8 +111,8 @@ class TestHybridPipeline:
         assert all(f == tuple(config.TILE_FRAME_SIZE) for f in frames)
 
     def test_apply_dataset_factors_returns_params_without_mutating(self, tmp_path):
-        from configs import SynthParams
-        from pipelines.hybrid import _apply_dataset_factors
+        from networksynth.configs import SynthParams
+        from networksynth.pipelines.hybrid import _apply_dataset_factors
 
         config = self._config(tmp_path)
         dataset_id = config.get_datasets()[0]
@@ -128,8 +128,8 @@ class TestHybridPipeline:
         assert config.CLOSED_NODES_FACTOR == before, "config must not be mutated"
 
     def test_apply_dataset_factors_passes_through_when_unset(self, tmp_path):
-        from configs import SynthParams
-        from pipelines.hybrid import _apply_dataset_factors
+        from networksynth.configs import SynthParams
+        from networksynth.pipelines.hybrid import _apply_dataset_factors
 
         config = self._config(tmp_path)
         config.DATASET_FACTORS = {}
@@ -144,9 +144,9 @@ class TestHybridPipeline:
 class TestHybridSnapshots:
 
     def test_hybrid_writes_snapshots_when_the_config_asks_for_them(self, tmp_path):
-        from configs.hybrid_mode.config_sample import SampleConfig
-        from handlers import create_run_paths
-        from pipelines.hybrid import run_hybrid_for_dataset
+        from networksynth.configs.hybrid_mode.config_sample import SampleConfig
+        from networksynth.handlers import create_run_paths
+        from networksynth.pipelines.hybrid import run_hybrid_for_dataset
 
         config = _tune(
             SampleConfig,
@@ -171,10 +171,12 @@ class TestHybridSnapshots:
 
 class TestSweepPipeline:
     def test_generate_networks_threads_trial_params(self, tmp_path, monkeypatch):
-        from analysis.error_checker import NullErrorChecker
-        from configs.sweep_mode.config_sample import SampleConfig as SweepConfig
-        from handlers import GenerationRun, create_run_paths
-        from pipelines.sweep import generate_networks
+        from networksynth.analysis.error_checker import NullErrorChecker
+        from networksynth.configs.sweep_mode.config_sample import (
+            SampleConfig as SweepConfig,
+        )
+        from networksynth.handlers import GenerationRun, create_run_paths
+        from networksynth.pipelines.sweep import generate_networks
 
         config = _tune(SweepConfig, tmp_path, SYNTHETIC_NETWORK_NUMBER=2)
         run_paths = create_run_paths(config)

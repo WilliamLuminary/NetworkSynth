@@ -1,15 +1,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import pytest
 
-from configs import SynthParams
-from graphs._graph_node import GraphNode, PlacementCounts
+from networksynth.configs import SynthParams
+from networksynth.graphs._graph_node import GraphNode, PlacementCounts
 
 pytestmark = pytest.mark.unit
 
 
 @pytest.fixture
 def attributes(load_unweighted_test_synth_graph):
-    from handlers import AttributesCalculator
+    from networksynth.handlers import AttributesCalculator
 
     return AttributesCalculator().analyze(load_unweighted_test_synth_graph)
 

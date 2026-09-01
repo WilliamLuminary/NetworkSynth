@@ -3,8 +3,8 @@ import igraph as ig
 import numpy as np
 import pytest
 
-from configs import BaseConfig, DatasetId
-from graphs.synth_graph import SynthGraph
+from networksynth.configs import BaseConfig, DatasetId
+from networksynth.graphs.synth_graph import SynthGraph
 
 pytestmark = pytest.mark.unit
 
@@ -30,9 +30,9 @@ class TestGenerationDoesNotAnalyse:
     def test_generation_has_no_analysis_of_its_own(self):
         import inspect
 
-        import pipelines.generate
+        import networksynth.pipelines.generate
 
-        source = inspect.getsource(pipelines.generate)
+        source = inspect.getsource(networksynth.pipelines.generate)
         for forbidden in (
             "MultifractalBatchProcessor",
             "analysis_data",
@@ -41,7 +41,7 @@ class TestGenerationDoesNotAnalyse:
             assert forbidden not in source, f"generate reaches for {forbidden}"
 
     def test_the_generation_run_has_no_analysis_methods(self):
-        from handlers import GenerationRun
+        from networksynth.handlers import GenerationRun
 
         for forbidden in ("multifractal_analysis", "analyse", "save_analysis"):
             assert not hasattr(GenerationRun, forbidden), forbidden
@@ -49,8 +49,8 @@ class TestGenerationDoesNotAnalyse:
 
 class TestAnalyzeReadsEveryFormatWeWrite:
     def test_reads_a_csv_pair_when_nothing_is_pickled(self, tmp_path):
-        from configs.compare_mode.config_sample import _load_networks
-        from configs.file_definitions import save_network_csv
+        from networksynth.configs.compare_mode.config_sample import _load_networks
+        from networksynth.configs.file_definitions import save_network_csv
 
         folder = tmp_path / "original"
         folder.mkdir()
@@ -62,9 +62,9 @@ class TestAnalyzeReadsEveryFormatWeWrite:
         assert loaded[0].number_of_nodes() == 64
 
     def test_graphml_wins_over_the_csv_pair(self, tmp_path):
-        from configs.compare_mode.config_sample import _load_networks
-        from configs.file_definitions import save_network_csv
-        from graphs.graphml_io import write_graph_graphml
+        from networksynth.configs.compare_mode.config_sample import _load_networks
+        from networksynth.configs.file_definitions import save_network_csv
+        from networksynth.graphs.graphml_io import write_graph_graphml
 
         folder = tmp_path / "synthetic"
         folder.mkdir()
@@ -78,7 +78,7 @@ class TestAnalyzeReadsEveryFormatWeWrite:
         assert len(_load_networks(str(folder))) == 2
 
     def test_an_edge_list_without_its_positions_stops_the_run(self, tmp_path):
-        from configs.compare_mode.config_sample import _load_networks
+        from networksynth.configs.compare_mode.config_sample import _load_networks
 
         folder = tmp_path / "original"
         folder.mkdir()
@@ -90,7 +90,7 @@ class TestAnalyzeReadsEveryFormatWeWrite:
 
 class TestComparisonLoadsTheTwoSetsItIsGiven:
     def _config(self, tmp_path, original, synthetic):
-        from configs.compare_mode.config_sample import SampleConfig
+        from networksynth.configs.compare_mode.config_sample import SampleConfig
 
         class TinyConfig(SampleConfig):
             BASE_OUTPUT_PATH = str(tmp_path / "out")
@@ -103,7 +103,7 @@ class TestComparisonLoadsTheTwoSetsItIsGiven:
         return TinyConfig
 
     def _run(self, config):
-        from handlers import ComparisonRun, create_run_paths
+        from networksynth.handlers import ComparisonRun, create_run_paths
 
         return ComparisonRun(
             config,
@@ -117,7 +117,7 @@ class TestComparisonLoadsTheTwoSetsItIsGiven:
         original, synthetic = tmp_path / "orig", tmp_path / "synth"
         original.mkdir()
         synthetic.mkdir()
-        from graphs.graphml_io import write_graph_graphml
+        from networksynth.graphs.graphml_io import write_graph_graphml
 
         write_graph_graphml(
             _small_graph(seed=5), str(original / "original_network.graphml")
@@ -134,7 +134,7 @@ class TestComparisonLoadsTheTwoSetsItIsGiven:
         assert len(run.original) == 1
 
     def test_the_two_sets_can_be_any_directories(self, tmp_path):
-        from configs.file_definitions import save_network_csv
+        from networksynth.configs.file_definitions import save_network_csv
 
         left, right = tmp_path / "monday", tmp_path / "tuesday"
         left.mkdir()
@@ -148,7 +148,7 @@ class TestComparisonLoadsTheTwoSetsItIsGiven:
         assert len(run.synthetic) == 1
 
     def test_it_writes_its_analysis_where_the_run_paths_say(self, tmp_path):
-        from configs.file_definitions import save_network_csv
+        from networksynth.configs.file_definitions import save_network_csv
 
         left, right = tmp_path / "a", tmp_path / "b"
         left.mkdir()

@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import pytest
 
-from configs import BaseConfig, DatasetId
-from handlers import NullSaver, Saver, build_saver
-from handlers.run_paths import RunPaths
+from networksynth.configs import BaseConfig, DatasetId
+from networksynth.handlers import NullSaver, Saver, build_saver
+from networksynth.handlers.run_paths import RunPaths
 
 pytestmark = pytest.mark.unit
 
@@ -11,7 +11,7 @@ pytestmark = pytest.mark.unit
 def _line_graph():
     import numpy as np
 
-    from graphs.synth_graph import SynthGraph
+    from networksynth.graphs.synth_graph import SynthGraph
 
     positions = np.array([[float(i), 0.0] for i in range(5)])
     edges = np.array([[i, i + 1] for i in range(4)])
@@ -67,7 +67,7 @@ class TestNullSaverIsSaferThanNone:
         assert saver
 
     def test_a_disabled_generation_run_can_be_saved_through(self, tmp_path):
-        from handlers import GenerationRun, create_run_paths
+        from networksynth.handlers import GenerationRun, create_run_paths
 
         config = _config(tmp_path, True)
         config.ORIGINAL_NETWORK_FUNC = staticmethod(lambda dataset_id: _line_graph())
@@ -82,7 +82,7 @@ class TestNullSaverIsSaferThanNone:
         assert list(tmp_path.iterdir()) == [], "a disabled run wrote something"
 
     def test_a_comparison_run_can_be_disabled(self, tmp_path):
-        from handlers import ComparisonRun
+        from networksynth.handlers import ComparisonRun
 
         original, synthetic = tmp_path / "orig", tmp_path / "synth"
         original.mkdir()

@@ -9,7 +9,7 @@ pytestmark = pytest.mark.unit
 
 
 def _make_synth_graph(n: int = 20, avg_edges: int = 3):
-    from graphs.synth_graph import SynthGraph
+    from networksynth.graphs.synth_graph import SynthGraph
 
     positions = np.random.RandomState(42).rand(n, 2) * 100.0
     pairs = [(i, (i + 1) % n) for i in range(n)]
@@ -26,7 +26,7 @@ def _make_synth_graph(n: int = 20, avg_edges: int = 3):
 
 class TestComputeNetworkMetrics:
     def test_returns_all_keys(self):
-        from utils import compute_network_metrics
+        from networksynth.utils import compute_network_metrics
 
         graph = _make_synth_graph()
         metrics = compute_network_metrics(graph)
@@ -40,21 +40,21 @@ class TestComputeNetworkMetrics:
         assert set(metrics.keys()) == expected
 
     def test_node_count_matches(self):
-        from utils import compute_network_metrics
+        from networksynth.utils import compute_network_metrics
 
         graph = _make_synth_graph(n=30)
         metrics = compute_network_metrics(graph)
         assert metrics["node_count"] == graph.number_of_nodes()
 
     def test_avg_degree_positive(self):
-        from utils import compute_network_metrics
+        from networksynth.utils import compute_network_metrics
 
         graph = _make_synth_graph()
         metrics = compute_network_metrics(graph)
         assert metrics["avg_degree"] > 0
 
     def test_values_finite(self):
-        from utils import compute_network_metrics
+        from networksynth.utils import compute_network_metrics
 
         graph = _make_synth_graph()
         metrics = compute_network_metrics(graph)
@@ -64,20 +64,20 @@ class TestComputeNetworkMetrics:
 
 class TestMetricDistance:
     def test_identical_is_zero(self):
-        from utils import metric_distance
+        from networksynth.utils import metric_distance
 
         m = {"a": 5.0, "b": 10.0, "c": 3.0}
         assert metric_distance(m, m) == pytest.approx(0.0)
 
     def test_positive_when_different(self):
-        from utils import metric_distance
+        from networksynth.utils import metric_distance
 
         ref = {"a": 5.0, "b": 10.0}
         syn = {"a": 6.0, "b": 8.0}
         assert metric_distance(syn, ref) > 0
 
     def test_handles_zero_ref(self):
-        from utils import metric_distance
+        from networksynth.utils import metric_distance
 
         ref = {"a": 0.0, "b": 10.0}
         syn = {"a": 2.0, "b": 10.0}
@@ -86,14 +86,14 @@ class TestMetricDistance:
 
 
 def _style(**overrides):
-    from configs import RenderStyle
+    from networksynth.configs import RenderStyle
 
     return RenderStyle(node_size=6.0, line_width=3.0, **overrides)
 
 
 class TestSaveBfsSnapshot:
     def test_creates_png(self, tmp_path):
-        from utils import save_bfs_snapshot
+        from networksynth.utils import save_bfs_snapshot
 
         positions = [(10, 20), (30, 40), (50, 60)]
         edges = {((10, 20), (30, 40)), ((30, 40), (50, 60))}
@@ -106,7 +106,7 @@ class TestSaveBfsSnapshot:
         assert os.path.getsize(expected) > 0
 
     def test_sequential_indices(self, tmp_path):
-        from utils import save_bfs_snapshot
+        from networksynth.utils import save_bfs_snapshot
 
         positions = [(5, 5)]
         edges = set()
@@ -121,7 +121,7 @@ class TestSaveBfsSnapshot:
 
 class TestSaveHybridSnapshot:
     def test_creates_png(self, tmp_path):
-        from utils import save_hybrid_snapshot
+        from networksynth.utils import save_hybrid_snapshot
 
         positions = [(10, 20), (30, 40)]
         edges = [((10, 20), (30, 40))]
@@ -134,7 +134,7 @@ class TestSaveHybridSnapshot:
         assert os.path.getsize(expected) > 0
 
     def test_empty_graph(self, tmp_path):
-        from utils import save_hybrid_snapshot
+        from networksynth.utils import save_hybrid_snapshot
 
         save_hybrid_snapshot(
             [], [], ((0, 50), (0, 50)), 0, str(tmp_path), _style(dpi=72)

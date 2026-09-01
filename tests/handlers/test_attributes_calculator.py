@@ -4,7 +4,7 @@ import pickle
 import numpy as np
 import pytest
 
-from handlers.attributes_calculator import AttributesCalculator
+from networksynth.handlers.attributes_calculator import AttributesCalculator
 
 pytestmark = pytest.mark.requires_fixture_data
 

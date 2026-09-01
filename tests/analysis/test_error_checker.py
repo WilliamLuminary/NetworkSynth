@@ -4,13 +4,13 @@ import pickle
 import numpy as np
 import pytest
 
-from analysis.error_checker import (
+from networksynth.analysis.error_checker import (
     MultifractalErrorChecker,
     NullErrorChecker,
     create_error_checker,
 )
-from configs import BaseConfig
-from graphs.synth_graph import SynthGraph
+from networksynth.configs import BaseConfig
+from networksynth.graphs.synth_graph import SynthGraph
 
 pytestmark = pytest.mark.unit
 
@@ -88,7 +88,7 @@ class TestAnalyzerHonoursExplicitSettings:
     def test_full_q_band_argument_wins(
         self, base_config_values, load_unweighted_test_synth_graph
     ):
-        from analysis.multifractal_analyzer import MultifractalAnalyzer
+        from networksynth.analysis.multifractal_analyzer import MultifractalAnalyzer
 
         BaseConfig.MEASURE_WEIGHTED = False
         BaseConfig.FULL_Q_BAND = False
@@ -103,7 +103,7 @@ class TestAnalyzerHonoursExplicitSettings:
         )
 
     def test_settings_are_required(self, load_unweighted_test_synth_graph):
-        from analysis.multifractal_analyzer import MultifractalAnalyzer
+        from networksynth.analysis.multifractal_analyzer import MultifractalAnalyzer
 
         with pytest.raises(TypeError):
             MultifractalAnalyzer(load_unweighted_test_synth_graph)
@@ -111,7 +111,7 @@ class TestAnalyzerHonoursExplicitSettings:
     def test_weighted_setting_rejected_for_unweighted_graph(
         self, load_unweighted_test_synth_graph
     ):
-        from analysis.multifractal_analyzer import MultifractalAnalyzer
+        from networksynth.analysis.multifractal_analyzer import MultifractalAnalyzer
 
         with pytest.raises(AssertionError, match="carries no edge weights"):
             MultifractalAnalyzer(
@@ -142,13 +142,16 @@ class TestLengthAngleErrorChecker:
         return SynthGraph(ig.Graph(n=len(coords), edges=pairs), positions)
 
     def _checker(self, tolerance=0.15):
-        from analysis.error_checker import LengthAngleErrorChecker
+        from networksynth.analysis.error_checker import LengthAngleErrorChecker
 
         return LengthAngleErrorChecker(tolerance)
 
     def test_it_is_reachable_through_the_registry(self):
-        from analysis.error_checker import LengthAngleErrorChecker, create_error_checker
-        from configs import BaseConfig
+        from networksynth.analysis.error_checker import (
+            LengthAngleErrorChecker,
+            create_error_checker,
+        )
+        from networksynth.configs import BaseConfig
 
         class Config(BaseConfig):
             ERROR_CHECKER = "length_angle"

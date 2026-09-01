@@ -10,8 +10,8 @@ import pytest
 from matplotlib import pyplot as plt
 from scipy.stats import pearsonr
 
-from configs.generate_mode.config_1 import Config1 as GenConfig1
-from handlers import Mapper
+from networksynth.configs.generate_mode.config_1 import Config1 as GenConfig1
+from networksynth.handlers import Mapper
 
 GenConfig1.initialize()
 

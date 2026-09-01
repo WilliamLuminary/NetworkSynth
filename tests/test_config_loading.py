@@ -3,7 +3,7 @@ import sys
 
 import pytest
 
-from configs.loader import load_config
+from networksynth.configs.loader import load_config
 
 pytestmark = pytest.mark.unit
 
@@ -46,7 +46,7 @@ class TestOnlyWhatIsAskedForLoads:
     def test_importing_configs_imports_no_config_module(self):
         before = _config_modules_loaded()
 
-        import configs  # noqa:F401
+        import networksynth.configs  # noqa:F401
 
         assert _config_modules_loaded() == before
 
@@ -59,23 +59,23 @@ class TestOnlyWhatIsAskedForLoads:
 
         newly_loaded = _config_modules_loaded() - before
         assert newly_loaded <= {
-            "configs.generate_mode.config_tmp",
-            "configs.generate_mode.config_sample",
+            "networksynth.configs.generate_mode.config_tmp",
+            "networksynth.configs.generate_mode.config_sample",
         }, newly_loaded
 
 
 class TestOneConfigPerFile:
     def test_a_file_with_no_config_says_so(self, tmp_path, monkeypatch):
-        module = type(sys)("configs.fake_mode.config_empty")
-        module.__name__ = "configs.fake_mode.config_empty"
+        module = type(sys)("networksynth.configs.fake_mode.config_empty")
+        module.__name__ = "networksynth.configs.fake_mode.config_empty"
 
-        from configs.loader import config_class_in
+        from networksynth.configs.loader import config_class_in
 
         with pytest.raises(AttributeError, match="defines no config class"):
             config_class_in(module)
 
     def test_two_configs_in_one_file_is_ambiguous(self):
-        module = type(sys)("configs.fake_mode.config_two")
+        module = type(sys)("networksynth.configs.fake_mode.config_two")
 
         class FirstConfig:
             DATASETS = []
@@ -88,7 +88,7 @@ class TestOneConfigPerFile:
         module.FirstConfig = FirstConfig
         module.SecondConfig = SecondConfig
 
-        from configs.loader import config_class_in
+        from networksynth.configs.loader import config_class_in
 
         with pytest.raises(AttributeError, match="FirstConfig, SecondConfig"):
             config_class_in(module)

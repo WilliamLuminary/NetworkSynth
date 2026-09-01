@@ -10,9 +10,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 def main() -> int:
     mp.set_start_method("spawn", force=True)
 
-    from configs.generate_mode.config_sample import SampleConfig
-    from handlers import create_run_paths
-    from pipelines.generate import run_for_dataset
+    from networksynth.configs.generate_mode.config_sample import SampleConfig
+    from networksynth.handlers import create_run_paths
+    from networksynth.pipelines.generate import run_for_dataset
 
     out_dir = tempfile.mkdtemp(prefix="spawn_safety_")
     config = type("SpawnSampleConfig", (SampleConfig,), {})

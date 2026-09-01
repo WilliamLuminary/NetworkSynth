@@ -1,7 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import pytest
 
-from graphs.csv_io import read_edge_list_csv, read_graph_csv, read_positions_csv
+from networksynth.graphs.csv_io import (
+    read_edge_list_csv,
+    read_graph_csv,
+    read_positions_csv,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -68,7 +72,7 @@ class TestOurOwnFormat:
     def test_round_trips_save_network_csv(
         self, tmp_path, load_unweighted_test_synth_graph
     ):
-        from configs.file_definitions import save_network_csv
+        from networksynth.configs.file_definitions import save_network_csv
 
         original = load_unweighted_test_synth_graph
         save_network_csv(original, str(tmp_path / "net.csv"))
@@ -84,7 +88,7 @@ class TestOurOwnFormat:
     def test_round_trip_preserves_unweightedness(
         self, tmp_path, load_unweighted_test_synth_graph
     ):
-        from configs.file_definitions import save_network_csv
+        from networksynth.configs.file_definitions import save_network_csv
 
         original = load_unweighted_test_synth_graph
         assert not original.is_weighted()
@@ -99,7 +103,7 @@ class TestOurOwnFormat:
     def test_round_trip_preserves_weights(
         self, tmp_path, load_weighted_test_synth_graph
     ):
-        from configs.file_definitions import save_network_csv
+        from networksynth.configs.file_definitions import save_network_csv
 
         original = load_weighted_test_synth_graph
         assert original.is_weighted()
@@ -116,7 +120,7 @@ class TestOurOwnFormat:
     def test_round_trip_preserves_positions(
         self, tmp_path, load_unweighted_test_synth_graph
     ):
-        from configs.file_definitions import save_network_csv
+        from networksynth.configs.file_definitions import save_network_csv
 
         original = load_unweighted_test_synth_graph
         save_network_csv(original, str(tmp_path / "net.csv"))

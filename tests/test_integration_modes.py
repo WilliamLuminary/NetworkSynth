@@ -14,7 +14,7 @@ SAMPLE_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "input", "sam
 
 class TestGenerateMode:
     def test_load_original_and_save(self, tmp_path):
-        from configs.generate_mode.config_sample import SampleConfig
+        from networksynth.configs.generate_mode.config_sample import SampleConfig
 
         SampleConfig.DATASETS = SampleConfig.DATASETS[:1]
         SampleConfig.SYNTHETIC_NETWORK_NUMBER = 0
@@ -22,7 +22,7 @@ class TestGenerateMode:
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
         SampleConfig.initialize()
 
-        from handlers import GenerationRun, create_run_paths
+        from networksynth.handlers import GenerationRun, create_run_paths
 
         run_paths = create_run_paths(SampleConfig)
         dataset_id = SampleConfig.get_datasets()[0]
@@ -39,7 +39,7 @@ class TestGenerateMode:
         logger.info(f"Generate (originals): {len(files)} files in {out}")
 
     def test_generate_one_network(self, tmp_path):
-        from configs.generate_mode.config_sample import SampleConfig
+        from networksynth.configs.generate_mode.config_sample import SampleConfig
 
         SampleConfig.DATASETS = SampleConfig.DATASETS[:1]
         SampleConfig.SYNTHETIC_NETWORK_NUMBER = 1
@@ -47,10 +47,10 @@ class TestGenerateMode:
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
         SampleConfig.initialize()
 
-        from configs import SynthParams
-        from graphs import GraphGenerator
-        from handlers import GenerationRun, create_run_paths
-        from utils import trim_graph
+        from networksynth.configs import SynthParams
+        from networksynth.graphs import GraphGenerator
+        from networksynth.handlers import GenerationRun, create_run_paths
+        from networksynth.utils import trim_graph
 
         run_paths = create_run_paths(SampleConfig)
         dataset_id = SampleConfig.get_datasets()[0]
@@ -84,18 +84,18 @@ class TestGenerateMode:
 
 class TestMosaicMode:
     def test_mosaic_2x2(self, tmp_path):
-        from configs.mosaic_mode.config_sample import SampleConfig
+        from networksynth.configs.mosaic_mode.config_sample import SampleConfig
 
         SampleConfig.GRID_ROWS = 2
         SampleConfig.GRID_COLS = 2
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
         SampleConfig.initialize()
 
-        from configs import SynthParams
-        from graphs import GraphGenerator
-        from graphs.mosaic_stitcher import MosaicStitcher
-        from handlers import GenerationRun, create_run_paths
-        from utils import trim_graph
+        from networksynth.configs import SynthParams
+        from networksynth.graphs import GraphGenerator
+        from networksynth.graphs.mosaic_stitcher import MosaicStitcher
+        from networksynth.handlers import GenerationRun, create_run_paths
+        from networksynth.utils import trim_graph
 
         run_paths = create_run_paths(SampleConfig)
         dataset_id = SampleConfig.get_datasets()[0]
@@ -145,17 +145,17 @@ class TestMosaicMode:
 
 class TestScalingMode:
     def test_scaling_2x2(self, tmp_path):
-        from configs.scaling_mode.config_sample import SampleConfig
+        from networksynth.configs.scaling_mode.config_sample import SampleConfig
 
         SampleConfig.SCALE_ROWS = 2
         SampleConfig.SCALE_COLS = 2
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
         SampleConfig.initialize()
 
-        from configs import SynthParams
-        from graphs import GraphGenerator
-        from handlers import GenerationRun, create_run_paths
-        from utils import trim_graph
+        from networksynth.configs import SynthParams
+        from networksynth.graphs import GraphGenerator
+        from networksynth.handlers import GenerationRun, create_run_paths
+        from networksynth.utils import trim_graph
 
         run_paths = create_run_paths(SampleConfig)
         dataset_id = SampleConfig.get_datasets()[0]
@@ -191,7 +191,7 @@ class TestScalingMode:
 
 class TestAnalyzeMode:
     def test_analyze_graph(self, tmp_path):
-        from configs.generate_mode.config_sample import SampleConfig
+        from networksynth.configs.generate_mode.config_sample import SampleConfig
 
         SampleConfig.DATASETS = SampleConfig.DATASETS[:1]
         SampleConfig.SYNTHETIC_NETWORK_NUMBER = 0
@@ -199,8 +199,8 @@ class TestAnalyzeMode:
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
         SampleConfig.initialize()
 
-        from analysis import MultifractalAnalyzer
-        from handlers import GenerationRun, create_run_paths
+        from networksynth.analysis import MultifractalAnalyzer
+        from networksynth.handlers import GenerationRun, create_run_paths
 
         run_paths = create_run_paths(SampleConfig)
         dataset_id = SampleConfig.get_datasets()[0]
@@ -225,20 +225,22 @@ class TestAnalyzeMode:
 
 class TestSnapshotMode:
     def test_generate_with_snapshots(self, tmp_path):
-        from configs.generate_mode.config_snapshot_1x1 import Snapshot1x1Config
+        from networksynth.configs.generate_mode.config_snapshot_1x1 import (
+            Snapshot1x1Config,
+        )
 
         Snapshot1x1Config.BASE_OUTPUT_PATH = str(tmp_path)
         Snapshot1x1Config.initialize()
 
-        from configs import SynthParams
-        from handlers import GenerationRun, create_run_paths
+        from networksynth.configs import SynthParams
+        from networksynth.handlers import GenerationRun, create_run_paths
 
         run_paths = create_run_paths(Snapshot1x1Config)
         dataset_id = Snapshot1x1Config.get_datasets()[0]
         agent = GenerationRun(Snapshot1x1Config, run_paths, dataset_id)
 
-        from graphs import GraphGenerator
-        from utils import save_bfs_snapshot, trim_graph
+        from networksynth.graphs import GraphGenerator
+        from networksynth.utils import save_bfs_snapshot, trim_graph
 
         snapshot_dir = os.path.join(agent.saver.output_dir, "snapshots")
         os.makedirs(snapshot_dir, exist_ok=True)
@@ -277,7 +279,7 @@ class TestSnapshotMode:
         )
 
     def test_compute_and_rank_metrics(self, tmp_path):
-        from configs.generate_mode.config_sample import SampleConfig
+        from networksynth.configs.generate_mode.config_sample import SampleConfig
 
         SampleConfig.DATASETS = SampleConfig.DATASETS[:1]
         SampleConfig.SYNTHETIC_NETWORK_NUMBER = 0
@@ -285,8 +287,8 @@ class TestSnapshotMode:
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
         SampleConfig.initialize()
 
-        from handlers import GenerationRun, create_run_paths
-        from utils import compute_network_metrics, metric_distance
+        from networksynth.handlers import GenerationRun, create_run_paths
+        from networksynth.utils import compute_network_metrics, metric_distance
 
         run_paths = create_run_paths(SampleConfig)
         dataset_id = SampleConfig.get_datasets()[0]

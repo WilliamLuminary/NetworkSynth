@@ -4,7 +4,7 @@ import logging
 
 import pytest
 
-from utils import JsonFormatter, tagged
+from networksynth.utils import JsonFormatter, tagged
 
 pytestmark = pytest.mark.unit
 
