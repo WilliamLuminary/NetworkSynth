@@ -2,9 +2,9 @@
 
 Target: `structural-gt` v3.8.6 (`sgtlib`), branch `gen`.
 
-NetworkSynth runs as a separate process in its own Python 3.12 environment; StructuralGT never imports our code, and the two talk through files. Appendix A is the constraint that forces this.
+NetworkSynth runs as a separate process with its own Python environment, on the same Python 3.14 StructuralGT uses; StructuralGT never imports our code, and the two talk through files. Separate processes keep our worker pools and the `OMP_NUM_THREADS` we set at import away from their Qt lifecycle, and stop a crash on our side taking their window with it. Running in-process is possible and would collapse the launcher, the ini settings and the submodule into an import — a decision to weigh, not a constraint.
 
-**Both sides are built.** `generate`, `hybrid`, `sweep` and `compare` all run from our GUI as subprocesses, each writing a manifest; worker processes use `spawn`, so nothing depends on the parent surviving. StructuralGT's `gen` branch carries the button that opens us. What remains here is the part that is not visible from either repository's README: the file contract between us (section 1), how their side finds and launches ours (section 2), how our code reaches them (section 3), and the constraint that forces all of it (Appendix A).
+**Both sides are built.** `generate`, `hybrid`, `sweep` and `compare` all run from our GUI as subprocesses, each writing a manifest; worker processes use `spawn`, so nothing depends on the parent surviving. StructuralGT's `gen` branch carries the button that opens us. What remains here is the part that is not visible from either repository's README: the file contract between us (section 1), how their side finds and launches ours (section 2), and how our code reaches them (section 3).
 
 ---
 
@@ -19,8 +19,8 @@ Inputs are chosen by the user, not exported on our behalf, and what a mode reads
 | Input set | Files | Modes |
 |---|---|---|
 | `edge_list` + `positions` (+ optional `image`) | one network, named directly | `generate`, `hybrid`, `sweep` |
-| `datasets_dir` | one dataset per prefix: `{name}_edgelist.csv` + `{name}_positions.csv`, or `{name}_adjacency.npy` + `{name}_positions.npy`, or `{name}_network.pkl` — each with an optional `{name}_image.tif` | `generate`, `hybrid`, `sweep` |
-| `original_dir` + `synthetic_dir` | two directories of networks to compare, in either format we write — a pickled batch or CSV pairs | `compare` |
+| `datasets_dir` | one dataset per prefix: `{name}_edgelist.csv` + `{name}_positions.csv`, or `{name}_adjacency.npy` + `{name}_positions.npy`, or `{name}_network.graphml` (`.graphml.gz` too) — each with an optional `{name}_image.tif` | `generate`, `hybrid`, `sweep` |
+| `original_dir` + `synthetic_dir` | two directories of networks to compare, in either format we write — GraphML or CSV pairs | `compare` |
 
 Comparison stands alone: `compare` reads the two sets of networks the caller names, and generation never analyses what it just made. So "generate then compare" is two runs — the second pointed at the first's `original/` and `synthetic/` folders, or at any other pair. Generation's own quality gate is a separate, cheaper thing: an `ErrorChecker` chosen by `ERROR_CHECKER`, measuring two scalars rather than a full spectrum.
 
@@ -98,7 +98,7 @@ One button on their ribbon opens our window. The user picks inputs in our GUI, w
 
 Four things about it are not obvious from either README, and are the reason this section exists.
 
-**No fallback to their interpreter.** With nothing configured the button looks for us in `third_party/NetworkSynth` and for our interpreter in the `.venv` inside it; the `[synthesis-settings]` ini keys are overrides. It never falls back to `sys.executable`. Theirs cannot have networkit (Appendix A), and in the frozen build `sys.executable` is StructuralGT itself, so that fallback would relaunch their own application with `gui_app.py` as an argument.
+**No fallback to their interpreter.** With nothing configured the button looks for us in `third_party/NetworkSynth` and for our interpreter in the `.venv` inside it; the `[synthesis-settings]` ini keys are overrides. It never falls back to `sys.executable`: in the frozen build that is StructuralGT itself, so the fallback would relaunch their own application with `gui_app.py` as an argument. Our dependencies would now install alongside theirs, but a shared environment is a decision to take deliberately, not by silent fallback.
 
 **Qt plugin paths are stripped from our environment.** `QT_PLUGIN_PATH`, `QT_QPA_PLATFORM_PLUGIN_PATH` and the QML import paths point at their PySide6, or into their PyInstaller bundle. Without removing them our Qt loads theirs and the child dies on a plugin mismatch.
 
@@ -125,18 +125,3 @@ git submodule update --init --checkout third_party/NetworkSynth
 Publishing is automatic: tagging a commit on `main` as `v1.0.1` triggers `.github/workflows/publish-dist.yml`, which rebuilds the branch from that commit and tags it `dist-v1.0.1`. The dist version is derived from the release tag, never chosen separately, so the two cannot drift. Our `README.md`, "The `dist` Branch", is the reference for both the branch and the workflow.
 
 Moving the pin stays a deliberate commit on their side. That is the property worth protecting: a release of ours cannot change what their application runs, and any old checkout of their repository brings back the NetworkSynth it was built against.
-
----
-
-## Appendix A: networkit and Python 3.14
-
-Rechecked 2026-08-29. StructuralGT is on 3.14; networkit still publishes no cp314 wheel and no stable-ABI wheel, so it cannot be a dependency of their environment. **This is now close to resolving.**
-
-- PyPI's latest is 11.2.1 (2026-01-09), cp310–cp313 only. No release of networkit has ever carried a cp314 wheel.
-- [Issue #1409 "Python 3.14 support"](https://github.com/networkit/networkit/issues/1409) is still open with no assignee or milestone, but no longer unanswered. On 2026-08-14 the maintainer `fabratu` wrote that they built the 3.14 wheels and could not attach them, because PyPI no longer allows amending a release more than 14 days old — "We will create a new patch release shortly." Fifteen days on, that release has not appeared.
-- A third party has published unofficial 3.14 wheels from a fork ([ggirelli/networkit 11.2.1-alpha](https://github.com/ggirelli/networkit/releases/tag/11.2.1-alpha-20260707-2)). Not something to depend on, but it does show the build works.
-- Nuance: `pip install networkit` does work on 3.14 by building from the sdist; only `uv` fails, which is what #1409 is really about. A source build is acceptable on a developer machine and unacceptable in a bundled end-user installer.
-
-When that patch release lands, the separate-process design stops being forced and becomes merely preferable — the two would still want separate environments, and the reasons in the last paragraph of this appendix do not depend on the wheel.
-
-Separate processes sidestep it entirely, and also mean our process pools and the `OMP_NUM_THREADS` set at import in `pipelines/generate.py` never touch their Qt worker lifecycle.

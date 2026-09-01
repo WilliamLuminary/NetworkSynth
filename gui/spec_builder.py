@@ -15,8 +15,8 @@ from configs.gui_config import (
 
 _FORMAT_HELP = {
     "csv": "…_edgelist.csv + …_positions.csv — what every loader here reads.",
-    "pkl": "The graph itself, pickled. Reloadable as a single network.",
-    "nkbin": "Compact binary plus …_positions.npy. Worth it for a big network.",
+    "graphml": "One self-describing file, positions included. Any tool reads it.",
+    "graphml.gz": "The same, gzipped — about an eighth of the size.",
     "webp": "Lossless and small.",
     "png": "Lossless, larger, opens anywhere.",
     "svg": "Vector, for a figure that has to scale.",
@@ -30,13 +30,14 @@ _FORMAT_ROWS = {"network": "Network format", "plot": "Plot format"}
 FORMAT_ROWS = tuple(_FORMAT_ROWS.values())
 
 
-def _format_fields(group: str, formats, default: str, omit: tuple = ()) -> List[Field]:
+def _format_fields(group: str, formats, default, omit: tuple = ()) -> List[Field]:
     noun = _FORMAT_ROWS[group]
+    defaults = (default,) if isinstance(default, str) else tuple(default)
     return [
         Field(
             format_param(group, name),
             f".{name}",
-            name == default,
+            name in defaults,
             kind="bool",
             group=OUTPUT_GROUP,
             row=noun,
@@ -426,7 +427,7 @@ def _common_fields(vector_plots: bool = True) -> List[Field]:
                 ),
             ),
         ]
-        + _format_fields("network", NETWORK_FORMATS, "csv")
+        + _format_fields("network", NETWORK_FORMATS, ("csv", "graphml.gz"))
         + _format_fields(
             "plot", PLOT_FORMATS, "webp", omit=() if vector_plots else ("svg",)
         )
@@ -623,21 +624,18 @@ def _network_shapes() -> List[InputShape]:
             ],
         ),
         InputShape(
-            "One network (pickle)",
-            format="Pickle",
+            "One network (GraphML)",
+            format="GraphML",
             inputs=[
                 Input(
-                    "network_pkl",
+                    "network_graphml",
                     "Network",
-                    filter="Pickle files (*.pkl)",
-                    placeholder="…_network.pkl",
+                    filter="GraphML files (*.graphml *.graphml.gz)",
+                    placeholder="…_network.graphml.gz",
                     help=(
-                        "A pickled SynthGraph, or a list of them — the\n"
-                        "synthetic_network_*.pkl a run writes.\n"
-                        "From a list the first is read, and the log\n"
-                        "says so.\n"
-                        "A legacy networkx pickle needs networkx\n"
-                        "installed, which it is not by default."
+                        "One network, positions included — the\n"
+                        "…_network.graphml.gz a run writes.\n"
+                        "Anything that reads GraphML can open it."
                     ),
                 ),
                 _background(),
@@ -775,7 +773,7 @@ _SAMPLE_INPUTS = {
     "datasets_dir": os.path.join(_SAMPLES, "gui_mode"),
     "adjacency": os.path.join(_SAMPLES, "generate_mode", "sample_1_mat.npy"),
     "positions_npy": os.path.join(_SAMPLES, "generate_mode", "sample_1_pos.npy"),
-    "network_pkl": os.path.join(_SAMPLES, "sample_1_network.pkl"),
+    "network_graphml": os.path.join(_SAMPLES, "sample_1_network.graphml"),
 }
 
 

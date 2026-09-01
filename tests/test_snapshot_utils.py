@@ -1,6 +1,6 @@
 import os
 
-import networkit as nk
+import igraph as ig
 import numpy as np
 import pytest
 
@@ -11,15 +11,16 @@ def _make_synth_graph(n: int = 20, avg_edges: int = 3):
     from graphs.synth_graph import SynthGraph
 
     positions = np.random.RandomState(42).rand(n, 2) * 100.0
-    g = nk.Graph(n, weighted=False)
-    for i in range(n):
-        g.addEdge(i, (i + 1) % n)
+    pairs = [(i, (i + 1) % n) for i in range(n)]
+    seen = {(min(u, v), max(u, v)) for u, v in pairs}
     rng = np.random.RandomState(7)
     for _ in range(avg_edges * n // 2):
         u, v = rng.randint(0, n, size=2)
-        if u != v and not g.hasEdge(u, v):
-            g.addEdge(u, v)
-    return SynthGraph(g, positions)
+        key = (min(int(u), int(v)), max(int(u), int(v)))
+        if u != v and key not in seen:
+            seen.add(key)
+            pairs.append((int(u), int(v)))
+    return SynthGraph(ig.Graph(n=n, edges=pairs), positions)
 
 
 class TestComputeNetworkMetrics:

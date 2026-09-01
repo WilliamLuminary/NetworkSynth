@@ -2,21 +2,25 @@ import os
 import sys
 
 
-def main(nkbin: str, output: str = None):
-    import networkit as nk
+def main(network: str, output: str = None):
+    _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    if _PROJECT_ROOT not in sys.path:
+        sys.path.insert(0, _PROJECT_ROOT)
 
-    nkbin = os.path.abspath(nkbin)
-    if not os.path.isfile(nkbin):
-        sys.exit(f"File not found: {nkbin}")
+    from graphs.graph_loader import load_graphs
 
-    g = nk.readGraph(nkbin, nk.Format.NetworkitBinary)
+    network = os.path.abspath(network)
+    if not os.path.isfile(network):
+        sys.exit(f"File not found: {network}")
 
-    nodes = g.numberOfNodes()
-    edges = g.numberOfEdges()
-    weighted = g.isWeighted()
+    g = load_graphs(network)[0]
+
+    nodes = g.number_of_nodes()
+    edges = g.number_of_edges()
+    weighted = g.is_weighted()
 
     lines = [
-        f"file: {os.path.basename(nkbin)}",
+        f"file: {os.path.basename(network)}",
         f"nodes: {nodes:,}",
         f"edges: {edges:,}",
         f"weighted: {weighted}",
@@ -26,7 +30,7 @@ def main(nkbin: str, output: str = None):
         print(line)
 
     if output is None:
-        output = nkbin.rsplit(".", 1)[0] + "_info.txt"
+        output = network.rsplit(".", 1)[0] + "_info.txt"
 
     with open(output, "w") as f:
         f.write("\n".join(lines) + "\n")

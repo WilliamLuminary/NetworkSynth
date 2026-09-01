@@ -7,48 +7,33 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 
-def load_graph(nkbin_path):
-    import networkit as nk
-    import numpy as np
+def load_graph(path):
+    """Positions travel inside the file now, so there is nothing to stitch on."""
+    from graphs.graph_loader import load_graphs
 
-    nkbin_path = os.path.abspath(nkbin_path)
-    if not os.path.isfile(nkbin_path):
-        sys.exit(f"File not found: {nkbin_path}")
+    path = os.path.abspath(path)
+    if not os.path.isfile(path):
+        sys.exit(f"File not found: {path}")
 
-    pos_path = nkbin_path.rsplit(".", 1)[0] + "_positions.npy"
-    if not os.path.isfile(pos_path):
-        sys.exit(
-            f"Companion positions file not found: {pos_path}\n"
-            f"Expected alongside {nkbin_path}"
-        )
-
-    g = nk.readGraph(nkbin_path, nk.Format.NetworkitBinary)
-    positions = np.load(pos_path)
-    assert (
-        positions.shape[0] == g.numberOfNodes()
-    ), f"Position count ({positions.shape[0]}) != node count ({g.numberOfNodes()})"
-
+    graph = load_graphs(path)[0]
     print(
-        f"Loaded: {g.numberOfNodes():,} nodes, {g.numberOfEdges():,} edges, "
-        f"weighted={g.isWeighted()}"
+        f"Loaded: {graph.number_of_nodes():,} nodes, "
+        f"{graph.number_of_edges():,} edges, weighted={graph.is_weighted()}"
     )
-
-    from graphs.synth_graph import SynthGraph
-
-    return SynthGraph(g, positions)
+    return graph
 
 
 def plot_single(
-    nkbin: str,
+    network: str,
     output: str = None,
     fmt: str = "webp",
     dpi: int = None,
     margin: float = 0.02,
 ):
-    """Plot a .nkbin network using the CV2-based renderer.
+    """Plot a network using the CV2-based renderer.
 
     Args:
-        nkbin: Path to the .nkbin file.
+        network: Path to the network file.
         output: Output path (default: <input_stem>.<fmt> in same dir).
         fmt: Output format — webp (default) or png.
         dpi: Resolution. Auto-calculated from node count if omitted.
@@ -58,7 +43,7 @@ def plot_single(
     if fmt not in ("webp", "png"):
         sys.exit(f"Unsupported format: {fmt}. Use webp or png.")
 
-    graph = load_graph(nkbin)
+    graph = load_graph(network)
 
     from configs import RenderStyle
     from utils import recommend_dpi_cv2, render_network
@@ -70,7 +55,7 @@ def plot_single(
     img = render_network(graph, RenderStyle(dpi=dpi, margin_frac=margin))
 
     if output is None:
-        output = nkbin.rsplit(".", 1)[0] + f".{fmt}"
+        output = network.rsplit(".", 1)[0] + f".{fmt}"
 
     # img is a BGR ndarray; the production serializers handle it.
     from configs.file_definitions import save_png, save_webp
@@ -80,32 +65,32 @@ def plot_single(
 
 
 def main(
-    nkbin: str = None,
+    network: str = None,
     batch_dir: str = None,
     **kwargs,
 ):
-    """Plot one or many .nkbin networks.
+    """Plot one or many networks.
 
     Args:
-        nkbin: Path to a single .nkbin file.
-        batch_dir: Directory to scan recursively for .nkbin files.
+        network: Path to a single network file.
+        batch_dir: Directory to scan recursively for network files.
                    Each file is plotted; errors are reported and skipped.
 
     All other flags (fmt, dpi, margin) are forwarded to the per-file
     plot function.
     """
-    if nkbin:
-        plot_single(nkbin, **kwargs)
+    if network:
+        plot_single(network, **kwargs)
     elif batch_dir:
         import glob
 
         files = sorted(
-            glob.glob(os.path.join(batch_dir, "**", "*.nkbin"), recursive=True)
+            glob.glob(os.path.join(batch_dir, "**", "*.graphml.gz"), recursive=True)
         )
         if not files:
-            print(f"No .nkbin files found under {batch_dir}")
+            print(f"No network files found under {batch_dir}")
             return
-        print(f"Found {len(files)} .nkbin files under {batch_dir}")
+        print(f"Found {len(files)} network files under {batch_dir}")
         failed = []
         for i, f in enumerate(files, 1):
             print(f"\n[{i}/{len(files)}] {f}")
@@ -121,7 +106,7 @@ def main(
         else:
             print(f"\nAll {len(files)} files plotted successfully.")
     else:
-        sys.exit("Provide --nkbin <file> or --batch_dir <directory>.")
+        sys.exit("Provide --network <file> or --batch_dir <directory>.")
 
 
 if __name__ == "__main__":

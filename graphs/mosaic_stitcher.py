@@ -2,7 +2,7 @@ import logging
 from collections import defaultdict
 from typing import Dict, Set, Tuple
 
-import networkit as nk
+import igraph as ig
 import numpy as np
 
 from .synth_graph import SynthGraph
@@ -74,7 +74,7 @@ class MosaicStitcher:
         total_nodes = sum(g.number_of_nodes() for g in tile_graphs.values())
         all_positions = np.zeros((total_nodes, 2), dtype=np.float64)
         node_tile_ids = np.zeros(total_nodes, dtype=np.int32)
-        combined_graph = nk.Graph(total_nodes, weighted=False)
+        pairs: list = []
 
         offset = 0
         for tile_idx, ((row, col), tile) in enumerate(tile_graphs.items()):
@@ -83,10 +83,11 @@ class MosaicStitcher:
             node_tile_ids[offset : offset + n] = tile_idx
 
             for u, v in tile.edges():
-                combined_graph.addEdge(offset + u, offset + v)
+                pairs.append((offset + u, offset + v))
 
             offset += n
 
+        combined_graph = ig.Graph(n=total_nodes, edges=pairs)
         return SynthGraph(combined_graph, all_positions), node_tile_ids
 
     def _merge_close_nodes(
@@ -145,13 +146,13 @@ class MosaicStitcher:
         new_id_map = {old: new for new, old in enumerate(kept_nodes)}
 
         n_new = len(kept_nodes)
-        new_graph = nk.Graph(n_new, weighted=False)
         new_positions = np.zeros((n_new, 2), dtype=np.float64)
 
         for old_id, new_id in new_id_map.items():
             new_positions[new_id] = positions[old_id]
 
         edge_set: Set[Tuple[int, int]] = set()
+        pairs: list = []
         for u, v in graph.edges():
             cu = new_id_map[canonical[u]]
             cv = new_id_map[canonical[v]]
@@ -159,7 +160,8 @@ class MosaicStitcher:
                 edge_key = (min(cu, cv), max(cu, cv))
                 if edge_key not in edge_set:
                     edge_set.add(edge_key)
-                    new_graph.addEdge(cu, cv)
+                    pairs.append((cu, cv))
+        new_graph = ig.Graph(n=n_new, edges=pairs)
 
         actual_merges = sum(1 for n, c in canonical.items() if n != c)
         logger.info(f"Merged {actual_merges:,} nodes into existing nodes")

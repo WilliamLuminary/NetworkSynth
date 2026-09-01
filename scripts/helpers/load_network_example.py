@@ -1,53 +1,39 @@
-import csv
 import os
+import sys
 
-import networkit as nk
-import numpy as np
+_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
 
 BASE = os.path.join("data")
 PREFIX = "hybrid_50x50_lcc"
 
 
 def from_csvs():
-    positions = np.loadtxt(
-        os.path.join(BASE, f"{PREFIX}_positions.csv"), delimiter=",", skiprows=1
-    )
+    from graphs.graph_loader import load_graphs
 
-    edges, weights = [], []
-    with open(os.path.join(BASE, f"{PREFIX}_edgelist.csv")) as f:
-        reader = csv.reader(f)
-        header = next(reader)
-        has_weight = len(header) >= 3
-        for row in reader:
-            edges.append((int(row[0]), int(row[1])))
-            if has_weight:
-                weights.append(float(row[2]))
-
-    g = nk.Graph(len(positions), weighted=has_weight)
-    for i, (u, v) in enumerate(edges):
-        g.addEdge(u, v, weights[i] if has_weight else 1.0)
-
+    g = load_graphs(os.path.join(BASE, f"{PREFIX}_edgelist.csv"))[0]
     print(
-        f"[CSV]   nodes={g.numberOfNodes():,}  edges={g.numberOfEdges():,}"
-        f"  weighted={g.isWeighted()}"
+        f"[CSV]   nodes={g.number_of_nodes():,}  edges={g.number_of_edges():,}"
+        f"  weighted={g.is_weighted()}"
     )
-    return g, positions
+    return g, g.positions()
 
 
-def from_nkbin():
-    g = nk.readGraph(os.path.join(BASE, f"{PREFIX}.nkbin"), nk.Format.NetworkitBinary)
-    positions = np.load(os.path.join(BASE, f"{PREFIX}_positions.npy"))
-    assert positions.shape[0] == g.numberOfNodes()
+def from_graphml():
+    from graphs.graph_loader import load_graphs
+
+    g = load_graphs(os.path.join(BASE, f"{PREFIX}.graphml.gz"))[0]
     print(
-        f"[nkbin] nodes={g.numberOfNodes():,}  edges={g.numberOfEdges():,}"
-        f"  weighted={g.isWeighted()}"
+        f"[graphml] nodes={g.number_of_nodes():,}  edges={g.number_of_edges():,}"
+        f"  weighted={g.is_weighted()}"
     )
-    return g, positions
+    return g, g.positions()
 
 
 if __name__ == "__main__":
     print("--- CSV pair ---")
     g1, p1 = from_csvs()
 
-    print("--- Binary pair ---")
-    g2, p2 = from_nkbin()
+    print("--- GraphML ---")
+    g2, p2 = from_graphml()

@@ -79,10 +79,9 @@ class GenerationRun(Run):
         self.saver.end_batch()
 
     def save_synthetic_outputs(self, prefix: str) -> None:
-        self.save(self.synthetic, "synthetic_network", f"{prefix}_")
         for i, graph in enumerate(self.synthetic):
             self.saver.begin_batch()
-            self.save(graph, "synthetic_export", f"{prefix}_n{i}_")
+            self.save(graph, "synthetic_network", f"{prefix}_n{i}_")
             self.saver.end_batch()
 
     def save_synthetic_plot(self, graph: SynthGraph, prefix: str = "") -> None:

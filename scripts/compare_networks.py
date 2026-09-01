@@ -19,10 +19,10 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 import logging
-import pickle
 
 from analysis import MultifractalProcessor
 from analysis.spectra_plot import plot_dimensions, plot_spectra
+from configs import save_json
 from graphs import load_graphs
 from utils import save_figure_as_webp
 
@@ -70,16 +70,15 @@ def compare(original_path: str, synthetic_path: str, output_dir: str) -> None:
         processor.analyze()
         results[label] = processor.get_summary_data()
 
-    data_path = os.path.join(output_dir, "analysis_data.pkl")
-    with open(data_path, "wb") as handle:
-        pickle.dump(
-            {
-                "results": results,
-                "measure_weighted": MEASURE_WEIGHTED,
-                "full_q_band": FULL_Q_BAND,
-            },
-            handle,
-        )
+    data_path = os.path.join(output_dir, "analysis_data.json")
+    save_json(
+        {
+            "results": results,
+            "measure_weighted": MEASURE_WEIGHTED,
+            "full_q_band": FULL_Q_BAND,
+        },
+        data_path,
+    )
     logger.info(f"Wrote {data_path}")
 
     for name, figure in (
