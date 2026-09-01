@@ -516,10 +516,6 @@ SynthGraph
 `subgraph()`, `copy()`, `component_sizes()`, `local_clustering()`,
 `from_sparse_matrix()`, `from_edge_list()`, `from_graph_nodes()`.
 
-While the migration off NetworKit finishes, `SynthGraph.nk` converts to a
-NetworKit graph on demand for `analysis/multifractal_analyzer.py`, the last
-consumer that has not moved. It is temporary and goes away with that file.
-
 Whether a graph is weighted depends on where it came from, and it matters:
 `from_sparse_matrix()` always produces a weighted graph, while
 `from_edge_list()` and `from_graph_nodes()` produce unweighted ones.

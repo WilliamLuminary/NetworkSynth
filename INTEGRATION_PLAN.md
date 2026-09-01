@@ -2,9 +2,9 @@
 
 Target: `structural-gt` v3.8.6 (`sgtlib`), branch `gen`.
 
-NetworkSynth runs as a separate process in its own Python environment; StructuralGT never imports our code, and the two talk through files. Appendix A explains why that was once forced and no longer is.
+NetworkSynth runs as a separate process with its own Python environment, on the same Python 3.14 StructuralGT uses; StructuralGT never imports our code, and the two talk through files. Separate processes keep our worker pools and the `OMP_NUM_THREADS` we set at import away from their Qt lifecycle, and stop a crash on our side taking their window with it. Running in-process is possible and would collapse the launcher, the ini settings and the submodule into an import — a decision to weigh, not a constraint.
 
-**Both sides are built.** `generate`, `hybrid`, `sweep` and `compare` all run from our GUI as subprocesses, each writing a manifest; worker processes use `spawn`, so nothing depends on the parent surviving. StructuralGT's `gen` branch carries the button that opens us. What remains here is the part that is not visible from either repository's README: the file contract between us (section 1), how their side finds and launches ours (section 2), how our code reaches them (section 3), and the constraint that forces all of it (Appendix A).
+**Both sides are built.** `generate`, `hybrid`, `sweep` and `compare` all run from our GUI as subprocesses, each writing a manifest; worker processes use `spawn`, so nothing depends on the parent surviving. StructuralGT's `gen` branch carries the button that opens us. What remains here is the part that is not visible from either repository's README: the file contract between us (section 1), how their side finds and launches ours (section 2), and how our code reaches them (section 3).
 
 ---
 
@@ -125,15 +125,3 @@ git submodule update --init --checkout third_party/NetworkSynth
 Publishing is automatic: tagging a commit on `main` as `v1.0.1` triggers `.github/workflows/publish-dist.yml`, which rebuilds the branch from that commit and tags it `dist-v1.0.1`. The dist version is derived from the release tag, never chosen separately, so the two cannot drift. Our `README.md`, "The `dist` Branch", is the reference for both the branch and the workflow.
 
 Moving the pin stays a deliberate commit on their side. That is the property worth protecting: a release of ours cannot change what their application runs, and any old checkout of their repository brings back the NetworkSynth it was built against.
-
----
-
-## Appendix A: Python 3.14, and why this was a separate process
-
-**Resolved.** NetworkSynth no longer depends on networkit, so nothing stops it running on Python 3.14 — StructuralGT's own version.
-
-The original constraint: networkit publishes cp310-cp313 wheels and no stable-ABI wheel, so it could never be installed into a 3.14 environment without compiling from source. That is why the two had to be separate processes. [Issue #1409](https://github.com/networkit/networkit/issues/1409) is still open; on 2026-08-14 a maintainer said the 3.14 wheels were built but blocked by a PyPI rule against amending an old release.
-
-Rather than wait, the graph layer moved to igraph, which ships `igraph-1.0.0-cp39-abi3-*.whl` — one stable-ABI build covering 3.9 through 3.14 and beyond. Every other dependency already had a cp314 wheel or was abi3. Measured on the operations this project uses, with networkit pinned to one thread as production ran it, igraph tied or won everywhere that cost real time, and the analyzer got roughly twice as fast overall because two hot helpers stopped rebuilding graphs in Python loops.
-
-The separate-process design still stands, but on its own merits rather than by necessity: our worker pools and the `OMP_NUM_THREADS` we set at import never touch their Qt lifecycle, and a crash on our side cannot take their window with it. Running in-process is now possible, and would collapse the launcher, the `[synthesis-settings]` ini and the submodule into a plain import. That is a decision to weigh, not a constraint.
