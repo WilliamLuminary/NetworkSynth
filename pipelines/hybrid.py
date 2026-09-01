@@ -14,7 +14,6 @@ from concurrent.futures import (
 from dataclasses import replace
 from typing import Dict, List, Optional, Tuple
 
-import networkit as nk
 import numpy as np
 
 from analysis.error_checker import ErrorChecker, NullErrorChecker, create_error_checker
@@ -137,8 +136,6 @@ def _generate_tile_worker(args):
         min_tile_nodes,
     ) = args
 
-    nk.setNumberOfThreads(1)
-
     apply_seed(params.seed)
 
     if exit_event.is_set():
@@ -222,7 +219,6 @@ def run_phase1(
     config,
     base_params: SynthParams,
 ) -> Dict[int, dict]:
-    nk.setNumberOfThreads(1)
 
     num_centers = len(frames)
     manager = spawn_context().Manager()
@@ -443,12 +439,10 @@ def run_phase2(
 
 
 def log_connectivity(graph: SynthGraph, label: str = ""):
-    cc = nk.components.ConnectedComponents(graph.nk)
-    cc.run()
-    sizes = sorted(cc.getComponentSizes().values(), reverse=True)
+    sizes = sorted(graph.component_sizes(), reverse=True)
     n = graph.number_of_nodes()
     logger.info(
-        f"{label} connectivity: {cc.numberOfComponents()} components, "
+        f"{label} connectivity: {len(sizes)} components, "
         f"LCC={sizes[0]:,} ({sizes[0] / n * 100:.2f}% of {n:,} nodes)",
         extra=tagged("STATS"),
     )
@@ -523,13 +517,6 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
         )
         return
 
-    max_threads = os.cpu_count() or 1
-    nk.setNumberOfThreads(max_threads)
-    logger.info(
-        f"Phase 2: restored networkit threads to {max_threads}",
-        extra=tagged("PHASE2", dataset=str(dataset_id)),
-    )
-
     snapshot_interval = config.SNAPSHOT_INTERVAL
     snapshot_dir = (
         os.path.join(run.saver.output_dir, "snapshots")
@@ -580,7 +567,7 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
     prefix = f"hybrid_{len(centers)}centers"
 
     run.saver.begin_batch()
-    run.save(hybrid_graph, "synthetic_export", f"{prefix}_")
+    run.save(hybrid_graph, "synthetic_network", f"{prefix}_")
 
     run.save(run.original_report(), "original_report")
     run.save(run.synthetic_report(hybrid_graph), "synthetic_report")

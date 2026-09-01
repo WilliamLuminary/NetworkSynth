@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-import pickle
 import re
 import sys
 from dataclasses import replace
@@ -14,12 +13,12 @@ logger = logging.getLogger("gui_preview")
 
 PREVIEW_DPI = 90
 
-_BATCH_SUFFIX = ".pkl"
-_BATCH_MARKER = "synthetic_network"
+_EXPORT_SUFFIX = ".graphml.gz"
+_EXPORT_MARKER = "synthetic_network"
 
-# The per-network exports share the batch's name — SAVE_SYNTHETIC_EXPORT's
-# detail is also "synthetic_network" — and differ only by this infix.
-_EXPORT_INFIX = re.compile(r"_n\d+_" + _BATCH_MARKER)
+# One file per network, numbered by this infix. There is no combined batch any
+# more: holding a list took a pickle, and GraphML carries a single graph.
+_EXPORT_INFIX = re.compile(r"_n(\d+)_" + _EXPORT_MARKER)
 
 _LABEL_WIDTH = 21
 
@@ -134,31 +133,27 @@ def preview_original(config, out_dir: str) -> dict:
     }
 
 
-def _find_batch(run_root: str) -> str:
+def _find_exports(run_root: str) -> list:
+    """Every synthetic network the run wrote, in the order it generated them."""
     found = []
     for directory, _, names in os.walk(run_root):
         for name in names:
-            if _EXPORT_INFIX.search(name):
-                continue
-            if _BATCH_MARKER in name and name.endswith(_BATCH_SUFFIX):
-                found.append(os.path.join(directory, name))
+            match = _EXPORT_INFIX.search(name)
+            if match and name.endswith(_EXPORT_SUFFIX):
+                found.append((int(match.group(1)), os.path.join(directory, name)))
     if not found:
         raise FileNotFoundError(
-            f"no '*{_BATCH_MARKER}*{_BATCH_SUFFIX}' under {run_root}. Only "
-            "generate mode writes the batch of synthetic networks a preview "
-            "reads."
+            f"no '*{_EXPORT_MARKER}*{_EXPORT_SUFFIX}' under {run_root}. Only "
+            "generate mode writes the synthetic networks a preview reads."
         )
-    return max(found, key=os.path.getmtime)
+    return [path for _, path in sorted(found)]
 
 
 def preview_synthetic(config, run_root: str, out_dir: str) -> dict:
-    batch_path = _find_batch(run_root)
-    with open(batch_path, "rb") as handle:
-        graphs = pickle.load(handle)
-    if not graphs:
-        raise ValueError(f"{batch_path} holds no networks")
+    from graphs.graphml_io import read_graph_graphml
 
-    graph = graphs[0]
+    exports = _find_exports(run_root)
+    graph = read_graph_graphml(exports[0])
     attributes = AttributesCalculator().analyze(graph)
     figure = plot_network(
         data_type="synthetic_graph",
@@ -171,9 +166,9 @@ def preview_synthetic(config, run_root: str, out_dir: str) -> dict:
         "kind": "synthetic",
         "has_background": False,
         "images": {"network": _write(figure, out_dir, "synthetic.png")},
-        "count": len(graphs),
+        "count": len(exports),
         "note": (
-            f"The first of the {len(graphs)} networks in this run's output "
+            f"The first of the {len(exports)} networks in this run's output "
             "list — the order they were generated in, not a ranking."
         ),
         "text": _info_text(
@@ -190,7 +185,8 @@ def _source(config, dataset_id):
         ("edge_list", "_edgelist.csv"),
         ("adjacency", "_adjacency.npy"),
         ("adjacency", "_mat.npy"),
-        ("network_pkl", ".pkl"),
+        ("network_graphml", ".graphml.gz"),
+        ("network_graphml", ".graphml"),
     ):
         if paths.get(key):
             name = os.path.basename(paths[key])

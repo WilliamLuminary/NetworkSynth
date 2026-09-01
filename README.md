@@ -6,10 +6,10 @@ This is the **`dist` branch** — a generated, code-only copy of [NetworkSynth](
 
 ## Setup
 
-NetworkSynth needs its own Python environment, separate from whatever hosts it, because NetworKit publishes no wheel for Python 3.14.
+NetworkSynth runs on Python 3.14.
 
 ```bash
-python3.12 -m venv .venv          # 3.11-3.13 also work
+python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
 
@@ -39,13 +39,13 @@ It exits `0` completed, `1` failed, `2` run-spec rejected, `130` cancelled, and 
 
 ## Inputs
 
-A network is a pair of files sharing a prefix, or a single pickle:
+A network is a pair of files sharing a prefix, or a single GraphML file:
 
 | Files | Format |
 | --- | --- |
 | `<prefix>_edgelist.csv` + `<prefix>_positions.csv` | a CSV pair |
 | `<prefix>_adjacency.npy` + `<prefix>_positions.npy` | a NumPy pair |
-| `<prefix>_network.pkl` | a pickled network |
+| `<prefix>_network.graphml` | one network, positions included (`.graphml.gz` too) |
 | `<prefix>_image.tif` | the background for that prefix, optional |
 
 Point a run at a folder of these and it reads one dataset per prefix, in name order, writing a subdirectory each under one run root. A half-named dataset stops the run and names it rather than being passed over.
@@ -54,7 +54,7 @@ Edge lists are read tolerantly: `Source,Target` columns (with `Weight,Length,Wid
 
 ## Output
 
-One directory per run, `{MODE}_{ConfigClass}_results_{timestamp}_{run_id}`, holding the original and synthetic networks as edge-list pairs, pickles and rendered images, plus a per-dataset `report.txt`. `manifest.json` at the run root groups every file written by kind and records whether the run ended `ok`, `failed` or `cancelled`.
+One directory per run, `{MODE}_{ConfigClass}_results_{timestamp}_{run_id}`, holding the original and synthetic networks as edge-list pairs, gzipped GraphML and rendered images, plus a per-dataset `report.txt`. `manifest.json` at the run root groups every file written by kind and records whether the run ended `ok`, `failed` or `cancelled`.
 
 ## Full documentation
 
