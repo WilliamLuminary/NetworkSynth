@@ -31,7 +31,7 @@ def _classify(relative_path: str) -> str:
         return "analysis"
     if lowered.endswith(_IMAGE_SUFFIXES):
         return "previews"
-    if lowered.endswith(".nkbin") or lowered.endswith(".pkl"):
+    if lowered.endswith((".graphml", ".graphml.gz", ".graphmlz")):
         return "networks"
     return "other"
 

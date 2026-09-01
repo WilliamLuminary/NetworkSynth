@@ -1,6 +1,6 @@
 import os
 
-import networkit as nk
+import igraph as ig
 import numpy as np
 import pytest
 
@@ -11,15 +11,16 @@ def _make_graph(n: int = 20, extra_edges: int = 40) -> "SynthGraph":
     from graphs.synth_graph import SynthGraph
 
     positions = np.random.RandomState(42).rand(n, 2) * 100.0
-    g = nk.Graph(n, weighted=False)
-    for i in range(n):
-        g.addEdge(i, (i + 1) % n)
+    pairs = [(i, (i + 1) % n) for i in range(n)]
+    seen = {(min(u, v), max(u, v)) for u, v in pairs}
     rng = np.random.RandomState(7)
     for _ in range(extra_edges):
         u, v = rng.randint(0, n, size=2)
-        if u != v and not g.hasEdge(u, v):
-            g.addEdge(u, v)
-    return SynthGraph(g, positions)
+        key = (min(int(u), int(v)), max(int(u), int(v)))
+        if u != v and key not in seen:
+            seen.add(key)
+            pairs.append((int(u), int(v)))
+    return SynthGraph(ig.Graph(n=n, edges=pairs), positions)
 
 
 class TestCalculateFrame:
@@ -210,9 +211,8 @@ class TestTrimGraph:
         from graphs.synth_graph import SynthGraph
         from utils import trim_graph
 
-        g = nk.Graph(0, weighted=False)
         positions = np.empty((0, 2))
-        graph = SynthGraph(g, positions)
+        graph = SynthGraph(ig.Graph(n=0), positions)
         trimmed = trim_graph(graph, 2.0)
         assert trimmed.number_of_nodes() == 0
 

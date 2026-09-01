@@ -42,7 +42,7 @@ def run_scaling_for_dataset(dataset_id, config, run_paths):
     prefix = f"scaled_{config.SCALE_ROWS}x{config.SCALE_COLS}"
 
     run.saver.begin_batch()
-    run.save(scaled_graph, "synthetic_export", f"{prefix}_")
+    run.save(scaled_graph, "synthetic_network", f"{prefix}_")
     scaled_img = render_network(scaled_graph, config.render("scaled_graph"))
     run.save(scaled_img, "synthetic_graph", f"{prefix}_")
     run.saver.end_batch()

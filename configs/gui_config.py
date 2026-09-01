@@ -18,8 +18,7 @@ from .file_definitions import (
     SYNTHETIC_DIR,
     SaveSpec,
     save_network_csv,
-    save_network_nkbin,
-    save_pickle,
+    save_network_graphml,
     save_png,
     save_svg,
     save_webp,
@@ -33,7 +32,7 @@ _PAIR_OR_DIRECTORY = (
     ("edge_list", "positions"),
     ("datasets_dir",),
     ("adjacency", "positions_npy"),
-    ("network_pkl",),
+    ("network_graphml",),
 )
 MODE_INPUTS = {
     "generate": _PAIR_OR_DIRECTORY,
@@ -46,13 +45,15 @@ _POSITIONS_SUFFIX = "_positions.csv"
 _IMAGE_SUFFIX = "_image.tif"
 _MATRIX_SUFFIX = "_adjacency.npy"
 _NPY_POSITIONS_SUFFIX = "_positions.npy"
-_PICKLE_SUFFIX = "_network.pkl"
+_GRAPHML_SUFFIX = "_network.graphml"
+_GRAPHML_GZ_SUFFIX = "_network.graphml.gz"
 
 
 _DIRECTORY_FORMS = (
     (_EDGE_SUFFIX, (_POSITIONS_SUFFIX,)),
     (_MATRIX_SUFFIX, (_NPY_POSITIONS_SUFFIX,)),
-    (_PICKLE_SUFFIX, ()),
+    (_GRAPHML_SUFFIX, ()),
+    (_GRAPHML_GZ_SUFFIX, ()),
 )
 
 _TUPLE_PARAMS = frozenset(
@@ -76,8 +77,8 @@ class SpecError(ValueError):
 
 NETWORK_FORMATS = {
     "csv": save_network_csv,
-    "pkl": save_pickle,
-    "nkbin": save_network_nkbin,
+    "graphml": save_network_graphml,
+    "graphml.gz": save_network_graphml,
 }
 PLOT_FORMATS = {
     "webp": save_webp,
@@ -88,7 +89,7 @@ PLOT_FORMATS = {
 _FORMATTED_OUTPUTS = {
     "network": (
         ("SAVE_ORIGINAL_NETWORK", ORIGINAL_DIR, "original_network"),
-        ("SAVE_SYNTHETIC_EXPORT", SYNTHETIC_DIR, "synthetic_network"),
+        ("SAVE_SYNTHETIC_NETWORK", SYNTHETIC_DIR, "synthetic_network"),
     ),
     "plot": (
         ("SAVE_ORIGINAL_GRAPH", ORIGINAL_DIR, "original_graph"),
@@ -99,7 +100,12 @@ _FORMATTED_OUTPUTS = {
 
 
 def format_param(group: str, name: str) -> str:
-    return f"WRITE_{group.upper()}_{name.upper()}"
+    """The switch for one output format.
+
+    The format's name is its file extension, so it can carry a dot
+    (``graphml.gz``); an attribute name cannot.
+    """
+    return f"WRITE_{group.upper()}_{name.upper().replace('.', '_')}"
 
 
 def _rebuild_from_spec(spec_path: str) -> type:
@@ -165,14 +171,14 @@ def _load_npy_pair(positions_path: str, adjacency_path: str) -> SynthGraph:
     return graph
 
 
-def _load_pickled(path: str) -> SynthGraph:
+def _load_single_network(path: str) -> SynthGraph:
     from graphs import load_graphs
 
     graphs = load_graphs(path)
     if len(graphs) > 1:
         logger.warning(
             f"{path} holds {len(graphs)} networks; reading the first. Point at "
-            "a single-network pickle to choose a different one."
+            "a single-network file to choose a different one."
         )
     return graphs[0]
 
@@ -188,7 +194,9 @@ def _load_from_directory(directory: str, name: str) -> SynthGraph:
         return _load_npy_pair(
             f"{path}{_NPY_POSITIONS_SUFFIX}", f"{path}{_MATRIX_SUFFIX}"
         )
-    return _load_pickled(f"{path}{_PICKLE_SUFFIX}")
+    if os.path.exists(f"{path}{_GRAPHML_GZ_SUFFIX}"):
+        return _load_single_network(f"{path}{_GRAPHML_GZ_SUFFIX}")
+    return _load_single_network(f"{path}{_GRAPHML_SUFFIX}")
 
 
 class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
@@ -314,8 +322,8 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
         directory = cls.PATHS.get("datasets_dir")
         if directory:
             graph = _load_from_directory(directory, str(dataset_id))
-        elif cls.PATHS.get("network_pkl"):
-            graph = _load_pickled(cls.PATHS["network_pkl"])
+        elif cls.PATHS.get("network_graphml"):
+            graph = _load_single_network(cls.PATHS["network_graphml"])
         elif cls.PATHS.get("adjacency"):
             graph = _load_npy_pair(cls.PATHS["positions_npy"], cls.PATHS["adjacency"])
         else:

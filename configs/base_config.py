@@ -11,8 +11,9 @@ from .file_definitions import (
     RenderStyle,
     SaveSpec,
     save_csv,
+    save_json,
     save_network_csv,
-    save_pickle,
+    save_network_graphml,
     save_text,
     save_webp,
 )
@@ -99,9 +100,10 @@ class BaseConfig:
     SAVE_ORIGINAL_GRAPH = (SaveSpec(ORIGINAL_DIR, "original_graph", "webp", save_webp),)
     SAVE_ORIGINAL_NETWORK = (
         SaveSpec(ORIGINAL_DIR, "original_network", "csv", save_network_csv),
+        SaveSpec(ORIGINAL_DIR, "original_network", "graphml.gz", save_network_graphml),
     )
     SAVE_ORIGINAL_PROPERTY = (
-        SaveSpec(ORIGINAL_DIR, "original_property", "pkl", save_pickle),
+        SaveSpec(ORIGINAL_DIR, "original_property", "json", save_json),
     )
     SAVE_ORIGINAL_REPORT = (
         SaveSpec(ORIGINAL_DIR, "report", "txt", save_text, use_timestamp=False),
@@ -110,10 +112,10 @@ class BaseConfig:
         SaveSpec(SYNTHETIC_DIR, "synthetic_graph", "webp", save_webp),
     )
     SAVE_SYNTHETIC_NETWORK = (
-        SaveSpec(SYNTHETIC_DIR, "synthetic_network", "pkl", save_pickle),
-    )
-    SAVE_SYNTHETIC_EXPORT = (
         SaveSpec(SYNTHETIC_DIR, "synthetic_network", "csv", save_network_csv),
+        SaveSpec(
+            SYNTHETIC_DIR, "synthetic_network", "graphml.gz", save_network_graphml
+        ),
     )
     SAVE_SYNTHETIC_REPORT = (
         SaveSpec(SYNTHETIC_DIR, "report", "txt", save_text, use_timestamp=False),
@@ -122,7 +124,7 @@ class BaseConfig:
         SaveSpec(INPLACE_DIR, "sweep_report", "csv", save_csv, use_timestamp=False),
     )
     SAVE_ANALYSIS_DATA = (
-        SaveSpec(INPLACE_DIR, "analysis_data", "pkl", save_pickle, use_timestamp=False),
+        SaveSpec(INPLACE_DIR, "analysis_data", "json", save_json, use_timestamp=False),
     )
     SAVE_ANALYSIS_FIGURE = (
         SaveSpec(INPLACE_DIR, "analysis_figure", "webp", save_webp),

@@ -6,7 +6,6 @@ import csv
 import logging
 from typing import List
 
-import networkit as nk
 import numpy as np
 
 from analysis.error_checker import (
@@ -70,7 +69,6 @@ def generate_synthetic_network(
     mapper: Mapper,
     params: SynthParams,
 ):
-    nk.setNumberOfThreads(1)
 
     if _should_exit(exit_event):
         return None, float("inf")
@@ -107,7 +105,6 @@ def _generate_single_network(
     mapper: Mapper,
     params: SynthParams,
 ):
-    nk.setNumberOfThreads(1)
 
     if exit_event.is_set():
         return None, float("inf")
@@ -146,7 +143,6 @@ def _generate_single_network_collecting_snapshots(
     early_check_node_count: int,
     params: SynthParams,
 ):
-    nk.setNumberOfThreads(1)
 
     if exit_event.is_set():
         return None, float("inf"), []

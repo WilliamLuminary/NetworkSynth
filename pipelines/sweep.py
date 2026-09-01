@@ -5,7 +5,6 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-import networkit as nk
 import wandb
 
 from analysis.error_checker import ErrorChecker, create_error_checker
@@ -48,7 +47,6 @@ logger = logging.getLogger(__name__)
 def _generate_with_factors(
     exit_event, error_checker: ErrorChecker, attributes, mapper, params
 ):
-    nk.setNumberOfThreads(1)
 
     if exit_event.is_set():
         return None, float("inf")

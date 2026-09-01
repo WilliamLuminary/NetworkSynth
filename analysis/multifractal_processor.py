@@ -22,10 +22,6 @@ def _worker_count(requested: Optional[int], num_jobs: int) -> int:
 def _analyze_one(job) -> Dict:
     idx, graph, measure_weighted, full_q_band = job
 
-    import networkit as nk
-
-    nk.setNumberOfThreads(1)
-
     result = MultifractalAnalyzer(graph, measure_weighted, full_q_band).analyze_graph()
     return {
         "graph_idx": idx,
