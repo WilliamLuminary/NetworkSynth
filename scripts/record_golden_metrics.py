@@ -1,8 +1,4 @@
-"""Record every analyzer output on the current graph backend.
-
-Run this before migrating anything, keep the JSON, then re-run after each phase and
-diff. It is the oracle the igraph migration is validated against, and it times every
-call so the performance comparison comes out of the same artefact.
+"""Record every analyzer output, with timings, as an oracle to diff against.
 
     python scripts/record_golden_metrics.py [out_dir]
 """
@@ -29,7 +25,6 @@ DEFAULT_OUT = os.path.join("tests", "data", "golden_metrics")
 
 
 def _plain(obj):
-    """Numpy scalars and arrays are not JSON, and tuples come back as lists."""
     if hasattr(obj, "tolist"):
         return obj.tolist()
     if hasattr(obj, "item"):

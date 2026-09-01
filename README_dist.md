@@ -6,10 +6,10 @@ This is the **`dist` branch** — a generated, code-only copy of [NetworkSynth](
 
 ## Setup
 
-NetworkSynth needs its own Python environment, separate from whatever hosts it, because NetworKit publishes no wheel for Python 3.14.
+NetworkSynth runs on Python 3.14.
 
 ```bash
-python3.12 -m venv .venv          # 3.11-3.13 also work
+python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
 

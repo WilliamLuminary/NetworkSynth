@@ -1,9 +1,4 @@
-"""Worker processes must not each grab every core.
-
-This used to pin networkit's thread count. igraph is single-threaded, so what is
-left to guard is the environment variable that stops numpy, scipy and OpenBLAS
-from oversubscribing inside a pool worker.
-"""
+"""Worker processes must not each grab every core."""
 
 import importlib
 import inspect
@@ -49,11 +44,19 @@ def test_the_pin_is_in_effect_once_a_pipeline_is_imported():
     assert os.environ["OMP_NUM_THREADS"] == "1"
 
 
-def test_no_pipeline_still_talks_to_networkit():
-    """The migration is done when this passes with networkit uninstalled."""
+def test_nothing_imports_networkit_any_more():
+    """igraph replaced it everywhere; this keeps it from creeping back."""
+    roots = ("analysis", "configs", "graphs", "gui", "handlers", "pipelines", "utils")
     offenders = []
-    for module_name in _PIPELINES:
-        source = inspect.getsource(importlib.import_module(module_name))
-        if "networkit" in source or "nk." in source:
-            offenders.append(module_name)
+    for root in roots:
+        for directory, _, names in os.walk(root):
+            if "__pycache__" in directory:
+                continue
+            for name in names:
+                if not name.endswith(".py"):
+                    continue
+                path = os.path.join(directory, name)
+                with open(path) as handle:
+                    if "networkit" in handle.read():
+                        offenders.append(path)
     assert not offenders, f"still referencing networkit: {offenders}"

@@ -1,12 +1,4 @@
-"""Read and write networks as GraphML, the interchange format igraph documents.
-
-One self-describing file carries the topology, the edge weights and the node
-positions, so a network is no longer split across a graph file and a positions
-sidecar, and nothing outside this project is needed to read it.
-
-``.graphml.gz`` is the same format gzipped -- about an eighth of the size, at roughly
-six times the write cost.
-"""
+"""Read and write networks as GraphML, positions included."""
 
 from __future__ import annotations
 

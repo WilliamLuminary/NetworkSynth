@@ -7,45 +7,18 @@ import numpy as np
 
 _WEIGHT = "weight"
 
-#: How often a consumer has reached past this facade for a networkit graph. The
-#: migration is finished when this stays at zero for a full run.
-_nk_shim_calls = 0
-
-
-def nk_shim_calls() -> int:
-    return _nk_shim_calls
-
 
 class SynthGraph:
 
-    __slots__ = ("_graph", "_positions", "_nk_cache")
+    __slots__ = ("_graph", "_positions")
 
     def __init__(self, graph: ig.Graph, positions: np.ndarray):
         self._graph: ig.Graph = graph
         self._positions: np.ndarray = np.asarray(positions, dtype=np.float64)
-        self._nk_cache = None
 
     @property
     def igraph(self) -> ig.Graph:
         return self._graph
-
-    @property
-    def nk(self):
-        """A networkit copy, for consumers not yet migrated to igraph.
-
-        Temporary: it converts and caches, so it is correct but not free. Anything
-        calling this inside a loop should be migrated instead.
-        """
-        global _nk_shim_calls
-        _nk_shim_calls += 1
-        if self._nk_cache is None:
-            from .backend import ig_to_nk
-
-            self._nk_cache = ig_to_nk(self._graph)
-        return self._nk_cache
-
-    def _touched(self) -> None:
-        self._nk_cache = None
 
     def number_of_nodes(self) -> int:
         return self._graph.vcount()
@@ -80,7 +53,7 @@ class SynthGraph:
         return float(self._graph.strength(node, weights=_WEIGHT))
 
     def weight(self, u: int, v: int) -> float:
-        """The edge's weight, or 0.0 when there is no such edge, as networkit had it."""
+        """The edge's weight, or 0.0 when there is no such edge."""
         edge_id = self._graph.get_eid(u, v, error=False)
         if edge_id == -1:
             return 0.0
@@ -91,14 +64,12 @@ class SynthGraph:
     def set_weight(self, u: int, v: int, w: float) -> None:
         assert w > 0, f"edge ({u}, {v}) has non-positive weight {w!r}"
         self._graph.es[self._graph.get_eid(u, v)][_WEIGHT] = w
-        self._touched()
 
     def has_edge(self, u: int, v: int) -> bool:
         return self._graph.get_eid(u, v, error=False) != -1
 
     def remove_edge(self, u: int, v: int) -> None:
         self._graph.delete_edges([(u, v)])
-        self._touched()
 
     def nodes(self) -> Iterator[int]:
         return iter(range(self._graph.vcount()))
@@ -125,7 +96,6 @@ class SynthGraph:
         return [len(component) for component in self._graph.connected_components()]
 
     def local_clustering(self) -> List[float]:
-        """Unweighted local clustering per node, 0.0 for degree < 2."""
         return self._graph.transitivity_local_undirected(mode="zero")
 
     def largest_connected_component(self) -> SynthGraph:
@@ -148,13 +118,11 @@ class SynthGraph:
         if self.is_weighted():
             return
         self._graph.es[_WEIGHT] = [1.0] * self._graph.ecount()
-        self._touched()
 
     def make_unweighted(self) -> None:
         if not self.is_weighted():
             return
         del self._graph.es[_WEIGHT]
-        self._touched()
 
     @classmethod
     def from_sparse_matrix(cls, positions: np.ndarray, adjacency_matrix) -> SynthGraph:

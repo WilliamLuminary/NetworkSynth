@@ -2,9 +2,7 @@
 
     python scripts/compare_golden_metrics.py <before_dir> <after_dir> [rel_tol]
 
-Exits non-zero when any value drifts past the tolerance, so it can gate a migration
-phase. The two gate scalars are held to a tighter bar than the reporting metrics,
-because they decide whether a generated candidate is accepted.
+Exits non-zero on drift, so it can gate a migration phase.
 """
 
 import json
@@ -14,14 +12,11 @@ import sys
 GATE_RTOL = 1e-9
 DEFAULT_RTOL = 1e-6
 
-#: Values below this are numerically zero, where relative drift is meaningless: the
-#: principal eigenvector legitimately holds components around 1e-20 whose last digits
-#: depend on the order edges were summed in.
+#: Below this a value is numerically zero and relative drift is meaningless.
 ATOL = 1e-12
 
 
 def _flatten(value, prefix=""):
-    """Every leaf number in a nested structure, keyed by its path."""
     if isinstance(value, dict):
         for key, item in value.items():
             yield from _flatten(item, f"{prefix}.{key}" if prefix else str(key))
@@ -33,11 +28,7 @@ def _flatten(value, prefix=""):
 
 
 def _drift(before, after, rtol):
-    """How far past tolerance the worst value is, where, and the worst absolute gap.
-
-    Scored as numpy does it: a difference passes when it is within
-    ``ATOL + rtol * |expected|``. A ratio of 1.0 or less is a pass.
-    """
+    """Worst tolerance breach, scored as numpy does: ``ATOL + rtol * |expected|``."""
     a = dict(_flatten(before))
     b = dict(_flatten(after))
     missing = set(a) ^ set(b)

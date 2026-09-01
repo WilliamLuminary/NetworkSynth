@@ -114,12 +114,10 @@ class MultifractalErrorFeatures:
 
 
 def _closeness(graph: SynthGraph) -> List[float]:
-    """Wasserman-Faust closeness: ``(r / (n - 1)) * (r / sum of distances)``.
+    """Wasserman-Faust closeness, which igraph does not offer directly.
 
-    igraph normalises within a node's own component, which is the second factor.
-    NetworKit additionally scales by how much of the graph that component covers,
-    so a node in a small island scores lower than the same node in a big one. The
-    two agree exactly on a connected graph, where the first factor is 1.
+    igraph normalises within a node's own component; this also scales by how much
+    of the graph that component covers. The two agree on a connected graph.
     """
     ig_graph = graph.igraph
     n = ig_graph.vcount()
@@ -176,11 +174,7 @@ class MultifractalAnalyzer:
         return self._uw_graph
 
     def _get_distances(self, graph: SynthGraph) -> list:
-        """All-pairs shortest paths, weighted when the graph carries weights.
-
-        Unreachable pairs come back as ``inf``, which every caller filters the
-        same way it filtered NetworKit's out-of-range sentinel.
-        """
+        """All-pairs shortest paths; unreachable pairs come back as ``inf``."""
         key = id(graph)
         if key not in self._distances:
             weights = "weight" if graph.is_weighted() else None
@@ -199,9 +193,7 @@ class MultifractalAnalyzer:
 
     @staticmethod
     def _weighted_clustering(graph: SynthGraph) -> List[float]:
-        """Onnela: the geometric mean of a triangle's normalised weights.
-
-        Deliberately not igraph's ``transitivity_local_undirected(weights=)``,
+        """Onnela clustering. Deliberately not igraph's weighted transitivity,
         which implements Barrat and gives materially different numbers.
         """
         n = graph.number_of_nodes()
@@ -396,8 +388,7 @@ class MultifractalAnalyzer:
         n = ig_graph.vcount()
         weights = "weight" if graph.is_weighted() else None
         raw = np.asarray(ig_graph.betweenness(weights=weights), dtype=float)
-        # Below three nodes the factor is zero and every score is zero, so this is
-        # 0/0 -> nan, which is what NetworKit returned too.
+        # Under three nodes this is 0/0 -> nan, as NetworKit also returned.
         with np.errstate(invalid="ignore", divide="ignore"):
             return (raw / ((n - 1) * (n - 2) / 2)).tolist()
 
@@ -455,7 +446,6 @@ class MultifractalAnalyzer:
             if self.graph.is_connected()
             else self.graph.largest_connected_component()
         )
-        # Hop diameter: weights are deliberately ignored.
         return graph.igraph.diameter(weights=None)
 
     def analyze_graph(self) -> Dict[str, List]:

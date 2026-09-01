@@ -1,5 +1,4 @@
 import igraph as ig
-import networkit as nk
 import numpy as np
 import pytest
 
@@ -39,9 +38,9 @@ class TestCoreProperties:
         g = _make_chain_graph(5, weighted=True)
         assert g.is_weighted() is True
 
-    def test_nk_property(self):
+    def test_igraph_property(self):
         g = _make_chain_graph(3)
-        assert isinstance(g.nk, nk.Graph)
+        assert isinstance(g.igraph, ig.Graph)
 
 
 class TestPositionAccess:
