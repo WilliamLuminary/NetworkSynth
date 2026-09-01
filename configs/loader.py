@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 import importlib
 import inspect
 from pathlib import Path

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 from .files import find_file_with_pattern
 from .graph_ops import (
     build_graph,

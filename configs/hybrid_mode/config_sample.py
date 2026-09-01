@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 import logging
 import os
 from typing import Dict, Optional, Tuple

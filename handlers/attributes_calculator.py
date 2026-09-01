@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 import logging
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
