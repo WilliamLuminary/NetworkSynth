@@ -5,7 +5,6 @@ from contextlib import contextmanager
 from dataclasses import astuple, dataclass
 from typing import Dict, List
 
-import networkit as nk
 import numpy as np
 import ot
 from scipy import sparse as sp
@@ -91,15 +90,13 @@ def _neighbour_masses(
     return (1.0 - alpha) * affinities / affinities.sum()
 
 
-def _principal_eigenvector(nk_graph: nk.Graph) -> List[float]:
-    n = nk_graph.numberOfNodes()
-    weighted = nk_graph.isWeighted()
+def _principal_eigenvector(graph: SynthGraph) -> List[float]:
+    n = graph.number_of_nodes()
 
     rows: List[int] = []
     cols: List[int] = []
     values: List[float] = []
-    for u, v in nk_graph.iterEdges():
-        w = nk_graph.weight(u, v) if weighted else 1.0
+    for u, v, w in graph.edges_with_weights():
         rows += [u, v]
         cols += [v, u]
         values += [w, w]
@@ -114,6 +111,31 @@ def _principal_eigenvector(nk_graph: nk.Graph) -> List[float]:
 class MultifractalErrorFeatures:
     holder_exponent: float
     spectrum_width: float
+
+
+def _closeness(graph: SynthGraph) -> List[float]:
+    """Wasserman-Faust closeness: ``(r / (n - 1)) * (r / sum of distances)``.
+
+    igraph normalises within a node's own component, which is the second factor.
+    NetworKit additionally scales by how much of the graph that component covers,
+    so a node in a small island scores lower than the same node in a big one. The
+    two agree exactly on a connected graph, where the first factor is 1.
+    """
+    ig_graph = graph.igraph
+    n = ig_graph.vcount()
+    if n < 2:
+        return [0.0] * n
+
+    weights = "weight" if graph.is_weighted() else None
+    scores = ig_graph.closeness(weights=weights, normalized=True)
+    components = ig_graph.connected_components()
+    sizes = [len(component) for component in components]
+    membership = components.membership
+
+    return [
+        0.0 if score != score else score * (sizes[membership[node]] - 1) / (n - 1)
+        for node, score in enumerate(scores)
+    ]
 
 
 def _generate_range(scale):
@@ -143,9 +165,6 @@ class MultifractalAnalyzer:
         self._inv_graph: SynthGraph | None = None
         self._uw_graph: SynthGraph | None = None
         self._distances: Dict[int, list] = {}
-
-    def _get_nk_graph(self) -> nk.Graph:
-        return self.graph.nk
 
     def _get_analysis_graph(self) -> SynthGraph:
         if self.weighted or not self.graph.is_weighted():
@@ -179,16 +198,21 @@ class MultifractalAnalyzer:
         return self._inv_graph
 
     @staticmethod
-    def _weighted_clustering(nk_graph: nk.Graph) -> List[float]:
-        n = nk_graph.numberOfNodes()
+    def _weighted_clustering(graph: SynthGraph) -> List[float]:
+        """Onnela: the geometric mean of a triangle's normalised weights.
+
+        Deliberately not igraph's ``transitivity_local_undirected(weights=)``,
+        which implements Barrat and gives materially different numbers.
+        """
+        n = graph.number_of_nodes()
         max_w = 0.0
-        for u, v, w in nk_graph.iterEdgesWeights():
+        for u, v, w in graph.edges_with_weights():
             if w > max_w:
                 max_w = w
         if max_w == 0:
             max_w = 1.0
 
-        nbrs = [set(nk_graph.iterNeighbors(u)) for u in range(n)]
+        nbrs = [set(graph.neighbors(u)) for u in range(n)]
         result = [0.0] * n
         for i in range(n):
             inbrs = nbrs[i]
@@ -199,12 +223,12 @@ class MultifractalAnalyzer:
             seen = set()
             for j in inbrs:
                 seen.add(j)
-                wij = nk_graph.weight(i, j) / max_w
+                wij = graph.weight(i, j) / max_w
                 jnbrs = nbrs[j] - seen
                 common = inbrs & jnbrs
                 for k in common:
-                    wjk = nk_graph.weight(j, k) / max_w
-                    wki = nk_graph.weight(k, i) / max_w
+                    wjk = graph.weight(j, k) / max_w
+                    wki = graph.weight(k, i) / max_w
                     wt_tri += (wij * wjk * wki) ** (1.0 / 3.0)
             result[i] = (2.0 * wt_tri) / (deg * (deg - 1))
         return result
@@ -337,19 +361,13 @@ class MultifractalAnalyzer:
 
     def _compute_centralities(self) -> Dict[str, List[float]]:
         analysis_graph = self._get_analysis_graph()
-        nk_graph = analysis_graph.nk
 
         nfd_centrality = self._compute_node_dimension()
 
         if self.weighted:
-            inv_graph = self._get_inverted_weight_graph().nk
-            closeness_values = (
-                nk.centrality.Closeness(inv_graph, True, True).run().scores()
-            )
+            closeness_values = _closeness(self._get_inverted_weight_graph())
         else:
-            closeness_values = (
-                nk.centrality.Closeness(nk_graph, True, True).run().scores()
-            )
+            closeness_values = _closeness(analysis_graph)
 
         if self.weighted:
             degree_values = [self.graph.weighted_degree(u) for u in self.graph.nodes()]
@@ -357,11 +375,9 @@ class MultifractalAnalyzer:
             degree_values = [self.graph.degree(u) for u in self.graph.nodes()]
 
         if self.weighted:
-            cluster_values = self._weighted_clustering(nk_graph)
+            cluster_values = self._weighted_clustering(analysis_graph)
         else:
-            cluster_values = list(
-                nk.centrality.LocalClusteringCoefficient(nk_graph).run().scores()
-            )
+            cluster_values = analysis_graph.local_clustering()
 
         return {
             "nfd": list(nfd_centrality.values()),
@@ -371,13 +387,19 @@ class MultifractalAnalyzer:
         }
 
     def _compute_betweenness(self) -> List[float]:
-        if self.weighted:
-            inv_graph = self._get_inverted_weight_graph().nk
-            bt = nk.centrality.Betweenness(inv_graph, normalized=True).run().scores()
-        else:
-            nk_graph = self._get_analysis_graph().nk
-            bt = nk.centrality.Betweenness(nk_graph, normalized=True).run().scores()
-        return bt
+        graph = (
+            self._get_inverted_weight_graph()
+            if self.weighted
+            else self._get_analysis_graph()
+        )
+        ig_graph = graph.igraph
+        n = ig_graph.vcount()
+        weights = "weight" if graph.is_weighted() else None
+        raw = np.asarray(ig_graph.betweenness(weights=weights), dtype=float)
+        # Below three nodes the factor is zero and every score is zero, so this is
+        # 0/0 -> nan, which is what NetworKit returned too.
+        with np.errstate(invalid="ignore", divide="ignore"):
+            return (raw / ((n - 1) * (n - 2) / 2)).tolist()
 
     def _compute_ollivier_ricci_curvature(self) -> List[float]:
         dist_graph = (
@@ -415,44 +437,26 @@ class MultifractalAnalyzer:
 
     def _compute_eigenvector_centrality(self) -> List[float]:
         if self.graph.is_connected():
-            nk_graph = self._get_analysis_graph().nk
+            graph = self._get_analysis_graph()
         else:
-            lcc = self.graph.largest_connected_component()
-            nk_graph = lcc.nk
-            if not self.weighted and nk_graph.isWeighted():
-                n = nk_graph.numberOfNodes()
-                uw = nk.Graph(n, weighted=False)
-                for u, v in nk_graph.iterEdges():
-                    uw.addEdge(u, v)
-                nk_graph = uw
+            graph = self.graph.largest_connected_component()
+            if not self.weighted and graph.is_weighted():
+                graph = graph.copy()
+                graph.make_unweighted()
 
         try:
-            return _principal_eigenvector(nk_graph)
+            return _principal_eigenvector(graph)
         except Exception:
-            return [float("nan")] * nk_graph.numberOfNodes()
+            return [float("nan")] * graph.number_of_nodes()
 
     def _compute_diameter(self) -> float:
-        if self.graph.is_connected():
-            nk_graph = self._get_nk_graph()
-        else:
-            lcc = self.graph.largest_connected_component()
-            nk_graph = lcc.nk
-
-        if nk_graph.isWeighted():
-            uw = nk.Graph(nk_graph.numberOfNodes(), weighted=False)
-            for u, v in nk_graph.iterEdges():
-                uw.addEdge(u, v)
-            nk_graph = uw
-
-        assert not nk_graph.isWeighted(), "hop diameter needs an unweighted graph"
-
-        algo = (
-            getattr(nk.distance.DiameterAlgo, "Exact", None)
-            or nk.distance.DiameterAlgo.exact
+        graph = (
+            self.graph
+            if self.graph.is_connected()
+            else self.graph.largest_connected_component()
         )
-        diam = nk.distance.Diameter(nk_graph, algo=algo)
-        diam.run()
-        return diam.getDiameter()[0]
+        # Hop diameter: weights are deliberately ignored.
+        return graph.igraph.diameter(weights=None)
 
     def analyze_graph(self) -> Dict[str, List]:
         with self.set_q(self.full_q):
