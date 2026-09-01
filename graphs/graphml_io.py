@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Read and write networks as GraphML, positions included."""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 from .attributes_calculator import AttributesCalculator
 from .manifest import (
     STATUS_CANCELLED,

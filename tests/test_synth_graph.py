@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 import igraph as ig
 import numpy as np
 import pytest

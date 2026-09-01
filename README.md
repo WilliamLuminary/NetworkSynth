@@ -478,6 +478,74 @@ The other way round, `INPUT_ORIENTATION` — a quarter turn applied to the input
 
 Drawing is shared but not single-source: matplotlib output goes through `plot_network` (runs and previews alike) and `save_bfs_snapshot`; OpenCV output through `render_network` and `save_hybrid_snapshot`. The GUI adds no network renderer of its own — the preview builds only its background figure.
 
+### Driving a run from another program
+
+`gui_run.py` is the third entry point: one run from one JSON file, with no config module and nothing imported. It is how a host application uses NetworkSynth without becoming coupled to it.
+
+```bash
+python gui_run.py path/to/run_spec.json
+```
+
+```json
+{
+  "contract": 2,
+  "inputs":  {"edge_list": "...", "positions": "...", "image": null},
+  "output_dir": "/path/to/run_output",
+  "mode": "generate",
+  "params": {
+    "SYNTHETIC_FRAME_SIZE": [1030, 730],
+    "CLOSED_NODES_FACTOR": 1.2,
+    "CLOSED_EDGES_FACTOR": 0.8,
+    "SYNTHETIC_NETWORK_NUMBER": 10,
+    "ERROR_TOLERANCE": 0.15,
+    "ERROR_CHECKER": "multifractal",
+    "MEASURE_WEIGHTED": false,
+    "SEED": 12345
+  }
+}
+```
+
+`contract` is 2 because the input shape varies by mode. `MODE_INPUTS` in `configs/gui_config.py` is the authority: it lists the input *sets* each mode accepts, and a spec must fill exactly one. Filling none is rejected, and so is filling two — that does not say which input to read, and choosing silently would turn a caller's mistake into a plausible-looking run.
+
+| Input set | Modes |
+| --- | --- |
+| `edge_list` + `positions` (+ optional `image`) | `generate`, `hybrid`, `sweep` |
+| `datasets_dir`, read by the prefix rule above | `generate`, `hybrid`, `sweep` |
+| `original_dir` + `synthetic_dir` | `compare` |
+
+A `sweep` spec adds `NF_RANGE` and `EF_RANGE` to `params`, and needs a wandb key in `WANDB_API_KEY` or `WANDB_KEY` (both are read) or in `~/.netrc`. Login happens inside the run's try block, so a missing key ends as a `failed` manifest with the reason rather than a hang, and the process should be started with stdin closed so wandb can never sit waiting for a key nobody can type.
+
+Exit codes are `0` completed, `1` failed, `2` run-spec rejected, `130` cancelled. Pipelines log and re-raise; the entry point is the only place that maps an outcome to a code, so a pipeline reused from elsewhere never calls `sys.exit` behind its caller's back.
+
+Every mode writes `manifest.json` at the run root from a `finally`, so a run that fails or is cancelled still leaves one saying so:
+
+```json
+{
+  "manifest_version": 1,
+  "status": "ok",
+  "run_root": "/path/to/output_dir/gui_generate_results_20260805_120000_abc123",
+  "outputs": {
+    "edge_lists": ["sample/synthetic/net_edgelist.csv"],
+    "positions":  ["sample/synthetic/net_positions.csv"],
+    "previews":   ["sample/synthetic/graph.webp"],
+    "snapshots":  [],
+    "networks":   [],
+    "analysis":   []
+  },
+  "file_count": 12
+}
+```
+
+- `status` is `ok`, `failed` (with an `error` string) or `cancelled`. `cancelled` is deliberately distinct from `failed` — a GUI must not show an error because the user pressed Cancel.
+- A *missing* manifest means the process died hard, which is unambiguous rather than looking like a failed run.
+- `snapshots` is an animation sequence, `previews` a final render, `analysis` what `compare` produces.
+- Paths are relative to `run_root`, forward slashes on every platform.
+- `manifest_version` and the spec's `contract` exist so a future shape change fails loudly instead of being misread.
+
+Progress rides on the JSON-lines log: `{"tag": "PROGRESS", "percent": 66.67, …}` in `run.jsonl`, beside `manifest.json`. A reader drives a progress bar off a numeric field rather than parsing prose.
+
+Nothing in the spec records what an edge weight *means*. A `Weight` column may hold a diameter, area, length, angle, conductance or resistance depending on what produced it, and none of that is carried: the Mapper learns the empirical length↔weight relationship from the input and reproduces it, whatever the weight physically is. If the meaning ever stops being length-related, that is a new mapper, not a new contract field.
+
 
 ## Sweep Best Parameters
 
@@ -659,16 +727,16 @@ Keeping both here rather than committing a README onto `dist` is deliberate: a f
 Tag `main` and push the tag. That is the whole release:
 
 ```bash
-git tag -a v1.0.1 -m "NetworkSynth v1.0.1"
-git push origin v1.0.1
+git tag -a v2.0.0 -m "NetworkSynth v2.0.0"
+git push origin v2.0.0
 ```
 
-`.github/workflows/publish-dist.yml` picks that up, runs the publish script against the tagged commit, and pushes `dist` along with a matching `dist-v1.0.1`. Three tag shapes, each meaning one thing:
+`.github/workflows/publish-dist.yml` picks that up, runs the publish script against the tagged commit, and pushes `dist` along with a matching `dist-v2.0.0`. Three tag shapes, each meaning one thing:
 
 | Tag | On | Made by |
 | --- | --- | --- |
-| `v1.0.1` | `main` | you, and it is what triggers everything |
-| `dist-v1.0.1` | `dist` | the workflow, one per `v` tag |
+| `v2.0.0` | `main` | you, and it is what triggers everything |
+| `dist-v2.0.0` | `dist` | the workflow, one per `v` tag |
 | `submission-v1.0.0` | a code-deposit branch | you, for a journal submission — unrelated to either of the above |
 
 `dist-v*` deliberately does not match the workflow's `v*` trigger, so publishing cannot set itself off again; pushes made with `GITHUB_TOKEN` do not start workflows either, so that holds twice over.
@@ -700,16 +768,14 @@ git push origin dist
 A submodule records a commit, not a branch, so a project carrying NetworkSynth keeps building against exactly what it was pinned to until someone moves the pin. Publishing a release changes nothing for them until they do:
 
 ```bash
-git -C third_party/NetworkSynth fetch --tags
-git -C third_party/NetworkSynth checkout dist-v1.0.1
-git add third_party/NetworkSynth && git commit -m "bump NetworkSynth to dist-v1.0.1"
+git -C networksynth fetch --tags
+git -C networksynth checkout dist-v2.0.0
+git add networksynth && git commit -m "bump NetworkSynth to dist-v2.0.0"
 ```
 
-The version they name is the one you tagged on `main` — that is the point of deriving `dist-v1.0.1` from `v1.0.1` rather than numbering the two branches separately. Committing that gitlink is what pins it: any later checkout of their repository brings back the same NetworkSynth it was built against, and a release of ours can never silently change what their application runs.
+The version they name is the one you tagged on `main` — that is the point of deriving `dist-v2.0.0` from `v2.0.0` rather than numbering the two branches separately. Committing that gitlink is what pins it: any later checkout of their repository brings back the same NetworkSynth it was built against, and a release of ours can never silently change what their application runs.
 
 If a consumer would rather follow the tip of `dist` than name versions, `git submodule update --remote` does that — `.gitmodules` records `branch = dist`, so the pin moves to whatever was published last. That trades the guarantee above for one less step, which is usually the wrong trade.
-
-`INTEGRATION_PLAN.md` covers the other side of this — how StructuralGT finds and launches us.
 
 
 ## CI / Code Quality
