@@ -428,7 +428,7 @@ def _common_fields(vector_plots: bool = True) -> List[Field]:
                 ),
             ),
         ]
-        + _format_fields("network", NETWORK_FORMATS, ("csv", "graphml.gz"))
+        + _format_fields("network", NETWORK_FORMATS, "csv")
         + _format_fields(
             "plot", PLOT_FORMATS, "webp", omit=() if vector_plots else ("svg",)
         )

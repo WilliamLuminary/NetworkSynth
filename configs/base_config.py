@@ -14,7 +14,6 @@ from .file_definitions import (
     save_csv,
     save_json,
     save_network_csv,
-    save_network_graphml,
     save_text,
     save_webp,
 )
@@ -101,7 +100,6 @@ class BaseConfig:
     SAVE_ORIGINAL_GRAPH = (SaveSpec(ORIGINAL_DIR, "original_graph", "webp", save_webp),)
     SAVE_ORIGINAL_NETWORK = (
         SaveSpec(ORIGINAL_DIR, "original_network", "csv", save_network_csv),
-        SaveSpec(ORIGINAL_DIR, "original_network", "graphml.gz", save_network_graphml),
     )
     SAVE_ORIGINAL_PROPERTY = (
         SaveSpec(ORIGINAL_DIR, "original_property", "json", save_json),
@@ -114,9 +112,6 @@ class BaseConfig:
     )
     SAVE_SYNTHETIC_NETWORK = (
         SaveSpec(SYNTHETIC_DIR, "synthetic_network", "csv", save_network_csv),
-        SaveSpec(
-            SYNTHETIC_DIR, "synthetic_network", "graphml.gz", save_network_graphml
-        ),
     )
     SAVE_SYNTHETIC_REPORT = (
         SaveSpec(SYNTHETIC_DIR, "report", "txt", save_text, use_timestamp=False),

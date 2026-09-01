@@ -35,12 +35,10 @@ Synthetic Generation
        │   ├── original_image_*.webp
        │   ├── original_network_*_edgelist.csv
        │   ├── original_network_*_positions.csv
-       │   ├── original_network_*.graphml.gz
        │   ├── original_property_*.json
        │   └── report.txt
        └── synthetic/
            ├── synthetic_graph_*.webp
-           ├── synthetic_network_*.graphml.gz
            ├── synthetic_network_*_edgelist.csv
            ├── synthetic_network_*_positions.csv
            └── report.txt
@@ -200,11 +198,11 @@ inherits them. **Default policy: images → `.webp`, network exports → `.csv`.
 | --- | --- | --- | --- |
 | `original_image` | `SAVE_ORIGINAL_IMAGE` | `original/` | `.webp` |
 | `original_graph` | `SAVE_ORIGINAL_GRAPH` | `original/` | `.webp` |
-| `original_network` | `SAVE_ORIGINAL_NETWORK` | `original/` | `.csv` **and** `.graphml.gz` |
+| `original_network` | `SAVE_ORIGINAL_NETWORK` | `original/` | `.csv` |
 | `original_property` | `SAVE_ORIGINAL_PROPERTY` | `original/` | `.json` |
 | `original_report` | `SAVE_ORIGINAL_REPORT` | `original/` | `.txt`, no timestamp |
 | `synthetic_graph` | `SAVE_SYNTHETIC_GRAPH` | `synthetic/` | `.webp` |
-| `synthetic_network` | `SAVE_SYNTHETIC_NETWORK` | `synthetic/` | `.csv` **and** `.graphml.gz` |
+| `synthetic_network` | `SAVE_SYNTHETIC_NETWORK` | `synthetic/` | `.csv` |
 | `synthetic_report` | `SAVE_SYNTHETIC_REPORT` | `synthetic/` | `.txt`, no timestamp |
 | `analysis_data` | `SAVE_ANALYSIS_DATA` | root | `.json`, no timestamp |
 | `analysis_figure` | `SAVE_ANALYSIS_FIGURE` | root | `.webp` |
@@ -527,15 +525,13 @@ Every mode writes `manifest.json` at the run root from a `finally`, so a run tha
   "outputs": {
     "edge_lists": ["sample/synthetic/net_edgelist.csv"],
     "positions":  ["sample/synthetic/net_positions.csv"],
-    "previews":   ["sample/synthetic/graph.webp"],
-    "snapshots":  [],
-    "networks":   [],
-    "analysis":   []
+    "previews":   ["sample/synthetic/graph.webp"]
   },
   "file_count": 12
 }
 ```
 
+- Only kinds that have files appear. A run writing no snapshots carries no `snapshots` key at all, so read `outputs` with a default rather than by subscript. The kinds are `edge_lists`, `positions`, `networks`, `previews`, `snapshots`, `analysis` and `other`.
 - `status` is `ok`, `failed` (with an `error` string) or `cancelled`. `cancelled` is deliberately distinct from `failed` — a GUI must not show an error because the user pressed Cancel.
 - A *missing* manifest means the process died hard, which is unambiguous rather than looking like a failed run.
 - `snapshots` is an animation sequence, `previews` a final render, `analysis` what `compare` produces.

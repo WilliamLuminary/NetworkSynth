@@ -68,12 +68,12 @@ class TestSpecs:
     def test_original_network_formats(self):
         specs = BaseConfig.save("original_network")
         exts = {s.extension for s in specs}
-        assert exts == {"csv", "graphml.gz"}
+        assert exts == {"csv"}
 
     def test_synthetic_network_formats(self):
         specs = BaseConfig.save("synthetic_network")
         exts = {s.extension for s in specs}
-        assert exts == {"csv", "graphml.gz"}
+        assert exts == {"csv"}
 
     def test_synthetic_graph_default_webp(self):
         specs = BaseConfig.save("synthetic_graph")
