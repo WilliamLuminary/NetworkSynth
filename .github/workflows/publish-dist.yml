@@ -14,12 +14,23 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
+      - name: Decide where this tag publishes
+        run: |
+          # A -dev tag is a pre-release: it goes to its own branch, so the branch
+          # consumers follow only ever holds released trees.
+          if [[ "$GITHUB_REF_NAME" == *-dev ]]; then
+            echo "DIST_BRANCH=dist-dev" >> "$GITHUB_ENV"
+          else
+            echo "DIST_BRANCH=dist" >> "$GITHUB_ENV"
+          fi
+
       - uses: actions/checkout@v4
         with:
           # The whole history, so origin/main and the dist branch are both reachable.
           fetch-depth: 0
 
-      - name: Refuse a tag that is not on main
+      - name: Refuse a release tag that is not on main
+        if: ${{ !endsWith(github.ref_name, '-dev') }}
         run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
 
       - name: Identify the commit's author
@@ -27,15 +38,15 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Bring dist into this checkout
+      - name: Bring the target branch into this checkout
         run: |
-          if git ls-remote --exit-code --heads origin dist > /dev/null; then
-            git fetch origin dist
-            git branch -f dist FETCH_HEAD
+          if git ls-remote --exit-code --heads origin "$DIST_BRANCH" > /dev/null; then
+            git fetch origin "$DIST_BRANCH"
+            git branch -f "$DIST_BRANCH" FETCH_HEAD
           fi
 
       - name: Publish
         run: scripts/publish_dist.sh "$GITHUB_SHA" "dist-$GITHUB_REF_NAME"
 
       - name: Push
-        run: git push origin dist "dist-$GITHUB_REF_NAME"
+        run: git push origin "$DIST_BRANCH" "dist-$GITHUB_REF_NAME"

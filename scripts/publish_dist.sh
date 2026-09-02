@@ -11,7 +11,9 @@
 
 set -euo pipefail
 
-BRANCH="dist"
+# Overridable so a pre-release can be built without touching the branch consumers
+# follow, and so a local test run does not move the real one.
+BRANCH="${DIST_BRANCH:-dist}"
 SOURCE="${1:-HEAD}"
 TAG="${2:-}"
 
