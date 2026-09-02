@@ -54,7 +54,7 @@ Edge lists are read tolerantly: `Source,Target` columns (with `Weight,Length,Wid
 
 ## Output
 
-One directory per run, `{MODE}_{ConfigClass}_results_{timestamp}_{run_id}`, holding the original and synthetic networks as edge-list pairs, gzipped GraphML and rendered images, plus a per-dataset `report.txt`. `manifest.json` at the run root groups every file written by kind and records whether the run ended `ok`, `failed` or `cancelled`.
+One directory per run, `{MODE}_{ConfigClass}_results_{timestamp}_{run_id}`, holding the original and synthetic networks as edge-list pairs and rendered images, plus a per-dataset `report.txt`. GraphML is offered as an output format but is not written by default. `manifest.json` at the run root groups every file written by kind and records whether the run ended `ok`, `failed` or `cancelled`.
 
 ## Full documentation
 
