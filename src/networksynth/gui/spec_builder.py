@@ -820,6 +820,14 @@ def default_values(mode: str) -> Dict[str, Any]:
     return {f.id: f.value for f in MODES[mode].fields}
 
 
+def graphml_shape_index(mode: str) -> Optional[int]:
+    """Where this mode takes one GraphML file, which is what a handover arrives as."""
+    for index, shape in enumerate(MODES[mode].input_shapes):
+        if shape.scope == SINGLE and shape.format == "GraphML":
+            return index
+    return None
+
+
 def default_inputs(mode: str, shape_index: int = 0) -> Dict[str, str]:
     if mode not in MODES:
         raise ValueError(f"unknown mode {mode!r}; available: {sorted(MODES)}")
