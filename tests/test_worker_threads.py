@@ -10,11 +10,11 @@ import pytest
 pytestmark = pytest.mark.unit
 
 _PIPELINES = (
-    "pipelines.generate",
-    "pipelines.hybrid",
-    "pipelines.mosaic",
-    "pipelines.sweep",
-    "pipelines.compare",
+    "networksynth.pipelines.generate",
+    "networksynth.pipelines.hybrid",
+    "networksynth.pipelines.mosaic",
+    "networksynth.pipelines.sweep",
+    "networksynth.pipelines.compare",
 )
 
 
@@ -41,7 +41,7 @@ def test_pipeline_pins_omp_before_importing_anything_heavy(module_name):
 
 
 def test_the_pin_is_in_effect_once_a_pipeline_is_imported():
-    importlib.import_module("pipelines.generate")
+    importlib.import_module("networksynth.pipelines.generate")
     assert os.environ["OMP_NUM_THREADS"] == "1"
 
 

@@ -9,12 +9,12 @@ pytestmark = pytest.mark.unit
 
 
 CHECKED_PIPELINES = [
-    ("pipelines.generate", "run_for_dataset"),
-    ("pipelines.mosaic", "run_mosaic_for_dataset"),
-    ("pipelines.scaling", "run_scaling_for_dataset"),
-    ("pipelines.hybrid", "_run_dataset_in_subprocess"),
-    ("pipelines.sweep", "run_for_dataset"),
-    ("pipelines.compare", "run_for_dataset"),
+    ("networksynth.pipelines.generate", "run_for_dataset"),
+    ("networksynth.pipelines.mosaic", "run_mosaic_for_dataset"),
+    ("networksynth.pipelines.scaling", "run_scaling_for_dataset"),
+    ("networksynth.pipelines.hybrid", "_run_dataset_in_subprocess"),
+    ("networksynth.pipelines.sweep", "run_for_dataset"),
+    ("networksynth.pipelines.compare", "run_for_dataset"),
 ]
 
 
@@ -107,8 +107,7 @@ def test_a_cancelled_run_is_distinct_from_a_failed_one(
 
 
 def test_every_gui_mode_is_covered_here():
-    import gui_run
-
+    from networksynth import gui_run
     from networksynth.pipelines import PIPELINES
 
     checked = {path for path, _ in CHECKED_PIPELINES}

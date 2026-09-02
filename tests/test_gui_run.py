@@ -2,9 +2,9 @@
 import json
 import os
 
-import gui_run
 import pytest
 
+from networksynth import gui_run
 from networksynth.configs.gui_config import GuiConfig, SpecError
 
 pytestmark = pytest.mark.unit

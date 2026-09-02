@@ -1,9 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import sys
+from pathlib import Path
 
 import pytest
 
+import networksynth
 from networksynth.configs.loader import load_config
+
+_CONFIGS = Path(networksynth.__file__).resolve().parent / "configs"
 
 pytestmark = pytest.mark.unit
 
@@ -14,25 +18,23 @@ def _config_modules_loaded():
 
 class TestLoadingByPath:
     def test_it_returns_the_class_in_that_file(self):
-        config = load_config("configs/generate_mode/config_snapshot_1x1.py")
+        config = load_config(str(_CONFIGS / "generate_mode" / "config_snapshot_1x1.py"))
 
         assert config.__name__ == "Snapshot1x1Config"
         assert config.SNAPSHOT_INTERVAL == 10
 
     def test_the_path_has_to_be_the_real_file(self):
         with pytest.raises(FileNotFoundError):
-            load_config("configs/hybrid_mode/config_snapshot")
+            load_config(str(_CONFIGS / "hybrid_mode" / "config_snapshot"))
 
     def test_an_absolute_path_works(self, tmp_path):
-        import os
-
-        absolute = os.path.abspath("configs/mosaic_mode/config_sample.py")
+        absolute = str(_CONFIGS / "mosaic_mode" / "config_sample.py")
 
         assert load_config(absolute).__name__ == "SampleConfig"
 
     def test_a_missing_file_says_so(self):
         with pytest.raises(FileNotFoundError, match="No config file at"):
-            load_config("configs/generate_mode/config_nope.py")
+            load_config(str(_CONFIGS / "generate_mode" / "config_nope.py"))
 
     def test_a_config_outside_the_project_is_refused(self, tmp_path):
         stray = tmp_path / "config_stray.py"
@@ -55,7 +57,7 @@ class TestOnlyWhatIsAskedForLoads:
             del sys.modules[stale]
         before = _config_modules_loaded()
 
-        load_config("configs/generate_mode/config_tmp.py")
+        load_config(str(_CONFIGS / "generate_mode" / "config_tmp.py"))
 
         newly_loaded = _config_modules_loaded() - before
         assert newly_loaded <= {
