@@ -9,8 +9,7 @@ This is the **`dist` branch** — a generated, code-only copy of [NetworkSynth](
 NetworkSynth runs on Python 3.14.
 
 ```bash
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+pip install .
 ```
 
 ## Running it
@@ -18,21 +17,21 @@ python3 -m venv .venv
 The window, where inputs, parameters and the output folder are all chosen:
 
 ```bash
-.venv/bin/python gui_app.py
+networksynth
 ```
 
 The command line, where a config module holds the same settings:
 
 ```bash
-.venv/bin/python run.py configs/generate_mode/config_sample.py
+networksynth-cli
 ```
 
-The config's `MODE` picks the pipeline — `generate`, `hybrid`, `mosaic`, `scaling`, `sweep` or `compare`. `run.py` with no argument lists every config shipped here. The sample configs read from `data/input/`, which this branch does not carry, so point `DATASETS` and `BASE_INPUT_PATH` at your own networks before running one.
+The config's `MODE` picks the pipeline — `generate`, `hybrid`, `mosaic`, `scaling`, `sweep` or `compare`. `networksynth-cli` with no argument lists every config shipped here. The sample configs read from `data/input/`, which this branch does not carry, so point `DATASETS` and `BASE_INPUT_PATH` at your own networks before running one.
 
 A third entry point runs a single job from a JSON run-spec rather than a config module, which is how a host application drives NetworkSynth without importing it:
 
 ```bash
-.venv/bin/python gui_run.py path/to/run_spec.json
+networksynth-run path/to/run_spec.json
 ```
 
 It exits `0` completed, `1` failed, `2` run-spec rejected, `130` cancelled, and writes `manifest.json` and `run.jsonl` into the run directory whatever happens — `manifest.json` comes from a `finally`, so a failed or cancelled run still leaves one saying so.

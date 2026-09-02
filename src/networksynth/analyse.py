@@ -27,7 +27,7 @@ EXIT_FAILED = 1
 EXIT_BAD_ARGS = 2
 EXIT_INTERRUPTED = 130
 
-_USAGE = """usage: python analyse.py [<input> ...  <output_dir>]
+_USAGE = """usage: networksynth-analyse [<input> ...  <output_dir>]
 
 With no arguments, uses the INPUTS and OUTPUT_DIR constants in this script.
 With arguments, the last is the output directory and the rest are inputs.
