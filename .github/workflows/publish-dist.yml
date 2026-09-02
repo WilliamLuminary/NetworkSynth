@@ -24,7 +24,7 @@ jobs:
             echo "DIST_BRANCH=dist" >> "$GITHUB_ENV"
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # The whole history, so origin/main and the dist branch are both reachable.
           fetch-depth: 0
