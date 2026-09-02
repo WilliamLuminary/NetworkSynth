@@ -828,6 +828,14 @@ def graphml_shape_index(mode: str) -> Optional[int]:
     return None
 
 
+def directory_shape_index(mode: str) -> Optional[int]:
+    """Where this mode reads a folder, which is what a batch handover names."""
+    for index, shape in enumerate(MODES[mode].input_shapes):
+        if shape.scope == DIRECTORY:
+            return index
+    return None
+
+
 def default_inputs(mode: str, shape_index: int = 0) -> Dict[str, str]:
     if mode not in MODES:
         raise ValueError(f"unknown mode {mode!r}; available: {sorted(MODES)}")

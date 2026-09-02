@@ -72,6 +72,7 @@ class SynthesisController(QObject):
         *,
         mode: str = "generate",
         handover: Optional[Dict[str, str]] = None,
+        output_dir: Optional[str] = None,
     ):
         super().__init__(parent)
         self._handover = handover or {}
@@ -79,7 +80,7 @@ class SynthesisController(QObject):
         self._values: Dict[str, Any] = spec_builder.default_values(mode)
         self._shape = 0
         self._inputs: Dict[str, str] = spec_builder.default_inputs(mode)
-        self._output_dir = BaseConfig.BASE_OUTPUT_PATH
+        self._output_dir = output_dir or BaseConfig.BASE_OUTPUT_PATH
         self._status = "Choose this mode's inputs, then Run."
         self._failed = False
         self._percent = 0.0
@@ -277,11 +278,21 @@ class SynthesisController(QObject):
         """Point the form at the network handed over on stdin, if there was one."""
         if not self._handover:
             return False
-        index = spec_builder.graphml_shape_index(self._mode)
+        directory = self._handover.get("datasets_dir")
+        index = (
+            spec_builder.directory_shape_index(self._mode)
+            if directory
+            else spec_builder.graphml_shape_index(self._mode)
+        )
         if index is None:
             return False
         self._shape = index
         self._inputs = spec_builder.default_inputs(self._mode, index)
+        if directory:
+            self._inputs["datasets_dir"] = directory
+            self._values["INPUT_ORIENTATION"] = "none"
+            self._info["original"] = None
+            return True
         self._inputs["network_graphml"] = self._handover["network"]
         image = self._handover.get("image")
         if image:
@@ -291,10 +302,11 @@ class SynthesisController(QObject):
 
     @Property(bool, notify=changed)
     def hasHandover(self) -> bool:
-        return (
-            bool(self._handover)
-            and spec_builder.graphml_shape_index(self._mode) is not None
-        )
+        if not self._handover:
+            return False
+        if self._handover.get("datasets_dir"):
+            return spec_builder.directory_shape_index(self._mode) is not None
+        return spec_builder.graphml_shape_index(self._mode) is not None
 
     @Slot()
     def reloadHandover(self) -> None:
@@ -859,6 +871,15 @@ class SynthesisController(QObject):
 
 _STDIN_FLAG = "--graph-from-stdin"
 _IMAGE_FLAG = "--image"
+_DATASETS_FLAG = "--datasets-dir"
+_OUTPUT_FLAG = "--output-dir"
+
+
+def _flag(argv, name: str) -> Optional[str]:
+    if name not in argv:
+        return None
+    value = argv[argv.index(name) + 1]
+    return value or None
 
 
 def _read_handover(argv) -> Optional[Dict[str, str]]:
@@ -867,6 +888,16 @@ def _read_handover(argv) -> Optional[Dict[str, str]]:
     The preview and the run are separate processes that take file paths, so the bytes
     are landed once in a scratch directory rather than kept in memory.
     """
+    datasets_dir = _flag(argv, _DATASETS_FLAG)
+    if datasets_dir:
+        # A batch already on disk. Reading it here would mean loading every network
+        # twice, so only the directory travels.
+        handover = {"datasets_dir": datasets_dir}
+        image = _flag(argv, _IMAGE_FLAG)
+        if image:
+            handover["image"] = image
+        return handover
+
     if _STDIN_FLAG not in argv:
         return None
 
@@ -881,10 +912,9 @@ def _read_handover(argv) -> Optional[Dict[str, str]]:
         handle.write(graphml)
 
     handover = {"network": network}
-    if _IMAGE_FLAG in argv:
-        image = argv[argv.index(_IMAGE_FLAG) + 1]
-        if image:
-            handover["image"] = image
+    image = _flag(argv, _IMAGE_FLAG)
+    if image:
+        handover["image"] = image
     return handover
 
 
@@ -893,7 +923,9 @@ def main(argv=None) -> int:
     handover = _read_handover(argv)
     app = QGuiApplication([argv[0]])
     engine = QQmlApplicationEngine()
-    controller = SynthesisController(handover=handover)
+    controller = SynthesisController(
+        handover=handover, output_dir=_flag(argv, _OUTPUT_FLAG)
+    )
     engine.rootContext().setContextProperty("controller", controller)
     engine.load(QUrl.fromLocalFile(_QML))
     if not engine.rootObjects():
