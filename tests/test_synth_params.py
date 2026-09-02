@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import pytest
 
-from configs import BaseConfig, SynthParams
+from networksynth.configs import BaseConfig, SynthParams
 
 pytestmark = pytest.mark.unit
 
@@ -76,7 +76,7 @@ class TestImmutability:
 class TestParamsWinOverBaseConfig:
 
     def test_graph_node_uses_params_not_base_config(self, base_config_values):
-        from graphs._graph_node import GraphNode
+        from networksynth.graphs._graph_node import GraphNode
 
         class Attrs:
             degree_distribution = {2: 1.0}
@@ -98,7 +98,7 @@ class TestParamsWinOverBaseConfig:
         assert GraphNode._rules.closed_edges_thr_sq == (10.0 * 4.0) ** 2
 
     def test_generator_uses_params_frame_size(self, base_config_values):
-        from graphs.graph_generator import GraphGenerator
+        from networksynth.graphs.graph_generator import GraphGenerator
 
         class Attrs:
             degree_distribution = {2: 1.0}
@@ -114,7 +114,7 @@ class TestParamsWinOverBaseConfig:
         assert generator._params.synthetic_frame_size == (999, 777)
 
     def test_generator_requires_params(self):
-        from graphs.graph_generator import GraphGenerator
+        from networksynth.graphs.graph_generator import GraphGenerator
 
         class Attrs:
             degree_distribution = {2: 1.0}

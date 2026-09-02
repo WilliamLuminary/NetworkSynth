@@ -1,9 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import sys
+from pathlib import Path
 
 import pytest
 
-from configs.loader import load_config
+import networksynth
+from networksynth.configs.loader import load_config
+
+_CONFIGS = Path(networksynth.__file__).resolve().parent / "configs"
 
 pytestmark = pytest.mark.unit
 
@@ -14,25 +18,23 @@ def _config_modules_loaded():
 
 class TestLoadingByPath:
     def test_it_returns_the_class_in_that_file(self):
-        config = load_config("configs/generate_mode/config_snapshot_1x1.py")
+        config = load_config(str(_CONFIGS / "generate_mode" / "config_snapshot_1x1.py"))
 
         assert config.__name__ == "Snapshot1x1Config"
         assert config.SNAPSHOT_INTERVAL == 10
 
     def test_the_path_has_to_be_the_real_file(self):
         with pytest.raises(FileNotFoundError):
-            load_config("configs/hybrid_mode/config_snapshot")
+            load_config(str(_CONFIGS / "hybrid_mode" / "config_snapshot"))
 
     def test_an_absolute_path_works(self, tmp_path):
-        import os
-
-        absolute = os.path.abspath("configs/mosaic_mode/config_sample.py")
+        absolute = str(_CONFIGS / "mosaic_mode" / "config_sample.py")
 
         assert load_config(absolute).__name__ == "SampleConfig"
 
     def test_a_missing_file_says_so(self):
         with pytest.raises(FileNotFoundError, match="No config file at"):
-            load_config("configs/generate_mode/config_nope.py")
+            load_config(str(_CONFIGS / "generate_mode" / "config_nope.py"))
 
     def test_a_config_outside_the_project_is_refused(self, tmp_path):
         stray = tmp_path / "config_stray.py"
@@ -46,7 +48,7 @@ class TestOnlyWhatIsAskedForLoads:
     def test_importing_configs_imports_no_config_module(self):
         before = _config_modules_loaded()
 
-        import configs  # noqa:F401
+        import networksynth.configs  # noqa:F401
 
         assert _config_modules_loaded() == before
 
@@ -55,27 +57,27 @@ class TestOnlyWhatIsAskedForLoads:
             del sys.modules[stale]
         before = _config_modules_loaded()
 
-        load_config("configs/generate_mode/config_tmp.py")
+        load_config(str(_CONFIGS / "generate_mode" / "config_tmp.py"))
 
         newly_loaded = _config_modules_loaded() - before
         assert newly_loaded <= {
-            "configs.generate_mode.config_tmp",
-            "configs.generate_mode.config_sample",
+            "networksynth.configs.generate_mode.config_tmp",
+            "networksynth.configs.generate_mode.config_sample",
         }, newly_loaded
 
 
 class TestOneConfigPerFile:
     def test_a_file_with_no_config_says_so(self, tmp_path, monkeypatch):
-        module = type(sys)("configs.fake_mode.config_empty")
-        module.__name__ = "configs.fake_mode.config_empty"
+        module = type(sys)("networksynth.configs.fake_mode.config_empty")
+        module.__name__ = "networksynth.configs.fake_mode.config_empty"
 
-        from configs.loader import config_class_in
+        from networksynth.configs.loader import config_class_in
 
         with pytest.raises(AttributeError, match="defines no config class"):
             config_class_in(module)
 
     def test_two_configs_in_one_file_is_ambiguous(self):
-        module = type(sys)("configs.fake_mode.config_two")
+        module = type(sys)("networksynth.configs.fake_mode.config_two")
 
         class FirstConfig:
             DATASETS = []
@@ -88,7 +90,7 @@ class TestOneConfigPerFile:
         module.FirstConfig = FirstConfig
         module.SecondConfig = SecondConfig
 
-        from configs.loader import config_class_in
+        from networksynth.configs.loader import config_class_in
 
         with pytest.raises(AttributeError, match="FirstConfig, SecondConfig"):
             config_class_in(module)

@@ -4,8 +4,10 @@ import pytest
 
 pytestmark = pytest.mark.requires_fixture_data
 
-from analysis.multifractal_analyzer import MultifractalAnalyzer
-from configs.compare_mode.config_sample import SampleConfig as CompareConfig
+from networksynth.analysis.multifractal_analyzer import MultifractalAnalyzer
+from networksynth.configs.compare_mode.config_sample import (
+    SampleConfig as CompareConfig,
+)
 
 CompareConfig.initialize()
 
@@ -215,7 +217,7 @@ def test_curvature_uses_the_analyzer_graph_not_its_own_copy(
 class TestNeighbourMasses:
 
     def test_matches_the_naive_formula_when_it_does_not_underflow(self):
-        from analysis.multifractal_analyzer import _neighbour_masses
+        from networksynth.analysis.multifractal_analyzer import _neighbour_masses
 
         distances = np.array([0.4, 0.9, 1.3])
         naive_affinity = np.e ** (-(distances**2))
@@ -226,7 +228,7 @@ class TestNeighbourMasses:
         assert np.allclose(masses, expected, rtol=0, atol=1e-15)
 
     def test_survives_distances_that_underflow(self):
-        from analysis.multifractal_analyzer import _neighbour_masses
+        from networksynth.analysis.multifractal_analyzer import _neighbour_masses
 
         distances = np.array([30.0, 40.0, 50.0])
         assert (np.e ** (-(distances**2)) == 0).all(), "premise: these underflow"
@@ -237,7 +239,7 @@ class TestNeighbourMasses:
         assert np.isclose(masses.sum(), 0.5), "must still carry 1 - alpha"
 
     def test_nearest_neighbour_takes_the_most_mass(self):
-        from analysis.multifractal_analyzer import _neighbour_masses
+        from networksynth.analysis.multifractal_analyzer import _neighbour_masses
 
         masses = _neighbour_masses(
             np.array([30.0, 31.0, 32.0]), alpha=0.5, base=np.e, exp_power=2

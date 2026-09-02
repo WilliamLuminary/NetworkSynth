@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import pytest
 
-from configs import SynthParams
-from utils import apply_seed
+from networksynth.configs import SynthParams
+from networksynth.utils import apply_seed
 
 pytestmark = pytest.mark.unit
 
@@ -86,7 +86,7 @@ class TestGenerationIsReproducible:
 
     @staticmethod
     def _generate(seed, attrs):
-        from graphs.graph_generator import GraphGenerator
+        from networksynth.graphs.graph_generator import GraphGenerator
 
         apply_seed(seed)
         return GraphGenerator(attrs, _params(seed)).generate_network()
@@ -102,7 +102,7 @@ class TestGenerationIsReproducible:
 
     @pytest.fixture
     def attrs(self, load_unweighted_test_synth_graph):
-        from handlers.attributes_calculator import AttributesCalculator
+        from networksynth.handlers.attributes_calculator import AttributesCalculator
 
         return AttributesCalculator().analyze(load_unweighted_test_synth_graph)
 

@@ -3,11 +3,13 @@ import os
 import re
 import sys
 
-_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+_PROJECT_ROOT = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "src")
+)
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
-from utils import save_hybrid_snapshot
+from networksynth.utils import save_hybrid_snapshot
 
 
 def find_snapshot_pairs(snapshot_dir):
@@ -83,7 +85,7 @@ def plot(
         (y_min - margin, y_max + margin),
     )
 
-    from configs import RenderStyle
+    from networksynth.configs import RenderStyle
 
     style = RenderStyle(
         dpi=dpi,

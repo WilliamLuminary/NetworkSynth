@@ -9,7 +9,7 @@ pytestmark = pytest.mark.unit
 
 
 def _make_graph(n: int = 20, extra_edges: int = 40) -> "SynthGraph":
-    from graphs.synth_graph import SynthGraph
+    from networksynth.graphs.synth_graph import SynthGraph
 
     positions = np.random.RandomState(42).rand(n, 2) * 100.0
     pairs = [(i, (i + 1) % n) for i in range(n)]
@@ -26,14 +26,14 @@ def _make_graph(n: int = 20, extra_edges: int = 40) -> "SynthGraph":
 
 class TestCalculateFrame:
     def test_frame_from_center_position(self):
-        from utils import calculate_frame
+        from networksynth.utils import calculate_frame
 
         frame = calculate_frame(center_position=(50, 50), frame_range=(100, 80))
         assert frame[0] == (0.0, 100.0)
         assert frame[1] == (10.0, 90.0)
 
     def test_frame_from_graph(self):
-        from utils import calculate_frame
+        from networksynth.utils import calculate_frame
 
         graph = _make_graph(n=10)
         frame = calculate_frame(graph=graph, frame_range=(200, 200))
@@ -45,13 +45,13 @@ class TestCalculateFrame:
         assert frame[1][1] == pytest.approx(round(cy + 100, 2))
 
     def test_no_input_raises(self):
-        from utils import calculate_frame
+        from networksynth.utils import calculate_frame
 
         with pytest.raises(ValueError, match="Either"):
             calculate_frame(frame_range=(100, 100))
 
     def test_both_inputs_raises(self):
-        from utils import calculate_frame
+        from networksynth.utils import calculate_frame
 
         graph = _make_graph(n=5)
         with pytest.raises(ValueError, match="Only"):
@@ -60,7 +60,7 @@ class TestCalculateFrame:
 
 class TestBuildGraph:
     def test_from_edge_list(self):
-        from utils import build_graph
+        from networksynth.utils import build_graph
 
         positions = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float64)
         edges = np.array([[0, 1], [1, 2], [2, 3], [3, 0]])
@@ -71,7 +71,7 @@ class TestBuildGraph:
     def test_from_adjacency_matrix(self):
         from scipy.sparse import csr_matrix
 
-        from utils import build_graph
+        from networksynth.utils import build_graph
 
         n = 5
         positions = np.random.rand(n, 2)
@@ -85,7 +85,7 @@ class TestBuildGraph:
         assert graph.number_of_edges() >= 1
 
     def test_unsupported_type_raises(self):
-        from utils import build_graph
+        from networksynth.utils import build_graph
 
         with pytest.raises(TypeError, match="Unsupported Type"):
             build_graph(None, arg_type="bad_type")
@@ -93,7 +93,7 @@ class TestBuildGraph:
 
 class TestLargestConnectedComponent:
     def test_connected_graph_unchanged(self):
-        from utils import largest_connected_component
+        from networksynth.utils import largest_connected_component
 
         graph = _make_graph(n=10)
         lcc = largest_connected_component(graph)
@@ -102,32 +102,32 @@ class TestLargestConnectedComponent:
 
 class TestRecommendDpi:
     def test_small_network(self):
-        from utils import recommend_dpi
+        from networksynth.utils import recommend_dpi
 
         assert recommend_dpi(500) == 150
 
     def test_medium_network(self):
-        from utils import recommend_dpi
+        from networksynth.utils import recommend_dpi
 
         assert recommend_dpi(50_000) == 300
 
     def test_large_network(self):
-        from utils import recommend_dpi
+        from networksynth.utils import recommend_dpi
 
         assert recommend_dpi(500_000) == 600
 
     def test_very_large_network(self):
-        from utils import recommend_dpi
+        from networksynth.utils import recommend_dpi
 
         assert recommend_dpi(5_000_000) == 900
 
     def test_huge_network(self):
-        from utils import recommend_dpi
+        from networksynth.utils import recommend_dpi
 
         assert recommend_dpi(15_000_000) == 1200
 
     def test_enormous_network(self):
-        from utils import recommend_dpi
+        from networksynth.utils import recommend_dpi
 
         assert recommend_dpi(50_000_000) == 1800
 
@@ -136,7 +136,7 @@ class TestFigureToNdarray:
     def test_returns_rgba_array(self):
         from matplotlib.figure import Figure
 
-        from utils import figure_to_ndarray
+        from networksynth.utils import figure_to_ndarray
 
         fig = Figure(figsize=(2, 2), dpi=50)
         ax = fig.add_subplot(111)
@@ -149,7 +149,7 @@ class TestFigureToNdarray:
     def test_swap_channels(self):
         from matplotlib.figure import Figure
 
-        from utils import figure_to_ndarray
+        from networksynth.utils import figure_to_ndarray
 
         fig = Figure(figsize=(2, 2), dpi=50)
         fig.add_subplot(111)
@@ -163,7 +163,7 @@ class TestSaveFigureAsWebp:
     def test_creates_webp_file(self, tmp_path):
         from matplotlib.figure import Figure
 
-        from utils import save_figure_as_webp
+        from networksynth.utils import save_figure_as_webp
 
         fig = Figure(figsize=(2, 2), dpi=72)
         ax = fig.add_subplot(111)
@@ -176,7 +176,7 @@ class TestSaveFigureAsWebp:
     def test_lossy_mode(self, tmp_path):
         from matplotlib.figure import Figure
 
-        from utils import save_figure_as_webp
+        from networksynth.utils import save_figure_as_webp
 
         fig = Figure(figsize=(2, 2), dpi=72)
         fig.add_subplot(111)
@@ -187,7 +187,7 @@ class TestSaveFigureAsWebp:
 
 class TestTrimGraph:
     def test_reduces_average_degree(self):
-        from utils import trim_graph
+        from networksynth.utils import trim_graph
 
         graph = _make_graph(n=50, extra_edges=200)
         original_avg = 2 * graph.number_of_edges() / graph.number_of_nodes()
@@ -199,7 +199,7 @@ class TestTrimGraph:
         assert actual_avg <= 1.1 * target + 0.1
 
     def test_no_trimming_if_already_below(self):
-        from utils import trim_graph
+        from networksynth.utils import trim_graph
 
         graph = _make_graph(n=20, extra_edges=5)
         original_edges = graph.number_of_edges()
@@ -209,8 +209,8 @@ class TestTrimGraph:
         assert trimmed.number_of_edges() == original_edges
 
     def test_empty_graph_handled(self):
-        from graphs.synth_graph import SynthGraph
-        from utils import trim_graph
+        from networksynth.graphs.synth_graph import SynthGraph
+        from networksynth.utils import trim_graph
 
         positions = np.empty((0, 2))
         graph = SynthGraph(ig.Graph(n=0), positions)
@@ -220,7 +220,7 @@ class TestTrimGraph:
 
 class TestTimerDecorator:
     def test_timer_returns_result(self):
-        from utils import timer
+        from networksynth.utils import timer
 
         @timer
         def add(a, b):

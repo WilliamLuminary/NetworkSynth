@@ -9,22 +9,22 @@ pytestmark = pytest.mark.unit
 
 class TestComputeAverageError:
     def test_empty_list(self):
-        from pipelines.generate import compute_average_error
+        from networksynth.pipelines.generate import compute_average_error
 
         assert compute_average_error([]) == float("inf")
 
     def test_all_inf(self):
-        from pipelines.generate import compute_average_error
+        from networksynth.pipelines.generate import compute_average_error
 
         assert compute_average_error([float("inf"), float("inf")]) == float("inf")
 
     def test_single_value(self):
-        from pipelines.generate import compute_average_error
+        from networksynth.pipelines.generate import compute_average_error
 
         assert compute_average_error([0.5]) == pytest.approx(0.5)
 
     def test_removes_outliers(self):
-        from pipelines.generate import compute_average_error
+        from networksynth.pipelines.generate import compute_average_error
 
         errors = [1.0, 1.01, 0.99, 1.02, 0.98, 1.0, 1.01, 0.99, 1.0, 100.0]
         avg = compute_average_error(errors)
@@ -32,7 +32,7 @@ class TestComputeAverageError:
         assert avg > 0.9
 
     def test_mixed_inf_and_valid(self):
-        from pipelines.generate import compute_average_error
+        from networksynth.pipelines.generate import compute_average_error
 
         errors = [0.1, 0.2, float("inf"), 0.15]
         avg = compute_average_error(errors)
@@ -42,7 +42,7 @@ class TestComputeAverageError:
 
 class TestFmtMetrics:
     def test_formatting(self):
-        from pipelines.generate import _fmt_metrics
+        from networksynth.pipelines.generate import _fmt_metrics
 
         m = {
             "node_count": 100,
@@ -61,7 +61,7 @@ class TestFmtMetrics:
 
 class TestSaveMetricReport:
     def test_creates_csv_with_header_and_rows(self, tmp_path):
-        from pipelines.generate import _save_metric_report
+        from networksynth.pipelines.generate import _save_metric_report
 
         ref_metrics = {
             "node_count": 500,
@@ -116,20 +116,20 @@ class TestSaveMetricReport:
 
 class TestGenerateRandomCenters:
     def test_returns_list_of_tuples(self):
-        from pipelines.hybrid import generate_random_centers
+        from networksynth.pipelines.hybrid import generate_random_centers
 
         centers = generate_random_centers(1000, 1000, min_distance=100, max_centers=10)
         assert isinstance(centers, list)
         assert all(isinstance(c, tuple) and len(c) == 2 for c in centers)
 
     def test_respects_max_centers(self):
-        from pipelines.hybrid import generate_random_centers
+        from networksynth.pipelines.hybrid import generate_random_centers
 
         centers = generate_random_centers(1000, 1000, min_distance=50, max_centers=5)
         assert len(centers) <= 5
 
     def test_min_distance_constraint(self):
-        from pipelines.hybrid import generate_random_centers
+        from networksynth.pipelines.hybrid import generate_random_centers
 
         min_dist = 100.0
         centers = generate_random_centers(
@@ -142,20 +142,20 @@ class TestGenerateRandomCenters:
                     assert d >= min_dist - 1e-6
 
     def test_deterministic_with_seed(self):
-        from pipelines.hybrid import generate_random_centers
+        from networksynth.pipelines.hybrid import generate_random_centers
 
         c1 = generate_random_centers(500, 500, 50, max_centers=10, rng_seed=42)
         c2 = generate_random_centers(500, 500, 50, max_centers=10, rng_seed=42)
         assert c1 == c2
 
     def test_zero_max_centers(self):
-        from pipelines.hybrid import generate_random_centers
+        from networksynth.pipelines.hybrid import generate_random_centers
 
         centers = generate_random_centers(500, 500, min_distance=50, max_centers=0)
         assert len(centers) > 0
 
     def test_tight_spacing_limits_count(self):
-        from pipelines.hybrid import generate_random_centers
+        from networksynth.pipelines.hybrid import generate_random_centers
 
         # Seeded: unseeded, four corners occasionally fit at min_distance=80
         # (about 1 run in 40), which made this assertion flaky.

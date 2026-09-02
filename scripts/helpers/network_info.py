@@ -4,11 +4,13 @@ import sys
 
 
 def main(network: str, output: str = None):
-    _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    _PROJECT_ROOT = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "src")
+    )
     if _PROJECT_ROOT not in sys.path:
         sys.path.insert(0, _PROJECT_ROOT)
 
-    from graphs.graph_loader import load_graphs
+    from networksynth.graphs.graph_loader import load_graphs
 
     network = os.path.abspath(network)
     if not os.path.isfile(network):

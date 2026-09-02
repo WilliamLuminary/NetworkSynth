@@ -8,16 +8,16 @@ import pytest
 
 pytestmark = pytest.mark.unit
 
-from configs import BaseConfig
-from configs.file_definitions import (
+from networksynth.configs import BaseConfig
+from networksynth.configs.file_definitions import (
     SaveSpec,
 )
-from configs.file_definitions import save_csv as _save_csv
-from configs.file_definitions import (
+from networksynth.configs.file_definitions import save_csv as _save_csv
+from networksynth.configs.file_definitions import (
     save_network_csv,
 )
-from configs.file_definitions import save_pickle as _save_pickle
-from handlers.saver import Saver
+from networksynth.configs.file_definitions import save_pickle as _save_pickle
+from networksynth.handlers.saver import Saver
 
 
 class FakeGraph:
@@ -92,7 +92,9 @@ class TestSpecs:
 class TestModeOverrides:
 
     def test_mosaic_synthetic_graph_has_png(self):
-        from configs.mosaic_mode.config_sample import SampleConfig as MosaicConfig
+        from networksynth.configs.mosaic_mode.config_sample import (
+            SampleConfig as MosaicConfig,
+        )
 
         specs = MosaicConfig.save("synthetic_graph")
         exts = [s.extension for s in specs]
@@ -101,7 +103,7 @@ class TestModeOverrides:
         assert len(specs) == 2
 
     def test_override_resolves_on_the_defining_config(self):
-        from configs.file_definitions import save_pickle
+        from networksynth.configs.file_definitions import save_pickle
 
         class CustomConfig(BaseConfig):
             SAVE_TEST_CUSTOM = (
@@ -113,14 +115,18 @@ class TestModeOverrides:
         assert specs[0].detail == "test_detail"
 
     def test_override_does_not_leak_to_other_configs(self):
-        from configs.mosaic_mode.config_sample import SampleConfig as MosaicConfig
+        from networksynth.configs.mosaic_mode.config_sample import (
+            SampleConfig as MosaicConfig,
+        )
 
         MosaicConfig.save("synthetic_graph")
 
         assert len(BaseConfig.save("synthetic_graph")) == 1
 
     def test_compare_mode_overrides(self):
-        from configs.compare_mode.config_sample import SampleConfig as CompareConfig
+        from networksynth.configs.compare_mode.config_sample import (
+            SampleConfig as CompareConfig,
+        )
 
         specs = CompareConfig.save("analysis_data")
         assert specs[0].use_timestamp is False

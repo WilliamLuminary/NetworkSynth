@@ -15,12 +15,11 @@ BRANCH="dist"
 SOURCE="${1:-HEAD}"
 TAG="${2:-}"
 
-# Everything needed to run the GUI and the CLI, plus the licence it is run under, and
-# nothing else. The seven packages are the whole of what the entry points import. An
-# entry may be written 'source:destination' to publish a path under a different name.
+# The installable package and what it needs, and nothing else. An entry may be written
+# 'source:destination' to publish a path under a different name.
 PATHS=(
-    analysis configs graphs gui handlers pipelines utils
-    analyse.py gui_app.py gui_preview.py gui_run.py run.py
+    src
+    pyproject.toml
     requirements.txt
     README_dist.md:README.md
     LICENSE

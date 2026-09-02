@@ -3,14 +3,16 @@ import os
 import sys
 
 # Ensure project root is on sys.path when invoked as a script.
-_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+_PROJECT_ROOT = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "src")
+)
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 
 def load_graph(path):
     """Positions travel inside the file now, so there is nothing to stitch on."""
-    from graphs.graph_loader import load_graphs
+    from networksynth.graphs.graph_loader import load_graphs
 
     path = os.path.abspath(path)
     if not os.path.isfile(path):
@@ -46,8 +48,8 @@ def plot_single(
 
     graph = load_graph(network)
 
-    from configs import RenderStyle
-    from utils import recommend_dpi_cv2, render_network
+    from networksynth.configs import RenderStyle
+    from networksynth.utils import recommend_dpi_cv2, render_network
 
     if dpi is None:
         dpi = recommend_dpi_cv2(graph.number_of_nodes())
@@ -59,7 +61,7 @@ def plot_single(
         output = network.rsplit(".", 1)[0] + f".{fmt}"
 
     # img is a BGR ndarray; the production serializers handle it.
-    from configs.file_definitions import save_png, save_webp
+    from networksynth.configs.file_definitions import save_png, save_webp
 
     (save_webp if fmt == "webp" else save_png)(img, output)
     print(f"Saved: {output} ({img.shape[1]}x{img.shape[0]})")

@@ -27,7 +27,7 @@ def load_sample_network(sample: str):
     positions = np.load(pos_path, allow_pickle=True)
     mat = np.load(mat_path, allow_pickle=True).item()
 
-    from graphs.synth_graph import SynthGraph
+    from networksynth.graphs.synth_graph import SynthGraph
 
     graph = SynthGraph.from_sparse_matrix(positions, mat).largest_connected_component()
 
@@ -151,7 +151,7 @@ def main(
         output = f"sample_{sample}_original_graph.{fmt}"
 
     if fmt == "webp":
-        from utils import save_figure_as_webp
+        from networksynth.utils import save_figure_as_webp
 
         try:
             save_figure_as_webp(fig, output, dpi=300)

@@ -4,8 +4,8 @@ import os
 
 import pytest
 
-import gui_run
-from configs.gui_config import GuiConfig, SpecError
+from networksynth import gui_run
+from networksynth.configs.gui_config import GuiConfig, SpecError
 
 pytestmark = pytest.mark.unit
 
@@ -13,7 +13,7 @@ _MODE_NAMES = set(gui_run._GUI_MODES)
 
 
 def _inputs_for(mode, tmp_path, shape_index=0):
-    from gui import spec_builder
+    from networksynth.gui import spec_builder
 
     shape = spec_builder.MODES[mode].input_shapes[shape_index]
     made = {}
@@ -33,7 +33,7 @@ def _inputs_for(mode, tmp_path, shape_index=0):
 
 
 def _every_shape():
-    from gui import spec_builder
+    from networksynth.gui import spec_builder
 
     return [
         (mode, index)
@@ -168,7 +168,7 @@ class TestDirectoryInput:
         (directory / f"{name}_positions.csv").write_text("x,y\n0,0\n1,1\n")
 
     def test_every_pair_becomes_a_dataset(self, tmp_path):
-        from configs.gui_config import discover_datasets
+        from networksynth.configs.gui_config import discover_datasets
 
         for name in ("gamma", "alpha", "beta"):
             self._pair(tmp_path, name)
@@ -176,7 +176,7 @@ class TestDirectoryInput:
         assert discover_datasets(str(tmp_path)) == ["alpha", "beta", "gamma"]
 
     def test_an_edge_list_without_positions_stops_the_run(self, tmp_path):
-        from configs.gui_config import discover_datasets
+        from networksynth.configs.gui_config import discover_datasets
 
         self._pair(tmp_path, "alpha")
         (tmp_path / "beta_edgelist.csv").write_text("source_index,target_index\n0,1\n")
@@ -185,7 +185,7 @@ class TestDirectoryInput:
             discover_datasets(str(tmp_path))
 
     def test_a_directory_with_no_pairs_is_rejected(self, tmp_path):
-        from configs.gui_config import discover_datasets
+        from networksynth.configs.gui_config import discover_datasets
 
         (tmp_path / "notes.txt").write_text("nothing to load here")
 
@@ -228,9 +228,9 @@ class TestDirectoryInput:
         import numpy as np
         from scipy.sparse import csr_matrix
 
-        from configs.gui_config import discover_datasets
-        from graphs import read_graph_csv
-        from graphs.graphml_io import write_graph_graphml
+        from networksynth.configs.gui_config import discover_datasets
+        from networksynth.graphs import read_graph_csv
+        from networksynth.graphs.graphml_io import write_graph_graphml
 
         self._pair(tmp_path, "as_csv")
         np.save(
@@ -251,7 +251,7 @@ class TestDirectoryInput:
     def test_one_prefix_named_twice_stops_the_run(self, tmp_path):
         import numpy as np
 
-        from configs.gui_config import discover_datasets
+        from networksynth.configs.gui_config import discover_datasets
 
         self._pair(tmp_path, "twice")
         np.save(tmp_path / "twice_adjacency.npy", np.array([[0, 1], [1, 0]]))
@@ -280,7 +280,7 @@ class TestEntryPointExitCodes:
         assert gui_run.main(["gui_run.py"]) == 2
 
     def test_pipeline_failure_exits_1(self, tmp_path, monkeypatch):
-        import pipelines.generate as gen
+        import networksynth.pipelines.generate as gen
 
         monkeypatch.setattr(
             gen, "main", lambda **k: (_ for _ in ()).throw(RuntimeError("boom"))
@@ -289,7 +289,7 @@ class TestEntryPointExitCodes:
         assert gui_run.main(["gui_run.py", _spec(tmp_path)]) == 1
 
     def test_cancellation_exits_130(self, tmp_path, monkeypatch):
-        import pipelines.generate as gen
+        import networksynth.pipelines.generate as gen
 
         monkeypatch.setattr(
             gen, "main", lambda **k: (_ for _ in ()).throw(KeyboardInterrupt)
@@ -298,7 +298,7 @@ class TestEntryPointExitCodes:
         assert gui_run.main(["gui_run.py", _spec(tmp_path)]) == 130
 
     def test_success_exits_0(self, tmp_path, monkeypatch):
-        import pipelines.generate as gen
+        import networksynth.pipelines.generate as gen
 
         monkeypatch.setattr(gen, "main", lambda **k: None)
 
@@ -311,7 +311,7 @@ class TestFullRun:
     def test_spec_in_network_and_manifest_out(
         self, tmp_path, load_unweighted_test_synth_graph
     ):
-        from configs.file_definitions import save_network_csv
+        from networksynth.configs.file_definitions import save_network_csv
 
         save_network_csv(load_unweighted_test_synth_graph, str(tmp_path / "net.csv"))
 
@@ -362,7 +362,7 @@ class TestDirectoryFullRun:
     def test_one_run_produces_one_output_per_dataset(
         self, tmp_path, load_unweighted_test_synth_graph
     ):
-        from configs.file_definitions import save_network_csv
+        from networksynth.configs.file_definitions import save_network_csv
 
         datasets = tmp_path / "inputs"
         datasets.mkdir()
@@ -416,13 +416,13 @@ class TestDirectoryFullRun:
 class TestModeSelection:
 
     def test_offered_modes_match_dispatchable_modes(self):
-        from gui.spec_builder import MODES
+        from networksynth.gui.spec_builder import MODES
 
         assert set(MODES) == set(gui_run._GUI_MODES)
 
     def test_the_form_asks_for_what_the_spec_requires(self):
-        from configs.gui_config import MODE_INPUTS
-        from gui.spec_builder import MODES
+        from networksynth.configs.gui_config import MODE_INPUTS
+        from networksynth.gui.spec_builder import MODES
 
         offered = {
             name: tuple(shape.ids for shape in mode.input_shapes)
@@ -434,7 +434,7 @@ class TestModeSelection:
 
     @pytest.mark.parametrize("mode", sorted(_MODE_NAMES))
     def test_every_mode_builds_a_valid_spec(self, mode, tmp_path):
-        from gui import spec_builder
+        from networksynth.gui import spec_builder
 
         inputs = _inputs_for(mode, tmp_path)
         values = spec_builder.default_values(mode)
@@ -447,7 +447,7 @@ class TestModeSelection:
 
     @pytest.mark.parametrize("mode", sorted(_MODE_NAMES))
     def test_every_mode_rejects_a_missing_input(self, mode, tmp_path):
-        from gui import spec_builder
+        from networksynth.gui import spec_builder
 
         blank = {key: "" for key in spec_builder.default_inputs(mode)}
 
@@ -459,7 +459,7 @@ class TestModeSelection:
 
     @pytest.mark.parametrize("mode", sorted(_MODE_NAMES))
     def test_every_mode_spec_loads_back_into_a_config(self, mode, tmp_path):
-        from gui import spec_builder
+        from networksynth.gui import spec_builder
 
         inputs = _inputs_for(mode, tmp_path)
         values = spec_builder.default_values(mode)
@@ -484,7 +484,7 @@ class TestModeSelection:
 
     @pytest.mark.parametrize("mode", sorted(_MODE_EXTRAS))
     def test_mode_specific_params_reach_the_config(self, mode, tmp_path):
-        from gui import spec_builder
+        from networksynth.gui import spec_builder
 
         if mode not in _MODE_NAMES:
             pytest.skip(f"{mode} is not currently offered by the GUI")
@@ -503,7 +503,7 @@ class TestModeSelection:
             assert hasattr(config, name), f"{mode} needs {name}"
 
     def test_size_params_become_tuples(self, tmp_path):
-        from gui import spec_builder
+        from networksynth.gui import spec_builder
 
         values = spec_builder.default_values("hybrid")
         spec = spec_builder.build_spec(

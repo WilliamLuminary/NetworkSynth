@@ -1,10 +1,53 @@
+[build-system]
+requires = ["setuptools >= 68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "networksynth"
+dynamic = ["version"]
+description = "Generates synthetic networks modelled on a real one."
+readme = "README.md"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+requires-python = ">=3.14"
+dependencies = [
+  "numpy==2.4.6",
+  "scipy==1.17.1",
+  "matplotlib==3.10.9",
+  "Pillow==12.2.0",
+  "scikit-learn==1.9.0",
+  "opencv-python>=4.13.0",
+  "igraph~=1.0.0",
+  "pot~=0.9.7",
+  "PySide6==6.11.1",
+  "psutil~=7.2.2",
+]
+
+[project.optional-dependencies]
+sweep = ["wandb~=0.28.2"]
+
+[project.scripts]
+networksynth = "networksynth.entrypoints:main_gui"
+networksynth-cli = "networksynth.entrypoints:main_cli"
+networksynth-run = "networksynth.entrypoints:main_run_spec"
+networksynth-analyse = "networksynth.entrypoints:main_analyse"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "networksynth.__version__"}
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
+pythonpath = ["src"]
 markers = [
     "unit: pure unit tests — no heavy deps, no sample data",
-    "integration: end-to-end pipeline tests — need networkit + sample data",
-    "requires_fixture_data: tests that load pkl fixtures from tests/data/",
+    "integration: end-to-end pipeline tests, need sample data",
+    "requires_fixture_data: tests that load fixtures from tests/data/",
     "slow: long-running tests (profiling, large graphs)",
     "manual: interactive / visual tests not suited for CI",
 ]

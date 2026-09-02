@@ -73,3 +73,5 @@ data/output/*
 src/anal/*
 !src/anal/*.py
 !src/anal/*.ipynb
+
+*.egg-info/

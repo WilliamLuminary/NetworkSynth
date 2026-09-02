@@ -5,7 +5,7 @@ import os
 
 import pytest
 
-from handlers.run_logging import (
+from networksynth.handlers.run_logging import (
     attach_run_log,
     configure_console,
     reset_logging,
@@ -122,7 +122,7 @@ class TestRunLog:
 
 class TestConfigNoLongerOwnsLogging:
     def test_initialize_sets_run_id_without_a_file_handler(self, tmp_path):
-        from configs.generate_mode.config_sample import SampleConfig
+        from networksynth.configs.generate_mode.config_sample import SampleConfig
 
         config = type("LogTestCfg", (SampleConfig,), {})
         config.BASE_OUTPUT_PATH = str(tmp_path)
@@ -138,7 +138,7 @@ class TestConfigNoLongerOwnsLogging:
         assert not run_logs, "initialize() must not attach a run log"
 
     def test_no_latch_attribute_remains(self):
-        from configs.base_config import BaseConfig
+        from networksynth.configs.base_config import BaseConfig
 
         assert not hasattr(BaseConfig, "_logger_initialized")
         assert not hasattr(BaseConfig, "_setup_logger")

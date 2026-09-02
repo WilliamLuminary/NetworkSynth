@@ -3,9 +3,9 @@ import pickle
 
 import pytest
 
-from configs import BaseConfig, DatasetId
-from handlers.run_logging import reset_logging
-from handlers.run_paths import RunPaths
+from networksynth.configs import BaseConfig, DatasetId
+from networksynth.handlers.run_logging import reset_logging
+from networksynth.handlers.run_paths import RunPaths
 
 pytestmark = pytest.mark.unit
 
@@ -46,7 +46,7 @@ class TestDatasetIdCrossesProcesses:
 
 class TestTheChildSetsItselfUp:
     def test_it_initializes_the_config_it_receives(self, tmp_path, config, monkeypatch):
-        import pipelines.hybrid as hybrid
+        import networksynth.pipelines.hybrid as hybrid
 
         ran = []
         monkeypatch.setattr(
@@ -61,7 +61,7 @@ class TestTheChildSetsItselfUp:
         assert ran, "the pipeline never ran"
 
     def test_it_logs_under_the_parents_run_id(self, tmp_path, config, monkeypatch):
-        import pipelines.hybrid as hybrid
+        import networksynth.pipelines.hybrid as hybrid
 
         monkeypatch.setattr(hybrid, "run_hybrid_for_dataset", lambda *a: None)
 
@@ -75,7 +75,7 @@ class TestTheChildSetsItselfUp:
 
 class TestAChildThatDiesFailsTheRun:
     def test_a_non_zero_exit_raises(self, tmp_path, config, monkeypatch):
-        import pipelines.hybrid as hybrid
+        import networksynth.pipelines.hybrid as hybrid
 
         class Proc:
             exitcode = 1
@@ -102,7 +102,7 @@ class TestAChildThatDiesFailsTheRun:
             )
 
     def test_a_clean_exit_does_not(self, tmp_path, config, monkeypatch):
-        import pipelines.hybrid as hybrid
+        import networksynth.pipelines.hybrid as hybrid
 
         class Proc:
             exitcode = 0

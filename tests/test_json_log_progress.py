@@ -4,7 +4,7 @@ import logging
 
 import pytest
 
-from utils import JsonFormatter, tagged
+from networksynth.utils import JsonFormatter, tagged
 
 pytestmark = pytest.mark.unit
 
@@ -78,13 +78,13 @@ class TestPipelinesEmitIt:
         import inspect
         import re
 
-        module = __import__(f"pipelines.{module_name}", fromlist=["x"])
+        module = __import__(f"networksynth.pipelines.{module_name}", fromlist=["x"])
         source = inspect.getsource(module)
 
         for match in re.finditer(r"logger\.info\((.{0,400}?)\)\n", source, re.S):
             body = match.group(1)
             if "%)" in body or "%" in body and "progress" in body:
                 assert "percent=" in body, (
-                    f"pipelines.{module_name} logs a percentage without the "
+                    f"networksynth.pipelines.{module_name} logs a percentage without the "
                     f"structured field:\n{body.strip()[:200]}"
                 )

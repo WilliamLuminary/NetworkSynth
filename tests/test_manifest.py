@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from handlers.manifest import (
+from networksynth.handlers.manifest import (
     MANIFEST_NAME,
     MANIFEST_VERSION,
     STATUS_CANCELLED,
@@ -14,7 +14,7 @@ from handlers.manifest import (
     read_manifest,
     write_manifest,
 )
-from handlers.run_paths import RunPaths
+from networksynth.handlers.run_paths import RunPaths
 
 pytestmark = pytest.mark.unit
 
@@ -138,8 +138,8 @@ class TestWriteManifest:
 @pytest.mark.requires_fixture_data
 class TestManifestFromARealRun:
     def test_generate_writes_a_manifest_listing_its_outputs(self, tmp_path):
-        from configs.generate_mode.config_sample import SampleConfig
-        from pipelines.generate import main
+        from networksynth.configs.generate_mode.config_sample import SampleConfig
+        from networksynth.pipelines.generate import main
 
         config = type("ManifestCfg", (SampleConfig,), {})
         config.BASE_OUTPUT_PATH = str(tmp_path)

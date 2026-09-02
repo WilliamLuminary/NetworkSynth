@@ -4,15 +4,18 @@ Generates synthetic networks modelled on a real one. It measures an input networ
 
 ## Quick start
 
+NetworkSynth runs on Python 3.14.
+
 ```bash
 git clone https://github.com/WilliamLuminary/NetworkSynth.git
 cd NetworkSynth
-pip install -r requirements.txt   # Python 3.14
+pip install -e .
 
-python run.py configs/generate_mode/config_sample.py
+networksynth        # the window
+networksynth-cli    # lists every config, then takes one as its argument
 ```
 
-That config reads from `data/input/samples/generate_mode/`:
+The sample configs read from `data/input/samples/generate_mode/`:
 
 ```
 sample_1_pos.npy      # node positions, shape (N, 2)
@@ -37,7 +40,7 @@ Networks are saved as a CSV pair, `*_edgelist.csv` plus `*_positions.csv`. Graph
 
 ## Configs
 
-A run takes one config file and nothing else. `run.py` with no argument lists them all.
+A run takes one config file and nothing else. `networksynth-cli` with no argument lists them all.
 
 Each file holds exactly one class with a `DATASETS` attribute. Its `MODE` picks the pipeline: `generate`, `hybrid`, `mosaic`, `scaling`, `sweep` or `compare`. Nothing needs registering, the file is the name.
 
@@ -104,8 +107,8 @@ DatasetId("A", "10kX").path  # "A/10kX"
 Generating a network and measuring one are different jobs, so measuring has its own entry point and no config module:
 
 ```bash
-python analyse.py                                  # uses the constants in the script
-python analyse.py <input> [<input> ...] <out_dir>   # last argument is the output directory
+networksynth-analyse                                  # uses the constants in the script
+networksynth-analyse <input> [<input> ...] <out_dir>   # last argument is the output directory
 ```
 
 An input is a directory of networks, one `*_edgelist.csv`, or one `*.graphml` or `*.graphml.gz`. Each input is measured as its own labelled set, so several inputs give one figure per measure with every set drawn on it. Labels come from the paths, taking in parent directories as needed to stay distinct.
@@ -131,7 +134,7 @@ The measurement settings live inside the data file, because the same networks me
 
 ## GUI and CLI
 
-`gui_app.py` opens a window, `run.py` takes a config file. Both end in the same two lines, so they run identical pipeline, generator, quality gate and save code. The only difference is where the config comes from.
+`networksynth` opens a window, `networksynth-cli` takes a config file. Both end in the same two lines, so they run identical pipeline, generator, quality gate and save code. The only difference is where the config comes from.
 
 The GUI can read a whole folder, one dataset per prefix, and a folder may hold a mixture:
 
@@ -144,16 +147,16 @@ The GUI can read a whole folder, one dataset per prefix, and a folder may hold a
 
 A half named dataset stops the run instead of being skipped: an edge list with no positions, an adjacency with no coordinates, or one prefix claimed by two formats. Datasets are read in name order and share one run root and one manifest.
 
-Two things this does not cover. The npy files in `data/input/samples/` keep older `_mat.npy` and `_pos.npy` names that CLI configs load directly, so those folders are not discoverable this way. And `analyse.py` reads a directory by its own rule, every GraphML file or else every CSV pair.
+Two things this does not cover. The npy files in `data/input/samples/` keep older `_mat.npy` and `_pos.npy` names that CLI configs load directly, so those folders are not discoverable this way. And `networksynth-analyse` reads a directory by its own rule, every GraphML file or else every CSV pair.
 
 The form is a deliberate subset of what a config can express. Only the CLI can run `mosaic`, `scaling` and `compare`, set per dataset factors, fix tile frame sizes, ask for log spaced snapshots, or write SVG from a hybrid run. Going the other way, `INPUT_ORIENTATION` rotates the input as it is read and exists only in the form.
 
 ## Driving a run from another program
 
-`gui_run.py` is the third entry point: one run from one JSON file, with no config module and nothing imported. It is how a host application uses NetworkSynth without becoming coupled to it.
+`networksynth-run` is the third entry point: one run from one JSON file, with no config module and nothing imported. It is how a host application uses NetworkSynth without becoming coupled to it.
 
 ```bash
-python gui_run.py path/to/run_spec.json
+networksynth-run path/to/run_spec.json
 ```
 
 ```json

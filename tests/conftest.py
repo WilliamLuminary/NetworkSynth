@@ -7,8 +7,8 @@ matplotlib.use("Agg")
 
 import pytest
 
-from graphs.graphml_io import read_graph_graphml
-from graphs.synth_graph import SynthGraph
+from networksynth.graphs.graphml_io import read_graph_graphml
+from networksynth.graphs.synth_graph import SynthGraph
 
 BASE_DIR = os.path.dirname(__file__)
 
