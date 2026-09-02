@@ -66,13 +66,21 @@ class SynthesisController(QObject):
     changed = Signal()
     logChanged = Signal()
 
-    def __init__(self, parent: Optional[QObject] = None, *, mode: str = "generate"):
+    def __init__(
+        self,
+        parent: Optional[QObject] = None,
+        *,
+        mode: str = "generate",
+        handover: Optional[Dict[str, str]] = None,
+        output_dir: Optional[str] = None,
+    ):
         super().__init__(parent)
+        self._handover = handover or {}
         self._mode = mode
         self._values: Dict[str, Any] = spec_builder.default_values(mode)
         self._shape = 0
         self._inputs: Dict[str, str] = spec_builder.default_inputs(mode)
-        self._output_dir = BaseConfig.BASE_OUTPUT_PATH
+        self._output_dir = output_dir or BaseConfig.BASE_OUTPUT_PATH
         self._status = "Choose this mode's inputs, then Run."
         self._failed = False
         self._percent = 0.0
@@ -94,6 +102,7 @@ class SynthesisController(QObject):
 
         self._shown = {"original": True, "synthetic": False}
         self._info: Dict[str, Optional[dict]] = {"original": None, "synthetic": None}
+        self._apply_handover()
         self._layers = {"background": True, "network": True}
 
         self._stale: set = set()
@@ -138,6 +147,7 @@ class SynthesisController(QObject):
         self._values = spec_builder.default_values(self._mode)
         self._shape = 0
         self._inputs = spec_builder.default_inputs(self._mode)
+        self._apply_handover()
         self._info["original"] = None
         self._shown["synthetic"] = False
         self._info["synthetic"] = None
@@ -263,6 +273,49 @@ class SynthesisController(QObject):
             if shape.scope not in seen:
                 seen.append(shape.scope)
         return seen
+
+    def _apply_handover(self) -> bool:
+        """Point the form at the network handed over on stdin, if there was one."""
+        if not self._handover:
+            return False
+        directory = self._handover.get("datasets_dir")
+        index = (
+            spec_builder.directory_shape_index(self._mode)
+            if directory
+            else spec_builder.graphml_shape_index(self._mode)
+        )
+        if index is None:
+            return False
+        self._shape = index
+        self._inputs = spec_builder.default_inputs(self._mode, index)
+        if directory:
+            self._inputs["datasets_dir"] = directory
+            self._values["INPUT_ORIENTATION"] = "none"
+            self._info["original"] = None
+            return True
+        self._inputs["network_graphml"] = self._handover["network"]
+        image = self._handover.get("image")
+        if image:
+            self._inputs["image"] = image
+        self._info["original"] = None
+        return True
+
+    @Property(bool, notify=changed)
+    def hasHandover(self) -> bool:
+        if not self._handover:
+            return False
+        if self._handover.get("datasets_dir"):
+            return spec_builder.directory_shape_index(self._mode) is not None
+        return spec_builder.graphml_shape_index(self._mode) is not None
+
+    @Slot()
+    def reloadHandover(self) -> None:
+        """Go back to the handed-over network after trying something else."""
+        if not self._apply_handover():
+            return
+        self._status = "Reading the network from StructuralGT."
+        self._note_ready()
+        self._want("original")
 
     @Slot(int)
     def selectInputShape(self, index: int) -> None:
@@ -816,11 +869,63 @@ class SynthesisController(QObject):
         self.changed.emit()
 
 
+_STDIN_FLAG = "--graph-from-stdin"
+_IMAGE_FLAG = "--image"
+_DATASETS_FLAG = "--datasets-dir"
+_OUTPUT_FLAG = "--output-dir"
+
+
+def _flag(argv, name: str) -> Optional[str]:
+    if name not in argv:
+        return None
+    value = argv[argv.index(name) + 1]
+    return value or None
+
+
+def _read_handover(argv) -> Optional[Dict[str, str]]:
+    """A network piped in by a host application, written where our children can read it.
+
+    The preview and the run are separate processes that take file paths, so the bytes
+    are landed once in a scratch directory rather than kept in memory.
+    """
+    datasets_dir = _flag(argv, _DATASETS_FLAG)
+    if datasets_dir:
+        # A batch already on disk. Reading it here would mean loading every network
+        # twice, so only the directory travels.
+        handover = {"datasets_dir": datasets_dir}
+        image = _flag(argv, _IMAGE_FLAG)
+        if image:
+            handover["image"] = image
+        return handover
+
+    if _STDIN_FLAG not in argv:
+        return None
+
+    graphml = sys.stdin.buffer.read()
+    if not graphml:
+        raise SystemExit(f"{_STDIN_FLAG} was given but nothing arrived on stdin")
+
+    scratch = tempfile.mkdtemp(prefix="networksynth_handover_")
+    atexit.register(shutil.rmtree, scratch, True)
+    network = os.path.join(scratch, "structuralgt_network.graphml")
+    with open(network, "wb") as handle:
+        handle.write(graphml)
+
+    handover = {"network": network}
+    image = _flag(argv, _IMAGE_FLAG)
+    if image:
+        handover["image"] = image
+    return handover
+
+
 def main(argv=None) -> int:
     argv = sys.argv if argv is None else argv
-    app = QGuiApplication(argv)
+    handover = _read_handover(argv)
+    app = QGuiApplication([argv[0]])
     engine = QQmlApplicationEngine()
-    controller = SynthesisController()
+    controller = SynthesisController(
+        handover=handover, output_dir=_flag(argv, _OUTPUT_FLAG)
+    )
     engine.rootContext().setContextProperty("controller", controller)
     engine.load(QUrl.fromLocalFile(_QML))
     if not engine.rootObjects():

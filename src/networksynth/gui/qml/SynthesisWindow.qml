@@ -675,6 +675,26 @@ ApplicationWindow {
                                 }
                             }
 
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 10
+                                visible: controller.hasHandover
+
+                                Item {
+                                    Layout.preferredWidth: root.labelWidth
+                                }
+                                Button {
+                                    text: "Use the StructuralGT network"
+                                    enabled: !controller.running
+                                    onClicked: controller.reloadHandover()
+                                    ToolTip.text: "Put the network StructuralGT sent back in the fields above."
+                                    ToolTip.visible: hovered
+                                }
+                                Item {
+                                    Layout.fillWidth: true
+                                }
+                            }
+
                             Repeater {
                                 model: controller.inputs
 

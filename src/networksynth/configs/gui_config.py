@@ -43,6 +43,10 @@ MODE_INPUTS = {
 
 _EDGE_SUFFIX = "_edgelist.csv"
 _POSITIONS_SUFFIX = "_positions.csv"
+# What StructuralGT's exporter writes. Its columns are already the ones
+# read_graph_csv accepts, so only the file names differ.
+_SGT_EDGE_SUFFIX = "_EdgeList.csv"
+_SGT_POSITIONS_SUFFIX = "_NodePositions.csv"
 _IMAGE_SUFFIX = "_image.tif"
 _MATRIX_SUFFIX = "_adjacency.npy"
 _NPY_POSITIONS_SUFFIX = "_positions.npy"
@@ -52,6 +56,7 @@ _GRAPHML_GZ_SUFFIX = "_network.graphml.gz"
 
 _DIRECTORY_FORMS = (
     (_EDGE_SUFFIX, (_POSITIONS_SUFFIX,)),
+    (_SGT_EDGE_SUFFIX, (_SGT_POSITIONS_SUFFIX,)),
     (_MATRIX_SUFFIX, (_NPY_POSITIONS_SUFFIX,)),
     (_GRAPHML_SUFFIX, ()),
     (_GRAPHML_GZ_SUFFIX, ()),
@@ -187,10 +192,14 @@ def _load_single_network(path: str) -> SynthGraph:
 def _load_from_directory(directory: str, name: str) -> SynthGraph:
     """One dataset out of a directory, read by the form its name is in."""
     path = os.path.join(directory, name)
-    if os.path.exists(f"{path}{_EDGE_SUFFIX}"):
-        from networksynth.graphs import read_graph_csv
+    for edges, positions in (
+        (_EDGE_SUFFIX, _POSITIONS_SUFFIX),
+        (_SGT_EDGE_SUFFIX, _SGT_POSITIONS_SUFFIX),
+    ):
+        if os.path.exists(f"{path}{edges}"):
+            from networksynth.graphs import read_graph_csv
 
-        return read_graph_csv(f"{path}{_EDGE_SUFFIX}", f"{path}{_POSITIONS_SUFFIX}")
+            return read_graph_csv(f"{path}{edges}", f"{path}{positions}")
     if os.path.exists(f"{path}{_MATRIX_SUFFIX}"):
         return _load_npy_pair(
             f"{path}{_NPY_POSITIONS_SUFFIX}", f"{path}{_MATRIX_SUFFIX}"
