@@ -141,6 +141,20 @@ ApplicationWindow {
 
     property string pendingInput: ""
 
+    MessageDialog {
+        id: updateDialog
+        title: "NetworkSynth"
+        buttons: MessageDialog.Ok
+    }
+
+    Connections {
+        target: controller
+        function onUpdateDone(message, restart) {
+            updateDialog.text = message;
+            updateDialog.open();
+        }
+    }
+
     FileDialog {
         id: fileDialog
         onAccepted: controller.setInput(root.pendingInput, selectedFile)

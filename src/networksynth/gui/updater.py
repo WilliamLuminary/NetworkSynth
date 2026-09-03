@@ -50,29 +50,51 @@ def _branch() -> str:
     return name if code == 0 else ""
 
 
-def update_commands() -> List[List[str]]:
-    """A dist checkout is moved by fetching its branch; anything else pulls."""
+def channel() -> str:
+    """The branch this checkout follows.
+
+    A submodule is checked out at a commit rather than a branch, so when there is
+    no branch name the tag says which line of releases this came from.
+    """
     branch = _branch()
-    if branch.startswith("dist"):
+    if branch and branch != "HEAD":
+        return branch
+    tag = version()
+    if tag.endswith("-dev"):
+        return "dist-dev"
+    return "dist"
+
+
+def update_commands() -> List[List[str]]:
+    """Always the newest of this checkout's own channel: dist fetches dist,
+    dist-dev fetches dist-dev, and a working branch pulls its own upstream."""
+    name = channel()
+    if name.startswith("dist"):
+        # --tags as well, or a shallow submodule clone has no tag to read the
+        # version from and the footer stays blank.
         return [
-            ["fetch", "origin", branch, "--depth", "1"],
-            ["checkout", "-B", branch, "FETCH_HEAD"],
+            ["fetch", "origin", name, "--depth", "1", "--tags"],
+            ["checkout", "-B", name, "FETCH_HEAD"],
         ]
     return [["pull", "--ff-only"]]
 
 
-def update() -> Tuple[bool, str]:
+def update() -> Tuple[bool, str, bool]:
     """Move the checkout forward. Returns whether it worked and what to show."""
     if not in_checkout():
-        return False, "Not a git checkout, so there is nothing to update."
+        return False, "Not a git checkout, so there is nothing to update.", False
 
     before = _git("rev-parse", "--short", "HEAD")[1]
     for command in update_commands():
         code, output = _git(*command)
         if code != 0:
-            return False, output.splitlines()[-1] if output else "git failed"
+            return False, (output.splitlines()[-1] if output else "git failed"), False
 
     after = _git("rev-parse", "--short", "HEAD")[1]
     if before == after:
-        return True, f"Already up to date ({version()})."
-    return True, f"Updated to {version()}. Restart to load it."
+        return True, f"Already the latest version ({version() or after}).", False
+    return (
+        True,
+        f"Updated to {version() or after}. Restart NetworkSynth to load it.",
+        True,
+    )

@@ -67,6 +67,7 @@ class SynthesisController(QObject):
 
     changed = Signal()
     logChanged = Signal()
+    updateDone = Signal(str, bool)
 
     def __init__(
         self,
@@ -312,8 +313,9 @@ class SynthesisController(QObject):
 
     @Slot()
     def updateTool(self) -> None:
-        ok, message = updater.update()
+        ok, message, restart = updater.update()
         self._set_status(message, failed=not ok)
+        self.updateDone.emit(message, restart)
 
     @Property(bool, notify=changed)
     def hasHandover(self) -> bool:
