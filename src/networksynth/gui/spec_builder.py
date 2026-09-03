@@ -255,7 +255,7 @@ def _common_fields(vector_plots: bool = True) -> List[Field]:
             Field(
                 "FRAME_SIZE",
                 "Background image",
-                (512, 512),
+                None,
                 kind="size",
                 unit="px",
                 help=(

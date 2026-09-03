@@ -74,7 +74,7 @@ class _CvCanvas(NamedTuple):
 
     image: ndarray
     x_min: float
-    y_max: float
+    y_min: float
     sx: float
     sy: float
     dpi: int
@@ -82,7 +82,7 @@ class _CvCanvas(NamedTuple):
     def project(self, xs, ys):
         return (
             ((xs - self.x_min) * self.sx).astype(np.int32),
-            ((self.y_max - ys) * self.sy).astype(np.int32),
+            ((ys - self.y_min) * self.sy).astype(np.int32),
         )
 
 
@@ -110,7 +110,7 @@ def _cv2_canvas(extent, style, node_count: int) -> _CvCanvas:
     return _CvCanvas(
         image=np.full((img_h, img_w, 3), 255, dtype=np.uint8),
         x_min=x_min,
-        y_max=y_max,
+        y_min=y_min,
         sx=(img_w - 1) / frame_w,
         sy=(img_h - 1) / frame_h,
         dpi=dpi,
@@ -277,7 +277,7 @@ def save_bfs_snapshot(
         ax.plot(pos[0], pos[1], "bo", markersize=node_size, zorder=3)
 
     ax.set_xlim(frame[0])
-    ax.set_ylim(frame[1])
+    ax.set_ylim(frame[1][1], frame[1][0])
     ax.add_patch(
         Rectangle(
             (frame[0][0], frame[1][0]),
@@ -392,7 +392,7 @@ def plot_network(
         ax.plot(pos[0], pos[1], "bo", markersize=node_size, zorder=2)
 
     ax.set_xlim(frame[0])
-    ax.set_ylim(frame[1])
+    ax.set_ylim(frame[1][1], frame[1][0])
 
     if data_type == "original_graph":
         image = background

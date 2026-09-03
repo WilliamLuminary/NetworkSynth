@@ -71,7 +71,7 @@ def _background_figure(image, frame_size, style):
         aspect="auto",
     )
     ax.set_xlim((0, width))
-    ax.set_ylim((0, height))
+    ax.set_ylim((height, 0))
     ax.set_xticks([])
     ax.set_yticks([])
     ax.axis("off")

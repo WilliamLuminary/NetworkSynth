@@ -303,7 +303,8 @@ ApplicationWindow {
             TextField {
                 Layout.preferredWidth: root.numberWidth
 
-                text: editor.field.kind === "size" || editor.field.kind === "range" ? editor.value[0] : ""
+                text: (editor.field.kind === "size" || editor.field.kind === "range") && editor.value ? editor.value[0] : ""
+                placeholderText: editor.field.kind === "size" ? "auto" : ""
                 validator: DoubleValidator {
                     bottom: 0
                 }
@@ -320,7 +321,8 @@ ApplicationWindow {
             }
             TextField {
                 Layout.preferredWidth: root.numberWidth
-                text: editor.field.kind === "size" || editor.field.kind === "range" ? editor.value[1] : ""
+                text: (editor.field.kind === "size" || editor.field.kind === "range") && editor.value ? editor.value[1] : ""
+                placeholderText: editor.field.kind === "size" ? "auto" : ""
                 validator: DoubleValidator {
                     bottom: 0
                 }
