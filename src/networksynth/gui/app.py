@@ -20,13 +20,15 @@ from PySide6.QtCore import (
     Signal,
     Slot,
 )
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QGuiApplication, QIcon
 from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtQuickControls2 import QQuickStyle
 
 from networksynth.configs import BaseConfig
 from networksynth.gui import spec_builder
 
 _QML = os.path.join(os.path.dirname(__file__), "qml", "SynthesisWindow.qml")
+_ICON = os.path.join(os.path.dirname(__file__), "qml", "assets", "networksynth.png")
 _GUI_RUN = ["-m", "networksynth.gui_run"]
 _GUI_PREVIEW = ["-m", "networksynth.gui_preview"]
 
@@ -922,6 +924,12 @@ def main(argv=None) -> int:
     argv = sys.argv if argv is None else argv
     handover = _read_handover(argv)
     app = QGuiApplication([argv[0]])
+    app.setWindowIcon(QIcon(_ICON))
+    # Every control here draws its own background, which the native macOS and Windows
+    # styles refuse. Fusion accepts customisation and, unlike Basic, takes its colours
+    # from the application palette, so the window still follows the system light or
+    # dark setting that every colour in the QML is derived from.
+    QQuickStyle.setStyle("Fusion")
     engine = QQmlApplicationEngine()
     controller = SynthesisController(
         handover=handover, output_dir=_flag(argv, _OUTPUT_FLAG)
