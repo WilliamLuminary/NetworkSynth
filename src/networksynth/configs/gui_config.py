@@ -342,7 +342,29 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
             graph = read_graph_csv(cls.PATHS["edge_list"], cls.PATHS["positions"])
 
         orient_positions(graph, cls.INPUT_ORIENTATION)
+
+        if not cls.FRAME_SIZE and not cls._has_background():
+            # No image to take the window from, so the network's own extent is all
+            # there is. It understates the window when nodes stop short of an edge,
+            # which is why an image is preferred when one exists.
+            import math
+
+            positions = graph.positions()
+            cls.FRAME_SIZE = (
+                max(1, math.ceil(positions[:, 0].max())),
+                max(1, math.ceil(positions[:, 1].max())),
+            )
+            if not cls.SYNTHETIC_FRAME_SIZE:
+                cls.SYNTHETIC_FRAME_SIZE = cls.FRAME_SIZE
+
         return graph
+
+    @classmethod
+    def _has_background(cls) -> bool:
+        directory = cls.PATHS.get("datasets_dir")
+        if directory:
+            return True
+        return bool(cls.PATHS.get("image"))
 
     @classmethod
     def load_original_image(cls, dataset_id: DatasetId) -> Optional[ndarray]:
@@ -368,4 +390,12 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
             return None
 
         cls.IMAGE_SIZE = (image.shape[0], image.shape[1])
+        if not cls.FRAME_SIZE:
+            # Node coordinates are in the source image's pixels, so its own size is
+            # the coordinate window. Left unset, that is the answer, and the image
+            # needs no scaling to match it.
+            cls.FRAME_SIZE = (image.shape[1], image.shape[0])
+            if not cls.SYNTHETIC_FRAME_SIZE:
+                cls.SYNTHETIC_FRAME_SIZE = cls.FRAME_SIZE
+            return image
         return resize_image(image, cls.FRAME_SIZE)
