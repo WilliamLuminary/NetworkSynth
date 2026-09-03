@@ -120,6 +120,21 @@ ApplicationWindow {
                     font.pixelSize: 11
                     opacity: 0.55
                 }
+                Label {
+                    text: controller.version
+                    font.pixelSize: 11
+                    opacity: 0.55
+                }
+                Button {
+                    text: "Update"
+                    visible: controller.canUpdate
+                    enabled: !controller.running
+                    flat: true
+                    font.pixelSize: 11
+                    onClicked: controller.updateTool()
+                    ToolTip.text: "Fetch the newest NetworkSynth into this checkout."
+                    ToolTip.visible: hovered
+                }
             }
         }
     }
@@ -1087,4 +1102,5 @@ ApplicationWindow {
             }
         }
     }
+
 }

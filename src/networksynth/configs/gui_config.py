@@ -199,7 +199,14 @@ def _load_from_directory(directory: str, name: str) -> SynthGraph:
         if os.path.exists(f"{path}{edges}"):
             from networksynth.graphs import read_graph_csv
 
-            return read_graph_csv(f"{path}{edges}", f"{path}{positions}")
+            graph = read_graph_csv(f"{path}{edges}", f"{path}{positions}")
+            if positions == _SGT_POSITIONS_SUFFIX:
+                # StructuralGT writes the skeleton's (row, col) under headers x and y.
+                # Its own plotting swaps them back; the exporter does not.
+                from networksynth.utils import transpose_positions
+
+                transpose_positions(graph)
+            return graph
     if os.path.exists(f"{path}{_MATRIX_SUFFIX}"):
         return _load_npy_pair(
             f"{path}{_NPY_POSITIONS_SUFFIX}", f"{path}{_MATRIX_SUFFIX}"

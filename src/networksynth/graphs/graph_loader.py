@@ -13,9 +13,11 @@ logger = logging.getLogger(__name__)
 _EDGELIST_SUFFIX = "_edgelist.csv"
 _POSITIONS_SUFFIX = "_positions.csv"
 # StructuralGT's exporter names the same two files differently.
+_SGT_EDGELIST_SUFFIX = "_EdgeList.csv"
+_SGT_POSITIONS_SUFFIX = "_NodePositions.csv"
 _CSV_PAIRS = (
     (_EDGELIST_SUFFIX, _POSITIONS_SUFFIX),
-    ("_EdgeList.csv", "_NodePositions.csv"),
+    (_SGT_EDGELIST_SUFFIX, _SGT_POSITIONS_SUFFIX),
 )
 _EDGELIST_SUFFIXES = tuple(edges for edges, _ in _CSV_PAIRS)
 _GRAPHML_SUFFIXES = (".graphml", ".graphml.gz", ".graphmlz")
@@ -69,4 +71,11 @@ def _load_csv_pair(edge_list: str) -> SynthGraph:
     assert os.path.exists(
         positions
     ), f"{edge_list} has no positions file beside it ({positions})"
-    return read_graph_csv(edge_list, positions)
+
+    graph = read_graph_csv(edge_list, positions)
+    if positions_suffix == _SGT_POSITIONS_SUFFIX:
+        # StructuralGT writes the skeleton's (row, col) under headers x and y.
+        from networksynth.utils import transpose_positions
+
+        transpose_positions(graph)
+    return graph
