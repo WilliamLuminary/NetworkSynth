@@ -25,7 +25,7 @@ from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 
 from networksynth.configs import BaseConfig
-from networksynth.gui import spec_builder
+from networksynth.gui import spec_builder, updater
 
 _QML = os.path.join(os.path.dirname(__file__), "qml", "SynthesisWindow.qml")
 _ICON = os.path.join(os.path.dirname(__file__), "qml", "assets", "networksynth.png")
@@ -301,6 +301,19 @@ class SynthesisController(QObject):
             self._inputs["image"] = image
         self._info["original"] = None
         return True
+
+    @Property(str, notify=changed)
+    def version(self) -> str:
+        return updater.version()
+
+    @Property(bool, notify=changed)
+    def canUpdate(self) -> bool:
+        return updater.in_checkout()
+
+    @Slot()
+    def updateTool(self) -> None:
+        ok, message = updater.update()
+        self._set_status(message, failed=not ok)
 
     @Property(bool, notify=changed)
     def hasHandover(self) -> bool:
