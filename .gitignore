@@ -62,16 +62,7 @@ wandb/
 # ---------------------------------------------------------------------------
 # Project-specific
 # ---------------------------------------------------------------------------
-# Ignore everything in the data/input and data/output directories
-data/input/*
+# Ignore everything in the data/output directory
 data/output/*
-
-# Keep some files in the data/input/samples directory
-!data/input/samples/
-
-# Analysis: ignore generated artifacts but keep source notebooks/scripts
-src/anal/*
-!src/anal/*.py
-!src/anal/*.ipynb
 
 *.egg-info/
