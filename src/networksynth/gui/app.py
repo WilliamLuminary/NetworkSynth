@@ -297,6 +297,11 @@ class SynthesisController(QObject):
             self._info["original"] = None
             return True
         self._inputs["network_graphml"] = self._handover["network"]
+        frame = self._handover.get("frame_size")
+        if frame:
+            for key in _FRAME_KEYS:
+                if key in self._values:
+                    self._values[key] = frame
         image = self._handover.get("image")
         if image:
             self._inputs["image"] = image
@@ -889,6 +894,7 @@ class SynthesisController(QObject):
 _STDIN_FLAG = "--graph-from-stdin"
 _IMAGE_FLAG = "--image"
 _DATASETS_FLAG = "--datasets-dir"
+_FRAME_FLAG = "--frame-size"
 _OUTPUT_FLAG = "--output-dir"
 
 
@@ -932,6 +938,12 @@ def _read_handover(argv) -> Optional[Dict[str, str]]:
     image = _flag(argv, _IMAGE_FLAG)
     if image:
         handover["image"] = image
+    frame = _flag(argv, _FRAME_FLAG)
+    if frame:
+        # The host measured its network on a scaled copy of that image, so the
+        # coordinate window is the copy's size, not the file's.
+        width, _, height = frame.partition("x")
+        handover["frame_size"] = (int(width), int(height))
     return handover
 
 
