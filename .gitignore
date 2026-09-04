@@ -62,7 +62,11 @@ wandb/
 # ---------------------------------------------------------------------------
 # Project-specific
 # ---------------------------------------------------------------------------
-# Ignore everything in the data/output directory
+# Ignore everything in the data/input and data/output directories
+data/input/*
 data/output/*
+
+# Keep some files in the data/input/samples directory
+!data/input/samples/
 
 *.egg-info/
