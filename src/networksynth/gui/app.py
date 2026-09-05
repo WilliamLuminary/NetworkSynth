@@ -102,6 +102,7 @@ class SynthesisController(QObject):
         self._run_mode = ""
         self._ran_ok = False
         self._frame_touched = False
+        self._fit_side = spec_builder.STRUCTURALGT_SIDE
 
         self._shown = {"original": True, "synthetic": False}
         self._info: Dict[str, Optional[dict]] = {"original": None, "synthetic": None}
@@ -297,7 +298,7 @@ class SynthesisController(QObject):
             self._info["original"] = None
             return True
         self._inputs["network_graphml"] = self._handover["network"]
-        frame = self._handover.get("frame_size")
+        frame = spec_builder.structuralgt_frame(self._handover.get("image"))
         if frame:
             for key in _FRAME_KEYS:
                 if key in self._values:
@@ -307,6 +308,42 @@ class SynthesisController(QObject):
             self._inputs["image"] = image
         self._info["original"] = None
         return True
+
+    @Property("QVariantList", notify=changed)
+    def structuralgtSides(self) -> list:
+        return spec_builder.structuralgt_sides(self._inputs.get("image"))
+
+    @Property(int, notify=changed)
+    def structuralgtSide(self) -> int:
+        sides = self.structuralgtSides
+        return sides.index(self._fit_side) if self._fit_side in sides else 0
+
+    @Slot(int)
+    def selectStructuralgtSide(self, index: int) -> None:
+        sides = self.structuralgtSides
+        if 0 <= index < len(sides):
+            self._fit_side = sides[index]
+            self.changed.emit()
+
+    @Property(bool, notify=changed)
+    def canFitFrame(self) -> bool:
+        return bool(self.structuralgtSides)
+
+    @Slot()
+    def fitFrame(self) -> None:
+        """Set the window to the scaled copy StructuralGT traced the network from."""
+        sides = self.structuralgtSides
+        side = self._fit_side if self._fit_side in sides else (sides or [0])[0]
+        frame = spec_builder.structuralgt_frame(self._inputs.get("image"), side)
+        if not frame:
+            self._set_status("No background image to measure.", failed=True)
+            return
+        for key in _FRAME_KEYS:
+            if key in self._values:
+                self._values[key] = frame
+        self._frame_touched = True
+        self._set_status(f"Window set to {frame[0]}x{frame[1]}.")
+        self._touch_preview()
 
     @Property(str, notify=changed)
     def version(self) -> str:
@@ -894,7 +931,6 @@ class SynthesisController(QObject):
 _STDIN_FLAG = "--graph-from-stdin"
 _IMAGE_FLAG = "--image"
 _DATASETS_FLAG = "--datasets-dir"
-_FRAME_FLAG = "--frame-size"
 _OUTPUT_FLAG = "--output-dir"
 
 
@@ -924,6 +960,12 @@ def _read_handover(argv) -> Optional[Dict[str, str]]:
     if _STDIN_FLAG not in argv:
         return None
 
+    if sys.platform == "win32":
+        # Windows opens stdin in text mode, which rewrites CRLF and stops at 0x1A.
+        import msvcrt
+
+        msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
+
     graphml = sys.stdin.buffer.read()
     if not graphml:
         raise SystemExit(f"{_STDIN_FLAG} was given but nothing arrived on stdin")
@@ -938,12 +980,6 @@ def _read_handover(argv) -> Optional[Dict[str, str]]:
     image = _flag(argv, _IMAGE_FLAG)
     if image:
         handover["image"] = image
-    frame = _flag(argv, _FRAME_FLAG)
-    if frame:
-        # The host measured its network on a scaled copy of that image, so the
-        # coordinate window is the copy's size, not the file's.
-        width, _, height = frame.partition("x")
-        handover["frame_size"] = (int(width), int(height))
     return handover
 
 
