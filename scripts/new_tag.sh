@@ -1,14 +1,4 @@
 #!/usr/bin/env bash
-#
-# Cut the next release tag.
-#
-#     scripts/new_tag.sh [--dev] [--major|--minor|--patch] [--push]
-#     scripts/new_tag.sh --dev -0.1.0 --push        # same thing, level as a number
-#
-# The number is always one step past the highest v* tag, whether that tag was a
-# release or a pre-release, so versions never collide or go backwards. --dev adds
-# the -dev suffix, which is what sends the publish to dist-dev instead of dist.
-# Without a level, the patch digit moves.
 
 set -euo pipefail
 
@@ -19,9 +9,27 @@ LEVEL="patch"
 PUSH="no"
 
 usage() {
-    sed -n '3,12p' "$0" | sed 's/^# \{0,1\}//'
+    cat <<'TEXT'
+Cut the next release tag.
+
+    scripts/new_tag.sh --create [--dev] [--major|--minor|--patch] [--push]
+    scripts/new_tag.sh --create --dev -0.1.0 --push     # level as a number
+
+  --create   make the tag; without it this help is all that happens
+  --dev      pre-release: adds -dev, publishes to dist-dev, any branch
+  --push     push the tag, which is what starts the publish
+  --major    -1.0.0
+  --minor    -0.1.0
+  --patch    -0.0.1, the default
+
+The number is always one step past the highest v* tag, release or pre-release,
+so the two share one sequence and can never collide. A release tag must be on
+origin/main, or the publish workflow would refuse it.
+TEXT
     exit "${1:-0}"
 }
+
+[ $# -eq 0 ] && usage 0
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -31,7 +39,7 @@ while [ $# -gt 0 ]; do
         -0.1.0) LEVEL="minor" ;;
         -0.0.1) LEVEL="patch" ;;
         --push) PUSH="yes" ;;
-        --create) ;;  # accepted and ignored: creating is what this script does
+        --create) ;;  # the flag that means "not just help"
         -h|--help) usage 0 ;;
         *) echo "new_tag: unknown argument '$1'" >&2; usage 1 ;;
     esac
