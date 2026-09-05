@@ -186,7 +186,7 @@ ApplicationWindow {
         default property alias content: body.data
         property string title: ""
 
-        property bool collapsible: false
+        property bool collapsible: true
         property bool expanded: true
 
         property string note: ""
@@ -783,7 +783,6 @@ ApplicationWindow {
                         Card {
                             title: "Align"
 
-                            collapsible: true
                             expanded: false
                             visible: controller.alignLines.length > 0 && controller.canPreview
 
@@ -792,6 +791,35 @@ ApplicationWindow {
                                 delegate: FormLine {
                                     required property var modelData
                                     line: modelData
+                                }
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+                                visible: controller.canFitFrame
+
+                                Label {
+                                    text: "Fit to StructuralGT"
+                                    Layout.preferredWidth: root.labelWidth
+                                }
+                                ComboBox {
+                                    Layout.preferredWidth: 130
+                                    model: controller.structuralgtSides
+                                    currentIndex: controller.structuralgtSide
+                                    enabled: !controller.running
+                                    displayText: currentText + " px"
+                                    onActivated: controller.selectStructuralgtSide(currentIndex)
+                                }
+                                Button {
+                                    text: "Fit"
+                                    enabled: !controller.running
+                                    onClicked: controller.fitFrame()
+                                    ToolTip.text: "Set the window to the copy StructuralGT traced the network from."
+                                    ToolTip.visible: hovered
+                                }
+                                Item {
+                                    Layout.fillWidth: true
                                 }
                             }
 
