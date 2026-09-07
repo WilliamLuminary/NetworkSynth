@@ -341,6 +341,7 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
     def load_original_network(cls, dataset_id: DatasetId) -> SynthGraph:
         from networksynth.utils import orient_positions
 
+        GuiConfig._sgt_source = False
         directory = cls.PATHS.get("datasets_dir")
         if directory:
             graph = _load_from_directory(directory, str(dataset_id))
@@ -356,7 +357,7 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
                 from networksynth.utils import transpose_positions
 
                 transpose_positions(graph)
-                cls._sgt_source = True
+                GuiConfig._sgt_source = True
 
         orient_positions(graph, cls.INPUT_ORIENTATION)
 
