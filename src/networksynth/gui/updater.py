@@ -10,7 +10,7 @@ import os
 import subprocess
 from typing import List, Tuple
 
-_TIMEOUT = 120
+_TIMEOUT = 30
 
 
 def repo_root() -> str:
@@ -25,6 +25,8 @@ def _git(*args: str) -> Tuple[int, str]:
             capture_output=True,
             text=True,
             timeout=_TIMEOUT,
+            stdin=subprocess.DEVNULL,
+            env={**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_ASKPASS": ""},
         )
     except (OSError, subprocess.SubprocessError) as error:
         return 1, str(error)
@@ -60,15 +62,17 @@ def channel() -> str:
     if branch and branch != "HEAD":
         return branch
     tag = version()
-    if tag.endswith("-dev"):
-        return "dist-dev"
-    return "dist"
+    if not tag:
+        return ""
+    return "dist-dev" if tag.endswith("-dev") else "dist"
 
 
 def update_commands() -> List[List[str]]:
     """Always the newest of this checkout's own channel: dist fetches dist,
     dist-dev fetches dist-dev, and a working branch pulls its own upstream."""
     name = channel()
+    if not name:
+        return []
     if name.startswith("dist"):
         # --tags as well, or a shallow submodule clone has no tag to read the
         # version from and the footer stays blank.
@@ -84,8 +88,17 @@ def update() -> Tuple[bool, str, bool]:
     if not in_checkout():
         return False, "Not a git checkout, so there is nothing to update.", False
 
+    commands = update_commands()
+    if not commands:
+        return (
+            False,
+            "This checkout is not on a branch and carries no tag, so there is "
+            "nothing to follow.",
+            False,
+        )
+
     before = _git("rev-parse", "--short", "HEAD")[1]
-    for command in update_commands():
+    for command in commands:
         code, output = _git(*command)
         if code != 0:
             return False, (output.splitlines()[-1] if output else "git failed"), False

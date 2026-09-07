@@ -360,7 +360,7 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
 
         orient_positions(graph, cls.INPUT_ORIENTATION)
 
-        if not cls.FRAME_SIZE and not cls._has_background():
+        if not cls.FRAME_SIZE and not cls._has_background(dataset_id):
             # No image to take the window from, so the network's own extent is all
             # there is. It understates the window when nodes stop short of an edge,
             # which is why an image is preferred when one exists.
@@ -377,10 +377,12 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
         return graph
 
     @classmethod
-    def _has_background(cls) -> bool:
+    def _has_background(cls, dataset_id: DatasetId) -> bool:
         directory = cls.PATHS.get("datasets_dir")
         if directory:
-            return True
+            return os.path.exists(
+                os.path.join(directory, f"{dataset_id}{_IMAGE_SUFFIX}")
+            )
         return bool(cls.PATHS.get("image"))
 
     @classmethod

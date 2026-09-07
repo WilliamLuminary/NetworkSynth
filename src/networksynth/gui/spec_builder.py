@@ -844,7 +844,7 @@ def _longest_side(image_path: Optional[str]) -> Optional[int]:
 
 
 def structuralgt_sides(image_path: Optional[str]) -> List[int]:
-    """The sizes StructuralGT offers for this image, in its own order."""
+    """The sizes StructuralGT offers for this image, ascending as it lists them."""
     longest = _longest_side(image_path)
     if longest is None:
         return []

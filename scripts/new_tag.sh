@@ -7,6 +7,7 @@ cd "$(git rev-parse --show-toplevel)"
 DEV=""
 LEVEL="patch"
 PUSH="no"
+CREATE="no"
 
 usage() {
     cat <<'TEXT'
@@ -39,12 +40,14 @@ while [ $# -gt 0 ]; do
         -0.1.0) LEVEL="minor" ;;
         -0.0.1) LEVEL="patch" ;;
         --push) PUSH="yes" ;;
-        --create) ;;  # the flag that means "not just help"
+        --create) CREATE="yes" ;;
         -h|--help) usage 0 ;;
         *) echo "new_tag: unknown argument '$1'" >&2; usage 1 ;;
     esac
     shift
 done
+
+[ "$CREATE" = "yes" ] || usage 0
 
 # The highest number any v* tag has reached, ignoring the -dev suffix.
 latest="$(git tag -l 'v*' | sed -e 's/-dev$//' -e 's/^v//' \
