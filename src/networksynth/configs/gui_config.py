@@ -206,7 +206,6 @@ def _load_from_directory(directory: str, name: str) -> SynthGraph:
             if positions == _SGT_POSITIONS_SUFFIX:
                 GuiConfig._sgt_source = True
                 # StructuralGT writes the skeleton's (row, col) under headers x and y.
-                # Its own plotting swaps them back; the exporter does not.
                 from networksynth.utils import transpose_positions
 
                 transpose_positions(graph)
