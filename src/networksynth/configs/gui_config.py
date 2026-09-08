@@ -195,18 +195,18 @@ def _load_single_network(path: str) -> SynthGraph:
 def _load_from_directory(directory: str, name: str) -> SynthGraph:
     """One dataset out of a directory, read by the form its name is in."""
     path = os.path.join(directory, name)
+    present = set(os.listdir(directory))
     for edges, positions in (
         (_EDGE_SUFFIX, _POSITIONS_SUFFIX),
         (_SGT_EDGE_SUFFIX, _SGT_POSITIONS_SUFFIX),
     ):
-        if os.path.exists(f"{path}{edges}"):
+        if f"{name}{edges}" in present:
             from networksynth.graphs import read_graph_csv
 
             graph = read_graph_csv(f"{path}{edges}", f"{path}{positions}")
             if positions == _SGT_POSITIONS_SUFFIX:
                 GuiConfig._sgt_source = True
                 # StructuralGT writes the skeleton's (row, col) under headers x and y.
-                # Its own plotting swaps them back; the exporter does not.
                 from networksynth.utils import transpose_positions
 
                 transpose_positions(graph)
@@ -342,6 +342,7 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
     def load_original_network(cls, dataset_id: DatasetId) -> SynthGraph:
         from networksynth.utils import orient_positions
 
+        GuiConfig._sgt_source = False
         directory = cls.PATHS.get("datasets_dir")
         if directory:
             graph = _load_from_directory(directory, str(dataset_id))
@@ -357,11 +358,11 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
                 from networksynth.utils import transpose_positions
 
                 transpose_positions(graph)
-                cls._sgt_source = True
+                GuiConfig._sgt_source = True
 
         orient_positions(graph, cls.INPUT_ORIENTATION)
 
-        if not cls.FRAME_SIZE and not cls._has_background():
+        if not cls.FRAME_SIZE and not cls._has_background(dataset_id):
             # No image to take the window from, so the network's own extent is all
             # there is. It understates the window when nodes stop short of an edge,
             # which is why an image is preferred when one exists.
@@ -378,10 +379,12 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
         return graph
 
     @classmethod
-    def _has_background(cls) -> bool:
+    def _has_background(cls, dataset_id: DatasetId) -> bool:
         directory = cls.PATHS.get("datasets_dir")
         if directory:
-            return True
+            return os.path.exists(
+                os.path.join(directory, f"{dataset_id}{_IMAGE_SUFFIX}")
+            )
         return bool(cls.PATHS.get("image"))
 
     @classmethod

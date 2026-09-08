@@ -127,7 +127,7 @@ def preview_original(config, out_dir: str) -> dict:
     return {
         "kind": "original",
         "has_background": image is not None,
-        "image_size": None if image is None else list(reversed(config.IMAGE_SIZE)),
+        "image_size": None if image is None else list(config.FRAME_SIZE),
         "images": images,
         "note": note,
         "text": _info_text("Original network", graph, attributes),

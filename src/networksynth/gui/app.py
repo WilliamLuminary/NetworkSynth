@@ -44,6 +44,14 @@ _EXIT_MEANING = {
 
 _PROCESS_GROUPS = hasattr(os, "killpg") and hasattr(os, "getpgid")
 
+# Windows has no SIGINT to send: Popen.send_signal rejects anything but SIGTERM
+# and the two console events, and only a process started in its own group can be
+# sent CTRL_BREAK. That event raises KeyboardInterrupt in the child, which is what
+# lets a cancelled run still write its manifest.
+_NEW_GROUP = (
+    {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {}
+)
+
 _CANCEL_GRACE = 15.0
 
 
@@ -103,6 +111,8 @@ class SynthesisController(QObject):
         self._ran_ok = False
         self._frame_touched = False
         self._fit_side = spec_builder.STRUCTURALGT_SIDE
+        self._version: Optional[str] = None
+        self._can_update: Optional[bool] = None
 
         self._shown = {"original": True, "synthetic": False}
         self._info: Dict[str, Optional[dict]] = {"original": None, "synthetic": None}
@@ -347,15 +357,20 @@ class SynthesisController(QObject):
 
     @Property(str, notify=changed)
     def version(self) -> str:
-        return updater.version()
+        if self._version is None:
+            self._version = updater.version()
+        return self._version
 
     @Property(bool, notify=changed)
     def canUpdate(self) -> bool:
-        return updater.in_checkout()
+        if self._can_update is None:
+            self._can_update = updater.in_checkout()
+        return self._can_update
 
     @Slot()
     def updateTool(self) -> None:
         ok, message, restart = updater.update()
+        self._version = None
         self._set_status(message, failed=not ok)
         self.updateDone.emit(message, restart)
 
@@ -578,6 +593,15 @@ class SynthesisController(QObject):
 
     @Slot(str, int, "QVariant")
     def setSize(self, key: str, index: int, value) -> None:
+        if str(value).strip() == "":
+            # Emptying either box puts the field back to deriving its own value,
+            # which is what the "auto" placeholder offers.
+            self._values[key] = None
+            if key in _FRAME_KEYS:
+                self._frame_touched = False
+            self._touch_preview()
+            return
+
         current = list(self._values.get(key) or (0, 0))
         as_float = self._kind_of(key) == "range"
         try:
@@ -631,6 +655,7 @@ class SynthesisController(QObject):
             stderr=subprocess.DEVNULL,
             stdin=subprocess.DEVNULL,
             start_new_session=_PROCESS_GROUPS,
+            **_NEW_GROUP,
         )
         self._cancel_at = None
         self._poll.start()
@@ -659,9 +684,11 @@ class SynthesisController(QObject):
                 )
             elif force:
                 self._process.kill()
+            elif os.name == "nt":
+                self._process.send_signal(signal.CTRL_BREAK_EVENT)
             else:
                 self._process.send_signal(signal.SIGINT)
-        except (ProcessLookupError, PermissionError, OSError):
+        except (ProcessLookupError, PermissionError, OSError, ValueError):
             pass
 
     def _kind_of(self, key: str) -> str:

@@ -43,11 +43,14 @@ A network is a pair of files sharing a prefix, or a single GraphML file:
 | Files | Format |
 | --- | --- |
 | `<prefix>_edgelist.csv` + `<prefix>_positions.csv` | a CSV pair |
+| `<prefix>_EdgeList.csv` + `<prefix>_NodePositions.csv` | a StructuralGT export |
 | `<prefix>_adjacency.npy` + `<prefix>_positions.npy` | a NumPy pair |
 | `<prefix>_network.graphml` | one network, positions included (`.graphml.gz` too) |
 | `<prefix>_image.tif` | the background for that prefix, optional |
 
 Point a run at a folder of these and it reads one dataset per prefix, in name order, writing a subdirectory each under one run root. A half-named dataset stops the run and names it rather than being passed over.
+
+A StructuralGT export is read to its own conventions: its positions are `(row, col)` under headers `x,y`, so they are swapped, and its network is traced on a copy scaled to 1024 on the longest side, so that copy is taken as the coordinate window rather than the image file.
 
 Edge lists are read tolerantly: `Source,Target` columns (with `Weight,Length,Width,Angle` when weighted) and `source_index,target_index,edge_weight` both work, with `x,y` for positions.
 
