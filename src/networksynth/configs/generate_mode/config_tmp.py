@@ -35,7 +35,9 @@ class ConfigTmp(BaseConfig):
     MEASURE_WEIGHTED = True
     FULL_Q_BAND = False
 
-    BASE_INPUT_PATH = os.path.join(BaseConfig.BASE_INPUT_PATH, "samples", "mosaic_mode")
+    BASE_INPUT_PATH = os.path.join(
+        BaseConfig.BASE_INPUT_PATH, "samples", "scaling_mode"
+    )
 
     @classmethod
     def initialize(cls) -> None:

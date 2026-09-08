@@ -43,7 +43,7 @@ class SampleConfig(BaseConfig):
     BASE_INPUT_PATH = os.path.join(
         BaseConfig.BASE_INPUT_PATH,
         "samples",
-        "mosaic_mode",
+        "scaling_mode",
     )
 
     @classmethod
