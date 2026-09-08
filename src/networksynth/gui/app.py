@@ -157,11 +157,22 @@ class SynthesisController(QObject):
         names = list(spec_builder.MODES)
         if not 0 <= index < len(names) or names[index] == self._mode:
             return
+
+        carried_values = dict(self._values)
+        carried_inputs = dict(self._inputs)
+
         self._mode = names[index]
         self._values = spec_builder.default_values(self._mode)
-        self._shape = 0
-        self._inputs = spec_builder.default_inputs(self._mode)
-        self._apply_handover()
+        for key, value in carried_values.items():
+            if key in self._values:
+                self._values[key] = value
+
+        self._shape = min(self._shape, len(self._shapes()) - 1)
+        self._inputs = spec_builder.default_inputs(self._mode, self._shape)
+        for key, value in carried_inputs.items():
+            if key in self._inputs:
+                self._inputs[key] = value
+
         self._info["original"] = None
         self._shown["synthetic"] = False
         self._info["synthetic"] = None
