@@ -441,13 +441,13 @@ def _hybrid_fields() -> List[Field]:
         Field(
             "TARGET_SCALE",
             "Target scale",
-            (100, 100),
+            (20, 20),
             kind="size",
             axes=("rows", "cols"),
             help=(
                 "A multiplier, not a size. The assembled area is\n"
                 "rows × background height by cols × background width —\n"
-                "so 100 × 100 over a 510 px background is 51000 px square."
+                "so 20 × 20 over a 510 px background is 10200 px square."
             ),
             group="Tiling",
         ),
@@ -470,7 +470,7 @@ def _hybrid_fields() -> List[Field]:
         Field(
             "NUM_CENTERS",
             "Patches",
-            2000,
+            800,
             kind="integer",
             minimum=1,
             maximum=100000,
