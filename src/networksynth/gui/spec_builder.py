@@ -470,7 +470,7 @@ def _hybrid_fields() -> List[Field]:
         Field(
             "NUM_CENTERS",
             "Patches",
-            2000,
+            800,
             kind="integer",
             minimum=1,
             maximum=100000,
