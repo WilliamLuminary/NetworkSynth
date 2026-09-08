@@ -560,24 +560,21 @@ ApplicationWindow {
                 anchors.margins: 14
                 contentWidth: availableWidth
                 clip: true
+                // The numbers describe the figure beside them, so with nothing
+                // drawn there is nothing for them to be about.
+                visible: picture.source != ""
 
                 ColumnLayout {
                     width: parent.width
                     spacing: 8
 
                     Label {
-                        Layout.fillWidth: true
-                        text: pane.metrics.title || ""
-                        visible: text !== ""
+                        text: "NETWORK PROPERTIES"
+                        visible: (pane.metrics.cells || []).length > 0
                         font.bold: true
-                        elide: Text.ElideRight
-                    }
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.bottomMargin: 2
-                        height: 1
-                        color: root.lineColor
-                        visible: pane.metrics.title !== undefined
+                        font.pixelSize: 10
+                        font.letterSpacing: 0.8
+                        opacity: 0.55
                     }
 
                     GridLayout {
@@ -604,7 +601,7 @@ ApplicationWindow {
                     }
 
                     Label {
-                        Layout.topMargin: 6
+                        Layout.topMargin: 12
                         text: "DEGREE DISTRIBUTION"
                         visible: (pane.metrics.distribution || []).length > 0
                         font.bold: true

@@ -27,11 +27,10 @@ def _percent(fraction: float) -> str:
     return f"{fraction * 100:.1f}%"
 
 
-def _metrics(title: str, graph, attributes) -> dict:
+def _metrics(graph, attributes) -> dict:
     distribution = attributes.degree_distribution or {}
     peak = max(distribution.values()) if distribution else 1.0
     return {
-        "title": title,
         "cells": [
             "Nodes",
             f"{graph.number_of_nodes():,}",
@@ -138,7 +137,7 @@ def preview_original(config, out_dir: str) -> dict:
         "image_size": None if image is None else list(config.FRAME_SIZE),
         "images": images,
         "note": note,
-        "metrics": _metrics("Original network", graph, attributes),
+        "metrics": _metrics(graph, attributes),
     }
 
 
@@ -180,9 +179,7 @@ def preview_synthetic(config, run_root: str, out_dir: str) -> dict:
             f"The first of the {len(exports)} networks in this run's output "
             "list — the order they were generated in, not a ranking."
         ),
-        "metrics": _metrics(
-            "Synthetic network — first in the output list", graph, attributes
-        ),
+        "metrics": _metrics(graph, attributes),
     }
 
 

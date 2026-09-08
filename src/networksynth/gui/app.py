@@ -651,6 +651,9 @@ class SynthesisController(QObject):
         self._spec_path = spec_path
         self._run_mode = self._mode
         self._ran_ok = False
+        # This run supersedes the last one's synthetic preview. _finish asks for
+        # the new one; until then the pane shows its placeholder, not run n-1.
+        self._info["synthetic"] = None
 
         self._log = [f"run-spec: {spec_path}"]
         self._percent = 0.0
