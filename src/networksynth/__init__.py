@@ -1,3 +1,3 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-__version__ = "2.1.0"
+__version__ = "3.0.0"

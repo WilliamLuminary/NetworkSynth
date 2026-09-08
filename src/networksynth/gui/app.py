@@ -25,7 +25,7 @@ from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 
 from networksynth.configs import BaseConfig
-from networksynth.gui import spec_builder
+from networksynth.gui import spec_builder, updater
 
 _QML = os.path.join(os.path.dirname(__file__), "qml", "SynthesisWindow.qml")
 _ICON = os.path.join(os.path.dirname(__file__), "qml", "assets", "networksynth.png")
@@ -43,6 +43,14 @@ _EXIT_MEANING = {
 }
 
 _PROCESS_GROUPS = hasattr(os, "killpg") and hasattr(os, "getpgid")
+
+# Windows has no SIGINT to send: Popen.send_signal rejects anything but SIGTERM
+# and the two console events, and only a process started in its own group can be
+# sent CTRL_BREAK. That event raises KeyboardInterrupt in the child, which is what
+# lets a cancelled run still write its manifest.
+_NEW_GROUP = (
+    {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {}
+)
 
 _CANCEL_GRACE = 15.0
 
@@ -67,6 +75,7 @@ class SynthesisController(QObject):
 
     changed = Signal()
     logChanged = Signal()
+    updateDone = Signal(str, bool)
 
     def __init__(
         self,
@@ -101,6 +110,9 @@ class SynthesisController(QObject):
         self._run_mode = ""
         self._ran_ok = False
         self._frame_touched = False
+        self._fit_side = spec_builder.STRUCTURALGT_SIDE
+        self._version: Optional[str] = None
+        self._can_update: Optional[bool] = None
 
         self._shown = {"original": True, "synthetic": False}
         self._info: Dict[str, Optional[dict]] = {"original": None, "synthetic": None}
@@ -296,11 +308,71 @@ class SynthesisController(QObject):
             self._info["original"] = None
             return True
         self._inputs["network_graphml"] = self._handover["network"]
+        frame = spec_builder.structuralgt_frame(self._handover.get("image"))
+        if frame:
+            for key in _FRAME_KEYS:
+                if key in self._values:
+                    self._values[key] = frame
         image = self._handover.get("image")
         if image:
             self._inputs["image"] = image
         self._info["original"] = None
         return True
+
+    @Property("QVariantList", notify=changed)
+    def structuralgtSides(self) -> list:
+        return spec_builder.structuralgt_sides(self._inputs.get("image"))
+
+    @Property(int, notify=changed)
+    def structuralgtSide(self) -> int:
+        sides = self.structuralgtSides
+        return sides.index(self._fit_side) if self._fit_side in sides else 0
+
+    @Slot(int)
+    def selectStructuralgtSide(self, index: int) -> None:
+        sides = self.structuralgtSides
+        if 0 <= index < len(sides):
+            self._fit_side = sides[index]
+            self.changed.emit()
+
+    @Property(bool, notify=changed)
+    def canFitFrame(self) -> bool:
+        return bool(self.structuralgtSides)
+
+    @Slot()
+    def fitFrame(self) -> None:
+        """Set the window to the scaled copy StructuralGT traced the network from."""
+        sides = self.structuralgtSides
+        side = self._fit_side if self._fit_side in sides else (sides or [0])[0]
+        frame = spec_builder.structuralgt_frame(self._inputs.get("image"), side)
+        if not frame:
+            self._set_status("No background image to measure.", failed=True)
+            return
+        for key in _FRAME_KEYS:
+            if key in self._values:
+                self._values[key] = frame
+        self._frame_touched = True
+        self._set_status(f"Window set to {frame[0]}x{frame[1]}.")
+        self._touch_preview()
+
+    @Property(str, notify=changed)
+    def version(self) -> str:
+        if self._version is None:
+            self._version = updater.version()
+        return self._version
+
+    @Property(bool, notify=changed)
+    def canUpdate(self) -> bool:
+        if self._can_update is None:
+            self._can_update = updater.in_checkout()
+        return self._can_update
+
+    @Slot()
+    def updateTool(self) -> None:
+        ok, message, restart = updater.update()
+        self._version = None
+        self._set_status(message, failed=not ok)
+        self.updateDone.emit(message, restart)
 
     @Property(bool, notify=changed)
     def hasHandover(self) -> bool:
@@ -521,6 +593,15 @@ class SynthesisController(QObject):
 
     @Slot(str, int, "QVariant")
     def setSize(self, key: str, index: int, value) -> None:
+        if str(value).strip() == "":
+            # Emptying either box puts the field back to deriving its own value,
+            # which is what the "auto" placeholder offers.
+            self._values[key] = None
+            if key in _FRAME_KEYS:
+                self._frame_touched = False
+            self._touch_preview()
+            return
+
         current = list(self._values.get(key) or (0, 0))
         as_float = self._kind_of(key) == "range"
         try:
@@ -574,6 +655,7 @@ class SynthesisController(QObject):
             stderr=subprocess.DEVNULL,
             stdin=subprocess.DEVNULL,
             start_new_session=_PROCESS_GROUPS,
+            **_NEW_GROUP,
         )
         self._cancel_at = None
         self._poll.start()
@@ -602,9 +684,11 @@ class SynthesisController(QObject):
                 )
             elif force:
                 self._process.kill()
+            elif os.name == "nt":
+                self._process.send_signal(signal.CTRL_BREAK_EVENT)
             else:
                 self._process.send_signal(signal.SIGINT)
-        except (ProcessLookupError, PermissionError, OSError):
+        except (ProcessLookupError, PermissionError, OSError, ValueError):
             pass
 
     def _kind_of(self, key: str) -> str:
@@ -902,6 +986,12 @@ def _read_handover(argv) -> Optional[Dict[str, str]]:
 
     if _STDIN_FLAG not in argv:
         return None
+
+    if sys.platform == "win32":
+        # Windows opens stdin in text mode, which rewrites CRLF and stops at 0x1A.
+        import msvcrt
+
+        msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
 
     graphml = sys.stdin.buffer.read()
     if not graphml:

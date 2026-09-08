@@ -141,6 +141,7 @@ The GUI can read a whole folder, one dataset per prefix, and a folder may hold a
 | Files | Format |
 | --- | --- |
 | `<prefix>_edgelist.csv` + `<prefix>_positions.csv` | a CSV pair |
+| `<prefix>_EdgeList.csv` + `<prefix>_NodePositions.csv` | a StructuralGT export, read as it comes |
 | `<prefix>_adjacency.npy` + `<prefix>_positions.npy` | a NumPy pair, positions transposed on load |
 | `<prefix>_network.graphml` or `.graphml.gz` | one file, positions inside it |
 | `<prefix>_image.tif` | the background for that prefix, optional |
@@ -213,6 +214,23 @@ Every mode writes `manifest.json` at the run root, from a `finally`, so a failed
 - `manifest_version` and the spec's `contract` exist so a future change fails loudly instead of being misread.
 
 Progress rides on the log: `{"tag": "PROGRESS", "percent": 66.67, ...}` in `run.jsonl`, next to `manifest.json`. Read the number rather than parsing prose.
+
+### From StructuralGT
+
+StructuralGT opens this window from its ribbon and hands the network over on stdin, so nothing is exported by hand:
+
+```bash
+networksynth --graph-from-stdin --image path/to/image.tif < network.graphml
+```
+
+The form opens with that network already selected, and a button in Align puts it back if you try another input and change your mind.
+
+Its exported CSV pairs are read directly too, under their own names, which is the extra row in the directory table above. Its conventions differ from ours in two ways, and both are handled on the way in:
+
+- Its positions are `(row, col)` written under headers `x,y`, so they are swapped on read. Only files named `_NodePositions.csv` are swapped; ours are left alone.
+- It traces the skeleton on a copy scaled to 1024 on the longest side, so the coordinate window is that copy rather than the image file. `FRAME_SIZE` follows that rule instead of the image, and Align has a Fit control for the other sizes StructuralGT offers.
+
+Both readings assume StructuralGT's defaults. Change the scaling there and set `FRAME_SIZE` by hand or use Fit. And if its export ever labels the columns the way we do, the swap above no longer applies, and nothing here will say so.
 
 Nothing in the spec records what an edge weight means. A `Weight` column may hold a diameter, area, length, angle, conductance or resistance depending on what produced it, and none of that is carried. The Mapper learns the length to weight relationship from the input and reproduces it, whatever the weight physically is. If the meaning ever stops being length related, that is a new mapper, not a new contract field.
 
