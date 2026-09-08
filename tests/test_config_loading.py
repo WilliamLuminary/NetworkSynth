@@ -28,7 +28,7 @@ class TestLoadingByPath:
             load_config(str(_CONFIGS / "hybrid_mode" / "config_snapshot"))
 
     def test_an_absolute_path_works(self, tmp_path):
-        absolute = str(_CONFIGS / "mosaic_mode" / "config_sample.py")
+        absolute = str(_CONFIGS / "hybrid_mode" / "config_sample.py")
 
         assert load_config(absolute).__name__ == "SampleConfig"
 

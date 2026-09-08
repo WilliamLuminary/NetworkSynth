@@ -29,31 +29,6 @@ def _tune(base, tmp_path, **overrides):
     return config
 
 
-class TestMosaicPipeline:
-    def test_run_mosaic_for_dataset(self, tmp_path):
-        from networksynth.configs.mosaic_mode.config_sample import SampleConfig
-        from networksynth.handlers import create_run_paths
-        from networksynth.pipelines.mosaic import run_mosaic_for_dataset
-
-        config = _tune(SampleConfig, tmp_path, GRID_ROWS=1, GRID_COLS=2)
-        run_paths = create_run_paths(config)
-
-        run_mosaic_for_dataset(config.get_datasets()[0], config, run_paths)
-
-        assert _outputs(str(tmp_path)), "mosaic produced no output files"
-
-    def test_compute_tile_layout_uses_its_config(self, tmp_path):
-        from networksynth.configs.mosaic_mode.config_sample import SampleConfig
-        from networksynth.pipelines.mosaic import compute_tile_layout
-
-        config = _tune(SampleConfig, tmp_path, GRID_ROWS=1, GRID_COLS=2)
-
-        tile_gen_frame, tile_offsets = compute_tile_layout(config)
-
-        assert len(tile_offsets) == 2
-        assert tile_gen_frame[0] > config.TILE_FRAME_SIZE[0]
-
-
 class TestScalingPipeline:
     def test_run_scaling_for_dataset(self, tmp_path):
         from networksynth.configs.scaling_mode.config_sample import SampleConfig

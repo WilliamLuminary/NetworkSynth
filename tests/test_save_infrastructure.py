@@ -91,12 +91,12 @@ class TestSpecs:
 
 class TestModeOverrides:
 
-    def test_mosaic_synthetic_graph_has_png(self):
-        from networksynth.configs.mosaic_mode.config_sample import (
-            SampleConfig as MosaicConfig,
+    def test_hybrid_synthetic_graph_has_png(self):
+        from networksynth.configs.hybrid_mode.config_sample import (
+            SampleConfig as HybridConfig,
         )
 
-        specs = MosaicConfig.save("synthetic_graph")
+        specs = HybridConfig.save("synthetic_graph")
         exts = [s.extension for s in specs]
         assert "webp" in exts
         assert "png" in exts
@@ -115,11 +115,11 @@ class TestModeOverrides:
         assert specs[0].detail == "test_detail"
 
     def test_override_does_not_leak_to_other_configs(self):
-        from networksynth.configs.mosaic_mode.config_sample import (
-            SampleConfig as MosaicConfig,
+        from networksynth.configs.hybrid_mode.config_sample import (
+            SampleConfig as HybridConfig,
         )
 
-        MosaicConfig.save("synthetic_graph")
+        HybridConfig.save("synthetic_graph")
 
         assert len(BaseConfig.save("synthetic_graph")) == 1
 

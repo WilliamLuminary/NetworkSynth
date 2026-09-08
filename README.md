@@ -42,7 +42,7 @@ Networks are saved as a CSV pair, `*_edgelist.csv` plus `*_positions.csv`. Graph
 
 A run takes one config file and nothing else. `networksynth-cli` with no argument lists them all.
 
-Each file holds exactly one class with a `DATASETS` attribute. Its `MODE` picks the pipeline: `generate`, `hybrid`, `mosaic`, `scaling`, `sweep` or `compare`. Nothing needs registering, the file is the name.
+Each file holds exactly one class with a `DATASETS` attribute. Its `MODE` picks the pipeline: `generate`, `hybrid`, `scaling`, `sweep` or `compare`. Nothing needs registering, the file is the name.
 
 ### Writing one
 
@@ -150,7 +150,7 @@ A half named dataset stops the run instead of being skipped: an edge list with n
 
 Two things this does not cover. The npy files in `data/input/samples/` keep older `_mat.npy` and `_pos.npy` names that CLI configs load directly, so those folders are not discoverable this way. And `networksynth-analyse` reads a directory by its own rule, every GraphML file or else every CSV pair.
 
-The form is a deliberate subset of what a config can express. Only the CLI can run `mosaic`, `scaling` and `compare`, set per dataset factors, fix tile frame sizes, ask for log spaced snapshots, or write SVG from a hybrid run. Going the other way, `INPUT_ORIENTATION` rotates the input as it is read and exists only in the form.
+The form is a deliberate subset of what a config can express. Only the CLI can run `scaling` and `compare`, set per dataset factors, fix tile frame sizes, ask for log spaced snapshots, or write SVG from a hybrid run. Going the other way, `INPUT_ORIENTATION` rotates the input as it is read and exists only in the form.
 
 ## Driving a run from another program
 
