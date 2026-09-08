@@ -541,8 +541,8 @@ ApplicationWindow {
                 width: parent.width - 40
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.WordWrap
-                visible: picture.source == ""
-                text: parent.parent.placeholder
+                visible: picture.source.toString() === ""
+                text: pane.placeholder
                 opacity: 0.55
             }
         }
@@ -562,7 +562,7 @@ ApplicationWindow {
                 clip: true
                 // The numbers describe the figure beside them, so with nothing
                 // drawn there is nothing for them to be about.
-                visible: picture.source != ""
+                visible: picture.source.toString() !== ""
 
                 ColumnLayout {
                     width: parent.width
@@ -629,7 +629,7 @@ ApplicationWindow {
                             Rectangle {
                                 Layout.fillWidth: true
                                 Layout.minimumWidth: 24
-                                height: 4
+                                Layout.preferredHeight: 4
                                 radius: 2
                                 color: root.lineColor
 
@@ -923,12 +923,13 @@ ApplicationWindow {
                                     Layout.preferredWidth: root.labelWidth
                                 }
                                 Button {
+                                    id: saveEdited
                                     text: "Save as edited"
                                     enabled: controller.canRun
                                     onClicked: controller.saveEdited()
                                     HoverPanel {
                                         note: "Write the network as it is drawn " + "now into an 'edited' folder beside " + "the source, and read that from here on."
-                                        showing: parent.hovered
+                                        showing: saveEdited.hovered
                                     }
                                 }
                                 Item {
@@ -1024,7 +1025,7 @@ ApplicationWindow {
 
                                     Rectangle {
                                         Layout.preferredWidth: 16
-                                        height: 1
+                                        Layout.preferredHeight: 1
                                         color: root.lineColor
                                     }
 
@@ -1038,7 +1039,7 @@ ApplicationWindow {
 
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        height: 1
+                                        Layout.preferredHeight: 1
                                         color: root.lineColor
                                     }
 
@@ -1098,7 +1099,7 @@ ApplicationWindow {
 
                                 Rectangle {
                                     Layout.fillWidth: true
-                                    height: 1
+                                    Layout.preferredHeight: 1
                                     color: root.lineColor
                                     Layout.bottomMargin: 4
                                 }
