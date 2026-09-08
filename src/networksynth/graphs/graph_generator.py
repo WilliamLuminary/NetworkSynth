@@ -7,12 +7,13 @@ from typing import Dict, List, Optional, Tuple, Union
 from numpy import ndarray
 
 from networksynth.configs import SynthParams
-from networksynth.utils import build_graph, calculate_frame, tagged
+from networksynth.utils import build_graph, calculate_frame, progress, tagged
 
 from ._graph_node import GraphNode
 from .synth_graph import SynthGraph
 
 logger = logging.getLogger(__name__)
+
 
 FrontierDescriptor = namedtuple(
     "FrontierDescriptor",
@@ -253,6 +254,7 @@ class GraphGenerator:
         *,
         snapshot_callback=None,
         snapshot_round_interval: int = 0,
+        expected_nodes: int = 0,
     ) -> SynthGraph:
         GraphNode.reset()
 
@@ -394,7 +396,10 @@ class GraphGenerator:
                         logger.info(
                             f"Phase 2 round {virtual_round}: "
                             f"frontier={len(frontier):,}, {GraphNode.counts()}",
-                            extra=tagged("PHASE2"),
+                            extra=tagged(
+                                "PHASE2",
+                                **progress(GraphNode.nodes_created(), expected_nodes),
+                            ),
                         )
 
                     if take_snapshots and (virtual_round + 1) >= next_snapshot_round:

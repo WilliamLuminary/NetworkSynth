@@ -42,6 +42,7 @@ from networksynth.utils import (
     apply_seed,
     build_graph,
     log_memory,
+    progress,
     render_network,
     save_hybrid_snapshot,
     spawn_context,
@@ -223,6 +224,7 @@ def run_phase1(
     frames: List[Tuple[float, float]],
     config,
     base_params: SynthParams,
+    expected_nodes: int = 0,
 ) -> Dict[int, dict]:
 
     num_centers = len(frames)
@@ -257,17 +259,19 @@ def run_phase1(
     try:
         futures = {executor.submit(_generate_tile_worker, a): a[0] for a in tile_args}
         completed = 0
+        made = 0
         next_log_pct = 10
         for future in as_completed(futures):
             tile_idx, data = future.result()
             completed += 1
-            progress = round(completed / num_centers * 100, 1)
-            if progress >= next_log_pct:
+            made += 0 if data is None else len(data["positions"])
+            tiles_pct = round(completed / num_centers * 100, 1)
+            if tiles_pct >= next_log_pct:
                 err_str = f", error={data['error']:.4f}" if data else ""
                 logger.info(
-                    f"Phase 1 progress: {progress}% "
+                    f"Phase 1 progress: {tiles_pct}% "
                     f"({completed:,}/{num_centers:,}){err_str}",
-                    extra=tagged("PHASE1", percent=progress),
+                    extra=tagged("PHASE1", **progress(made, expected_nodes)),
                 )
                 next_log_pct += 10
             if data is not None:
@@ -313,6 +317,7 @@ def run_phase2(
     params: SynthParams,
     snapshot_dir: str | None = None,
     snapshot_round_interval: int = 0,
+    expected_nodes: int = 0,
 ) -> SynthGraph:
     frame_w, frame_h = config.SYNTHETIC_FRAME_SIZE
     margin_x = frame_w
@@ -326,7 +331,7 @@ def run_phase2(
 
     logger.info(
         f"Phase 2: whiteboard {whiteboard_w:.0f}×{whiteboard_h:.0f}, "
-        f"global_frame={global_frame}"
+        f"global_frame={global_frame}, expecting ~{expected_nodes:,} nodes"
         + (
             (
                 f", snapshot every {snapshot_round_interval} round(s)"
@@ -417,6 +422,7 @@ def run_phase2(
                 max_rounds,
                 snapshot_callback=on_snapshot,
                 snapshot_round_interval=snapshot_round_interval,
+                expected_nodes=expected_nodes,
             )
 
         remaining = sum(1 for f in pending if not f.done())
@@ -437,7 +443,10 @@ def run_phase2(
     else:
         with GraphNode.traversal(attributes, params):
             graph = GraphGenerator.assemble_and_continue(
-                tile_data_list, global_frame, max_rounds
+                tile_data_list,
+                global_frame,
+                max_rounds,
+                expected_nodes=expected_nodes,
             )
 
     return graph
@@ -491,6 +500,16 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
     frame_w, frame_h = config.FRAME_SIZE
     whiteboard_w = scale_cols * frame_w
     whiteboard_h = scale_rows * frame_h
+    # Growth is bounded by run_phase2's global_frame, which pads the whiteboard
+    # by one frame on each side, so the area that fills is the padded one. On
+    # runs 1000x apart in scale the count lands at ~0.89 of this, which leaves
+    # the bar short of the end rather than at it.
+    expected_nodes = round(
+        run.original.number_of_nodes()
+        / (frame_w * frame_h)
+        * (whiteboard_w + 2 * frame_w)
+        * (whiteboard_h + 2 * frame_h)
+    )
     min_distance = center_min_distance(config)
 
     max_centers = config.NUM_CENTERS
@@ -507,7 +526,13 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
     log_memory(f"Before Phase 1 ({dataset_id})", config.LOG_MEMORY)
     t0 = time.time()
     tile_results = run_phase1(
-        attributes, mapper, error_checker, frames, config, base_params
+        attributes,
+        mapper,
+        error_checker,
+        frames,
+        config,
+        base_params,
+        expected_nodes=expected_nodes,
     )
     logger.info(
         f"Phase 1 elapsed: {time.time() - t0:.1f}s",
@@ -542,6 +567,7 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
         base_params,
         snapshot_dir=snapshot_dir,
         snapshot_round_interval=snapshot_interval,
+        expected_nodes=expected_nodes,
     )
     logger.info(
         f"Phase 2 elapsed: {time.time() - t1:.1f}s",
