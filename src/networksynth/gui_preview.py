@@ -17,32 +17,40 @@ PREVIEW_DPI = 90
 _EXPORT_SUFFIX = ".graphml.gz"
 _EXPORT_MARKER = "synthetic_network"
 
-# One file per network, numbered by this infix. There is no combined batch any
-# more: holding a list took a pickle, and GraphML carries a single graph.
+
 _EXPORT_INFIX = re.compile(r"_n(\d+)_" + _EXPORT_MARKER)
 
-_LABEL_WIDTH = 21
+
+def _percent(fraction: float) -> str:
+    if 0 < fraction < 0.0005:
+        return "<0.1%"
+    return f"{fraction * 100:.1f}%"
 
 
-def _row(label: str, value: str) -> str:
-    return f"{label + ':':<{_LABEL_WIDTH}}{value}"
-
-
-def _info_text(title: str, graph, attributes) -> str:
-    rows = [
-        _row("Nodes", f"{graph.number_of_nodes():,}"),
-        _row("Edges", f"{graph.number_of_edges():,}"),
-        _row("Average degree", f"{attributes.average_degree:.4f}"),
-        _row("Average edge length", f"{attributes.average_length:.4f}"),
-    ]
-    lines = [title, "=" * max(len(row) for row in [title] + rows), *rows]
-    if attributes.degree_distribution:
-        lines.append("")
-        lines.append("Degree distribution:")
-        for degree in sorted(attributes.degree_distribution):
-            fraction = attributes.degree_distribution[degree]
-            lines.append(f"  degree {degree:>3d}: {fraction:.4f}")
-    return "\n".join(lines)
+def _metrics(title: str, graph, attributes) -> dict:
+    distribution = attributes.degree_distribution or {}
+    peak = max(distribution.values()) if distribution else 1.0
+    return {
+        "title": title,
+        "cells": [
+            "Nodes",
+            f"{graph.number_of_nodes():,}",
+            "Edges",
+            f"{graph.number_of_edges():,}",
+            "Average degree",
+            f"{attributes.average_degree:.4f}",
+            "Average edge length",
+            f"{attributes.average_length:.4f}",
+        ],
+        "distribution": [
+            {
+                "degree": str(degree),
+                "percent": _percent(distribution[degree]),
+                "bar": distribution[degree] / peak,
+            }
+            for degree in sorted(distribution)
+        ],
+    }
 
 
 def _write(fig, out_dir: str, name: str) -> str:
@@ -130,7 +138,7 @@ def preview_original(config, out_dir: str) -> dict:
         "image_size": None if image is None else list(config.FRAME_SIZE),
         "images": images,
         "note": note,
-        "text": _info_text("Original network", graph, attributes),
+        "metrics": _metrics("Original network", graph, attributes),
     }
 
 
@@ -172,7 +180,7 @@ def preview_synthetic(config, run_root: str, out_dir: str) -> dict:
             f"The first of the {len(exports)} networks in this run's output "
             "list — the order they were generated in, not a ranking."
         ),
-        "text": _info_text(
+        "metrics": _metrics(
             "Synthetic network — first in the output list", graph, attributes
         ),
     }

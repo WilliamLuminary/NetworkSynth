@@ -535,9 +535,9 @@ class SynthesisController(QObject):
             return ""
         return _file_url(images.get(key))
 
-    @Property(str, notify=changed)
-    def originalInfo(self) -> str:
-        return self._text_of("original")
+    @Property("QVariantMap", notify=changed)
+    def originalInfo(self) -> dict:
+        return self._metrics_of("original")
 
     @Property(str, notify=changed)
     def originalNote(self) -> str:
@@ -548,9 +548,9 @@ class SynthesisController(QObject):
         info = self._info["synthetic"]
         return _file_url(info["images"]["network"]) if info else ""
 
-    @Property(str, notify=changed)
-    def syntheticInfo(self) -> str:
-        return self._text_of("synthetic")
+    @Property("QVariantMap", notify=changed)
+    def syntheticInfo(self) -> dict:
+        return self._metrics_of("synthetic")
 
     @Property(str, notify=changed)
     def syntheticNote(self) -> str:
@@ -839,9 +839,9 @@ class SynthesisController(QObject):
         )
         return spec_builder.write_spec(spec, os.path.join(self._scratch_dir(), name))
 
-    def _text_of(self, kind: str) -> str:
+    def _metrics_of(self, kind: str) -> dict:
         info = self._info[kind]
-        return info["text"] if info else ""
+        return info["metrics"] if info else {}
 
     def _note_of(self, kind: str) -> str:
         info = self._info[kind]

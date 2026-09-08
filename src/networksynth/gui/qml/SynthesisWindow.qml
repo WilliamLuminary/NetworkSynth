@@ -32,8 +32,7 @@ ApplicationWindow {
     readonly property color goodColor: darkTheme ? "#5ac97f" : "#1e8e4c"
     readonly property color badColor: darkTheme ? "#f0796d" : "#c0392b"
 
-    // font.family takes one name and "menlo" exists on macOS only, so name one
-    // per platform and keep the first the machine actually has.
+    // font.family takes one name, and "menlo" exists on macOS only.
     readonly property string monoFamily: {
         const have = Qt.fontFamilies();
         for (const name of ["Menlo", "Consolas", "DejaVu Sans Mono", "Liberation Mono", "Courier New"])
@@ -41,27 +40,6 @@ ApplicationWindow {
                 return name;
         return "monospace";
     }
-    readonly property string ruleHex: darkTheme ? "#5f5f5f" : "#c4c4c4"
-
-    // The report is plain text and stays plain text; this only dresses it for
-    // display, keeping every space so the columns still line up. One block per
-    // line, not <br>, so selecting the whole pane still copies as lines.
-    readonly property string reportStyle: "margin-top:0px;margin-bottom:0px;line-height:150%"
-
-    function report(text) {
-        if (!text)
-            return "";
-        return text.split("\n").map(function (line) {
-            const body = line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/ /g, "&nbsp;") || "&nbsp;";
-            const open = "<p style=\"" + root.reportStyle + "\">";
-            if (/^=+$/.test(line))
-                return open + "<span style=\"color:" + root.ruleHex + "\">" + body + "</span></p>";
-            if (line.indexOf(":") < 0 || line.endsWith(":"))
-                return open + "<b>" + body + "</b></p>";
-            return open + body + "</p>";
-        }).join("");
-    }
-
     footer: Rectangle {
 
         color: root.cardColor
@@ -537,7 +515,7 @@ ApplicationWindow {
     component PreviewPane: RowLayout {
         id: pane
         property alias image: picture.source
-        property string info: ""
+        property var metrics: ({})
         property string placeholder: "Run, and the result is drawn here."
 
         spacing: 12
@@ -579,18 +557,100 @@ ApplicationWindow {
 
             ScrollView {
                 anchors.fill: parent
-                anchors.margins: 2
-                TextArea {
-                    id: details
-                    readOnly: true
-                    wrapMode: TextArea.NoWrap
-                    textFormat: TextArea.RichText
-                    text: root.report(pane.info)
-                    color: palette.text
-                    font.family: root.monoFamily
-                    font.pixelSize: 11
-                    padding: 10
-                    background: null
+                anchors.margins: 14
+                contentWidth: availableWidth
+                clip: true
+
+                ColumnLayout {
+                    width: parent.width
+                    spacing: 8
+
+                    Label {
+                        Layout.fillWidth: true
+                        text: pane.metrics.title || ""
+                        visible: text !== ""
+                        font.bold: true
+                        elide: Text.ElideRight
+                    }
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.bottomMargin: 2
+                        height: 1
+                        color: root.lineColor
+                        visible: pane.metrics.title !== undefined
+                    }
+
+                    GridLayout {
+                        Layout.fillWidth: true
+                        columns: 2
+                        columnSpacing: 16
+                        rowSpacing: 6
+
+                        Repeater {
+                            model: pane.metrics.cells || []
+
+                            delegate: Label {
+                                required property int index
+                                required property string modelData
+                                readonly property bool isValue: index % 2 === 1
+
+                                Layout.fillWidth: isValue
+                                horizontalAlignment: isValue ? Text.AlignRight : Text.AlignLeft
+                                text: modelData
+                                font.bold: isValue
+                                opacity: isValue ? 1.0 : 0.6
+                            }
+                        }
+                    }
+
+                    Label {
+                        Layout.topMargin: 6
+                        text: "DEGREE DISTRIBUTION"
+                        visible: (pane.metrics.distribution || []).length > 0
+                        font.bold: true
+                        font.pixelSize: 10
+                        font.letterSpacing: 0.8
+                        opacity: 0.55
+                    }
+
+                    Repeater {
+                        model: pane.metrics.distribution || []
+
+                        delegate: RowLayout {
+                            id: share
+                            required property var modelData
+
+                            Layout.fillWidth: true
+                            spacing: 10
+
+                            Label {
+                                Layout.preferredWidth: 24
+                                horizontalAlignment: Text.AlignRight
+                                text: share.modelData.degree
+                                opacity: 0.6
+                            }
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.minimumWidth: 24
+                                height: 4
+                                radius: 2
+                                color: root.lineColor
+
+                                Rectangle {
+                                    width: parent.width * share.modelData.bar
+                                    height: parent.height
+                                    radius: parent.radius
+                                    color: root.accent
+                                }
+                            }
+                            Label {
+                                Layout.preferredWidth: 48
+                                horizontalAlignment: Text.AlignRight
+                                text: share.modelData.percent
+                                font.bold: true
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1147,12 +1207,12 @@ ApplicationWindow {
 
                                 PreviewPane {
                                     image: controller.originalImage
-                                    info: controller.originalInfo
+                                    metrics: controller.originalInfo
                                     placeholder: controller.previewStatus !== "" ? controller.previewStatus : "Choose an edge list and positions, and the input network is drawn here."
                                 }
                                 PreviewPane {
                                     image: controller.syntheticImage
-                                    info: controller.syntheticInfo
+                                    metrics: controller.syntheticInfo
                                     placeholder: controller.previewStatus !== "" ? controller.previewStatus : "Run, and the first network of the output is drawn here."
                                 }
                             }
