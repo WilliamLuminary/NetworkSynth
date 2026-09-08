@@ -32,6 +32,36 @@ ApplicationWindow {
     readonly property color goodColor: darkTheme ? "#5ac97f" : "#1e8e4c"
     readonly property color badColor: darkTheme ? "#f0796d" : "#c0392b"
 
+    // font.family takes one name and "menlo" exists on macOS only, so name one
+    // per platform and keep the first the machine actually has.
+    readonly property string monoFamily: {
+        const have = Qt.fontFamilies();
+        for (const name of ["Menlo", "Consolas", "DejaVu Sans Mono", "Liberation Mono", "Courier New"])
+            if (have.indexOf(name) >= 0)
+                return name;
+        return "monospace";
+    }
+    readonly property string ruleHex: darkTheme ? "#5f5f5f" : "#c4c4c4"
+
+    // The report is plain text and stays plain text; this only dresses it for
+    // display, keeping every space so the columns still line up. One block per
+    // line, not <br>, so selecting the whole pane still copies as lines.
+    readonly property string reportStyle: "margin-top:0px;margin-bottom:0px;line-height:150%"
+
+    function report(text) {
+        if (!text)
+            return "";
+        return text.split("\n").map(function (line) {
+            const body = line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/ /g, "&nbsp;") || "&nbsp;";
+            const open = "<p style=\"" + root.reportStyle + "\">";
+            if (/^=+$/.test(line))
+                return open + "<span style=\"color:" + root.ruleHex + "\">" + body + "</span></p>";
+            if (line.indexOf(":") < 0 || line.endsWith(":"))
+                return open + "<b>" + body + "</b></p>";
+            return open + body + "</p>";
+        }).join("");
+    }
+
     footer: Rectangle {
 
         color: root.cardColor
@@ -116,7 +146,7 @@ ApplicationWindow {
                 Label {
                     text: controller.runLabel
                     visible: controller.runLabel !== ""
-                    font.family: "menlo"
+                    font.family: root.monoFamily
                     font.pixelSize: 11
                     opacity: 0.55
                 }
@@ -505,8 +535,9 @@ ApplicationWindow {
     }
 
     component PreviewPane: RowLayout {
+        id: pane
         property alias image: picture.source
-        property alias info: details.text
+        property string info: ""
         property string placeholder: "Run, and the result is drawn here."
 
         spacing: 12
@@ -541,20 +572,24 @@ ApplicationWindow {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 260
-            color: root.paneColor
+            color: palette.base
             border.color: root.lineColor
             border.width: 1
             radius: 6
 
             ScrollView {
                 anchors.fill: parent
-                anchors.margins: 8
+                anchors.margins: 2
                 TextArea {
                     id: details
                     readOnly: true
                     wrapMode: TextArea.NoWrap
-                    font.family: "menlo"
+                    textFormat: TextArea.RichText
+                    text: root.report(pane.info)
+                    color: palette.text
+                    font.family: root.monoFamily
                     font.pixelSize: 11
+                    padding: 10
                     background: null
                 }
             }
@@ -870,273 +905,276 @@ ApplicationWindow {
                     }
                 }
 
-                ColumnLayout {
+                ScrollView {
                     SplitView.fillWidth: true
                     SplitView.minimumWidth: 470
-                    spacing: 12
+                    contentWidth: availableWidth
 
-                    Card {
-                        title: "Output"
-                        Layout.leftMargin: 14
+                    ColumnLayout {
+                        width: parent.width
+                        spacing: 12
 
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 10
-
-                            Label {
-                                text: "Folder"
-                                Layout.preferredWidth: root.labelWidth
-                            }
-                            TextField {
-                                id: outputField
-                                Layout.fillWidth: true
-                                text: controller.outputDir
-                                onEditingFinished: controller.setOutputDir(text)
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    enabled: outputField.text === ""
-                                    onClicked: outputDialog.open()
-                                }
-                            }
-                            Button {
-                                text: "Browse…"
-                                onClicked: outputDialog.open()
-                            }
-
-                            InfoButton {
-                                note: "Each run makes its own timestamped " + "folder in here, named for the mode and " + "the run. \"latest_result\" is kept " + "pointing at the newest."
-                            }
-                        }
-
-                        Repeater {
-                            model: controller.outputLines
-                            delegate: FormLine {
-                                required property var modelData
-                                line: modelData
-                            }
-                        }
-
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            Layout.topMargin: 4
-                            spacing: 8
+                        Card {
+                            title: "Output"
+                            Layout.leftMargin: 14
 
                             RowLayout {
-                                Layout.fillWidth: false
-                                spacing: 14
-
-                                Rectangle {
-                                    Layout.preferredWidth: 16
-                                    height: 1
-                                    color: root.lineColor
-                                }
+                                Layout.fillWidth: true
+                                spacing: 10
 
                                 Label {
-                                    text: "OUTPUT FORMATS"
-                                    font.pixelSize: 10
-                                    font.bold: true
-                                    font.letterSpacing: 0.8
-                                    opacity: 0.55
+                                    text: "Folder"
+                                    Layout.preferredWidth: root.labelWidth
+                                }
+                                TextField {
+                                    id: outputField
+                                    Layout.fillWidth: true
+                                    text: controller.outputDir
+                                    onEditingFinished: controller.setOutputDir(text)
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        enabled: outputField.text === ""
+                                        onClicked: outputDialog.open()
+                                    }
+                                }
+                                Button {
+                                    text: "Browse…"
+                                    onClicked: outputDialog.open()
+                                }
+
+                                InfoButton {
+                                    note: "Each run makes its own timestamped " + "folder in here, named for the mode and " + "the run. \"latest_result\" is kept " + "pointing at the newest."
+                                }
+                            }
+
+                            Repeater {
+                                model: controller.outputLines
+                                delegate: FormLine {
+                                    required property var modelData
+                                    line: modelData
+                                }
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                Layout.topMargin: 4
+                                spacing: 8
+
+                                RowLayout {
+                                    Layout.fillWidth: false
+                                    spacing: 14
+
+                                    Rectangle {
+                                        Layout.preferredWidth: 16
+                                        height: 1
+                                        color: root.lineColor
+                                    }
+
+                                    Label {
+                                        text: "OUTPUT FORMATS"
+                                        font.pixelSize: 10
+                                        font.bold: true
+                                        font.letterSpacing: 0.8
+                                        opacity: 0.55
+                                    }
+
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        height: 1
+                                        color: root.lineColor
+                                    }
+
+                                    Label {
+                                        text: "Select none"
+                                        font.pixelSize: 11
+                                        color: noneHover.hovered ? root.accent : palette.text
+                                        opacity: noneHover.hovered ? 1.0 : 0.55
+
+                                        HoverHandler {
+                                            id: noneHover
+                                            cursorShape: Qt.PointingHandCursor
+                                        }
+                                        TapHandler {
+                                            onTapped: controller.clearOutputs()
+                                        }
+                                        HoverPanel {
+                                            note: "Write no networks and no plots. " + "A run still leaves its report " + "and the batch a preview reads."
+                                            showing: noneHover.hovered
+                                            alignRight: true
+                                        }
+                                    }
+
+                                    Label {
+                                        text: "Defaults"
+                                        font.pixelSize: 11
+                                        color: defaultsHover.hovered ? root.accent : palette.text
+                                        opacity: defaultsHover.hovered ? 1.0 : 0.55
+
+                                        HoverHandler {
+                                            id: defaultsHover
+                                            cursorShape: Qt.PointingHandCursor
+                                        }
+                                        TapHandler {
+                                            onTapped: controller.resetOutputs()
+                                        }
+                                        HoverPanel {
+                                            note: "Networks as .csv, plots as .webp."
+                                            showing: defaultsHover.hovered
+                                            alignRight: true
+                                        }
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+
+                                    Repeater {
+                                        model: controller.formatLines
+                                        delegate: FormLine {
+                                            required property var modelData
+                                            line: modelData
+                                        }
+                                    }
                                 }
 
                                 Rectangle {
                                     Layout.fillWidth: true
                                     height: 1
                                     color: root.lineColor
+                                    Layout.bottomMargin: 4
                                 }
-
-                                Label {
-                                    text: "Select none"
-                                    font.pixelSize: 11
-                                    color: noneHover.hovered ? root.accent : palette.text
-                                    opacity: noneHover.hovered ? 1.0 : 0.55
-
-                                    HoverHandler {
-                                        id: noneHover
-                                        cursorShape: Qt.PointingHandCursor
-                                    }
-                                    TapHandler {
-                                        onTapped: controller.clearOutputs()
-                                    }
-                                    HoverPanel {
-                                        note: "Write no networks and no plots. " + "A run still leaves its report " + "and the batch a preview reads."
-                                        showing: noneHover.hovered
-                                        alignRight: true
-                                    }
-                                }
-
-                                Label {
-                                    text: "Defaults"
-                                    font.pixelSize: 11
-                                    color: defaultsHover.hovered ? root.accent : palette.text
-                                    opacity: defaultsHover.hovered ? 1.0 : 0.55
-
-                                    HoverHandler {
-                                        id: defaultsHover
-                                        cursorShape: Qt.PointingHandCursor
-                                    }
-                                    TapHandler {
-                                        onTapped: controller.resetOutputs()
-                                    }
-                                    HoverPanel {
-                                        note: "Networks as .csv, plots as .webp."
-                                        showing: defaultsHover.hovered
-                                        alignRight: true
-                                    }
-                                }
-                            }
-
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 8
-
-                                Repeater {
-                                    model: controller.formatLines
-                                    delegate: FormLine {
-                                        required property var modelData
-                                        line: modelData
-                                    }
-                                }
-                            }
-
-                            Rectangle {
-                                Layout.fillWidth: true
-                                height: 1
-                                color: root.lineColor
-                                Layout.bottomMargin: 4
                             }
                         }
-                    }
 
-                    Card {
-                        title: "Preview"
-                        Layout.leftMargin: 14
-                        visible: controller.canPreview
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 10
+                        Card {
+                            title: "Preview"
+                            Layout.leftMargin: 14
+                            visible: controller.canPreview
 
                             RowLayout {
-                                id: previewTabs
-                                property int currentIndex: 0
-                                onCurrentIndexChanged: controller.selectPreviewTab(currentIndex)
-                                spacing: 4
-
-                                Connections {
-                                    target: controller
-                                    function onChanged() {
-                                        if (!controller.offersSyntheticPreview && previewTabs.currentIndex !== 0)
-                                            previewTabs.currentIndex = 0;
-                                    }
-                                }
-
-                                Rectangle {
-                                    Layout.preferredWidth: 112
-                                    Layout.preferredHeight: 26
-                                    radius: 6
-                                    color: previewTabs.currentIndex === 0 ? root.paneColor : "transparent"
-
-                                    Label {
-                                        anchors.centerIn: parent
-                                        text: "Original"
-                                        opacity: previewTabs.currentIndex === 0 ? 1.0 : 0.65
-                                    }
-                                    TapHandler {
-                                        onTapped: previewTabs.currentIndex = 0
-                                    }
-                                }
-
-                                Rectangle {
-                                    Layout.preferredWidth: 112
-                                    Layout.preferredHeight: 26
-                                    radius: 6
-                                    visible: controller.offersSyntheticPreview
-                                    enabled: controller.canPreviewSynthetic
-                                    opacity: enabled ? 1.0 : 0.4
-                                    color: previewTabs.currentIndex === 1 ? root.paneColor : "transparent"
-
-                                    Label {
-                                        anchors.centerIn: parent
-                                        text: "Synthetic"
-                                        opacity: previewTabs.currentIndex === 1 ? 1.0 : 0.65
-                                    }
-                                    TapHandler {
-                                        onTapped: previewTabs.currentIndex = 1
-                                    }
-                                }
-                            }
-
-                            Button {
-                                text: "Background"
-                                checkable: true
-                                checked: controller.showBackground
-                                visible: previewTabs.currentIndex === 0 && controller.hasBackground
-                                onToggled: controller.setShowBackground(checked)
-                            }
-                            Button {
-                                text: "Network"
-                                checkable: true
-                                checked: controller.showNetwork
-                                visible: previewTabs.currentIndex === 0
-                                onToggled: controller.setShowNetwork(checked)
-                            }
-                            Item {
                                 Layout.fillWidth: true
+                                spacing: 10
+
+                                RowLayout {
+                                    id: previewTabs
+                                    property int currentIndex: 0
+                                    onCurrentIndexChanged: controller.selectPreviewTab(currentIndex)
+                                    spacing: 4
+
+                                    Connections {
+                                        target: controller
+                                        function onChanged() {
+                                            if (!controller.offersSyntheticPreview && previewTabs.currentIndex !== 0)
+                                                previewTabs.currentIndex = 0;
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        Layout.preferredWidth: 112
+                                        Layout.preferredHeight: 26
+                                        radius: 6
+                                        color: previewTabs.currentIndex === 0 ? root.paneColor : "transparent"
+
+                                        Label {
+                                            anchors.centerIn: parent
+                                            text: "Original"
+                                            opacity: previewTabs.currentIndex === 0 ? 1.0 : 0.65
+                                        }
+                                        TapHandler {
+                                            onTapped: previewTabs.currentIndex = 0
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        Layout.preferredWidth: 112
+                                        Layout.preferredHeight: 26
+                                        radius: 6
+                                        visible: controller.offersSyntheticPreview
+                                        enabled: controller.canPreviewSynthetic
+                                        opacity: enabled ? 1.0 : 0.4
+                                        color: previewTabs.currentIndex === 1 ? root.paneColor : "transparent"
+
+                                        Label {
+                                            anchors.centerIn: parent
+                                            text: "Synthetic"
+                                            opacity: previewTabs.currentIndex === 1 ? 1.0 : 0.65
+                                        }
+                                        TapHandler {
+                                            onTapped: previewTabs.currentIndex = 1
+                                        }
+                                    }
+                                }
+
+                                Button {
+                                    text: "Background"
+                                    checkable: true
+                                    checked: controller.showBackground
+                                    visible: previewTabs.currentIndex === 0 && controller.hasBackground
+                                    onToggled: controller.setShowBackground(checked)
+                                }
+                                Button {
+                                    text: "Network"
+                                    checkable: true
+                                    checked: controller.showNetwork
+                                    visible: previewTabs.currentIndex === 0
+                                    onToggled: controller.setShowNetwork(checked)
+                                }
+                                Item {
+                                    Layout.fillWidth: true
+                                }
+                                Label {
+                                    text: controller.previewStatus
+                                    color: controller.previewFailed ? root.badColor : palette.text
+                                    opacity: controller.previewFailed ? 1.0 : 0.65
+                                    elide: Text.ElideRight
+                                }
                             }
+
                             Label {
-                                text: controller.previewStatus
-                                color: controller.previewFailed ? root.badColor : palette.text
-                                opacity: controller.previewFailed ? 1.0 : 0.65
-                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                                wrapMode: Text.WordWrap
+                                opacity: 0.65
+                                text: previewTabs.currentIndex === 0 ? controller.originalNote : controller.syntheticNote
+                                visible: text !== ""
+                            }
+
+                            StackLayout {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 264
+                                currentIndex: previewTabs.currentIndex
+
+                                PreviewPane {
+                                    image: controller.originalImage
+                                    info: controller.originalInfo
+                                    placeholder: controller.previewStatus !== "" ? controller.previewStatus : "Choose an edge list and positions, and the input network is drawn here."
+                                }
+                                PreviewPane {
+                                    image: controller.syntheticImage
+                                    info: controller.syntheticInfo
+                                    placeholder: controller.previewStatus !== "" ? controller.previewStatus : "Run, and the first network of the output is drawn here."
+                                }
                             }
                         }
 
-                        Label {
-                            Layout.fillWidth: true
-                            wrapMode: Text.WordWrap
-                            opacity: 0.65
-                            text: previewTabs.currentIndex === 0 ? controller.originalNote : controller.syntheticNote
-                            visible: text !== ""
-                        }
+                        Card {
+                            title: "Log"
+                            Layout.leftMargin: 14
 
-                        StackLayout {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 264
-                            currentIndex: previewTabs.currentIndex
-
-                            PreviewPane {
-                                image: controller.originalImage
-                                info: controller.originalInfo
-                                placeholder: controller.previewStatus !== "" ? controller.previewStatus : "Choose an edge list and positions, and the input network is drawn here."
-                            }
-                            PreviewPane {
-                                image: controller.syntheticImage
-                                info: controller.syntheticInfo
-                                placeholder: controller.previewStatus !== "" ? controller.previewStatus : "Run, and the first network of the output is drawn here."
-                            }
-                        }
-                    }
-
-                    Card {
-                        title: "Log"
-                        Layout.leftMargin: 14
-                        Layout.fillHeight: true
-                        Layout.minimumHeight: 170
-
-                        ScrollView {
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            TextArea {
-                                id: logArea
-                                readOnly: true
-                                wrapMode: TextArea.NoWrap
-                                font.family: "menlo"
-                                font.pixelSize: 11
-                                text: controller.logText
-                                background: null
-                                onTextChanged: cursorPosition = length
+                            ScrollView {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 220
+                                TextArea {
+                                    id: logArea
+                                    readOnly: true
+                                    wrapMode: TextArea.NoWrap
+                                    font.family: root.monoFamily
+                                    font.pixelSize: 11
+                                    text: controller.logText
+                                    background: null
+                                    onTextChanged: cursorPosition = length
+                                }
                             }
                         }
                     }
