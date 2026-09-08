@@ -43,6 +43,13 @@ MODE_INPUTS = {
 
 _EDGE_SUFFIX = "_edgelist.csv"
 _POSITIONS_SUFFIX = "_positions.csv"
+# What StructuralGT's exporter writes. Its columns are already the ones
+# read_graph_csv accepts, so only the file names differ.
+_SGT_EDGE_SUFFIX = "_EdgeList.csv"
+_SGT_POSITIONS_SUFFIX = "_NodePositions.csv"
+# StructuralGT skeletonises a copy scaled to this on its longest side, and exports
+# the untouched image beside it, so its coordinates are in the scaled copy's pixels.
+_SGT_MAX_SIDE = 1024
 _IMAGE_SUFFIX = "_image.tif"
 _MATRIX_SUFFIX = "_adjacency.npy"
 _NPY_POSITIONS_SUFFIX = "_positions.npy"
@@ -52,6 +59,7 @@ _GRAPHML_GZ_SUFFIX = "_network.graphml.gz"
 
 _DIRECTORY_FORMS = (
     (_EDGE_SUFFIX, (_POSITIONS_SUFFIX,)),
+    (_SGT_EDGE_SUFFIX, (_SGT_POSITIONS_SUFFIX,)),
     (_MATRIX_SUFFIX, (_NPY_POSITIONS_SUFFIX,)),
     (_GRAPHML_SUFFIX, ()),
     (_GRAPHML_GZ_SUFFIX, ()),
@@ -187,10 +195,22 @@ def _load_single_network(path: str) -> SynthGraph:
 def _load_from_directory(directory: str, name: str) -> SynthGraph:
     """One dataset out of a directory, read by the form its name is in."""
     path = os.path.join(directory, name)
-    if os.path.exists(f"{path}{_EDGE_SUFFIX}"):
-        from networksynth.graphs import read_graph_csv
+    present = set(os.listdir(directory))
+    for edges, positions in (
+        (_EDGE_SUFFIX, _POSITIONS_SUFFIX),
+        (_SGT_EDGE_SUFFIX, _SGT_POSITIONS_SUFFIX),
+    ):
+        if f"{name}{edges}" in present:
+            from networksynth.graphs import read_graph_csv
 
-        return read_graph_csv(f"{path}{_EDGE_SUFFIX}", f"{path}{_POSITIONS_SUFFIX}")
+            graph = read_graph_csv(f"{path}{edges}", f"{path}{positions}")
+            if positions == _SGT_POSITIONS_SUFFIX:
+                GuiConfig._sgt_source = True
+                # StructuralGT writes the skeleton's (row, col) under headers x and y.
+                from networksynth.utils import transpose_positions
+
+                transpose_positions(graph)
+            return graph
     if os.path.exists(f"{path}{_MATRIX_SUFFIX}"):
         return _load_npy_pair(
             f"{path}{_NPY_POSITIONS_SUFFIX}", f"{path}{_MATRIX_SUFFIX}"
@@ -316,10 +336,13 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
         cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
         cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
 
+    _sgt_source = False
+
     @classmethod
     def load_original_network(cls, dataset_id: DatasetId) -> SynthGraph:
         from networksynth.utils import orient_positions
 
+        GuiConfig._sgt_source = False
         directory = cls.PATHS.get("datasets_dir")
         if directory:
             graph = _load_from_directory(directory, str(dataset_id))
@@ -331,9 +354,38 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
             from networksynth.graphs import read_graph_csv
 
             graph = read_graph_csv(cls.PATHS["edge_list"], cls.PATHS["positions"])
+            if cls.PATHS["positions"].endswith(_SGT_POSITIONS_SUFFIX):
+                from networksynth.utils import transpose_positions
+
+                transpose_positions(graph)
+                GuiConfig._sgt_source = True
 
         orient_positions(graph, cls.INPUT_ORIENTATION)
+
+        if not cls.FRAME_SIZE and not cls._has_background(dataset_id):
+            # No image to take the window from, so the network's own extent is all
+            # there is. It understates the window when nodes stop short of an edge,
+            # which is why an image is preferred when one exists.
+            import math
+
+            positions = graph.positions()
+            cls.FRAME_SIZE = (
+                max(1, math.ceil(positions[:, 0].max())),
+                max(1, math.ceil(positions[:, 1].max())),
+            )
+            if not cls.SYNTHETIC_FRAME_SIZE:
+                cls.SYNTHETIC_FRAME_SIZE = cls.FRAME_SIZE
+
         return graph
+
+    @classmethod
+    def _has_background(cls, dataset_id: DatasetId) -> bool:
+        directory = cls.PATHS.get("datasets_dir")
+        if directory:
+            return os.path.exists(
+                os.path.join(directory, f"{dataset_id}{_IMAGE_SUFFIX}")
+            )
+        return bool(cls.PATHS.get("image"))
 
     @classmethod
     def load_original_image(cls, dataset_id: DatasetId) -> Optional[ndarray]:
@@ -359,4 +411,19 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
             return None
 
         cls.IMAGE_SIZE = (image.shape[0], image.shape[1])
+        if not cls.FRAME_SIZE and cls._sgt_source:
+            height, width = image.shape[:2]
+            longest = max(height, width)
+            scale = _SGT_MAX_SIDE / longest if longest > _SGT_MAX_SIDE else 1.0
+            cls.FRAME_SIZE = (round(width * scale), round(height * scale))
+            if not cls.SYNTHETIC_FRAME_SIZE:
+                cls.SYNTHETIC_FRAME_SIZE = cls.FRAME_SIZE
+        if not cls.FRAME_SIZE:
+            # Node coordinates are in the source image's pixels, so its own size is
+            # the coordinate window. Left unset, that is the answer, and the image
+            # needs no scaling to match it.
+            cls.FRAME_SIZE = (image.shape[1], image.shape[0])
+            if not cls.SYNTHETIC_FRAME_SIZE:
+                cls.SYNTHETIC_FRAME_SIZE = cls.FRAME_SIZE
+            return image
         return resize_image(image, cls.FRAME_SIZE)

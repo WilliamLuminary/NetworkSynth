@@ -120,11 +120,40 @@ ApplicationWindow {
                     font.pixelSize: 11
                     opacity: 0.55
                 }
+                Label {
+                    text: controller.version
+                    font.pixelSize: 11
+                    opacity: 0.55
+                }
+                Button {
+                    text: "Update"
+                    visible: controller.canUpdate
+                    enabled: !controller.running
+                    flat: true
+                    font.pixelSize: 11
+                    onClicked: controller.updateTool()
+                    ToolTip.text: "Fetch the newest NetworkSynth into this checkout."
+                    ToolTip.visible: hovered
+                }
             }
         }
     }
 
     property string pendingInput: ""
+
+    MessageDialog {
+        id: updateDialog
+        title: "NetworkSynth"
+        buttons: MessageDialog.Ok
+    }
+
+    Connections {
+        target: controller
+        function onUpdateDone(message, restart) {
+            updateDialog.text = message;
+            updateDialog.open();
+        }
+    }
 
     FileDialog {
         id: fileDialog
@@ -157,7 +186,7 @@ ApplicationWindow {
         default property alias content: body.data
         property string title: ""
 
-        property bool collapsible: false
+        property bool collapsible: true
         property bool expanded: true
 
         property string note: ""
@@ -303,7 +332,8 @@ ApplicationWindow {
             TextField {
                 Layout.preferredWidth: root.numberWidth
 
-                text: editor.field.kind === "size" || editor.field.kind === "range" ? editor.value[0] : ""
+                text: (editor.field.kind === "size" || editor.field.kind === "range") && editor.value ? editor.value[0] : ""
+                placeholderText: editor.field.kind === "size" ? "auto" : ""
                 validator: DoubleValidator {
                     bottom: 0
                 }
@@ -320,7 +350,8 @@ ApplicationWindow {
             }
             TextField {
                 Layout.preferredWidth: root.numberWidth
-                text: editor.field.kind === "size" || editor.field.kind === "range" ? editor.value[1] : ""
+                text: (editor.field.kind === "size" || editor.field.kind === "range") && editor.value ? editor.value[1] : ""
+                placeholderText: editor.field.kind === "size" ? "auto" : ""
                 validator: DoubleValidator {
                     bottom: 0
                 }
@@ -675,6 +706,26 @@ ApplicationWindow {
                                 }
                             }
 
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 10
+                                visible: controller.hasHandover
+
+                                Item {
+                                    Layout.preferredWidth: root.labelWidth
+                                }
+                                Button {
+                                    text: "Use the StructuralGT network"
+                                    enabled: !controller.running
+                                    onClicked: controller.reloadHandover()
+                                    ToolTip.text: "Put the network StructuralGT sent back in the fields above."
+                                    ToolTip.visible: hovered
+                                }
+                                Item {
+                                    Layout.fillWidth: true
+                                }
+                            }
+
                             Repeater {
                                 model: controller.inputs
 
@@ -732,7 +783,6 @@ ApplicationWindow {
                         Card {
                             title: "Align"
 
-                            collapsible: true
                             expanded: false
                             visible: controller.alignLines.length > 0 && controller.canPreview
 
@@ -741,6 +791,35 @@ ApplicationWindow {
                                 delegate: FormLine {
                                     required property var modelData
                                     line: modelData
+                                }
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+                                visible: controller.canFitFrame
+
+                                Label {
+                                    text: "Fit to StructuralGT"
+                                    Layout.preferredWidth: root.labelWidth
+                                }
+                                ComboBox {
+                                    Layout.preferredWidth: 130
+                                    model: controller.structuralgtSides
+                                    currentIndex: controller.structuralgtSide
+                                    enabled: !controller.running
+                                    displayText: currentText + " px"
+                                    onActivated: controller.selectStructuralgtSide(currentIndex)
+                                }
+                                Button {
+                                    text: "Fit"
+                                    enabled: !controller.running
+                                    onClicked: controller.fitFrame()
+                                    ToolTip.text: "Set the window to the copy StructuralGT traced the network from."
+                                    ToolTip.visible: hovered
+                                }
+                                Item {
+                                    Layout.fillWidth: true
                                 }
                             }
 
@@ -1065,4 +1144,5 @@ ApplicationWindow {
             }
         }
     }
+
 }

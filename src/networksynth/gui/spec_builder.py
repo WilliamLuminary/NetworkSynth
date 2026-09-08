@@ -255,15 +255,16 @@ def _common_fields(vector_plots: bool = True) -> List[Field]:
             Field(
                 "FRAME_SIZE",
                 "Background image",
-                (512, 512),
+                None,
                 kind="size",
                 unit="px",
+                group=ALIGN_GROUP,
                 help=(
                     "The coordinate window everything shares: the input image\n"
                     "is scaled to it, and the network is drawn in it.\n"
-                    "Defaults to the image's own size, which is the reliable\n"
-                    "answer — position data need not reach the corners, so its\n"
-                    "extent understates the window."
+                    "Left empty it follows the image, or the network's extent\n"
+                    "when there is no image. Use Fit to StructuralGT when the\n"
+                    "network was traced from a scaled copy."
                 ),
             ),
             Field(
@@ -818,6 +819,69 @@ def default_values(mode: str) -> Dict[str, Any]:
     if mode not in MODES:
         raise ValueError(f"unknown mode {mode!r}; available: {sorted(MODES)}")
     return {f.id: f.value for f in MODES[mode].fields}
+
+
+def graphml_shape_index(mode: str) -> Optional[int]:
+    """Where this mode takes one GraphML file, which is what a handover arrives as."""
+    for index, shape in enumerate(MODES[mode].input_shapes):
+        if shape.scope == SINGLE and shape.format == "GraphML":
+            return index
+    return None
+
+
+#: What StructuralGT scales to by default, for any image longer than this.
+STRUCTURALGT_SIDE = 1024
+
+
+def _longest_side(image_path: Optional[str]) -> Optional[int]:
+    if not image_path or not os.path.exists(image_path):
+        return None
+
+    import cv2
+
+    image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    return None if image is None else max(image.shape[:2])
+
+
+def structuralgt_sides(image_path: Optional[str]) -> List[int]:
+    """The sizes StructuralGT offers for this image, ascending as it lists them."""
+    longest = _longest_side(image_path)
+    if longest is None:
+        return []
+    if longest > 2048:
+        sides = [1024, 2048]
+    elif longest > STRUCTURALGT_SIDE:
+        sides = [1024]
+    else:
+        sides = []
+    sides += [int(longest * f) for f in (0.25, 0.5, 0.75)] + [longest]
+    return sorted({side for side in sides if side >= 1})
+
+
+def structuralgt_frame(
+    image_path: Optional[str], side: int = STRUCTURALGT_SIDE
+) -> Optional[list]:
+    """The coordinate window a StructuralGT network is in, given the image it came from."""
+    if not image_path or not os.path.exists(image_path):
+        return None
+
+    import cv2
+
+    image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        return None
+    height, width = image.shape[:2]
+    longest = max(height, width)
+    scale = side / longest if longest > side else 1.0
+    return [round(width * scale), round(height * scale)]
+
+
+def directory_shape_index(mode: str) -> Optional[int]:
+    """Where this mode reads a folder, which is what a batch handover names."""
+    for index, shape in enumerate(MODES[mode].input_shapes):
+        if shape.scope == DIRECTORY:
+            return index
+    return None
 
 
 def default_inputs(mode: str, shape_index: int = 0) -> Dict[str, str]:

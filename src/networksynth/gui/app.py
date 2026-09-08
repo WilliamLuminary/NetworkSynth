@@ -20,13 +20,15 @@ from PySide6.QtCore import (
     Signal,
     Slot,
 )
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QGuiApplication, QIcon
 from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtQuickControls2 import QQuickStyle
 
 from networksynth.configs import BaseConfig
-from networksynth.gui import spec_builder
+from networksynth.gui import spec_builder, updater
 
 _QML = os.path.join(os.path.dirname(__file__), "qml", "SynthesisWindow.qml")
+_ICON = os.path.join(os.path.dirname(__file__), "qml", "assets", "networksynth.png")
 _GUI_RUN = ["-m", "networksynth.gui_run"]
 _GUI_PREVIEW = ["-m", "networksynth.gui_preview"]
 
@@ -41,6 +43,14 @@ _EXIT_MEANING = {
 }
 
 _PROCESS_GROUPS = hasattr(os, "killpg") and hasattr(os, "getpgid")
+
+# Windows has no SIGINT to send: Popen.send_signal rejects anything but SIGTERM
+# and the two console events, and only a process started in its own group can be
+# sent CTRL_BREAK. That event raises KeyboardInterrupt in the child, which is what
+# lets a cancelled run still write its manifest.
+_NEW_GROUP = (
+    {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {}
+)
 
 _CANCEL_GRACE = 15.0
 
@@ -65,14 +75,23 @@ class SynthesisController(QObject):
 
     changed = Signal()
     logChanged = Signal()
+    updateDone = Signal(str, bool)
 
-    def __init__(self, parent: Optional[QObject] = None, *, mode: str = "generate"):
+    def __init__(
+        self,
+        parent: Optional[QObject] = None,
+        *,
+        mode: str = "generate",
+        handover: Optional[Dict[str, str]] = None,
+        output_dir: Optional[str] = None,
+    ):
         super().__init__(parent)
+        self._handover = handover or {}
         self._mode = mode
         self._values: Dict[str, Any] = spec_builder.default_values(mode)
         self._shape = 0
         self._inputs: Dict[str, str] = spec_builder.default_inputs(mode)
-        self._output_dir = BaseConfig.BASE_OUTPUT_PATH
+        self._output_dir = output_dir or BaseConfig.BASE_OUTPUT_PATH
         self._status = "Choose this mode's inputs, then Run."
         self._failed = False
         self._percent = 0.0
@@ -91,9 +110,13 @@ class SynthesisController(QObject):
         self._run_mode = ""
         self._ran_ok = False
         self._frame_touched = False
+        self._fit_side = spec_builder.STRUCTURALGT_SIDE
+        self._version: Optional[str] = None
+        self._can_update: Optional[bool] = None
 
         self._shown = {"original": True, "synthetic": False}
         self._info: Dict[str, Optional[dict]] = {"original": None, "synthetic": None}
+        self._apply_handover()
         self._layers = {"background": True, "network": True}
 
         self._stale: set = set()
@@ -138,6 +161,7 @@ class SynthesisController(QObject):
         self._values = spec_builder.default_values(self._mode)
         self._shape = 0
         self._inputs = spec_builder.default_inputs(self._mode)
+        self._apply_handover()
         self._info["original"] = None
         self._shown["synthetic"] = False
         self._info["synthetic"] = None
@@ -263,6 +287,109 @@ class SynthesisController(QObject):
             if shape.scope not in seen:
                 seen.append(shape.scope)
         return seen
+
+    def _apply_handover(self) -> bool:
+        """Point the form at the network handed over on stdin, if there was one."""
+        if not self._handover:
+            return False
+        directory = self._handover.get("datasets_dir")
+        index = (
+            spec_builder.directory_shape_index(self._mode)
+            if directory
+            else spec_builder.graphml_shape_index(self._mode)
+        )
+        if index is None:
+            return False
+        self._shape = index
+        self._inputs = spec_builder.default_inputs(self._mode, index)
+        if directory:
+            self._inputs["datasets_dir"] = directory
+            self._values["INPUT_ORIENTATION"] = "none"
+            self._info["original"] = None
+            return True
+        self._inputs["network_graphml"] = self._handover["network"]
+        frame = spec_builder.structuralgt_frame(self._handover.get("image"))
+        if frame:
+            for key in _FRAME_KEYS:
+                if key in self._values:
+                    self._values[key] = frame
+        image = self._handover.get("image")
+        if image:
+            self._inputs["image"] = image
+        self._info["original"] = None
+        return True
+
+    @Property("QVariantList", notify=changed)
+    def structuralgtSides(self) -> list:
+        return spec_builder.structuralgt_sides(self._inputs.get("image"))
+
+    @Property(int, notify=changed)
+    def structuralgtSide(self) -> int:
+        sides = self.structuralgtSides
+        return sides.index(self._fit_side) if self._fit_side in sides else 0
+
+    @Slot(int)
+    def selectStructuralgtSide(self, index: int) -> None:
+        sides = self.structuralgtSides
+        if 0 <= index < len(sides):
+            self._fit_side = sides[index]
+            self.changed.emit()
+
+    @Property(bool, notify=changed)
+    def canFitFrame(self) -> bool:
+        return bool(self.structuralgtSides)
+
+    @Slot()
+    def fitFrame(self) -> None:
+        """Set the window to the scaled copy StructuralGT traced the network from."""
+        sides = self.structuralgtSides
+        side = self._fit_side if self._fit_side in sides else (sides or [0])[0]
+        frame = spec_builder.structuralgt_frame(self._inputs.get("image"), side)
+        if not frame:
+            self._set_status("No background image to measure.", failed=True)
+            return
+        for key in _FRAME_KEYS:
+            if key in self._values:
+                self._values[key] = frame
+        self._frame_touched = True
+        self._set_status(f"Window set to {frame[0]}x{frame[1]}.")
+        self._touch_preview()
+
+    @Property(str, notify=changed)
+    def version(self) -> str:
+        if self._version is None:
+            self._version = updater.version()
+        return self._version
+
+    @Property(bool, notify=changed)
+    def canUpdate(self) -> bool:
+        if self._can_update is None:
+            self._can_update = updater.in_checkout()
+        return self._can_update
+
+    @Slot()
+    def updateTool(self) -> None:
+        ok, message, restart = updater.update()
+        self._version = None
+        self._set_status(message, failed=not ok)
+        self.updateDone.emit(message, restart)
+
+    @Property(bool, notify=changed)
+    def hasHandover(self) -> bool:
+        if not self._handover:
+            return False
+        if self._handover.get("datasets_dir"):
+            return spec_builder.directory_shape_index(self._mode) is not None
+        return spec_builder.graphml_shape_index(self._mode) is not None
+
+    @Slot()
+    def reloadHandover(self) -> None:
+        """Go back to the handed-over network after trying something else."""
+        if not self._apply_handover():
+            return
+        self._status = "Reading the network from StructuralGT."
+        self._note_ready()
+        self._want("original")
 
     @Slot(int)
     def selectInputShape(self, index: int) -> None:
@@ -466,6 +593,15 @@ class SynthesisController(QObject):
 
     @Slot(str, int, "QVariant")
     def setSize(self, key: str, index: int, value) -> None:
+        if str(value).strip() == "":
+            # Emptying either box puts the field back to deriving its own value,
+            # which is what the "auto" placeholder offers.
+            self._values[key] = None
+            if key in _FRAME_KEYS:
+                self._frame_touched = False
+            self._touch_preview()
+            return
+
         current = list(self._values.get(key) or (0, 0))
         as_float = self._kind_of(key) == "range"
         try:
@@ -519,6 +655,7 @@ class SynthesisController(QObject):
             stderr=subprocess.DEVNULL,
             stdin=subprocess.DEVNULL,
             start_new_session=_PROCESS_GROUPS,
+            **_NEW_GROUP,
         )
         self._cancel_at = None
         self._poll.start()
@@ -547,9 +684,11 @@ class SynthesisController(QObject):
                 )
             elif force:
                 self._process.kill()
+            elif os.name == "nt":
+                self._process.send_signal(signal.CTRL_BREAK_EVENT)
             else:
                 self._process.send_signal(signal.SIGINT)
-        except (ProcessLookupError, PermissionError, OSError):
+        except (ProcessLookupError, PermissionError, OSError, ValueError):
             pass
 
     def _kind_of(self, key: str) -> str:
@@ -816,11 +955,75 @@ class SynthesisController(QObject):
         self.changed.emit()
 
 
+_STDIN_FLAG = "--graph-from-stdin"
+_IMAGE_FLAG = "--image"
+_DATASETS_FLAG = "--datasets-dir"
+_OUTPUT_FLAG = "--output-dir"
+
+
+def _flag(argv, name: str) -> Optional[str]:
+    if name not in argv:
+        return None
+    value = argv[argv.index(name) + 1]
+    return value or None
+
+
+def _read_handover(argv) -> Optional[Dict[str, str]]:
+    """A network piped in by a host application, written where our children can read it.
+
+    The preview and the run are separate processes that take file paths, so the bytes
+    are landed once in a scratch directory rather than kept in memory.
+    """
+    datasets_dir = _flag(argv, _DATASETS_FLAG)
+    if datasets_dir:
+        # A batch already on disk. Reading it here would mean loading every network
+        # twice, so only the directory travels.
+        handover = {"datasets_dir": datasets_dir}
+        image = _flag(argv, _IMAGE_FLAG)
+        if image:
+            handover["image"] = image
+        return handover
+
+    if _STDIN_FLAG not in argv:
+        return None
+
+    if sys.platform == "win32":
+        # Windows opens stdin in text mode, which rewrites CRLF and stops at 0x1A.
+        import msvcrt
+
+        msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
+
+    graphml = sys.stdin.buffer.read()
+    if not graphml:
+        raise SystemExit(f"{_STDIN_FLAG} was given but nothing arrived on stdin")
+
+    scratch = tempfile.mkdtemp(prefix="networksynth_handover_")
+    atexit.register(shutil.rmtree, scratch, True)
+    network = os.path.join(scratch, "structuralgt_network.graphml")
+    with open(network, "wb") as handle:
+        handle.write(graphml)
+
+    handover = {"network": network}
+    image = _flag(argv, _IMAGE_FLAG)
+    if image:
+        handover["image"] = image
+    return handover
+
+
 def main(argv=None) -> int:
     argv = sys.argv if argv is None else argv
-    app = QGuiApplication(argv)
+    handover = _read_handover(argv)
+    app = QGuiApplication([argv[0]])
+    app.setWindowIcon(QIcon(_ICON))
+    # Every control here draws its own background, which the native macOS and Windows
+    # styles refuse. Fusion accepts customisation and, unlike Basic, takes its colours
+    # from the application palette, so the window still follows the system light or
+    # dark setting that every colour in the QML is derived from.
+    QQuickStyle.setStyle("Fusion")
     engine = QQmlApplicationEngine()
-    controller = SynthesisController()
+    controller = SynthesisController(
+        handover=handover, output_dir=_flag(argv, _OUTPUT_FLAG)
+    )
     engine.rootContext().setContextProperty("controller", controller)
     engine.load(QUrl.fromLocalFile(_QML))
     if not engine.rootObjects():
