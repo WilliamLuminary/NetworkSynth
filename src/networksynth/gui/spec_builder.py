@@ -855,7 +855,7 @@ def structuralgt_sides(image_path: Optional[str]) -> List[int]:
     else:
         sides = []
     sides += [int(longest * f) for f in (0.25, 0.5, 0.75)] + [longest]
-    return sorted(set(sides))
+    return sorted({side for side in sides if side >= 1})
 
 
 def structuralgt_frame(

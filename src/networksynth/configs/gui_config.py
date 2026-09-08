@@ -195,11 +195,12 @@ def _load_single_network(path: str) -> SynthGraph:
 def _load_from_directory(directory: str, name: str) -> SynthGraph:
     """One dataset out of a directory, read by the form its name is in."""
     path = os.path.join(directory, name)
+    present = set(os.listdir(directory))
     for edges, positions in (
         (_EDGE_SUFFIX, _POSITIONS_SUFFIX),
         (_SGT_EDGE_SUFFIX, _SGT_POSITIONS_SUFFIX),
     ):
-        if os.path.exists(f"{path}{edges}"):
+        if f"{name}{edges}" in present:
             from networksynth.graphs import read_graph_csv
 
             graph = read_graph_csv(f"{path}{edges}", f"{path}{positions}")

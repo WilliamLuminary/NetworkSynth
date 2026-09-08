@@ -51,7 +51,8 @@ done
 
 # The highest number any v* tag has reached, ignoring the -dev suffix.
 latest="$(git tag -l 'v*' | sed -e 's/-dev$//' -e 's/^v//' \
-          | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)"
+          | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
+          | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)"
 latest="${latest:-0.0.0}"
 
 IFS=. read -r major minor patch <<< "$latest"
