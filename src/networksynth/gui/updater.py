@@ -38,7 +38,7 @@ def in_checkout() -> bool:
 
 
 def version() -> str:
-    """The tag on this commit, or the number publish_dist.sh stamped.
+    """The tag on this commit, or the number release_dist.sh stamped.
 
     A shallow submodule fetches a commit, not the tags naming it, so git cannot
     answer there. Where git does have tags, an untagged commit reports nothing

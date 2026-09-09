@@ -45,7 +45,7 @@ jobs:
           fi
 
       - name: Publish
-        run: scripts/publish_dist.sh "$GITHUB_SHA" "dist-$GITHUB_REF_NAME"
+        run: scripts/release_dist.sh "$GITHUB_SHA" "dist-$GITHUB_REF_NAME"
 
       - name: Push
         run: git push origin "$DIST_BRANCH" "dist-$GITHUB_REF_NAME"

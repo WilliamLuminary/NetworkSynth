@@ -10,7 +10,8 @@ __pycache__/
 .Python
 target/
 build/
-sdist/
+# python -m build writes here; unrelated to the dist branch.
+dist/
 *.whl
 
 # Installer logs

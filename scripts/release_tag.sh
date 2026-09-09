@@ -13,8 +13,8 @@ usage() {
     cat <<'TEXT'
 Cut the next release tag.
 
-    scripts/new_tag.sh --create [--dev] [--major|--minor|--patch] [--push]
-    scripts/new_tag.sh --create --dev -0.1.0 --push     # level as a number
+    scripts/release_tag.sh --create [--dev] [--major|--minor|--patch] [--push]
+    scripts/release_tag.sh --create --dev -0.1.0 --push     # level as a number
 
   --create   make the tag; without it this help is all that happens
   --dev      pre-release: adds -dev, publishes to dist-dev, any branch
@@ -42,7 +42,7 @@ while [ $# -gt 0 ]; do
         --push) PUSH="yes" ;;
         --create) CREATE="yes" ;;
         -h|--help) usage 0 ;;
-        *) echo "new_tag: unknown argument '$1'" >&2; usage 1 ;;
+        *) echo "release_tag: unknown argument '$1'" >&2; usage 1 ;;
     esac
     shift
 done
@@ -67,14 +67,14 @@ commit="$(git rev-parse --short HEAD)"
 branch="$(git rev-parse --abbrev-ref HEAD)"
 
 if git rev-parse -q --verify "refs/tags/$tag" > /dev/null; then
-    echo "new_tag: $tag already exists" >&2
+    echo "release_tag: $tag already exists" >&2
     exit 1
 fi
 
 # The workflow refuses a release tag off main, so fail before the push, not after.
 if [ -z "$DEV" ] && ! git merge-base --is-ancestor HEAD origin/main 2>/dev/null; then
-    echo "new_tag: $commit is not on origin/main, so $tag would fail to publish." >&2
-    echo "         Use --dev for a pre-release, which publishes from any branch." >&2
+    echo "release_tag: $commit is not on origin/main, so $tag would fail to publish." >&2
+    echo "             Use --dev for a pre-release, which publishes from any branch." >&2
     exit 1
 fi
 
@@ -82,8 +82,8 @@ fi
 declared="$(sed -nE 's/^__version__ = "(.*)"$/\1/p' src/networksynth/__init__.py)"
 expected="${tag#v}"
 if [ "$declared" != "${expected%-dev}" ]; then
-    echo "new_tag: __version__ is $declared, this tag is $tag." >&2
-    echo "         The published tree gets ${tag#v} either way; main keeps $declared." >&2
+    echo "release_tag: __version__ is $declared, this tag is $tag." >&2
+    echo "             The published tree gets ${tag#v} either way; main keeps $declared." >&2
 fi
 
 git tag -a "$tag" -m "NetworkSynth $tag"

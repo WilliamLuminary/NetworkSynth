@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-#     scripts/publish_dist.sh [source-ref] [tag]
+#     scripts/release_dist.sh [source-ref] [tag]
 #
 # Built from a commit through a temporary index, so the working tree is never read.
 # Nothing is pushed.
@@ -34,7 +34,7 @@ for spec in "${PATHS[@]}"; do
     destination="${spec##*:}"
     entry="$(git ls-tree "$source_commit" -- "$path")"
     if [ -z "$entry" ]; then
-        echo "publish_dist: $path is not in $SOURCE" >&2
+        echo "release_dist: $path is not in $SOURCE" >&2
         exit 1
     fi
     if [ "$(echo "$entry" | awk '{print $2}')" = "tree" ]; then
@@ -52,7 +52,7 @@ if [ -n "$TAG" ]; then
     stamped="$(git show "$source_commit:$init" \
                | sed -E "s/^__version__ = \".*\"\$/__version__ = \"$version\"/")"
     if ! printf '%s' "$stamped" | grep -q "^__version__ = \"$version\"\$"; then
-        echo "publish_dist: no __version__ line to stamp in $init" >&2
+        echo "release_dist: no __version__ line to stamp in $init" >&2
         exit 1
     fi
     blob="$(printf '%s\n' "$stamped" | git hash-object -w --stdin)"
@@ -66,7 +66,7 @@ message="dist from $(git rev-parse --short "$source_commit"): $(git log -1 --for
 # Only reachable when the same tag is published twice: the stamp differs otherwise.
 if parent="$(git rev-parse --verify --quiet "refs/heads/$BRANCH")"; then
     if [ "$(git rev-parse "$parent^{tree}")" = "$tree" ]; then
-        echo "publish_dist: $BRANCH already carries this tree."
+        echo "release_dist: $BRANCH already carries this tree."
         commit="$parent"
     else
         commit="$(git commit-tree "$tree" -p "$parent" -m "$message")"
