@@ -26,7 +26,7 @@ The command line, where a config module holds the same settings:
 networksynth-cli
 ```
 
-The config's `MODE` picks the pipeline — `generate`, `hybrid`, `mosaic`, `scaling`, `sweep` or `compare`. `networksynth-cli` with no argument lists every config shipped here. No networks come with this branch, so a config's `DATASETS` and `BASE_INPUT_PATH` need pointing at an input directory of your own before you run it. The window asks for that directory instead, and a run-spec names its paths outright, so neither needs anything put in place first.
+The config's `MODE` picks the pipeline — `generate`, `hybrid`, `sweep` or `compare`. `networksynth-cli` with no argument lists every config shipped here. No networks come with this branch, so a config's `DATASETS` and `BASE_INPUT_PATH` need pointing at an input directory of your own before you run it. The window asks for that directory instead, and a run-spec names its paths outright, so neither needs anything put in place first.
 
 A third entry point runs a single job from a JSON run-spec rather than a config module, which is how a host application drives NetworkSynth without importing it:
 

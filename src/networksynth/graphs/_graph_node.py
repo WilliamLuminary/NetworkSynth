@@ -57,6 +57,7 @@ class PlacementCounts:
 class GraphNode:
 
     id_counter = None
+    _created: int
     node_grid: Dict[tuple[float, float], set]
     edge_grid: Dict[
         Tuple[int, int], Set[Tuple[Tuple[float, float], Tuple[float, float]]]
@@ -91,10 +92,22 @@ class GraphNode:
     @classmethod
     def reset(cls):
         cls.id_counter = itertools.count()
+        cls._created = 0
         cls.node_grid = defaultdict(set)
         cls.edge_grid = defaultdict(set)
         cls._aborted_edge = 0
         cls._merged_edge = 0
+
+    @classmethod
+    def next_id(cls) -> int:
+        cls._created += 1
+        return next(cls.id_counter)
+
+    @classmethod
+    def nodes_created(cls) -> int:
+        """Nodes made so far. The grid cannot say: _add_to_grid files a node
+        under its children's cells too, so cell sizes over-count."""
+        return cls._created
 
     @classmethod
     def counts(cls) -> PlacementCounts:
@@ -103,7 +116,7 @@ class GraphNode:
     @classmethod
     def create_interior_node(cls, position):
         node = object.__new__(cls)
-        node.id = next(cls.id_counter)
+        node.id = cls.next_id()
         node.position = position
         node.degree = 2
         node.children = [None, None]
@@ -117,7 +130,7 @@ class GraphNode:
     @classmethod
     def create_frontier_node(cls, position, degree, base_angle, clockwise, parent_node):
         node = object.__new__(cls)
-        node.id = next(cls.id_counter)
+        node.id = cls.next_id()
         node.position = position
         node.degree = degree
         node.base_angle = base_angle
@@ -135,7 +148,7 @@ class GraphNode:
             cls.edge_grid[key].add(edge)
 
     def __init__(self, position, parent=None, parent_angle=None):
-        self.id: int = next(GraphNode.id_counter)
+        self.id: int = GraphNode.next_id()
 
         self.position: Tuple[float, float] = position
         self.clockwise: bool = random.choice([True, False])

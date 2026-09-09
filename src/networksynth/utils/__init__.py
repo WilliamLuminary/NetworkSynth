@@ -21,7 +21,7 @@ from .plotting import (
     save_figure_as_webp,
     save_hybrid_snapshot,
 )
-from .run_log import JsonFormatter, tagged
+from .run_log import JsonFormatter, progress, tagged
 from .runtime import apply_seed, log_memory, spawn_context, timer
 
 __all__ = [
@@ -41,6 +41,7 @@ __all__ = [
     "log_memory",
     "metric_distance",
     "plot_network",
+    "progress",
     "recommend_dpi",
     "recommend_dpi_cv2",
     "render_network",
