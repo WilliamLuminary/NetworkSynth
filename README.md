@@ -23,7 +23,9 @@ To just use it, install the latest release. No clone, no git:
 pip install "networksynth @ https://github.com/WilliamLuminary/NetworkSynth/archive/refs/heads/dist.zip"
 ```
 
-That URL is the `dist` branch tip, which is whatever was released last, so it needs no version in it. Every [release](https://github.com/WilliamLuminary/NetworkSynth/releases) also carries a built wheel if you would rather not build one, and names the exact URL to install it from.
+That URL is the `dist` branch tip, which is whatever was released last, so it needs no version in it. Swap `dist` for `dist-dev` to take the newest pre-release instead. Every [release](https://github.com/WilliamLuminary/NetworkSynth/releases) also carries a built wheel if you would rather not build one, and names the exact URL to install it from; pre-releases are listed there too, marked as such.
+
+A pre-release version normalises to `X.Y.Z.dev0`, which sorts before `X.Y.Z`, and installing from a URL needs no `--pre` since nothing is being resolved.
 
 Either way you get the same four commands, and the version in the window comes from the release itself, so an installed copy knows what it is with no tags to read.
 
