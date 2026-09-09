@@ -80,7 +80,8 @@ fi
 
 # Consumers get the stamped tree either way; this only keeps the drift visible.
 declared="$(sed -nE 's/^__version__ = "(.*)"$/\1/p' src/networksynth/__init__.py)"
-if [ "$declared" != "${tag#v}" ]; then
+expected="${tag#v}"
+if [ "$declared" != "${expected%-dev}" ]; then
     echo "new_tag: __version__ is $declared, this tag is $tag." >&2
     echo "         The published tree gets ${tag#v} either way; main keeps $declared." >&2
 fi

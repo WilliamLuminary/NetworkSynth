@@ -61,6 +61,14 @@ jobs:
           git archive "$DIST_BRANCH" | tar -x -C .release/tree
           python -m pip install --quiet --upgrade build
           python -m build --wheel --outdir .release/wheel .release/tree
+          python - <<'CHECK'
+          import glob, sys, zipfile
+          names = zipfile.ZipFile(glob.glob(".release/wheel/*.whl")[0]).namelist()
+          want = ("gui/qml/SynthesisWindow.qml", "gui/qml/assets/networksynth.png")
+          missing = [w for w in want if not any(n.endswith(w) for n in names)]
+          sys.exit(f"wheel omits {missing}; check [tool.setuptools.package-data]"
+                   if missing else 0)
+          CHECK
 
       - name: Attach it to a release
         env:
@@ -80,7 +88,12 @@ jobs:
               pip install "networksynth @ $zip_url"
           TEXT
           )"
-          gh release create "$GITHUB_REF_NAME" "$wheel" \
-            --title "NetworkSynth $GITHUB_REF_NAME" \
-            --notes "$notes" \
-            $([[ "$GITHUB_REF_NAME" == *-dev ]] && echo --prerelease)
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --notes "$notes"
+            gh release upload "$GITHUB_REF_NAME" "$wheel" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$wheel" \
+              --title "NetworkSynth $GITHUB_REF_NAME" \
+              --notes "$notes" \
+              $([[ "$GITHUB_REF_NAME" == *-dev ]] && echo --prerelease)
+          fi

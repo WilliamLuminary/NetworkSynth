@@ -63,7 +63,7 @@ fi
 tree="$(git write-tree)"
 message="dist from $(git rev-parse --short "$source_commit"): $(git log -1 --format=%s "$source_commit")"
 
-# A release whose code did not change still gets its tag, on the commit already there.
+# Only reachable when the same tag is published twice: the stamp differs otherwise.
 if parent="$(git rev-parse --verify --quiet "refs/heads/$BRANCH")"; then
     if [ "$(git rev-parse "$parent^{tree}")" = "$tree" ]; then
         echo "publish_dist: $BRANCH already carries this tree."
