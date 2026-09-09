@@ -12,7 +12,6 @@ pytestmark = pytest.mark.unit
 _PIPELINES = (
     "networksynth.pipelines.generate",
     "networksynth.pipelines.hybrid",
-    "networksynth.pipelines.mosaic",
     "networksynth.pipelines.sweep",
     "networksynth.pipelines.compare",
 )

@@ -473,12 +473,6 @@ class TestModeSelection:
         assert config.MODE == mode
 
     _MODE_EXTRAS = {
-        "scaling": [
-            "SCALE_ROWS",
-            "SCALE_COLS",
-            "ROOT_SPACING_FACTOR",
-            "MAX_GENERATION_ROUNDS",
-        ],
         "hybrid": ["TARGET_SCALE", "PHASE2_MAX_ROUNDS"],
     }
 

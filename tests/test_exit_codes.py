@@ -11,8 +11,6 @@ pytestmark = pytest.mark.unit
 
 PIPELINES = [
     "generate",
-    "mosaic",
-    "scaling",
     "sweep",
     "hybrid",
     "compare",
@@ -40,6 +38,9 @@ def test_pipeline_main_reraises_interruption(module_name, monkeypatch):
         module.main()
 
 
+# A shipped config on purpose, not a fixture: what these assert is the entry
+# point's own path handling, and load_config refuses anything outside the
+# package. A config under tests/ could not be loaded by path at all.
 _CONFIGS = Path(networksynth.__file__).resolve().parent / "configs"
 _A_CONFIG = str(_CONFIGS / "generate_mode" / "config_sample.py")
 

@@ -4,7 +4,7 @@ import logging
 
 import pytest
 
-from networksynth.utils import JsonFormatter, tagged
+from networksynth.utils import JsonFormatter, progress, tagged
 
 pytestmark = pytest.mark.unit
 
@@ -68,11 +68,34 @@ class TestPercentField:
         assert json.loads(line)["message"] == "multi\nline\nmessage"
 
 
+class TestProgressField:
+    def test_it_reports_a_share_of_the_expected_total(self):
+        assert progress(25, 100) == {"percent": 25.0}
+
+    def test_it_stays_under_a_hundred_until_the_run_itself_ends(self):
+        assert progress(100, 100)["percent"] == 99.0
+        assert progress(500, 100)["percent"] == 99.0
+
+    def test_no_field_when_there_is_nothing_to_measure_against(self):
+        assert progress(10, 0) == {}
+
+    def test_it_promotes_through_the_formatter(self):
+        entry = _emit("Phase 2 round 9", tagged("PHASE2", **progress(1, 4)))
+
+        assert entry["percent"] == 25.0
+        assert entry["tag"] == "PHASE2"
+
+
 class TestPipelinesEmitIt:
+
+    # Either idiom carries the field: a literal percent=, or the shared helper
+    # splatted into tagged(). Grepping the source is what catches a new site
+    # that logs a percentage and forgets one.
+    _IDIOMS = ("percent=", "**progress(")
 
     @pytest.mark.parametrize(
         "module_name",
-        ["generate", "sweep", "mosaic", "hybrid"],
+        ["generate", "sweep", "hybrid"],
     )
     def test_progress_sites_pass_percent(self, module_name):
         import inspect
@@ -84,7 +107,7 @@ class TestPipelinesEmitIt:
         for match in re.finditer(r"logger\.info\((.{0,400}?)\)\n", source, re.S):
             body = match.group(1)
             if "%)" in body or "%" in body and "progress" in body:
-                assert "percent=" in body, (
+                assert any(idiom in body for idiom in self._IDIOMS), (
                     f"networksynth.pipelines.{module_name} logs a percentage without the "
                     f"structured field:\n{body.strip()[:200]}"
                 )

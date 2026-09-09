@@ -5,9 +5,7 @@ import pytest
 pytestmark = pytest.mark.requires_fixture_data
 
 from networksynth.analysis.multifractal_analyzer import MultifractalAnalyzer
-from networksynth.configs.compare_mode.config_sample import (
-    SampleConfig as CompareConfig,
-)
+from tests.fixture_config import FixtureCompareConfig as CompareConfig
 
 CompareConfig.initialize()
 

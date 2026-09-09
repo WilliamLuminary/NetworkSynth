@@ -138,8 +138,8 @@ class TestWriteManifest:
 @pytest.mark.requires_fixture_data
 class TestManifestFromARealRun:
     def test_generate_writes_a_manifest_listing_its_outputs(self, tmp_path):
-        from networksynth.configs.generate_mode.config_sample import SampleConfig
         from networksynth.pipelines.generate import main
+        from tests.fixture_config import FixtureConfig as SampleConfig
 
         config = type("ManifestCfg", (SampleConfig,), {})
         config.BASE_OUTPUT_PATH = str(tmp_path)

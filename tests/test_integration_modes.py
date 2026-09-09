@@ -14,9 +14,9 @@ SAMPLE_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "input", "sam
 
 class TestGenerateMode:
     def test_load_original_and_save(self, tmp_path):
-        from networksynth.configs.generate_mode.config_sample import SampleConfig
+        from tests.fixture_config import FixtureConfig
 
-        SampleConfig.DATASETS = SampleConfig.DATASETS[:1]
+        SampleConfig = type("IntegrationCfg", (FixtureConfig,), {})
         SampleConfig.SYNTHETIC_NETWORK_NUMBER = 0
         SampleConfig.SYNTHETIC_GRAPH_NUMBER = 0
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
@@ -39,9 +39,9 @@ class TestGenerateMode:
         logger.info(f"Generate (originals): {len(files)} files in {out}")
 
     def test_generate_one_network(self, tmp_path):
-        from networksynth.configs.generate_mode.config_sample import SampleConfig
+        from tests.fixture_config import FixtureConfig
 
-        SampleConfig.DATASETS = SampleConfig.DATASETS[:1]
+        SampleConfig = type("IntegrationCfg", (FixtureConfig,), {})
         SampleConfig.SYNTHETIC_NETWORK_NUMBER = 1
         SampleConfig.SYNTHETIC_GRAPH_NUMBER = 1
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
@@ -82,118 +82,11 @@ class TestGenerateMode:
         )
 
 
-class TestMosaicMode:
-    def test_mosaic_2x2(self, tmp_path):
-        from networksynth.configs.mosaic_mode.config_sample import SampleConfig
-
-        SampleConfig.GRID_ROWS = 2
-        SampleConfig.GRID_COLS = 2
-        SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
-        SampleConfig.initialize()
-
-        from networksynth.configs import SynthParams
-        from networksynth.graphs import GraphGenerator
-        from networksynth.graphs.mosaic_stitcher import MosaicStitcher
-        from networksynth.handlers import GenerationRun, create_run_paths
-        from networksynth.utils import trim_graph
-
-        run_paths = create_run_paths(SampleConfig)
-        dataset_id = SampleConfig.get_datasets()[0]
-        agent = GenerationRun(SampleConfig, run_paths, dataset_id)
-        attributes = agent.attributes
-
-        tile_w, tile_h = SampleConfig.TILE_FRAME_SIZE
-        overlap = SampleConfig.OVERLAP_MARGIN_FRACTION
-        tile_gen_frame = (
-            round(tile_w + 2 * overlap * tile_w),
-            round(tile_h + 2 * overlap * tile_h),
-        )
-
-        tile_graphs = {}
-        for r in range(SampleConfig.GRID_ROWS):
-            for c in range(SampleConfig.GRID_COLS):
-                gen = GraphGenerator(attributes, SynthParams.from_config(SampleConfig))
-                g = gen.generate_network(frame_range=tile_gen_frame)
-                g = trim_graph(g, attributes.average_degree)
-                positions = g.positions()
-                positions[:, 0] += c * tile_w + tile_w / 2.0
-                positions[:, 1] += r * tile_h + tile_h / 2.0
-                tile_graphs[(r, c)] = g
-
-        merge_threshold = attributes.average_length * SampleConfig.CLOSED_NODES_FACTOR
-        stitcher = MosaicStitcher(merge_threshold=merge_threshold)
-        mosaic = stitcher.stitch(tile_graphs)
-        agent.mapper.assign_weights(mosaic)
-
-        assert mosaic.number_of_nodes() > 100
-        assert mosaic.number_of_edges() > 100
-
-        agent.saver.begin_batch()
-        agent.saver.save(mosaic, "synthetic_network", "mosaic_2x2_")
-        agent.saver.end_batch()
-
-        out = agent.saver.output_dir
-        files = []
-        for root, _, fnames in os.walk(out):
-            files.extend(fnames)
-        assert any("mosaic" in f for f in files)
-        logger.info(
-            f"Mosaic 2x2: {mosaic.number_of_nodes()} nodes, "
-            f"{mosaic.number_of_edges()} edges, {len(files)} files"
-        )
-
-
-class TestScalingMode:
-    def test_scaling_2x2(self, tmp_path):
-        from networksynth.configs.scaling_mode.config_sample import SampleConfig
-
-        SampleConfig.SCALE_ROWS = 2
-        SampleConfig.SCALE_COLS = 2
-        SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
-        SampleConfig.initialize()
-
-        from networksynth.configs import SynthParams
-        from networksynth.graphs import GraphGenerator
-        from networksynth.handlers import GenerationRun, create_run_paths
-        from networksynth.utils import trim_graph
-
-        run_paths = create_run_paths(SampleConfig)
-        dataset_id = SampleConfig.get_datasets()[0]
-        agent = GenerationRun(SampleConfig, run_paths, dataset_id)
-
-        gen = GraphGenerator(agent.attributes, SynthParams.from_config(SampleConfig))
-        scaled = gen.generate_scaled_network(
-            scale_rows=SampleConfig.SCALE_ROWS,
-            scale_cols=SampleConfig.SCALE_COLS,
-            max_rounds=SampleConfig.MAX_GENERATION_ROUNDS,
-            root_spacing_factor=SampleConfig.ROOT_SPACING_FACTOR,
-        )
-        scaled = trim_graph(scaled, agent.attributes.average_degree)
-        agent.mapper.assign_weights(scaled)
-
-        assert scaled.number_of_nodes() > 200
-        assert scaled.number_of_edges() > 200
-
-        agent.saver.begin_batch()
-        agent.saver.save(scaled, "synthetic_network", "scaled_2x2_")
-        agent.saver.end_batch()
-
-        out = agent.saver.output_dir
-        files = []
-        for root, _, fnames in os.walk(out):
-            files.extend(fnames)
-        assert any("scaled" in f for f in files)
-        logger.info(
-            f"Scaling 2x2: {scaled.number_of_nodes()} nodes, "
-            f"{scaled.number_of_edges()} edges, {len(files)} files"
-        )
-
-
 class TestAnalyzeMode:
     def test_analyze_graph(self, tmp_path):
-        from networksynth.configs.generate_mode.config_sample import SampleConfig
+        from tests.fixture_config import FixtureConfig
 
-        SampleConfig.DATASETS = SampleConfig.DATASETS[:1]
+        SampleConfig = type("IntegrationCfg", (FixtureConfig,), {})
         SampleConfig.SYNTHETIC_NETWORK_NUMBER = 0
         SampleConfig.SYNTHETIC_GRAPH_NUMBER = 0
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
@@ -225,10 +118,9 @@ class TestAnalyzeMode:
 
 class TestSnapshotMode:
     def test_generate_with_snapshots(self, tmp_path):
-        from networksynth.configs.generate_mode.config_snapshot_1x1 import (
-            Snapshot1x1Config,
-        )
+        from tests.fixture_config import FixtureSnapshotConfig
 
+        Snapshot1x1Config = type("IntegrationSnapCfg", (FixtureSnapshotConfig,), {})
         Snapshot1x1Config.BASE_OUTPUT_PATH = str(tmp_path)
         Snapshot1x1Config.initialize()
 
@@ -279,9 +171,9 @@ class TestSnapshotMode:
         )
 
     def test_compute_and_rank_metrics(self, tmp_path):
-        from networksynth.configs.generate_mode.config_sample import SampleConfig
+        from tests.fixture_config import FixtureConfig
 
-        SampleConfig.DATASETS = SampleConfig.DATASETS[:1]
+        SampleConfig = type("IntegrationCfg", (FixtureConfig,), {})
         SampleConfig.SYNTHETIC_NETWORK_NUMBER = 0
         SampleConfig.SYNTHETIC_GRAPH_NUMBER = 0
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)

@@ -29,65 +29,12 @@ def _tune(base, tmp_path, **overrides):
     return config
 
 
-class TestMosaicPipeline:
-    def test_run_mosaic_for_dataset(self, tmp_path):
-        from networksynth.configs.mosaic_mode.config_sample import SampleConfig
-        from networksynth.handlers import create_run_paths
-        from networksynth.pipelines.mosaic import run_mosaic_for_dataset
-
-        config = _tune(SampleConfig, tmp_path, GRID_ROWS=1, GRID_COLS=2)
-        run_paths = create_run_paths(config)
-
-        run_mosaic_for_dataset(config.get_datasets()[0], config, run_paths)
-
-        assert _outputs(str(tmp_path)), "mosaic produced no output files"
-
-    def test_compute_tile_layout_uses_its_config(self, tmp_path):
-        from networksynth.configs.mosaic_mode.config_sample import SampleConfig
-        from networksynth.pipelines.mosaic import compute_tile_layout
-
-        config = _tune(SampleConfig, tmp_path, GRID_ROWS=1, GRID_COLS=2)
-
-        tile_gen_frame, tile_offsets = compute_tile_layout(config)
-
-        assert len(tile_offsets) == 2
-        assert tile_gen_frame[0] > config.TILE_FRAME_SIZE[0]
-
-
-class TestScalingPipeline:
-    def test_run_scaling_for_dataset(self, tmp_path):
-        from networksynth.configs.scaling_mode.config_sample import SampleConfig
-        from networksynth.handlers import create_run_paths
-        from networksynth.pipelines.scaling import run_scaling_for_dataset
-
-        config = _tune(
-            SampleConfig,
-            tmp_path,
-            SCALE_ROWS=1,
-            SCALE_COLS=2,
-            MAX_GENERATION_ROUNDS=40,
-        )
-        run_paths = create_run_paths(config)
-
-        run_scaling_for_dataset(config.get_datasets()[0], config, run_paths)
-
-        assert _outputs(str(tmp_path)), "scaling produced no output files"
-
-
 class TestHybridPipeline:
     @staticmethod
     def _config(tmp_path):
-        from networksynth.configs.hybrid_mode.config_sample import SampleConfig
+        from tests.fixture_config import FixtureHybridConfig
 
-        return _tune(
-            SampleConfig,
-            tmp_path,
-            TARGET_SCALE=(1, 2),
-            NUM_CENTERS=2,
-            PHASE2_MAX_ROUNDS=10,
-            TILE_FRAME_SIZE=(510, 510),
-            SNAPSHOT_INTERVAL=0,
-        )
+        return _tune(FixtureHybridConfig, tmp_path)
 
     def test_run_hybrid_for_dataset(self, tmp_path):
         from networksynth.handlers import create_run_paths
@@ -144,17 +91,14 @@ class TestHybridPipeline:
 class TestHybridSnapshots:
 
     def test_hybrid_writes_snapshots_when_the_config_asks_for_them(self, tmp_path):
-        from networksynth.configs.hybrid_mode.config_sample import SampleConfig
         from networksynth.handlers import create_run_paths
         from networksynth.pipelines.hybrid import run_hybrid_for_dataset
+        from tests.fixture_config import FixtureHybridConfig
 
         config = _tune(
-            SampleConfig,
+            FixtureHybridConfig,
             tmp_path,
-            TARGET_SCALE=(1, 2),
-            NUM_CENTERS=2,
             PHASE2_MAX_ROUNDS=6,
-            TILE_FRAME_SIZE=(510, 510),
             SNAPSHOT_INTERVAL=100,
             RENDER_HYBRID_SNAPSHOT=replace(BaseConfig.RENDER_HYBRID_SNAPSHOT, dpi=72),
         )
@@ -172,13 +116,11 @@ class TestHybridSnapshots:
 class TestSweepPipeline:
     def test_generate_networks_threads_trial_params(self, tmp_path, monkeypatch):
         from networksynth.analysis.error_checker import NullErrorChecker
-        from networksynth.configs.sweep_mode.config_sample import (
-            SampleConfig as SweepConfig,
-        )
         from networksynth.handlers import GenerationRun, create_run_paths
         from networksynth.pipelines.sweep import generate_networks
+        from tests.fixture_config import FixtureSweepConfig
 
-        config = _tune(SweepConfig, tmp_path, SYNTHETIC_NETWORK_NUMBER=2)
+        config = _tune(FixtureSweepConfig, tmp_path, SYNTHETIC_NETWORK_NUMBER=2)
         run_paths = create_run_paths(config)
 
         agent = GenerationRun(config, run_paths, config.get_datasets()[0])

@@ -10,8 +10,6 @@ pytestmark = pytest.mark.unit
 
 CHECKED_PIPELINES = [
     ("networksynth.pipelines.generate", "run_for_dataset"),
-    ("networksynth.pipelines.mosaic", "run_mosaic_for_dataset"),
-    ("networksynth.pipelines.scaling", "run_scaling_for_dataset"),
     ("networksynth.pipelines.hybrid", "_run_dataset_in_subprocess"),
     ("networksynth.pipelines.sweep", "run_for_dataset"),
     ("networksynth.pipelines.compare", "run_for_dataset"),

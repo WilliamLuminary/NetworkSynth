@@ -62,6 +62,16 @@ def recommend_dpi_cv2(num_nodes: int) -> int:
     return recommend_dpi(num_nodes) + _DPI_BOOST
 
 
+_EDGE_SAMPLE = 20_000
+_EDGE_WIDTH_FRACTION = 0.2
+
+
+def _edge_thickness(style, canvas, lengths_px) -> int:
+    if style.line_width is not None:
+        return _points_to_px(style.line_width, canvas.dpi, minimum=1)
+    return max(1, round(float(np.median(lengths_px)) * _EDGE_WIDTH_FRACTION))
+
+
 _WEBP_MAX_PX = 16383
 
 
@@ -141,8 +151,13 @@ def render_network(graph: SynthGraph, style):
     )
     px, py = canvas.project(pos_arr[:, 0], pos_arr[:, 1])
 
-    thickness = _points_to_px(style.line_width, canvas.dpi, minimum=1)
     edge_list = np.asarray(list(graph.edges()), dtype=np.int64)
+    probe = edge_list[:: max(1, len(edge_list) // _EDGE_SAMPLE)]
+    thickness = _edge_thickness(
+        style,
+        canvas,
+        np.hypot(px[probe[:, 0]] - px[probe[:, 1]], py[probe[:, 0]] - py[probe[:, 1]]),
+    )
     for start in range(0, len(edge_list), _SEGMENT_BATCH):
         batch = edge_list[start : start + _SEGMENT_BATCH]
         pts_u = np.column_stack([px[batch[:, 0]], py[batch[:, 0]]])
@@ -319,7 +334,14 @@ def save_hybrid_snapshot(
         pts_u = np.column_stack(canvas.project(edge_arr[:, 0, 0], edge_arr[:, 0, 1]))
         pts_v = np.column_stack(canvas.project(edge_arr[:, 1, 0], edge_arr[:, 1, 1]))
         segments = np.stack([pts_u, pts_v], axis=1).astype(np.int32)
-        thickness = _points_to_px(style.line_width, canvas.dpi, minimum=1)
+        probe = slice(None, None, max(1, len(pts_u) // _EDGE_SAMPLE))
+        thickness = _edge_thickness(
+            style,
+            canvas,
+            np.hypot(
+                pts_u[probe, 0] - pts_v[probe, 0], pts_u[probe, 1] - pts_v[probe, 1]
+            ),
+        )
         for start in range(0, len(segments), _SEGMENT_BATCH):
             cv2.polylines(
                 canvas.image,

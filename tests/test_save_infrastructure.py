@@ -91,12 +91,10 @@ class TestSpecs:
 
 class TestModeOverrides:
 
-    def test_mosaic_synthetic_graph_has_png(self):
-        from networksynth.configs.mosaic_mode.config_sample import (
-            SampleConfig as MosaicConfig,
-        )
+    def test_a_mode_config_can_add_a_second_format(self):
+        from tests.fixture_config import FixtureHybridConfig
 
-        specs = MosaicConfig.save("synthetic_graph")
+        specs = FixtureHybridConfig.save("synthetic_graph")
         exts = [s.extension for s in specs]
         assert "webp" in exts
         assert "png" in exts
@@ -115,22 +113,18 @@ class TestModeOverrides:
         assert specs[0].detail == "test_detail"
 
     def test_override_does_not_leak_to_other_configs(self):
-        from networksynth.configs.mosaic_mode.config_sample import (
-            SampleConfig as MosaicConfig,
-        )
+        from tests.fixture_config import FixtureHybridConfig
 
-        MosaicConfig.save("synthetic_graph")
+        FixtureHybridConfig.save("synthetic_graph")
 
         assert len(BaseConfig.save("synthetic_graph")) == 1
 
-    def test_compare_mode_overrides(self):
-        from networksynth.configs.compare_mode.config_sample import (
-            SampleConfig as CompareConfig,
-        )
+    def test_a_mode_config_inherits_the_analysis_specs(self):
+        from tests.fixture_config import FixtureCompareConfig
 
-        specs = CompareConfig.save("analysis_data")
+        specs = FixtureCompareConfig.save("analysis_data")
         assert specs[0].use_timestamp is False
-        specs = CompareConfig.save("analysis_figure")
+        specs = FixtureCompareConfig.save("analysis_figure")
         assert specs[0].extension == "webp"
 
 

@@ -90,9 +90,9 @@ class TestAnalyzeReadsEveryFormatWeWrite:
 
 class TestComparisonLoadsTheTwoSetsItIsGiven:
     def _config(self, tmp_path, original, synthetic):
-        from networksynth.configs.compare_mode.config_sample import SampleConfig
+        from tests.fixture_config import FixtureCompareConfig
 
-        class TinyConfig(SampleConfig):
+        class TinyConfig(FixtureCompareConfig):
             BASE_OUTPUT_PATH = str(tmp_path / "out")
             MEASURE_WEIGHTED = False
             FULL_Q_BAND = False

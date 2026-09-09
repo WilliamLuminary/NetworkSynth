@@ -10,10 +10,10 @@ import pytest
 from matplotlib import pyplot as plt
 from scipy.stats import pearsonr
 
-from networksynth.configs.generate_mode.config_1 import Config1 as GenConfig1
 from networksynth.handlers import Mapper
+from tests.fixture_config import FixtureConfig
 
-GenConfig1.initialize()
+FixtureConfig.initialize()
 
 pytestmark = [pytest.mark.requires_fixture_data, pytest.mark.slow]
 
