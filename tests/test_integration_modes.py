@@ -82,52 +82,6 @@ class TestGenerateMode:
         )
 
 
-class TestScalingMode:
-    def test_scaling_2x2(self, tmp_path):
-        from networksynth.configs.scaling_mode.config_sample import SampleConfig
-
-        SampleConfig.SCALE_ROWS = 2
-        SampleConfig.SCALE_COLS = 2
-        SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
-        SampleConfig.initialize()
-
-        from networksynth.configs import SynthParams
-        from networksynth.graphs import GraphGenerator
-        from networksynth.handlers import GenerationRun, create_run_paths
-        from networksynth.utils import trim_graph
-
-        run_paths = create_run_paths(SampleConfig)
-        dataset_id = SampleConfig.get_datasets()[0]
-        agent = GenerationRun(SampleConfig, run_paths, dataset_id)
-
-        gen = GraphGenerator(agent.attributes, SynthParams.from_config(SampleConfig))
-        scaled = gen.generate_scaled_network(
-            scale_rows=SampleConfig.SCALE_ROWS,
-            scale_cols=SampleConfig.SCALE_COLS,
-            max_rounds=SampleConfig.MAX_GENERATION_ROUNDS,
-            root_spacing_factor=SampleConfig.ROOT_SPACING_FACTOR,
-        )
-        scaled = trim_graph(scaled, agent.attributes.average_degree)
-        agent.mapper.assign_weights(scaled)
-
-        assert scaled.number_of_nodes() > 200
-        assert scaled.number_of_edges() > 200
-
-        agent.saver.begin_batch()
-        agent.saver.save(scaled, "synthetic_network", "scaled_2x2_")
-        agent.saver.end_batch()
-
-        out = agent.saver.output_dir
-        files = []
-        for root, _, fnames in os.walk(out):
-            files.extend(fnames)
-        assert any("scaled" in f for f in files)
-        logger.info(
-            f"Scaling 2x2: {scaled.number_of_nodes()} nodes, "
-            f"{scaled.number_of_edges()} edges, {len(files)} files"
-        )
-
-
 class TestAnalyzeMode:
     def test_analyze_graph(self, tmp_path):
         from networksynth.configs.generate_mode.config_sample import SampleConfig

@@ -11,7 +11,6 @@ pytestmark = pytest.mark.unit
 
 PIPELINES = [
     "generate",
-    "scaling",
     "sweep",
     "hybrid",
     "compare",

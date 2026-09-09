@@ -29,26 +29,6 @@ def _tune(base, tmp_path, **overrides):
     return config
 
 
-class TestScalingPipeline:
-    def test_run_scaling_for_dataset(self, tmp_path):
-        from networksynth.configs.scaling_mode.config_sample import SampleConfig
-        from networksynth.handlers import create_run_paths
-        from networksynth.pipelines.scaling import run_scaling_for_dataset
-
-        config = _tune(
-            SampleConfig,
-            tmp_path,
-            SCALE_ROWS=1,
-            SCALE_COLS=2,
-            MAX_GENERATION_ROUNDS=40,
-        )
-        run_paths = create_run_paths(config)
-
-        run_scaling_for_dataset(config.get_datasets()[0], config, run_paths)
-
-        assert _outputs(str(tmp_path)), "scaling produced no output files"
-
-
 class TestHybridPipeline:
     @staticmethod
     def _config(tmp_path):

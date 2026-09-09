@@ -53,16 +53,15 @@ class TestOnlyWhatIsAskedForLoads:
         assert _config_modules_loaded() == before
 
     def test_loading_one_does_not_drag_in_the_others(self):
-        for stale in [n for n in sys.modules if "generate_mode.config_tmp" in n]:
+        for stale in [n for n in sys.modules if "generate_mode.config_1" in n]:
             del sys.modules[stale]
         before = _config_modules_loaded()
 
-        load_config(str(_CONFIGS / "generate_mode" / "config_tmp.py"))
+        load_config(str(_CONFIGS / "generate_mode" / "config_1.py"))
 
         newly_loaded = _config_modules_loaded() - before
         assert newly_loaded <= {
-            "networksynth.configs.generate_mode.config_tmp",
-            "networksynth.configs.generate_mode.config_sample",
+            "networksynth.configs.generate_mode.config_1",
         }, newly_loaded
 
 

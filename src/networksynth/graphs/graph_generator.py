@@ -73,52 +73,6 @@ class GraphGenerator:
         synthetic_network = _filter_graph(_synthetic_network, frame)
         return synthetic_network
 
-    def generate_scaled_network(
-        self,
-        scale_rows: int,
-        scale_cols: int,
-        max_rounds: int = 500,
-        root_spacing_factor: float = 0.7,
-    ) -> SynthGraph:
-        frame_w, frame_h = self._params.synthetic_frame_size
-        spacing_w = frame_w * root_spacing_factor
-        spacing_h = frame_h * root_spacing_factor
-
-        root_positions: List[Tuple[float, float]] = []
-        for r in range(scale_rows):
-            for c in range(scale_cols):
-                x = c * spacing_w + spacing_w / 2.0
-                y = r * spacing_h + spacing_h / 2.0
-                root_positions.append((x, y))
-
-        total_w = scale_cols * spacing_w
-        total_h = scale_rows * spacing_h
-        margin_x = spacing_w * 0.5
-        margin_y = spacing_h * 0.5
-        global_frame = (
-            (-margin_x, total_w + margin_x),
-            (-margin_y, total_h + margin_y),
-        )
-
-        logger.info(
-            f"Scaled generation: {scale_rows}×{scale_cols} roots, "
-            f"spacing=({spacing_w:.0f}, {spacing_h:.0f}) "
-            f"(factor={root_spacing_factor}), "
-            f"global_frame={global_frame}",
-            extra=tagged("PHASE1"),
-        )
-
-        nodes, edges = self._multi_root_bfs(root_positions, global_frame, max_rounds)
-
-        if not nodes or len(nodes) < 100:
-            raise RuntimeError(
-                f"Scaled generation produced only {len(nodes) if nodes else 0} nodes"
-            )
-
-        synthetic_network = SynthGraph.from_graph_nodes(nodes, edges)
-        filtered = _filter_to_frame(synthetic_network, global_frame)
-        return filtered
-
     @staticmethod
     def _bfs_network(
         frame_range: Tuple[int, int],
@@ -446,83 +400,6 @@ class GraphGenerator:
         graph = SynthGraph.from_graph_nodes(all_nodes, all_edges)
         filtered = _filter_to_frame(graph, global_frame)
         return filtered
-
-    @staticmethod
-    def _multi_root_bfs(
-        root_positions: List[Tuple[float, float]],
-        global_frame: Tuple[Tuple[float, float], Tuple[float, float]],
-        max_rounds: int,
-    ) -> Tuple[set, set]:
-        GraphNode.reset()
-
-        all_nodes: set = set()
-        all_edges: set = set()
-        seen_ids: set = set()
-
-        frontier: list = []
-        n_roots = len(root_positions)
-        for i, pos in enumerate(root_positions):
-            root = GraphNode(pos)
-            all_nodes.add(root)
-            seen_ids.add(id(root))
-            frontier.append(root)
-
-            for child in root.children:
-                all_nodes.add(child)
-                all_edges.add((root.position, child.position))
-                if id(child) not in seen_ids:
-                    seen_ids.add(id(child))
-                    frontier.append(child)
-
-            if (i + 1) % max(1, n_roots // 10) == 0:
-                logger.info(f"Root init: {i + 1:,}/{n_roots:,}", extra=tagged("BFS"))
-
-        logger.info(
-            f"Initialized {n_roots:,} roots → "
-            f"{len(all_nodes):,} nodes, {len(all_edges):,} edges, "
-            f"frontier={len(frontier):,}",
-            extra=tagged("BFS"),
-        )
-
-        for round_num in range(max_rounds):
-            rng.shuffle(frontier)
-            next_frontier: list = []
-
-            for node in frontier:
-                if not _within_frame(node.position, global_frame):
-                    continue
-                if node.generate_children():
-                    for child in node.children:
-                        all_nodes.add(child)
-                        all_edges.add((node.position, child.position))
-                        if id(child) not in seen_ids:
-                            seen_ids.add(id(child))
-                            next_frontier.append(child)
-
-            if not next_frontier:
-                logger.info(
-                    f"Round {round_num}: converged (no new nodes). "
-                    f"Total: {len(all_nodes):,} nodes, {len(all_edges):,} edges",
-                    extra=tagged("BFS"),
-                )
-                break
-
-            if (round_num + 1) % 10 == 0 or round_num == 0:
-                logger.info(
-                    f"Round {round_num}: frontier={len(next_frontier):,}, "
-                    f"nodes={len(all_nodes):,}, edges={len(all_edges):,}, "
-                    f"{GraphNode.counts()}",
-                    extra=tagged("BFS"),
-                )
-
-            frontier = next_frontier
-
-        logger.info(
-            f"Multi-root BFS complete: {len(all_nodes):,} nodes, "
-            f"{len(all_edges):,} edges, {GraphNode.counts()}",
-            extra=tagged("BFS"),
-        )
-        return all_nodes, all_edges
 
 
 def _within_frame(
