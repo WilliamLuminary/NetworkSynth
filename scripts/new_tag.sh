@@ -79,6 +79,15 @@ if [ -z "$DEV" ] && ! git merge-base --is-ancestor HEAD origin/main 2>/dev/null;
     exit 1
 fi
 
+# publish_dist.sh stamps the shipped tree from this tag, so a mismatch here
+# costs nothing to consumers. It is only worth seeing, so main does not drift
+# further than whoever cuts the next release expects.
+declared="$(sed -nE 's/^__version__ = "(.*)"$/\1/p' src/networksynth/__init__.py)"
+if [ "$declared" != "${tag#v}" ]; then
+    echo "new_tag: __version__ is $declared, this tag is $tag." >&2
+    echo "         The published tree gets ${tag#v} either way; main keeps $declared." >&2
+fi
+
 git tag -a "$tag" -m "NetworkSynth $tag"
 echo "$tag -> $commit ($branch), was $latest"
 

@@ -10,6 +10,8 @@ import os
 import subprocess
 from typing import List, Tuple
 
+from networksynth import __version__
+
 _TIMEOUT = 30
 
 
@@ -38,13 +40,31 @@ def in_checkout() -> bool:
 
 
 def version() -> str:
-    """The tag on this exact commit, or nothing.
+    """The tag on this exact commit, or the number the package was published with.
 
-    Anything between tags is an untagged state, and inventing a number for it
-    would say more than is known.
+    A shallow submodule fetches a commit, not the tags that name it, so git has
+    nothing to answer with there. publish_dist.sh stamps __version__ from the tag
+    it builds, which is why the fallback is a fact rather than a guess.
+
+    Anything between tags in a working clone is an untagged state, and git says
+    so; inventing a number for it would claim more than is known.
     """
     code, tag = _git("describe", "--tags", "--exact-match")
-    return tag if code == 0 else ""
+    if code == 0:
+        return tag
+    if _has_tags():
+        return ""
+    return __version__
+
+
+def _has_tags() -> bool:
+    """Whether git has any tag to describe with; a shallow fetch brings none.
+
+    _git folds stderr into its output, so the exit code is what says whether
+    there was a repository to ask at all.
+    """
+    code, listed = _git("tag", "-l")
+    return code == 0 and bool(listed)
 
 
 def _branch() -> str:
