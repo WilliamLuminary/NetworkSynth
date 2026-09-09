@@ -49,7 +49,7 @@ done
 
 [ "$CREATE" = "yes" ] || usage 0
 
-# The highest number any v* tag has reached, ignoring the -dev suffix.
+# Highest v* number, release or pre-release, so the two share one sequence.
 latest="$(git tag -l 'v*' | sed -e 's/-dev$//' -e 's/^v//' \
           | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
           | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)"
@@ -71,17 +71,14 @@ if git rev-parse -q --verify "refs/tags/$tag" > /dev/null; then
     exit 1
 fi
 
-# The publish workflow refuses a release tag that is not an ancestor of main, so
-# fail here rather than after a push that cannot be undone quietly.
+# The workflow refuses a release tag off main, so fail before the push, not after.
 if [ -z "$DEV" ] && ! git merge-base --is-ancestor HEAD origin/main 2>/dev/null; then
     echo "new_tag: $commit is not on origin/main, so $tag would fail to publish." >&2
     echo "         Use --dev for a pre-release, which publishes from any branch." >&2
     exit 1
 fi
 
-# publish_dist.sh stamps the shipped tree from this tag, so a mismatch here
-# costs nothing to consumers. It is only worth seeing, so main does not drift
-# further than whoever cuts the next release expects.
+# Consumers get the stamped tree either way; this only keeps the drift visible.
 declared="$(sed -nE 's/^__version__ = "(.*)"$/\1/p' src/networksynth/__init__.py)"
 if [ "$declared" != "${tag#v}" ]; then
     echo "new_tag: __version__ is $declared, this tag is $tag." >&2

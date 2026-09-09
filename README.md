@@ -6,6 +6,8 @@ Generates synthetic networks modelled on a real one. It measures an input networ
 
 NetworkSynth runs on Python 3.14.
 
+To work on it, clone and install in place, so edits take effect without reinstalling:
+
 ```bash
 git clone https://github.com/WilliamLuminary/NetworkSynth.git
 cd NetworkSynth
@@ -14,6 +16,16 @@ pip install -e .
 networksynth        # the window
 networksynth-cli    # lists every config, then takes one as its argument
 ```
+
+To just use it, install the latest release. No clone, no git:
+
+```bash
+pip install "networksynth @ https://github.com/WilliamLuminary/NetworkSynth/archive/refs/heads/dist.zip"
+```
+
+That URL is the `dist` branch tip, which is whatever was released last, so it needs no version in it. Every [release](https://github.com/WilliamLuminary/NetworkSynth/releases) also carries a built wheel if you would rather not build one, and names the exact URL to install it from.
+
+Either way you get the same four commands, and the version in the window comes from the release itself, so an installed copy knows what it is with no tags to read.
 
 The sample configs read from `data/input/samples/generate_mode/`:
 

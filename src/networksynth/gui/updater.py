@@ -1,9 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """What version this is, and how to move it forward.
 
-A checkout on a normal branch pulls. A `dist` checkout, which is what another
-project carries as a submodule, has no upstream to pull from and is moved by
-fetching the branch and resetting onto it.
+A `dist` checkout has no upstream to pull from, so it is moved by fetching the
+branch and resetting onto it.
 """
 
 import os
@@ -16,7 +15,6 @@ _TIMEOUT = 30
 
 
 def repo_root() -> str:
-    """The checkout holding this package, whether that is the repository or a submodule."""
     return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 
@@ -40,14 +38,11 @@ def in_checkout() -> bool:
 
 
 def version() -> str:
-    """The tag on this exact commit, or the number the package was published with.
+    """The tag on this commit, or the number publish_dist.sh stamped.
 
-    A shallow submodule fetches a commit, not the tags that name it, so git has
-    nothing to answer with there. publish_dist.sh stamps __version__ from the tag
-    it builds, which is why the fallback is a fact rather than a guess.
-
-    Anything between tags in a working clone is an untagged state, and git says
-    so; inventing a number for it would claim more than is known.
+    A shallow submodule fetches a commit, not the tags naming it, so git cannot
+    answer there. Where git does have tags, an untagged commit reports nothing
+    rather than borrowing the last release's number.
     """
     code, tag = _git("describe", "--tags", "--exact-match")
     if code == 0:
@@ -58,11 +53,7 @@ def version() -> str:
 
 
 def _has_tags() -> bool:
-    """Whether git has any tag to describe with; a shallow fetch brings none.
-
-    _git folds stderr into its output, so the exit code is what says whether
-    there was a repository to ask at all.
-    """
+    """Whether git has any tag to describe with; _git folds stderr in, so test the code."""
     code, listed = _git("tag", "-l")
     return code == 0 and bool(listed)
 

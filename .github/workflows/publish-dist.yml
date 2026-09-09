@@ -16,8 +16,7 @@ jobs:
     steps:
       - name: Decide where this tag publishes
         run: |
-          # A -dev tag is a pre-release: it goes to its own branch, so the branch
-          # consumers follow only ever holds released trees.
+          # A -dev tag goes to its own branch, so dist only ever holds releases.
           if [[ "$GITHUB_REF_NAME" == *-dev ]]; then
             echo "DIST_BRANCH=dist-dev" >> "$GITHUB_ENV"
           else
@@ -26,7 +25,7 @@ jobs:
 
       - uses: actions/checkout@v5
         with:
-          # The whole history, so origin/main and the dist branch are both reachable.
+          # origin/main and the dist branch both have to be reachable.
           fetch-depth: 0
 
       - name: Refuse a release tag that is not on main
@@ -50,3 +49,38 @@ jobs:
 
       - name: Push
         run: git push origin "$DIST_BRANCH" "dist-$GITHUB_REF_NAME"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Build the wheel
+        run: |
+          # The published tree, not the checkout: only that one carries the stamp.
+          rm -rf .release && mkdir -p .release/tree
+          git archive "$DIST_BRANCH" | tar -x -C .release/tree
+          python -m pip install --quiet --upgrade build
+          python -m build --wheel --outdir .release/wheel .release/tree
+
+      - name: Attach it to a release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          wheel="$(ls .release/wheel/*.whl)"
+          base="https://github.com/${GITHUB_REPOSITORY}"
+          whl_url="${base}/releases/download/${GITHUB_REF_NAME}/$(basename "$wheel")"
+          zip_url="${base}/archive/refs/tags/dist-${GITHUB_REF_NAME}.zip"
+          notes="$(cat <<TEXT
+          Install without cloning anything:
+
+              pip install $whl_url
+
+          Or build from the source tree the submodule tracks:
+
+              pip install "networksynth @ $zip_url"
+          TEXT
+          )"
+          gh release create "$GITHUB_REF_NAME" "$wheel" \
+            --title "NetworkSynth $GITHUB_REF_NAME" \
+            --notes "$notes" \
+            $([[ "$GITHUB_REF_NAME" == *-dev ]] && echo --prerelease)
