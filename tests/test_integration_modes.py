@@ -14,9 +14,9 @@ SAMPLE_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "input", "sam
 
 class TestGenerateMode:
     def test_load_original_and_save(self, tmp_path):
-        from networksynth.configs.generate_mode.config_sample import SampleConfig
+        from tests.fixture_config import FixtureConfig
 
-        SampleConfig.DATASETS = SampleConfig.DATASETS[:1]
+        SampleConfig = type("IntegrationCfg", (FixtureConfig,), {})
         SampleConfig.SYNTHETIC_NETWORK_NUMBER = 0
         SampleConfig.SYNTHETIC_GRAPH_NUMBER = 0
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
@@ -39,9 +39,9 @@ class TestGenerateMode:
         logger.info(f"Generate (originals): {len(files)} files in {out}")
 
     def test_generate_one_network(self, tmp_path):
-        from networksynth.configs.generate_mode.config_sample import SampleConfig
+        from tests.fixture_config import FixtureConfig
 
-        SampleConfig.DATASETS = SampleConfig.DATASETS[:1]
+        SampleConfig = type("IntegrationCfg", (FixtureConfig,), {})
         SampleConfig.SYNTHETIC_NETWORK_NUMBER = 1
         SampleConfig.SYNTHETIC_GRAPH_NUMBER = 1
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
@@ -84,9 +84,9 @@ class TestGenerateMode:
 
 class TestAnalyzeMode:
     def test_analyze_graph(self, tmp_path):
-        from networksynth.configs.generate_mode.config_sample import SampleConfig
+        from tests.fixture_config import FixtureConfig
 
-        SampleConfig.DATASETS = SampleConfig.DATASETS[:1]
+        SampleConfig = type("IntegrationCfg", (FixtureConfig,), {})
         SampleConfig.SYNTHETIC_NETWORK_NUMBER = 0
         SampleConfig.SYNTHETIC_GRAPH_NUMBER = 0
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
@@ -118,10 +118,9 @@ class TestAnalyzeMode:
 
 class TestSnapshotMode:
     def test_generate_with_snapshots(self, tmp_path):
-        from networksynth.configs.generate_mode.config_snapshot_1x1 import (
-            Snapshot1x1Config,
-        )
+        from tests.fixture_config import FixtureSnapshotConfig
 
+        Snapshot1x1Config = type("IntegrationSnapCfg", (FixtureSnapshotConfig,), {})
         Snapshot1x1Config.BASE_OUTPUT_PATH = str(tmp_path)
         Snapshot1x1Config.initialize()
 
@@ -172,9 +171,9 @@ class TestSnapshotMode:
         )
 
     def test_compute_and_rank_metrics(self, tmp_path):
-        from networksynth.configs.generate_mode.config_sample import SampleConfig
+        from tests.fixture_config import FixtureConfig
 
-        SampleConfig.DATASETS = SampleConfig.DATASETS[:1]
+        SampleConfig = type("IntegrationCfg", (FixtureConfig,), {})
         SampleConfig.SYNTHETIC_NETWORK_NUMBER = 0
         SampleConfig.SYNTHETIC_GRAPH_NUMBER = 0
         SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)

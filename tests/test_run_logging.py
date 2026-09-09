@@ -122,7 +122,7 @@ class TestRunLog:
 
 class TestConfigNoLongerOwnsLogging:
     def test_initialize_sets_run_id_without_a_file_handler(self, tmp_path):
-        from networksynth.configs.generate_mode.config_sample import SampleConfig
+        from tests.fixture_config import FixtureConfig as SampleConfig
 
         config = type("LogTestCfg", (SampleConfig,), {})
         config.BASE_OUTPUT_PATH = str(tmp_path)

@@ -4,15 +4,17 @@ import os
 import sys
 import tempfile
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+_ROOT = os.path.join(os.path.dirname(__file__), "..")
+sys.path.insert(0, os.path.join(_ROOT, "src"))
+sys.path.insert(0, _ROOT)
 
 
 def main() -> int:
     mp.set_start_method("spawn", force=True)
 
-    from networksynth.configs.generate_mode.config_sample import SampleConfig
     from networksynth.handlers import create_run_paths
     from networksynth.pipelines.generate import run_for_dataset
+    from tests.fixture_config import FixtureConfig as SampleConfig
 
     out_dir = tempfile.mkdtemp(prefix="spawn_safety_")
     config = type("SpawnSampleConfig", (SampleConfig,), {})

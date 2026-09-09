@@ -32,17 +32,9 @@ def _tune(base, tmp_path, **overrides):
 class TestHybridPipeline:
     @staticmethod
     def _config(tmp_path):
-        from networksynth.configs.hybrid_mode.config_sample import SampleConfig
+        from tests.fixture_config import FixtureHybridConfig
 
-        return _tune(
-            SampleConfig,
-            tmp_path,
-            TARGET_SCALE=(1, 2),
-            NUM_CENTERS=2,
-            PHASE2_MAX_ROUNDS=10,
-            TILE_FRAME_SIZE=(510, 510),
-            SNAPSHOT_INTERVAL=0,
-        )
+        return _tune(FixtureHybridConfig, tmp_path)
 
     def test_run_hybrid_for_dataset(self, tmp_path):
         from networksynth.handlers import create_run_paths
@@ -99,17 +91,14 @@ class TestHybridPipeline:
 class TestHybridSnapshots:
 
     def test_hybrid_writes_snapshots_when_the_config_asks_for_them(self, tmp_path):
-        from networksynth.configs.hybrid_mode.config_sample import SampleConfig
         from networksynth.handlers import create_run_paths
         from networksynth.pipelines.hybrid import run_hybrid_for_dataset
+        from tests.fixture_config import FixtureHybridConfig
 
         config = _tune(
-            SampleConfig,
+            FixtureHybridConfig,
             tmp_path,
-            TARGET_SCALE=(1, 2),
-            NUM_CENTERS=2,
             PHASE2_MAX_ROUNDS=6,
-            TILE_FRAME_SIZE=(510, 510),
             SNAPSHOT_INTERVAL=100,
             RENDER_HYBRID_SNAPSHOT=replace(BaseConfig.RENDER_HYBRID_SNAPSHOT, dpi=72),
         )
@@ -127,13 +116,11 @@ class TestHybridSnapshots:
 class TestSweepPipeline:
     def test_generate_networks_threads_trial_params(self, tmp_path, monkeypatch):
         from networksynth.analysis.error_checker import NullErrorChecker
-        from networksynth.configs.sweep_mode.config_sample import (
-            SampleConfig as SweepConfig,
-        )
         from networksynth.handlers import GenerationRun, create_run_paths
         from networksynth.pipelines.sweep import generate_networks
+        from tests.fixture_config import FixtureSweepConfig
 
-        config = _tune(SweepConfig, tmp_path, SYNTHETIC_NETWORK_NUMBER=2)
+        config = _tune(FixtureSweepConfig, tmp_path, SYNTHETIC_NETWORK_NUMBER=2)
         run_paths = create_run_paths(config)
 
         agent = GenerationRun(config, run_paths, config.get_datasets()[0])
