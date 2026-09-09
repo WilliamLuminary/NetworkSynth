@@ -47,9 +47,6 @@ jobs:
       - name: Publish
         run: scripts/release_dist.sh "$GITHUB_SHA" "dist-$GITHUB_REF_NAME"
 
-      - name: Push
-        run: git push origin "$DIST_BRANCH" "dist-$GITHUB_REF_NAME"
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
@@ -69,6 +66,12 @@ jobs:
           sys.exit(f"wheel omits {missing}; check [tool.setuptools.package-data]"
                    if missing else 0)
           CHECK
+
+      # Last, so a wheel that fails to build or check leaves the remote untouched
+      # rather than a published tree with no release. git archive reads the local
+      # ref, so the build above needs nothing pushed.
+      - name: Push
+        run: git push origin "$DIST_BRANCH" "dist-$GITHUB_REF_NAME"
 
       - name: Attach it to a release
         env:
