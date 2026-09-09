@@ -2,7 +2,7 @@
 
 Generates synthetic networks modelled on a real one: it measures an input network's structure, grows candidates that match it, and keeps the ones that pass a quality gate.
 
-This is the **`dist` branch** — a generated, code-only copy of [NetworkSynth](https://github.com/WilliamLuminary/NetworkSynth) meant to be checked out as a submodule inside another project. It carries the package and what it needs to install, and nothing else. Nothing here should be edited: every commit on this branch is built from the main repository by `scripts/publish_dist.sh`, so a change made here is lost at the next publish. Fix things in the main repository instead.
+This is the **`dist` branch** — a generated, code-only copy of [NetworkSynth](https://github.com/WilliamLuminary/NetworkSynth) meant to be checked out as a submodule inside another project. It carries the package and what it needs to install, and nothing else. Nothing here should be edited: every commit on this branch is built from the main repository by `scripts/release_dist.sh`, so a change made here is lost at the next publish. Fix things in the main repository instead.
 
 ## Setup
 
@@ -26,7 +26,7 @@ The command line, where a config module holds the same settings:
 networksynth-cli
 ```
 
-The config's `MODE` picks the pipeline — `generate`, `hybrid`, `scaling`, `sweep` or `compare`. `networksynth-cli` with no argument lists every config shipped here. No networks come with this branch, so a config's `DATASETS` and `BASE_INPUT_PATH` need pointing at an input directory of your own before you run it. The window asks for that directory instead, and a run-spec names its paths outright, so neither needs anything put in place first.
+The config's `MODE` picks the pipeline — `generate`, `hybrid`, `sweep` or `compare`. `networksynth-cli` with no argument lists every config shipped here. No networks come with this branch, so a config's `DATASETS` and `BASE_INPUT_PATH` need pointing at an input directory of your own before you run it. The window asks for that directory instead, and a run-spec names its paths outright, so neither needs anything put in place first.
 
 A third entry point runs a single job from a JSON run-spec rather than a config module, which is how a host application drives NetworkSynth without importing it:
 

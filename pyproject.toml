@@ -38,6 +38,11 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 
+# The GUI loads these by path from inside the package, so a wheel without
+# them installs a program with no window.
+[tool.setuptools.package-data]
+networksynth = ["gui/qml/*.qml", "gui/qml/assets/*"]
+
 [tool.setuptools.dynamic]
 version = {attr = "networksynth.__version__"}
 

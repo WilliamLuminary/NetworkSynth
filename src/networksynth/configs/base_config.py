@@ -93,7 +93,6 @@ class BaseConfig:
     RENDER_BFS_SNAPSHOT = RenderStyle(node_size=6.0, line_width=3.0, dpi=300)
     RENDER_HYBRID_SNAPSHOT = RenderStyle()
     RENDER_HYBRID_GRAPH = RenderStyle()
-    RENDER_SCALED_GRAPH = RenderStyle()
 
     SAVE_ORIGINAL_IMAGE = (SaveSpec(ORIGINAL_DIR, "original_image", "webp", save_webp),)
     SAVE_ORIGINAL_GRAPH = (SaveSpec(ORIGINAL_DIR, "original_graph", "webp", save_webp),)

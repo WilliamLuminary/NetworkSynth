@@ -4,7 +4,6 @@ import importlib
 PIPELINES = {
     "generate": "networksynth.pipelines.generate",
     "hybrid": "networksynth.pipelines.hybrid",
-    "scaling": "networksynth.pipelines.scaling",
     "sweep": "networksynth.pipelines.sweep",
     "compare": "networksynth.pipelines.compare",
 }
