@@ -28,7 +28,6 @@ from networksynth.handlers import (
     write_manifest,
 )
 from networksynth.utils import (
-    apply_seed,
     compute_network_metrics,
     metric_distance,
     save_bfs_snapshot,
@@ -74,13 +73,12 @@ def generate_synthetic_network(
     if _should_exit(exit_event):
         return None, float("inf")
 
-    apply_seed(params.seed)
     generator = GraphGenerator(attributes, params)
     for attempt in range(params.max_attempts):
         try:
             synthetic_graph = generator.generate_network()
             synthetic_graph = trim_graph(synthetic_graph, attributes.average_degree)
-            mapper.assign_weights(synthetic_graph)
+            mapper.assign_weights(synthetic_graph, generator.rng)
 
             if _should_exit(exit_event):
                 return None, float("inf")
@@ -110,13 +108,12 @@ def _generate_single_network(
     if exit_event.is_set():
         return None, float("inf")
 
-    apply_seed(params.seed)
     generator = GraphGenerator(attributes, params)
     for attempt in range(params.max_attempts):
         try:
             graph = generator.generate_network()
             graph = trim_graph(graph, attributes.average_degree)
-            mapper.assign_weights(graph)
+            mapper.assign_weights(graph, generator.rng)
 
             if exit_event.is_set():
                 return None, float("inf")
@@ -148,7 +145,6 @@ def _generate_single_network_collecting_snapshots(
     if exit_event.is_set():
         return None, float("inf"), []
 
-    apply_seed(params.seed)
     avg_degree = attributes.average_degree
     generator = GraphGenerator(attributes, params)
     for attempt in range(params.max_attempts):
@@ -170,7 +166,7 @@ def _generate_single_network_collecting_snapshots(
                     early_checked = True
                     temp_graph = _build_temp_graph(positions, edges)
                     temp_graph = trim_graph(temp_graph, avg_degree)
-                    mapper.assign_weights(temp_graph)
+                    mapper.assign_weights(temp_graph, generator.rng)
                     passed, error = error_checker.check(temp_graph)
                     if not passed:
                         logger.debug(
@@ -190,7 +186,7 @@ def _generate_single_network_collecting_snapshots(
                 continue
 
             graph = trim_graph(graph, attributes.average_degree)
-            mapper.assign_weights(graph)
+            mapper.assign_weights(graph, generator.rng)
 
             if exit_event.is_set():
                 return None, float("inf"), []
@@ -319,14 +315,13 @@ def generate_with_snapshots(run: GenerationRun, config):
         plot_futures.append(fut)
 
     params = SynthParams.from_config(config)
-    apply_seed(params.seed)
     generator = GraphGenerator(run.attributes, params)
     synthetic_graph = generator.generate_network_with_snapshots(
         snapshot_callback=on_snapshot,
         snapshot_round_interval=interval,
     )
     synthetic_graph = trim_graph(synthetic_graph, run.attributes.average_degree)
-    run.mapper.assign_weights(synthetic_graph)
+    run.mapper.assign_weights(synthetic_graph, generator.rng)
 
     for fut in plot_futures:
         fut.result()

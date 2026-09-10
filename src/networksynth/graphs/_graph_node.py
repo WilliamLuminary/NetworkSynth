@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import math
-import random
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Dict, List, Set, Tuple
@@ -62,6 +61,7 @@ class Traversal:
     built for one pass and dropped with it, so nothing survives into the next."""
 
     rules: TraversalRules
+    rng: np.random.Generator
     node_grid: Dict[Tuple[int, int], Set["GraphNode"]] = field(
         default_factory=lambda: defaultdict(set)
     )
@@ -73,8 +73,8 @@ class Traversal:
     aborted: int = 0
 
     @classmethod
-    def build(cls, attrs, params: SynthParams) -> "Traversal":
-        return cls(TraversalRules.build(attrs, params))
+    def build(cls, attrs, params: SynthParams, rng: np.random.Generator) -> "Traversal":
+        return cls(TraversalRules.build(attrs, params), rng)
 
     def next_id(self) -> int:
         self.created += 1
@@ -153,7 +153,7 @@ class GraphNode:
         self.id: int = traversal.next_id()
 
         self.position: Position = position
-        self.clockwise: bool = random.choice([True, False])
+        self.clockwise: bool = bool(traversal.rng.integers(2))
         self.parent: GraphNode = parent
         self.children: List[GraphNode] = []
         if parent is not None and parent_angle is not None:
@@ -162,7 +162,7 @@ class GraphNode:
             self._add_child(self.parent)
         elif parent is None and parent_angle is None:
             self.degree = self._choose_degree_random()
-            self.base_angle = random.uniform(0, 360)
+            self.base_angle = float(traversal.rng.uniform(0, 360))
             self._initialize_root_node()
         else:
             raise ValueError(
@@ -173,15 +173,15 @@ class GraphNode:
         transitions = self._t.rules.degree_trans_probs[parent_degree]
         degrees = list(transitions.keys())
         probabilities = list(transitions.values())
-        return np.random.choice(degrees, p=probabilities)
+        return int(self._t.rng.choice(degrees, p=probabilities))
 
     def _choose_degree_random(self) -> int:
         degrees = list(self._t.rules.degree_dist.keys())
         probabilities = list(self._t.rules.degree_dist.values())
-        return np.random.choice(degrees, p=probabilities)
+        return int(self._t.rng.choice(degrees, p=probabilities))
 
     def _initialize_root_node(self) -> None:
-        length = random.choice(self._t.rules.degree_lengths[self.degree])
+        length = _sample(self._t.rng, self._t.rules.degree_lengths[self.degree], 1)[0]
         child_position = self._polar_to_cartesian([length], [self.base_angle])[0]
         child = GraphNode(
             self._t, child_position, parent=self, parent_angle=self.base_angle
@@ -288,7 +288,7 @@ class GraphNode:
         if self.degree == 1:
             return [], []
         rules = self._t.rules
-        raw = random.choices(rules.degree_angles[self.degree], k=self.degree - 1)
+        raw = _sample(self._t.rng, rules.degree_angles[self.degree], self.degree - 1)
         sign = 1 if self.clockwise else -1
         base = self.base_angle
         acc = 0.0
@@ -296,7 +296,9 @@ class GraphNode:
         for a in raw:
             acc += sign * a
             angles.append(acc + base)
-        lengths = random.choices(rules.degree_lengths[self.degree], k=self.degree - 1)
+        lengths = _sample(
+            self._t.rng, rules.degree_lengths[self.degree], self.degree - 1
+        )
         return angles, lengths
 
     def _polar_to_cartesian(
@@ -329,6 +331,10 @@ class GraphNode:
 
     def __str__(self):
         return f"Node No. {self.id}"
+
+
+def _sample(rng: np.random.Generator, population: list, k: int) -> list:
+    return [population[i] for i in rng.integers(len(population), size=k)]
 
 
 def _do_intersect(p1: Position, q1: Position, p2: Position, q2: Position) -> bool:

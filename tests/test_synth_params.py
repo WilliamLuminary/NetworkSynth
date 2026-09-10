@@ -78,7 +78,7 @@ class TestGenerationReadsParamsNotAConfig:
             max_attempts=1,
             seed=None,
         )
-        rules = Traversal.build(Attrs(), params).rules
+        rules = Traversal.build(Attrs(), params, params.rng()).rules
 
         assert rules.closed_nodes_thr_sq == (10.0 * 5.0) ** 2
         assert rules.closed_edges_thr_sq == (10.0 * 4.0) ** 2

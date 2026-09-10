@@ -27,17 +27,17 @@ def params():
 
 class TestATraversalOwnsItsRecord:
     def test_the_rules_come_from_the_attributes(self, attributes, params):
-        traversal = Traversal.build(attributes, params)
+        traversal = Traversal.build(attributes, params, params.rng())
 
         assert traversal.rules.degree_dist is attributes.degree_distribution
         assert traversal.rules.grid_size == attributes.average_length
 
     def test_the_rules_are_immutable(self, attributes, params):
         with pytest.raises(Exception):
-            Traversal.build(attributes, params).rules.grid_size = 1.0
+            Traversal.build(attributes, params, params.rng()).rules.grid_size = 1.0
 
     def test_a_node_is_filed_in_the_traversal_it_was_grown_in(self, attributes, params):
-        traversal = Traversal.build(attributes, params)
+        traversal = Traversal.build(attributes, params, params.rng())
 
         GraphNode(traversal, (0.0, 0.0))
 
@@ -45,8 +45,8 @@ class TestATraversalOwnsItsRecord:
         assert traversal.edge_grid
 
     def test_two_traversals_do_not_share_a_grid(self, attributes, params):
-        first = Traversal.build(attributes, params)
-        second = Traversal.build(attributes, params)
+        first = Traversal.build(attributes, params, params.rng())
+        second = Traversal.build(attributes, params, params.rng())
 
         GraphNode(first, (0.0, 0.0))
 
@@ -55,8 +55,8 @@ class TestATraversalOwnsItsRecord:
         assert second.nodes_created() == 0
 
     def test_ids_count_from_zero_per_traversal(self, attributes, params):
-        first = Traversal.build(attributes, params)
-        second = Traversal.build(attributes, params)
+        first = Traversal.build(attributes, params, params.rng())
+        second = Traversal.build(attributes, params, params.rng())
 
         assert [first.next_id(), first.next_id()] == [0, 1]
         assert second.next_id() == 0
@@ -65,7 +65,7 @@ class TestATraversalOwnsItsRecord:
 
 class TestPlacementCountsAreAResult:
     def test_they_start_at_zero_and_read_back(self, attributes, params):
-        traversal = Traversal.build(attributes, params)
+        traversal = Traversal.build(attributes, params, params.rng())
         assert traversal.counts() == PlacementCounts(merged=0, aborted=0)
 
         traversal.merged = 3

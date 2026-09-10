@@ -6,8 +6,6 @@ import logging
 import os
 import time
 
-import numpy as np
-
 
 def worker_count(num_tasks: int | None = None, ceiling: int | None = None) -> int:
     import psutil
@@ -24,16 +22,6 @@ def worker_count(num_tasks: int | None = None, ceiling: int | None = None) -> in
     if num_tasks is not None:
         workers = min(workers, num_tasks)
     return max(1, workers)
-
-
-def apply_seed(seed: int | None) -> None:
-    if seed is None:
-        return
-
-    import random
-
-    random.seed(seed)
-    np.random.seed(seed % (2**32))
 
 
 def log_memory(label: str, enabled: bool) -> None:

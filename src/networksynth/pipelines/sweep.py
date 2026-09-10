@@ -20,7 +20,6 @@ from networksynth.handlers import (
 )
 from networksynth.pipelines.generate import compute_average_error
 from networksynth.utils import (
-    apply_seed,
     build_graph,
     spawn_context,
     tagged,
@@ -60,12 +59,11 @@ def _generate_with_factors(
     if exit_event.is_set():
         return None, float("inf")
 
+    rng = params.rng()
     for attempt in range(params.max_attempts):
-        apply_seed(None if params.seed is None else params.seed + attempt)
-
         try:
             inner_nodes, inner_edges, *_ = GraphGenerator.bfs_with_frontier(
-                Traversal.build(attributes, params), params.synthetic_frame_size
+                Traversal.build(attributes, params, rng), params.synthetic_frame_size
             )
 
             if not inner_nodes or len(inner_nodes) < 100:
@@ -73,7 +71,7 @@ def _generate_with_factors(
 
             graph = build_graph(inner_nodes, inner_edges, arg_type="graph_node")
             graph = trim_graph(graph, attributes.average_degree)
-            mapper.assign_weights(graph)
+            mapper.assign_weights(graph, rng)
 
             if exit_event.is_set():
                 return None, float("inf")

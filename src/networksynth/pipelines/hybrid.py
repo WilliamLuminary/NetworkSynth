@@ -38,7 +38,6 @@ from networksynth.handlers import (
     write_manifest,
 )
 from networksynth.utils import (
-    apply_seed,
     build_graph,
     log_memory,
     progress,
@@ -65,7 +64,7 @@ def generate_random_centers(
     rng_seed: Optional[int] = None,
     max_rejections: int = 50_000,
 ) -> List[Tuple[float, float]]:
-    gen = np.random.RandomState(rng_seed)
+    gen = np.random.default_rng(rng_seed)
     centers: List[Tuple[float, float]] = []
     consecutive_rejects = 0
 
@@ -141,11 +140,10 @@ def _generate_tile_worker(args):
         min_tile_nodes,
     ) = args
 
-    apply_seed(params.seed)
-
     if exit_event.is_set():
         return tile_idx, None
 
+    rng = params.rng()
     try:
         best_error = float("inf")
         best_result = None
@@ -161,7 +159,7 @@ def _generate_tile_worker(args):
                 all_positions,
                 all_edge_tuples,
             ) = GraphGenerator.bfs_with_frontier(
-                Traversal.build(attributes, params), frame_range
+                Traversal.build(attributes, params, rng), frame_range
             )
 
             if not inner_nodes or len(inner_nodes) < min_tile_nodes:
@@ -177,7 +175,7 @@ def _generate_tile_worker(args):
 
             graph = build_graph(inner_nodes, inner_edges, arg_type="graph_node")
             graph = trim_graph(graph, attributes.average_degree)
-            mapper.assign_weights(graph)
+            mapper.assign_weights(graph, rng)
 
             passed, error = error_checker.check(graph)
 
@@ -314,6 +312,7 @@ def run_phase2(
     max_rounds: int,
     config,
     params: SynthParams,
+    rng: np.random.Generator,
     snapshot_dir: str | None = None,
     snapshot_round_interval: int = 0,
     expected_nodes: int = 0,
@@ -374,8 +373,6 @@ def run_phase2(
             }
         )
 
-    apply_seed(params.seed)
-
     if take_snapshots:
         os.makedirs(snapshot_dir, exist_ok=True)
         snapshot_style = config.render("hybrid_snapshot")
@@ -415,7 +412,7 @@ def run_phase2(
             )
 
         graph = GraphGenerator.assemble_and_continue(
-            Traversal.build(attributes, params),
+            Traversal.build(attributes, params, rng),
             tile_data_list,
             global_frame,
             max_rounds,
@@ -441,7 +438,7 @@ def run_phase2(
         )
     else:
         graph = GraphGenerator.assemble_and_continue(
-            Traversal.build(attributes, params),
+            Traversal.build(attributes, params, rng),
             tile_data_list,
             global_frame,
             max_rounds,
@@ -551,6 +548,8 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
 
     log_memory(f"Before Phase 2 ({dataset_id})", config.LOG_MEMORY)
     t1 = time.time()
+    # Phase 2 and the weights it ends with draw from one stream.
+    rng = base_params.rng()
     hybrid_graph = run_phase2(
         tile_results,
         attributes,
@@ -560,6 +559,7 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
         max_rounds,
         config,
         base_params,
+        rng,
         snapshot_dir=snapshot_dir,
         snapshot_round_interval=snapshot_interval,
         expected_nodes=expected_nodes,
@@ -585,7 +585,7 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
         extra=tagged("STATS", dataset=str(dataset_id)),
     )
 
-    mapper.assign_weights(hybrid_graph)
+    mapper.assign_weights(hybrid_graph, rng)
 
     run.save_original()
 

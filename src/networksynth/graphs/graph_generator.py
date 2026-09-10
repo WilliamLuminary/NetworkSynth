@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import logging
-import random as rng
 from collections import deque, namedtuple
 from typing import Dict, List, Optional, Tuple, Union
 
@@ -28,6 +27,7 @@ class GraphGenerator:
     def __init__(self, attributes_calculator, params: SynthParams):
         self._attributes = attributes_calculator
         self._params = params
+        self.rng = params.rng()
 
     def generate_network(
         self,
@@ -40,7 +40,7 @@ class GraphGenerator:
         frame_range = frame_range or self._params.synthetic_frame_size
 
         for _ in range(regenerate_times):
-            traversal = Traversal.build(self._attributes, self._params)
+            traversal = Traversal.build(self._attributes, self._params, self.rng)
             nodes, edges = self._bfs(
                 traversal,
                 frame_range,
@@ -298,7 +298,7 @@ class GraphGenerator:
                 # lays a concentric shell per round and leaves a visible ripple
                 # around every seed. Rounds survive as a pop budget only.
                 last = len(frontier) - 1
-                idx = rng.randint(0, last)
+                idx = int(traversal.rng.integers(last + 1))
                 if idx != last:
                     frontier[idx], frontier[last] = frontier[last], frontier[idx]
                 node = frontier.pop()

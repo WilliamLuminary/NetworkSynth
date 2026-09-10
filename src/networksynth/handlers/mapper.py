@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import logging
-import random
 from collections import defaultdict
 from typing import DefaultDict, Final, Tuple
 
@@ -84,25 +83,30 @@ class Mapper:
         )
         return length_bins
 
-    def assign_weights(self, graph: SynthGraph) -> None:
+    def assign_weights(
+        self, graph: SynthGraph, rng: np.random.Generator | None = None
+    ) -> None:
         if self.skipped:
             return
 
         if graph.is_weighted():
             raise ValueError("Graph already has edge weights assigned")
 
+        rng = np.random.default_rng() if rng is None else rng
         graph.make_weighted()
         positions = graph.positions()
         for u, v in graph.edges():
             length = euclidean(positions[u], positions[v])
-            graph.set_weight(u, v, self._length_to_weight(length))
+            graph.set_weight(u, v, self._length_to_weight(length, rng))
 
-    def _length_to_weight(self, length: float) -> float:
+    def _length_to_weight(self, length: float, rng: np.random.Generator) -> float:
         bin_idx = np.clip(
             np.digitize(length, self.length_bins) - 1, 0, len(self.length_bins) - 2
         )
         distribution = self.weight_distributions.get(bin_idx)
-        return random.choice(distribution) if distribution else self.avg_weights
+        if not distribution:
+            return self.avg_weights
+        return distribution[rng.integers(len(distribution))]
 
 
 class EnhancedMapper(Mapper):
@@ -126,7 +130,7 @@ class EnhancedMapper(Mapper):
 
         self.bandwidth = self.mix_intensity * np.std(lengths) * 2
 
-    def _get_mixed_weight(self, length: float) -> float:
+    def _get_mixed_weight(self, length: float, rng: np.random.Generator) -> float:
         distances, indices = self.nn_model.kneighbors(
             [[length, 0]], return_distance=True
         )
@@ -134,20 +138,21 @@ class EnhancedMapper(Mapper):
         raw_weights = 1 / (distances.squeeze() + 1e-8)
         mixing_probs = raw_weights / raw_weights.sum()
 
-        return np.random.choice(
-            self.original_weights[indices.squeeze()], p=mixing_probs
-        )
+        return rng.choice(self.original_weights[indices.squeeze()], p=mixing_probs)
 
-    def assign_weights(self, graph: SynthGraph) -> None:
+    def assign_weights(
+        self, graph: SynthGraph, rng: np.random.Generator | None = None
+    ) -> None:
         if graph.is_weighted():
             raise ValueError("Graph already has edge weights assigned")
 
+        rng = np.random.default_rng() if rng is None else rng
         graph.make_weighted()
         positions = graph.positions()
         for u, v in graph.edges():
             length = euclidean(positions[u], positions[v])
-            if np.random.random() < self.mix_intensity:
-                weight = self._get_mixed_weight(length)
+            if rng.random() < self.mix_intensity:
+                weight = self._get_mixed_weight(length, rng)
             else:
-                weight = self._length_to_weight(length)
+                weight = self._length_to_weight(length, rng)
             graph.set_weight(u, v, weight)
