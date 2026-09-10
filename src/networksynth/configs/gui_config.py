@@ -24,6 +24,17 @@ from .file_definitions import (
     save_svg,
     save_webp,
 )
+from .loaders import (
+    IMAGE_SUFFIX,
+    SGT_EDGE_SUFFIX,
+    SGT_POSITIONS_SUFFIX,
+    SpecError,
+    discover_datasets,
+    load_csv_pair,
+    load_network,
+    load_network_file,
+    load_npy_pair,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,29 +52,9 @@ MODE_INPUTS = {
     "sweep": _PAIR_OR_DIRECTORY,
 }
 
-_EDGE_SUFFIX = "_edgelist.csv"
-_POSITIONS_SUFFIX = "_positions.csv"
-# What StructuralGT's exporter writes. Its columns are already the ones
-# read_graph_csv accepts, so only the file names differ.
-_SGT_EDGE_SUFFIX = "_EdgeList.csv"
-_SGT_POSITIONS_SUFFIX = "_NodePositions.csv"
 # StructuralGT skeletonises a copy scaled to this on its longest side, and exports
 # the untouched image beside it, so its coordinates are in the scaled copy's pixels.
 _SGT_MAX_SIDE = 1024
-_IMAGE_SUFFIX = "_image.tif"
-_MATRIX_SUFFIX = "_adjacency.npy"
-_NPY_POSITIONS_SUFFIX = "_positions.npy"
-_GRAPHML_SUFFIX = "_network.graphml"
-_GRAPHML_GZ_SUFFIX = "_network.graphml.gz"
-
-
-_DIRECTORY_FORMS = (
-    (_EDGE_SUFFIX, (_POSITIONS_SUFFIX,)),
-    (_SGT_EDGE_SUFFIX, (_SGT_POSITIONS_SUFFIX,)),
-    (_MATRIX_SUFFIX, (_NPY_POSITIONS_SUFFIX,)),
-    (_GRAPHML_SUFFIX, ()),
-    (_GRAPHML_GZ_SUFFIX, ()),
-)
 
 _TUPLE_PARAMS = frozenset(
     {
@@ -78,10 +69,6 @@ _TUPLE_PARAMS = frozenset(
 )
 
 _REQUIRED_KEYS = ("contract", "mode", "output_dir", "inputs", "params", "run_name")
-
-
-class SpecError(ValueError):
-    pass
 
 
 NETWORK_FORMATS = {
@@ -136,88 +123,6 @@ def _reduce_spec_config(cls):
 # once it sees a custom metaclass it saves the class by name — which a spawned
 # child cannot resolve, since this config was built at run time from a spec.
 copyreg.pickle(_SpecConfigMeta, _reduce_spec_config)
-
-
-def discover_datasets(directory: str) -> list:
-    if not os.path.isdir(directory):
-        raise SpecError(f"not a directory: {directory}")
-
-    found = {}
-    for entry in sorted(os.listdir(directory)):
-        for lead, partners in _DIRECTORY_FORMS:
-            if not entry.endswith(lead):
-                continue
-            name = entry[: -len(lead)]
-            if name in found:
-                raise SpecError(
-                    f"{directory}: '{name}' is named as two datasets at once "
-                    f"({found[name]} and {lead}). Rename one of them."
-                )
-            for partner in partners:
-                beside = os.path.join(directory, f"{name}{partner}")
-                if not os.path.exists(beside):
-                    raise SpecError(
-                        f"{os.path.join(directory, entry)} has no {partner} "
-                        f"file beside it ({beside})"
-                    )
-            found[name] = lead
-
-    if not found:
-        forms = ", ".join(f"*{lead}" for lead, _ in _DIRECTORY_FORMS)
-        raise SpecError(f"no {forms} file found in {directory}")
-    return sorted(found)
-
-
-def _load_npy_pair(positions_path: str, adjacency_path: str) -> SynthGraph:
-    import numpy as np
-
-    from networksynth.utils import build_graph, transpose_positions
-
-    positions = np.load(positions_path, allow_pickle=True)
-    matrix = np.load(adjacency_path, allow_pickle=True).item()
-    graph = build_graph(positions, matrix)
-    transpose_positions(graph)
-    return graph
-
-
-def _load_single_network(path: str) -> SynthGraph:
-    from networksynth.graphs import load_graphs
-
-    graphs = load_graphs(path)
-    if len(graphs) > 1:
-        logger.warning(
-            f"{path} holds {len(graphs)} networks; reading the first. Point at "
-            "a single-network file to choose a different one."
-        )
-    return graphs[0]
-
-
-def _load_from_directory(directory: str, name: str) -> SynthGraph:
-    """One dataset out of a directory, read by the form its name is in."""
-    path = os.path.join(directory, name)
-    present = set(os.listdir(directory))
-    for edges, positions in (
-        (_EDGE_SUFFIX, _POSITIONS_SUFFIX),
-        (_SGT_EDGE_SUFFIX, _SGT_POSITIONS_SUFFIX),
-    ):
-        if f"{name}{edges}" in present:
-            from networksynth.graphs import read_graph_csv
-
-            graph = read_graph_csv(f"{path}{edges}", f"{path}{positions}")
-            if positions == _SGT_POSITIONS_SUFFIX:
-                GuiConfig._sgt_source = True
-                # StructuralGT writes the skeleton's (row, col) under headers x and y.
-                from networksynth.utils import transpose_positions
-
-                transpose_positions(graph)
-            return graph
-    if os.path.exists(f"{path}{_MATRIX_SUFFIX}"):
-        return _load_npy_pair(
-            f"{path}{_NPY_POSITIONS_SUFFIX}", f"{path}{_MATRIX_SUFFIX}"
-        )
-    if os.path.exists(f"{path}{_GRAPHML_GZ_SUFFIX}"):
-        return _load_single_network(f"{path}{_GRAPHML_GZ_SUFFIX}")
-    return _load_single_network(f"{path}{_GRAPHML_SUFFIX}")
 
 
 class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
@@ -333,8 +238,6 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
     def initialize(cls) -> None:
         super().initialize()
         cls.OUTPUT_DENOTE = f"gui_{cls.MODE}"
-        cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
-        cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
 
     _sgt_source = False
 
@@ -345,20 +248,17 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
         GuiConfig._sgt_source = False
         directory = cls.PATHS.get("datasets_dir")
         if directory:
-            graph = _load_from_directory(directory, str(dataset_id))
+            graph, form = load_network(directory, str(dataset_id))
+            GuiConfig._sgt_source = form == SGT_EDGE_SUFFIX
         elif cls.PATHS.get("network_graphml"):
-            graph = _load_single_network(cls.PATHS["network_graphml"])
+            graph = load_network_file(cls.PATHS["network_graphml"])
         elif cls.PATHS.get("adjacency"):
-            graph = _load_npy_pair(cls.PATHS["positions_npy"], cls.PATHS["adjacency"])
+            graph = load_npy_pair(cls.PATHS["positions_npy"], cls.PATHS["adjacency"])
         else:
-            from networksynth.graphs import read_graph_csv
-
-            graph = read_graph_csv(cls.PATHS["edge_list"], cls.PATHS["positions"])
-            if cls.PATHS["positions"].endswith(_SGT_POSITIONS_SUFFIX):
-                from networksynth.utils import transpose_positions
-
-                transpose_positions(graph)
-                GuiConfig._sgt_source = True
+            graph = load_csv_pair(cls.PATHS["edge_list"], cls.PATHS["positions"])
+            GuiConfig._sgt_source = cls.PATHS["positions"].endswith(
+                SGT_POSITIONS_SUFFIX
+            )
 
         orient_positions(graph, cls.INPUT_ORIENTATION)
 
@@ -383,7 +283,7 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
         directory = cls.PATHS.get("datasets_dir")
         if directory:
             return os.path.exists(
-                os.path.join(directory, f"{dataset_id}{_IMAGE_SUFFIX}")
+                os.path.join(directory, f"{dataset_id}{IMAGE_SUFFIX}")
             )
         return bool(cls.PATHS.get("image"))
 
@@ -391,7 +291,7 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
     def load_original_image(cls, dataset_id: DatasetId) -> Optional[ndarray]:
         directory = cls.PATHS.get("datasets_dir")
         if directory:
-            candidate = os.path.join(directory, f"{dataset_id}{_IMAGE_SUFFIX}")
+            candidate = os.path.join(directory, f"{dataset_id}{IMAGE_SUFFIX}")
             path = candidate if os.path.exists(candidate) else None
         else:
             path = cls.PATHS.get("image")

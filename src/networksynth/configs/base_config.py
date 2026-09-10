@@ -17,14 +17,23 @@ from .file_definitions import (
     save_text,
     save_webp,
 )
+from .loaders import IMAGE_SUFFIX as _IMAGE_SUFFIX
 
 logger = logging.getLogger(__name__)
 
 
-def load_idle(*_, **__):
-    err_msg = "Logic of loading data is not implemented yet."
-    logging.info(err_msg)
-    raise NotImplementedError(err_msg)
+def _unwired(cls, func) -> bool:
+    """Whether initialize() should wire a loader onto this class.
+
+    None means nothing was set. A method bound to an ancestor means that
+    ancestor's initialize() ran first and this class inherited its binding,
+    which would read the ancestor's paths; it needs its own. Anything else is a
+    loader somebody plugged in, and stays.
+    """
+    if func is None:
+        return True
+    owner = getattr(func, "__self__", None)
+    return isinstance(owner, type) and owner is not cls and issubclass(cls, owner)
 
 
 class BaseConfig:
@@ -129,18 +138,19 @@ class BaseConfig:
     DISABLE_SAVING_NOTE: str = ""
 
     BASE_OUTPUT_PATH = os.path.join(BASE_DATA_PATH, "output")
-    ORIGINAL_NETWORK_FUNC = ORIGINAL_IMAGE_FUNC = load_idle
-    NETWORKS_FUNC = load_idle
+    # A config plugs in a loader by overriding load_original_* below, or by
+    # assigning any callable here; initialize() fills in only what is still None.
+    ORIGINAL_NETWORK_FUNC = ORIGINAL_IMAGE_FUNC = None
+    NETWORKS_FUNC = None
+    IMAGE_SUFFIX: str = _IMAGE_SUFFIX
 
     MAX_WORKERS: int = 50
 
     @classmethod
     def get_max_workers(cls, num_tasks: int = None) -> int:
-        cpu_count = os.cpu_count() or 1
-        max_workers = min(max(1, cpu_count // 2), cls.MAX_WORKERS)
-        if num_tasks is not None:
-            max_workers = min(max_workers, num_tasks)
-        return max_workers
+        from networksynth.utils import worker_count
+
+        return worker_count(num_tasks, ceiling=cls.MAX_WORKERS)
 
     @classmethod
     def snapshot_formats(cls) -> tuple:
@@ -148,8 +158,9 @@ class BaseConfig:
 
     @classmethod
     def get_snapshot_plot_workers(cls) -> int:
-        cpu_count = os.cpu_count() or 1
-        return min(max(1, cpu_count // 2), cls.SNAPSHOT_PLOT_WORKERS)
+        from networksynth.utils import worker_count
+
+        return worker_count(ceiling=cls.SNAPSHOT_PLOT_WORKERS)
 
     @classmethod
     def initialize(cls) -> None:
@@ -175,6 +186,30 @@ class BaseConfig:
         module_parts = cls.__module__.split(".")
         mode = next((p for p in module_parts if p.endswith("_mode")), None)
         cls.OUTPUT_DENOTE = f"{mode}_{cls.__name__}" if mode else cls.__name__
+
+        if _unwired(cls, cls.ORIGINAL_NETWORK_FUNC):
+            cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
+        if _unwired(cls, cls.ORIGINAL_IMAGE_FUNC):
+            cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
+        if _unwired(cls, cls.NETWORKS_FUNC):
+            from networksynth.graphs import load_graphs
+
+            cls.NETWORKS_FUNC = staticmethod(load_graphs)
+
+    @classmethod
+    def load_original_network(cls, dataset_id: DatasetId):
+        from .loaders import load_network
+
+        graph, _ = load_network(cls.BASE_INPUT_PATH, dataset_id.path)
+        return graph
+
+    @classmethod
+    def load_original_image(cls, dataset_id: DatasetId):
+        from .loaders import load_image
+
+        return load_image(
+            cls.BASE_INPUT_PATH, dataset_id.path, cls.FRAME_SIZE, cls.IMAGE_SUFFIX
+        )
 
     @classmethod
     def render(cls, identifier: str) -> RenderStyle:
