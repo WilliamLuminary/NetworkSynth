@@ -342,8 +342,15 @@ def run_phase2(
         extra=tagged("PHASE2"),
     )
 
+    # Tiles arrive in completion order. A seeded run assembles them by index so
+    # it replays; an unseeded one takes them as they come.
+    tiles = (
+        sorted(tile_results.items())
+        if params.seed is not None
+        else tile_results.items()
+    )
     tile_data_list: List[dict] = []
-    for tile_idx, data in tile_results.items():
+    for tile_idx, data in tiles:
         cx, cy = centers[tile_idx]
 
         offset_positions = [(x + cx, y + cy) for x, y in data["positions"]]

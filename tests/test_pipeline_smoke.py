@@ -5,6 +5,7 @@ from dataclasses import replace
 import pytest
 
 from networksynth.configs import RenderStyle
+from tests.fixture_config import FIXTURE_HYBRID
 
 pytestmark = [pytest.mark.integration, pytest.mark.requires_fixture_data]
 
@@ -45,6 +46,26 @@ class TestHybridPipeline:
         run_hybrid_for_dataset(config.DATASETS[0], config, run_paths)
 
         assert _outputs(str(tmp_path)), "hybrid produced no output files"
+
+    def test_a_seeded_run_replays(self, tmp_path):
+        import hashlib
+
+        from networksynth.handlers import create_run_paths
+        from networksynth.pipelines.hybrid import run_hybrid_for_dataset
+
+        def edge_lists(out_dir):
+            config = _tune(FIXTURE_HYBRID, out_dir, NUM_CENTERS=4)
+            run_hybrid_for_dataset(config.DATASETS[0], config, create_run_paths(config))
+            return sorted(
+                hashlib.md5(path.read_bytes()).hexdigest()
+                for path in out_dir.rglob("*synthetic_network*_edgelist.csv")
+            )
+
+        first = edge_lists(tmp_path / "a")
+        second = edge_lists(tmp_path / "b")
+
+        assert first, "no synthetic network was written"
+        assert first == second
 
     def test_compute_center_frames_uses_its_config(self, tmp_path):
         from networksynth.pipelines.hybrid import compute_center_frames
