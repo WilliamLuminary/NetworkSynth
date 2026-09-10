@@ -1,23 +1,39 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+import importlib
 import sys
 from pathlib import Path
 
 import pytest
 
 import networksynth
-from networksynth.configs import loader
-from networksynth.configs.loader import load_config
+from networksynth.configs import BaseConfig, GenerateConfig, loader
+from networksynth.configs.loader import config_in, load_config
+from networksynth.pipelines import PIPELINES
 
 _CONFIGS = Path(networksynth.__file__).resolve().parent / "configs"
 
 pytestmark = pytest.mark.unit
+
+_MINIMAL_GENERATE = """\
+from networksynth.configs import DatasetId, GenerateConfig
+
+CONFIG = GenerateConfig(
+    DATASETS=[DatasetId("d")],
+    FRAME_SIZE=(8, 8),
+    SYNTHETIC_FRAME_SIZE=(8, 8),
+    CLOSED_NODES_FACTOR=1.0,
+    CLOSED_EDGES_FACTOR=1.0,
+    MEASURE_WEIGHTED=False,
+    {extra}
+)
+"""
 
 
 def _config_modules_loaded():
     return {name for name in sys.modules if ".config_" in name}
 
 
-def _fixture_package(root: Path, *names: str) -> Path:
+def _fixture_package(root: Path, *names: str, extra: str = "") -> Path:
     """A configs package written for a test, so nothing asserts on a real one.
 
     load_config imports by dotted path relative to the package root and refuses
@@ -29,26 +45,54 @@ def _fixture_package(root: Path, *names: str) -> Path:
     (package / "__init__.py").write_text("")
     for name in names:
         (package / f"config_{name}.py").write_text(
-            f"class {name.title()}Config:\n    DATASETS = []\n"
+            _MINIMAL_GENERATE.format(extra=extra)
         )
     return package
 
 
-class TestLoadingByPath:
-    def test_it_returns_the_class_in_that_file(self):
-        config = load_config(str(_CONFIGS / "generate_mode" / "config_snapshot_1x1.py"))
+def _forget_fixture_modules():
+    for name in [n for n in sys.modules if n.startswith("fixture_mode")]:
+        del sys.modules[name]
+    importlib.invalidate_caches()
 
-        assert config.__name__ == "Snapshot1x1Config"
+
+@pytest.fixture
+def fixture_root(tmp_path, monkeypatch):
+    """Each test gets its own package, so the import cache must not carry over."""
+    monkeypatch.setattr(loader, "_PACKAGE_ROOT", tmp_path)
+    monkeypatch.syspath_prepend(str(tmp_path))
+    _forget_fixture_modules()
+    yield tmp_path
+    _forget_fixture_modules()
+
+
+class TestLoadingByPath:
+    def test_it_returns_the_config_in_that_file(self, fixture_root):
+        package = _fixture_package(fixture_root, "one", extra="SNAPSHOT_INTERVAL=10,")
+
+        config = load_config(str(package / "config_one.py"))
+
+        assert isinstance(config, GenerateConfig)
         assert config.SNAPSHOT_INTERVAL == 10
+
+    def test_the_run_is_named_after_the_file(self, fixture_root):
+        package = _fixture_package(fixture_root, "one")
+
+        config = load_config(str(package / "config_one.py"))
+
+        assert config.OUTPUT_DENOTE == "fixture_mode_config_one"
+
+    def test_two_loads_are_two_runs(self, fixture_root):
+        package = _fixture_package(fixture_root, "one")
+
+        first = load_config(str(package / "config_one.py"))
+        second = load_config(str(package / "config_one.py"))
+
+        assert first.RUN_ID != second.RUN_ID
 
     def test_the_path_has_to_be_the_real_file(self):
         with pytest.raises(FileNotFoundError):
             load_config(str(_CONFIGS / "hybrid_mode" / "config_snapshot"))
-
-    def test_an_absolute_path_works(self, tmp_path):
-        absolute = str(_CONFIGS / "hybrid_mode" / "config_sample.py")
-
-        assert load_config(absolute).__name__ == "SampleConfig"
 
     def test_a_missing_file_says_so(self):
         with pytest.raises(FileNotFoundError, match="No config file at"):
@@ -56,7 +100,7 @@ class TestLoadingByPath:
 
     def test_a_config_outside_the_project_is_refused(self, tmp_path):
         stray = tmp_path / "config_stray.py"
-        stray.write_text("class StrayConfig:\n    DATASETS = []\n")
+        stray.write_text(_MINIMAL_GENERATE.format(extra=""))
 
         with pytest.raises(ValueError, match="outside the project"):
             load_config(str(stray))
@@ -70,47 +114,30 @@ class TestOnlyWhatIsAskedForLoads:
 
         assert _config_modules_loaded() == before
 
-    def test_loading_one_does_not_drag_in_the_others(self, tmp_path, monkeypatch):
-        package = _fixture_package(tmp_path, "one", "two")
-        monkeypatch.setattr(loader, "_PACKAGE_ROOT", tmp_path)
-        monkeypatch.syspath_prepend(str(tmp_path))
+    def test_loading_one_does_not_drag_in_the_others(self, fixture_root):
+        package = _fixture_package(fixture_root, "one", "two")
         before = _config_modules_loaded()
 
         config = load_config(str(package / "config_one.py"))
 
-        assert config.__name__ == "OneConfig"
+        assert isinstance(config, GenerateConfig)
         newly_loaded = _config_modules_loaded() - before
         assert newly_loaded == {"fixture_mode.config_one"}, newly_loaded
 
 
-class TestOneConfigPerFile:
-    def test_a_file_with_no_config_says_so(self, tmp_path, monkeypatch):
+class TestTheFileBindsCONFIG:
+    def test_a_file_with_no_config_says_so(self):
         module = type(sys)("networksynth.configs.fake_mode.config_empty")
-        module.__name__ = "networksynth.configs.fake_mode.config_empty"
 
-        from networksynth.configs.loader import config_class_in
+        with pytest.raises(AttributeError, match="defines no CONFIG"):
+            config_in(module)
 
-        with pytest.raises(AttributeError, match="defines no config class"):
-            config_class_in(module)
+    def test_config_has_to_be_a_config(self):
+        module = type(sys)("networksynth.configs.fake_mode.config_wrong")
+        module.CONFIG = {"MODE": "generate"}
 
-    def test_two_configs_in_one_file_is_ambiguous(self):
-        module = type(sys)("networksynth.configs.fake_mode.config_two")
-
-        class FirstConfig:
-            DATASETS = []
-
-        class SecondConfig:
-            DATASETS = []
-
-        FirstConfig.__module__ = module.__name__
-        SecondConfig.__module__ = module.__name__
-        module.FirstConfig = FirstConfig
-        module.SecondConfig = SecondConfig
-
-        from networksynth.configs.loader import config_class_in
-
-        with pytest.raises(AttributeError, match="FirstConfig, SecondConfig"):
-            config_class_in(module)
+        with pytest.raises(AttributeError, match="defines no CONFIG"):
+            config_in(module)
 
 
 class TestEveryConfigInTheRepoLoads:
@@ -122,4 +149,5 @@ class TestEveryConfigInTheRepoLoads:
     def test_it_loads(self, path):
         config = load_config(path)
 
-        assert hasattr(config, "DATASETS")
+        assert isinstance(config, BaseConfig)
+        assert config.MODE in PIPELINES

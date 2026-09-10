@@ -5,11 +5,47 @@ import os
 import pytest
 
 from networksynth import gui_run
-from networksynth.configs.gui_config import GuiConfig, SpecError
+from networksynth.configs.gui_config import SpecError, from_spec
 
 pytestmark = pytest.mark.unit
 
 _MODE_NAMES = set(gui_run._GUI_MODES)
+
+
+def _write_input(kind, target):
+    """A two-node network in whichever form the input takes; images stay unset."""
+    if kind == "datasets_dir":
+        target.mkdir(exist_ok=True)
+        _write_input("edge_list", target / "one_edgelist.csv")
+        _write_input("positions", target / "one_positions.csv")
+    elif kind == "edge_list":
+        target.write_text("source_index,target_index\n0,1\n")
+    elif kind == "positions":
+        target.write_text("x,y\n0,0\n1,1\n")
+    elif kind == "adjacency":
+        import numpy as np
+        from scipy.sparse import csr_matrix
+
+        np.save(target, np.array(csr_matrix([[0, 1], [1, 0]]), dtype=object))
+    elif kind == "positions_npy":
+        import numpy as np
+
+        np.save(target, np.array([[0.0, 0.0], [1.0, 1.0]]))
+    elif kind == "network_graphml":
+        from networksynth.graphs import read_graph_csv
+        from networksynth.graphs.graphml_io import write_graph_graphml
+
+        _write_input("edge_list", target.parent / "for_graphml_edgelist.csv")
+        _write_input("positions", target.parent / "for_graphml_positions.csv")
+        write_graph_graphml(
+            read_graph_csv(
+                str(target.parent / "for_graphml_edgelist.csv"),
+                str(target.parent / "for_graphml_positions.csv"),
+            ),
+            str(target),
+        )
+    else:
+        raise ValueError(f"no fixture for input {kind!r}")
 
 
 def _inputs_for(mode, tmp_path, shape_index=0):
@@ -18,18 +54,31 @@ def _inputs_for(mode, tmp_path, shape_index=0):
     shape = spec_builder.MODES[mode].input_shapes[shape_index]
     made = {}
     for spec_input in shape.inputs:
-        target = tmp_path / spec_input.id
-        if spec_input.kind == "dir":
-            target.mkdir(exist_ok=True)
-            if spec_input.id == "datasets_dir":
-                (target / "one_edgelist.csv").write_text(
-                    "source_index,target_index\n0,1\n"
-                )
-                (target / "one_positions.csv").write_text("x,y\n0,0\n1,1\n")
-        else:
-            target.write_text("x\n")
+        if spec_input.optional:
+            continue
+        suffix = (
+            ".npy"
+            if spec_input.id.endswith("npy") or spec_input.id == "adjacency"
+            else ""
+        )
+        target = tmp_path / f"{spec_input.id}{suffix}"
+        _write_input(spec_input.id, target)
         made[spec_input.id] = str(target)
     return made
+
+
+def _generate_params(**overrides):
+    """Every parameter a generate run needs, as the window would send them."""
+    from networksynth.gui import spec_builder
+
+    params = spec_builder.build_spec(
+        "generate",
+        {"edge_list": "e", "positions": "p"},
+        "out",
+        spec_builder.default_values("generate"),
+    )["params"]
+    params.update({"FRAME_SIZE": [512, 512], "SEED": 7}, **overrides)
+    return params
 
 
 def _every_shape():
@@ -53,7 +102,7 @@ def _spec(tmp_path, **overrides):
             "positions": str(tmp_path / "p.csv"),
             "image": None,
         },
-        "params": {"FRAME_SIZE": [512, 512], "SEED": 7},
+        "params": _generate_params(),
     }
     spec.update(overrides)
     path = tmp_path / "spec.json"
@@ -63,37 +112,35 @@ def _spec(tmp_path, **overrides):
 
 class TestSpecLoading:
     def test_builds_a_config_from_a_spec(self, tmp_path):
-        config = GuiConfig.from_spec(_spec(tmp_path))
+        config = from_spec(_spec(tmp_path))
 
         assert config.MODE == "generate"
         assert config.BASE_OUTPUT_PATH == str(tmp_path / "out")
         assert [str(d) for d in config.DATASETS] == ["test_run"]
 
     def test_json_arrays_become_tuples(self, tmp_path):
-        config = GuiConfig.from_spec(_spec(tmp_path))
+        config = from_spec(_spec(tmp_path))
 
         assert config.FRAME_SIZE == (512, 512)
         assert isinstance(config.FRAME_SIZE, tuple)
 
     def test_scalar_params_pass_through(self, tmp_path):
-        config = GuiConfig.from_spec(_spec(tmp_path))
+        config = from_spec(_spec(tmp_path))
 
         assert config.SEED == 7
 
-    def test_returns_a_fresh_subclass_each_time(self, tmp_path):
-        first = GuiConfig.from_spec(_spec(tmp_path, run_name="one"))
+    def test_returns_a_fresh_config_each_time(self, tmp_path):
+        first = from_spec(_spec(tmp_path, run_name="one"))
         second_dir = tmp_path / "second"
         second_dir.mkdir()
-        second = GuiConfig.from_spec(_spec(second_dir, run_name="two"))
+        second = from_spec(_spec(second_dir, run_name="two"))
 
         assert first is not second
-        assert first is not GuiConfig
         assert [str(d) for d in first.DATASETS] == ["one"]
         assert [str(d) for d in second.DATASETS] == ["two"]
 
     def test_output_denote_names_the_mode(self, tmp_path):
-        config = GuiConfig.from_spec(_spec(tmp_path))
-        config.initialize()
+        config = from_spec(_spec(tmp_path))
 
         assert config.OUTPUT_DENOTE == "gui_generate"
 
@@ -102,13 +149,13 @@ class TestSpecIsValidated:
 
     def test_missing_file(self, tmp_path):
         with pytest.raises(SpecError, match="not found"):
-            GuiConfig.from_spec(str(tmp_path / "nope.json"))
+            from_spec(str(tmp_path / "nope.json"))
 
     def test_invalid_json(self, tmp_path):
         path = tmp_path / "spec.json"
         path.write_text("{not json")
         with pytest.raises(SpecError, match="not valid JSON"):
-            GuiConfig.from_spec(str(path))
+            from_spec(str(path))
 
     @pytest.mark.parametrize("key", ["mode", "output_dir", "inputs", "params"])
     def test_missing_required_key(self, tmp_path, key):
@@ -118,15 +165,15 @@ class TestSpecIsValidated:
         path.write_text(json.dumps(spec))
 
         with pytest.raises(SpecError, match="missing required key"):
-            GuiConfig.from_spec(str(path))
+            from_spec(str(path))
 
     def test_wrong_contract_version(self, tmp_path):
         with pytest.raises(SpecError, match="contract version"):
-            GuiConfig.from_spec(_spec(tmp_path, contract=99))
+            from_spec(_spec(tmp_path, contract=99))
 
     def test_unknown_mode_is_rejected(self, tmp_path):
         with pytest.raises(SpecError, match="unknown mode"):
-            GuiConfig.from_spec(_spec(tmp_path, mode="not_a_mode"))
+            from_spec(_spec(tmp_path, mode="not_a_mode"))
 
     def test_keys_from_another_shape_are_not_an_input_set(self, tmp_path):
         spec = json.loads(open(_spec(tmp_path)).read())
@@ -135,7 +182,7 @@ class TestSpecIsValidated:
         path.write_text(json.dumps(spec))
 
         with pytest.raises(SpecError, match="fills none of its input sets"):
-            GuiConfig.from_spec(str(path))
+            from_spec(str(path))
 
     def test_filling_two_input_sets_is_rejected(self, tmp_path):
         datasets = tmp_path / "many"
@@ -146,7 +193,7 @@ class TestSpecIsValidated:
         path.write_text(json.dumps(spec))
 
         with pytest.raises(SpecError, match="matches more than one"):
-            GuiConfig.from_spec(str(path))
+            from_spec(str(path))
 
     @pytest.mark.parametrize("key", ["edge_list", "positions"])
     def test_half_a_pair_is_not_an_input_set(self, tmp_path, key):
@@ -156,7 +203,7 @@ class TestSpecIsValidated:
         path.write_text(json.dumps(spec))
 
         with pytest.raises(SpecError, match="fills none of its input sets"):
-            GuiConfig.from_spec(str(path))
+            from_spec(str(path))
 
 
 class TestDirectoryInput:
@@ -198,9 +245,7 @@ class TestDirectoryInput:
         self._pair(datasets, "alpha")
         self._pair(datasets, "beta")
 
-        config = GuiConfig.from_spec(
-            _spec(tmp_path, inputs={"datasets_dir": str(datasets)})
-        )
+        config = from_spec(_spec(tmp_path, inputs={"datasets_dir": str(datasets)}))
 
         assert [str(d) for d in config.DATASETS] == ["alpha", "beta"]
 
@@ -213,13 +258,10 @@ class TestDirectoryInput:
         )
         (datasets / "beta_positions.csv").write_text("x,y\n0,0\n1,1\n2,2\n")
 
-        config = GuiConfig.from_spec(
-            _spec(tmp_path, inputs={"datasets_dir": str(datasets)})
-        )
-        config.initialize()
+        config = from_spec(_spec(tmp_path, inputs={"datasets_dir": str(datasets)}))
 
-        alpha = config.ORIGINAL_NETWORK_FUNC(config.DATASETS[0])
-        beta = config.ORIGINAL_NETWORK_FUNC(config.DATASETS[1])
+        alpha = config.load_original_network(config.DATASETS[0])
+        beta = config.load_original_network(config.DATASETS[1])
 
         assert alpha.number_of_nodes() == 2
         assert beta.number_of_nodes() == 3
@@ -328,7 +370,6 @@ class TestFullRun:
             "params": {
                 "FRAME_SIZE": [512, 512],
                 "SYNTHETIC_FRAME_SIZE": [512, 512],
-                "IMAGE_SIZE": [512, 512],
                 "CLOSED_NODES_FACTOR": 1.2,
                 "CLOSED_EDGES_FACTOR": 0.8,
                 "SYNTHETIC_NETWORK_NUMBER": 1,
@@ -380,7 +421,6 @@ class TestDirectoryFullRun:
             "params": {
                 "FRAME_SIZE": [512, 512],
                 "SYNTHETIC_FRAME_SIZE": [512, 512],
-                "IMAGE_SIZE": [512, 512],
                 "CLOSED_NODES_FACTOR": 1.2,
                 "CLOSED_EDGES_FACTOR": 0.8,
                 "SYNTHETIC_NETWORK_NUMBER": 1,
@@ -433,6 +473,22 @@ class TestModeSelection:
         assert offered == required
 
     @pytest.mark.parametrize("mode", sorted(_MODE_NAMES))
+    def test_every_form_field_is_a_config_field(self, mode):
+        from dataclasses import fields
+
+        from networksynth.configs.gui_config import GUI_CONFIG_CLASSES
+        from networksynth.gui import spec_builder
+
+        names = {f.name for f in fields(GUI_CONFIG_CLASSES[mode])}
+        ids = {
+            f.id
+            for f in spec_builder.MODES[mode].fields
+            if not f.id.startswith("WRITE_")
+        }
+
+        assert ids <= names, ids - names
+
+    @pytest.mark.parametrize("mode", sorted(_MODE_NAMES))
     def test_every_mode_builds_a_valid_spec(self, mode, tmp_path):
         from networksynth.gui import spec_builder
 
@@ -468,7 +524,7 @@ class TestModeSelection:
             json.dumps(spec_builder.build_spec(mode, inputs, str(tmp_path), values))
         )
 
-        config = GuiConfig.from_spec(str(spec_path))
+        config = from_spec(str(spec_path))
 
         assert config.MODE == mode
 
@@ -491,7 +547,7 @@ class TestModeSelection:
         spec_path = tmp_path / "spec.json"
         spec_path.write_text(json.dumps(spec))
 
-        config = GuiConfig.from_spec(str(spec_path))
+        config = from_spec(str(spec_path))
 
         for name in required:
             assert hasattr(config, name), f"{mode} needs {name}"
@@ -506,7 +562,7 @@ class TestModeSelection:
         spec_path = tmp_path / "spec.json"
         spec_path.write_text(json.dumps(spec))
 
-        config = GuiConfig.from_spec(str(spec_path))
+        config = from_spec(str(spec_path))
 
         assert isinstance(config.TARGET_SCALE, tuple)
         assert isinstance(config.SYNTHETIC_FRAME_SIZE, tuple)
@@ -517,7 +573,7 @@ class TestSpecConfigCrossesProcesses:
     def test_a_spec_built_config_survives_pickling(self, tmp_path):
         import pickle
 
-        config = GuiConfig.from_spec(_spec(tmp_path))
+        config = from_spec(_spec(tmp_path))
 
         restored = pickle.loads(pickle.dumps(config))
 
@@ -529,22 +585,17 @@ class TestSpecConfigCrossesProcesses:
     def test_tuple_params_stay_tuples_after_a_round_trip(self, tmp_path):
         import pickle
 
-        config = GuiConfig.from_spec(_spec(tmp_path))
+        config = from_spec(_spec(tmp_path))
 
         restored = pickle.loads(pickle.dumps(config))
 
         assert isinstance(restored.FRAME_SIZE, tuple)
         assert restored.FRAME_SIZE == config.FRAME_SIZE
 
-    def test_the_base_class_still_pickles_by_name(self, tmp_path):
-        import pickle
-
-        assert pickle.loads(pickle.dumps(GuiConfig)) is GuiConfig
-
     def test_the_loader_paths_survive(self, tmp_path):
         import pickle
 
-        config = GuiConfig.from_spec(_spec(tmp_path))
+        config = from_spec(_spec(tmp_path))
 
         restored = pickle.loads(pickle.dumps(config))
 

@@ -95,10 +95,7 @@ def test_a_config_without_a_mode_is_rejected_with_2(monkeypatch, tmp_path):
     from networksynth import run
     from networksynth.configs import BaseConfig
 
-    class Modeless(BaseConfig):
-        pass
-
-    monkeypatch.setattr(run, "load_config", lambda path: Modeless)
+    monkeypatch.setattr(run, "load_config", lambda path: BaseConfig(DATASETS=[]))
 
     assert run.main(["run.py", _A_CONFIG]) == 2
 

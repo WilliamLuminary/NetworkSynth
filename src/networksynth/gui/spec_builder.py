@@ -3,10 +3,16 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import asdict, dataclass, field, replace
+from dataclasses import asdict, dataclass, field, fields, replace
 from typing import Any, Dict, List, Optional, Tuple
 
-from networksynth.configs.base_config import BaseConfig
+from networksynth.configs.base_config import (
+    DEFAULT_INPUT_PATH,
+    PROJECT_ROOT,
+    GenerateConfig,
+    HybridConfig,
+    SweepConfig,
+)
 from networksynth.configs.gui_config import (
     NETWORK_FORMATS,
     PLOT_FORMATS,
@@ -74,6 +80,11 @@ SECTION_NOTES = {
 }
 
 ALIGN_GROUP = "Align"
+
+
+def _cli_default(config_class, name: str) -> Any:
+    """The value a config file gets when it leaves this field out."""
+    return next(f.default for f in fields(config_class) if f.name == name)
 
 
 @dataclass(frozen=True)
@@ -319,7 +330,7 @@ def _common_fields(vector_plots: bool = True) -> List[Field]:
             Field(
                 "ERROR_CHECKER",
                 "Measured by",
-                "multifractal",
+                _cli_default(GenerateConfig, "ERROR_CHECKER"),
                 kind="choice",
                 options=_CHECKER_NAMES,
                 labels=_CHECKER_LABELS,
@@ -333,7 +344,7 @@ def _common_fields(vector_plots: bool = True) -> List[Field]:
             Field(
                 "ERROR_TOLERANCE",
                 "Tolerance",
-                0.15,
+                _cli_default(GenerateConfig, "ERROR_TOLERANCE"),
                 minimum=0.0,
                 maximum=1.0,
                 step=0.01,
@@ -344,7 +355,7 @@ def _common_fields(vector_plots: bool = True) -> List[Field]:
             Field(
                 "MAX_ATTEMPTS",
                 "Max attempts",
-                10,
+                _cli_default(GenerateConfig, "MAX_ATTEMPTS"),
                 kind="integer",
                 minimum=1,
                 maximum=100,
@@ -368,7 +379,7 @@ def _common_fields(vector_plots: bool = True) -> List[Field]:
             Field(
                 "FULL_Q_BAND",
                 "Moment range",
-                False,
+                _cli_default(GenerateConfig, "FULL_Q_BAND"),
                 kind="choice",
                 options=(False, True),
                 labels=("Narrow", "Wide"),
@@ -416,7 +427,7 @@ def _common_fields(vector_plots: bool = True) -> List[Field]:
                 10,
                 kind="integer",
                 minimum=1,
-                maximum=BaseConfig.PHASE2_MAX_ROUNDS,
+                maximum=_cli_default(HybridConfig, "PHASE2_MAX_ROUNDS"),
                 step=1,
                 unit="rounds apart",
                 group=OUTPUT_GROUP,
@@ -670,7 +681,7 @@ def _sweep_fields() -> List[Field]:
         Field(
             "USE_WANDB",
             "Log to wandb",
-            True,
+            _cli_default(SweepConfig, "USE_WANDB"),
             kind="bool",
             group="Tracking",
             help=(
@@ -708,7 +719,7 @@ def _sweep_fields() -> List[Field]:
         Field(
             "SWEEP_STEP",
             "Step",
-            0.1,
+            _cli_default(SweepConfig, "SWEEP_STEP"),
             minimum=0.01,
             maximum=1.0,
             step=0.01,
@@ -766,7 +777,7 @@ def shape_for(mode: str, inputs: Dict[str, str]) -> InputShape:
     )
 
 
-_SAMPLES = os.path.join(BaseConfig.BASE_INPUT_PATH, "samples")
+_SAMPLES = os.path.join(DEFAULT_INPUT_PATH, "samples")
 
 _SAMPLE_INPUTS = {
     "edge_list": os.path.join(_SAMPLES, "gui_mode", "sample_1_edgelist.csv"),
@@ -777,9 +788,6 @@ _SAMPLE_INPUTS = {
     "positions_npy": os.path.join(_SAMPLES, "generate_mode", "sample_1_pos.npy"),
     "network_graphml": os.path.join(_SAMPLES, "sample_1_network.graphml"),
 }
-
-
-PROJECT_ROOT = BaseConfig.PROJECT_ROOT
 
 
 def display_path(path: str) -> str:
@@ -966,10 +974,6 @@ def build_spec(
     frame = params.get("SYNTHETIC_FRAME_SIZE")
     if frame is not None:
         params.setdefault("FRAME_SIZE", frame)
-
-    if "NF_RANGE" in params:
-        params.setdefault("CLOSED_NODES_FACTOR", params["NF_RANGE"][0])
-        params.setdefault("CLOSED_EDGES_FACTOR", params["EF_RANGE"][0])
 
     params = {
         key: list(value) if isinstance(value, tuple) else value

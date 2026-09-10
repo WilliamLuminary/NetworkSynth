@@ -1,33 +1,30 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+from dataclasses import replace
+
 import pytest
 
-from networksynth.configs import BaseConfig, DatasetId
+from networksynth.configs import CompareConfig, DatasetId
 from networksynth.handlers import NullSaver, Saver, build_saver
 from networksynth.handlers.run_paths import RunPaths
 
 pytestmark = pytest.mark.unit
 
 
-def _line_graph():
-    import numpy as np
-
-    from networksynth.graphs.synth_graph import SynthGraph
-
-    positions = np.array([[float(i), 0.0] for i in range(5)])
-    edges = np.array([[i, i + 1] for i in range(4)])
-    return SynthGraph.from_edge_list(positions, edges)
-
-
 def _config(tmp_path, disabled):
-    class Config(BaseConfig):
-        MODE = "generate"
-        BASE_OUTPUT_PATH = str(tmp_path)
-        DATASETS = [DatasetId("ds")]
-        DISABLE_SAVING = disabled
-        DISABLE_SAVING_NOTE = "a test"
-        MEASURE_WEIGHTED = False
+    from tests.fixture_config import FIXTURE
 
-    return Config
+    return replace(
+        FIXTURE,
+        BASE_OUTPUT_PATH=str(tmp_path),
+        DATASETS=[DatasetId("ds")],
+        DISABLE_SAVING=disabled,
+        DISABLE_SAVING_NOTE="a test",
+    )
+
+
+class _NoNetworks(CompareConfig):
+    def load_networks(self, path):
+        return []
 
 
 class TestBuildSaver:
@@ -70,9 +67,6 @@ class TestNullSaverIsSaferThanNone:
         from networksynth.handlers import GenerationRun, create_run_paths
 
         config = _config(tmp_path, True)
-        config.ORIGINAL_NETWORK_FUNC = staticmethod(lambda dataset_id: _line_graph())
-        config.ORIGINAL_IMAGE_FUNC = staticmethod(lambda dataset_id: None)
-        config.initialize()
         run = GenerationRun(config, create_run_paths(config), DatasetId("ds"))
 
         run.saver.begin_batch()
@@ -88,9 +82,14 @@ class TestNullSaverIsSaferThanNone:
         original.mkdir()
         synthetic.mkdir()
 
-        config = _config(tmp_path, True)
-        config.NETWORKS_FUNC = staticmethod(lambda path: [])
-        config.initialize()
+        config = _NoNetworks(
+            DATASETS=[DatasetId("ds")],
+            BASE_OUTPUT_PATH=str(tmp_path),
+            DISABLE_SAVING=True,
+            MEASURE_WEIGHTED=False,
+            ORIGINAL_NETWORKS_PATH="",
+            SYNTHETIC_NETWORKS_PATH="",
+        )
 
         run = ComparisonRun(
             config,

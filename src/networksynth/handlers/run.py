@@ -55,8 +55,8 @@ class GenerationRun(Run):
 
     def __init__(self, config, run_paths: RunPaths, dataset_id: DatasetId):
         super().__init__(config, run_paths, dataset_id)
-        self.original: SynthGraph = config.ORIGINAL_NETWORK_FUNC(dataset_id)
-        self.original_image = config.ORIGINAL_IMAGE_FUNC(dataset_id)
+        self.original: SynthGraph = config.load_original_network(dataset_id)
+        self.original_image = config.load_original_image(dataset_id)
 
         from .attributes_calculator import AttributesCalculator
         from .mapper import Mapper
@@ -124,8 +124,8 @@ class ComparisonRun(Run):
         synthetic_path: str,
     ):
         super().__init__(config, run_paths, dataset_id)
-        self.original = config.NETWORKS_FUNC(original_path)
-        self.synthetic = config.NETWORKS_FUNC(synthetic_path)
+        self.original = config.load_networks(original_path)
+        self.synthetic = config.load_networks(synthetic_path)
 
         from networksynth.analysis import MultifractalBatchProcessor
 

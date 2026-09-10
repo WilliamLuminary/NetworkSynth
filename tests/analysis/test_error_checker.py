@@ -9,30 +9,23 @@ from networksynth.analysis.error_checker import (
     NullErrorChecker,
     create_error_checker,
 )
-from networksynth.configs import BaseConfig
+from networksynth.configs import GenerateConfig
 from networksynth.graphs.synth_graph import SynthGraph
 
 pytestmark = pytest.mark.unit
 
 
-@pytest.fixture
-def base_config_values():
-    saved = {
-        name: getattr(BaseConfig, name, "__missing__")
-        for name in (
-            "ERROR_CHECKER",
-            "ERROR_TOLERANCE",
-            "MEASURE_WEIGHTED",
-            "FULL_Q_BAND",
-        )
-    }
-    yield
-    for name, value in saved.items():
-        if value == "__missing__":
-            if hasattr(BaseConfig, name):
-                delattr(BaseConfig, name)
-        else:
-            setattr(BaseConfig, name, value)
+def _config(**overrides):
+    values = dict(
+        DATASETS=[],
+        FRAME_SIZE=(8, 8),
+        SYNTHETIC_FRAME_SIZE=(8, 8),
+        CLOSED_NODES_FACTOR=1.0,
+        CLOSED_EDGES_FACTOR=1.0,
+        MEASURE_WEIGHTED=False,
+    )
+    values.update(overrides)
+    return GenerateConfig(**values)
 
 
 class TestSettingsCapture:
@@ -58,40 +51,35 @@ class TestSettingsCapture:
 
 
 class TestCreateErrorChecker:
-    def test_reads_settings_from_base_config(self, base_config_values):
-        BaseConfig.ERROR_CHECKER = "multifractal"
-        BaseConfig.ERROR_TOLERANCE = 0.11
-        BaseConfig.MEASURE_WEIGHTED = True
-        BaseConfig.FULL_Q_BAND = True
-
-        checker = create_error_checker(BaseConfig)
+    def test_reads_settings_from_the_config(self):
+        checker = create_error_checker(
+            _config(
+                ERROR_CHECKER="multifractal",
+                ERROR_TOLERANCE=0.11,
+                MEASURE_WEIGHTED=True,
+                FULL_Q_BAND=True,
+            )
+        )
 
         assert isinstance(checker, MultifractalErrorChecker)
         assert checker.tolerance == 0.11
         assert checker.measure_weighted is True
         assert checker.full_q_band is True
 
-    def test_none_selects_the_null_checker(self, base_config_values):
-        BaseConfig.ERROR_CHECKER = "none"
+    def test_none_selects_the_null_checker(self):
+        checker = create_error_checker(_config(ERROR_CHECKER="none"))
 
-        assert isinstance(create_error_checker(BaseConfig), NullErrorChecker)
+        assert isinstance(checker, NullErrorChecker)
 
-    def test_unknown_name_raises(self, base_config_values):
-        BaseConfig.ERROR_CHECKER = "nope"
-
+    def test_unknown_name_raises(self):
         with pytest.raises(ValueError, match="Unknown ERROR_CHECKER"):
-            create_error_checker(BaseConfig)
+            create_error_checker(_config(ERROR_CHECKER="nope"))
 
 
 class TestAnalyzerHonoursExplicitSettings:
 
-    def test_full_q_band_argument_wins(
-        self, base_config_values, load_unweighted_test_synth_graph
-    ):
+    def test_full_q_band_argument_wins(self, load_unweighted_test_synth_graph):
         from networksynth.analysis.multifractal_analyzer import MultifractalAnalyzer
-
-        BaseConfig.MEASURE_WEIGHTED = False
-        BaseConfig.FULL_Q_BAND = False
 
         assert (
             MultifractalAnalyzer(
@@ -151,13 +139,10 @@ class TestLengthAngleErrorChecker:
             LengthAngleErrorChecker,
             create_error_checker,
         )
-        from networksynth.configs import BaseConfig
 
-        class Config(BaseConfig):
-            ERROR_CHECKER = "length_angle"
-            ERROR_TOLERANCE = 0.2
-
-        checker = create_error_checker(Config)
+        checker = create_error_checker(
+            _config(ERROR_CHECKER="length_angle", ERROR_TOLERANCE=0.2)
+        )
 
         assert isinstance(checker, LengthAngleErrorChecker)
         assert checker.tolerance == 0.2

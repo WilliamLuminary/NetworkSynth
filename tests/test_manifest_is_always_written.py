@@ -29,18 +29,16 @@ def _prepare(module, runner, replacement, monkeypatch):
 
 
 def _config(tmp_path, name):
-    from networksynth.configs import BaseConfig, DatasetId
+    from dataclasses import replace
 
-    class Config(BaseConfig):
-        MODE = name.rsplit(".", 1)[-1]
-        BASE_OUTPUT_PATH = str(tmp_path / f"out_{name}")
-        DATASETS = [DatasetId("ds")]
-        SYNTHETIC_NETWORK_NUMBER = 1
-        NF_RANGE = (1.0, 1.0)
-        EF_RANGE = (1.0, 1.0)
-        SWEEP_STEP = 0.1
+    from tests.fixture_config import FIXTURES
 
-    return Config
+    mode = name.rsplit(".", 1)[-1]
+    return replace(
+        FIXTURES[mode],
+        BASE_OUTPUT_PATH=str(tmp_path / f"out_{name}"),
+        DISABLE_SAVING=False,
+    )
 
 
 def _read_manifest(tmp_path, name):
@@ -59,7 +57,7 @@ def test_a_completed_run_writes_a_manifest(module_path, runner, tmp_path, monkey
     module = importlib.import_module(module_path)
     _prepare(module, runner, lambda *a, **k: None, monkeypatch)
 
-    module.main(config_cls=_config(tmp_path, module_path))
+    module.main(config=_config(tmp_path, module_path))
 
     assert _read_manifest(tmp_path, module_path)["status"] == STATUS_OK
 
@@ -78,7 +76,7 @@ def test_a_failed_run_writes_a_manifest_saying_so(
     _prepare(module, runner, explode, monkeypatch)
 
     with pytest.raises(RuntimeError):
-        module.main(config_cls=_config(tmp_path, module_path))
+        module.main(config=_config(tmp_path, module_path))
 
     manifest = _read_manifest(tmp_path, module_path)
     assert manifest["status"] == STATUS_FAILED
@@ -99,7 +97,7 @@ def test_a_cancelled_run_is_distinct_from_a_failed_one(
     _prepare(module, runner, interrupt, monkeypatch)
 
     with pytest.raises(KeyboardInterrupt):
-        module.main(config_cls=_config(tmp_path, module_path))
+        module.main(config=_config(tmp_path, module_path))
 
     assert _read_manifest(tmp_path, module_path)["status"] == STATUS_CANCELLED
 

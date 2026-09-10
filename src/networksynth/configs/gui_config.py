@@ -1,17 +1,20 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+"""A config built from the JSON run-spec the window writes."""
+
 from __future__ import annotations
 
-import copyreg
 import json
 import logging
+import math
 import os
-from typing import Any, Dict, Optional
+from dataclasses import dataclass
+from typing import Any, Dict, Optional, Tuple
 
 from numpy import ndarray
 
 from networksynth.graphs.synth_graph import SynthGraph
 
-from .base_config import BaseConfig
+from .base_config import BaseConfig, GenerateConfig, HybridConfig, SweepConfig
 from .dataset_id import DatasetId
 from .file_definitions import (
     INPLACE_DIR,
@@ -56,18 +59,6 @@ MODE_INPUTS = {
 # the untouched image beside it, so its coordinates are in the scaled copy's pixels.
 _SGT_MAX_SIDE = 1024
 
-_TUPLE_PARAMS = frozenset(
-    {
-        "IMAGE_SIZE",
-        "FRAME_SIZE",
-        "SYNTHETIC_FRAME_SIZE",
-        "TILE_FRAME_SIZE",
-        "TARGET_SCALE",
-        "NF_RANGE",
-        "EF_RANGE",
-    }
-)
-
 _REQUIRED_KEYS = ("contract", "mode", "output_dir", "inputs", "params", "run_name")
 
 
@@ -104,201 +95,85 @@ def format_param(group: str, name: str) -> str:
     return f"WRITE_{group.upper()}_{name.upper().replace('.', '_')}"
 
 
-def _rebuild_from_spec(spec_path: str) -> type:
-    return GuiConfig.from_spec(spec_path)
+def _load_network(paths: Dict[str, Any], dataset_id: DatasetId) -> SynthGraph:
+    directory = paths.get("datasets_dir")
+    if directory:
+        graph, _ = load_network(directory, str(dataset_id))
+        return graph
+    if paths.get("network_graphml"):
+        return load_network_file(paths["network_graphml"])
+    if paths.get("adjacency"):
+        return load_npy_pair(paths["positions_npy"], paths["adjacency"])
+    return load_csv_pair(paths["edge_list"], paths["positions"])
 
 
-class _SpecConfigMeta(type):
-    pass
+def _image_path(paths: Dict[str, Any], dataset_id: DatasetId) -> Optional[str]:
+    directory = paths.get("datasets_dir")
+    if directory:
+        return os.path.join(directory, f"{dataset_id}{IMAGE_SUFFIX}")
+    return paths.get("image") or None
 
 
-def _reduce_spec_config(cls):
-    spec_path = cls.__dict__.get("SPEC_PATH")
-    if spec_path is None:
-        return cls.__qualname__
-    return (_rebuild_from_spec, (spec_path,))
+def _sgt_export(paths: Dict[str, Any], dataset_id: DatasetId) -> bool:
+    directory = paths.get("datasets_dir")
+    if directory:
+        return os.path.exists(os.path.join(directory, f"{dataset_id}{SGT_EDGE_SUFFIX}"))
+    positions = paths.get("positions") or ""
+    return positions.endswith(SGT_POSITIONS_SUFFIX)
 
 
-# Through copyreg, not __reduce__: pickle checks the dispatch table first, and
-# once it sees a custom metaclass it saves the class by name — which a spawned
-# child cannot resolve, since this config was built at run time from a spec.
-copyreg.pickle(_SpecConfigMeta, _reduce_spec_config)
+def _frame_from_inputs(
+    paths: Dict[str, Any], orientation: str, dataset_id: DatasetId
+) -> Tuple[int, int]:
+    """The coordinate window when the spec leaves it open.
+
+    The image's own size when there is one; otherwise the network's extent,
+    which understates the window when nodes stop short of an edge.
+    """
+    path = _image_path(paths, dataset_id)
+    if path and os.path.exists(path):
+        import cv2
+
+        image = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+        if image is None:
+            raise SpecError(f"image could not be read: {path}")
+        height, width = image.shape[:2]
+        if _sgt_export(paths, dataset_id):
+            longest = max(height, width)
+            scale = _SGT_MAX_SIDE / longest if longest > _SGT_MAX_SIDE else 1.0
+            return (round(width * scale), round(height * scale))
+        return (width, height)
+
+    from networksynth.utils import orient_positions
+
+    graph = _load_network(paths, dataset_id)
+    orient_positions(graph, orientation)
+    positions = graph.positions()
+    return (
+        max(1, math.ceil(positions[:, 0].max())),
+        max(1, math.ceil(positions[:, 1].max())),
+    )
 
 
-class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
-    MODE: str = ""
-    PATHS: Dict[str, Any] = {}
-
+@dataclass(frozen=True, kw_only=True)
+class _SpecInputs:
+    PATHS: Dict[str, Any]
     INPUT_ORIENTATION: str = "none"
 
-    TILE_FRAME_SIZE = None
-    DATASET_FACTORS: dict = {}
-
-    @classmethod
-    def from_spec(cls, spec_path: str) -> type:
-        if not os.path.exists(spec_path):
-            raise SpecError(f"run-spec not found: {spec_path}")
-        try:
-            with open(spec_path) as handle:
-                spec = json.load(handle)
-        except json.JSONDecodeError as exc:
-            raise SpecError(f"{spec_path}: not valid JSON ({exc})") from exc
-
-        missing = [k for k in _REQUIRED_KEYS if k not in spec]
-        if missing:
-            raise SpecError(f"{spec_path}: missing required key(s): {missing}")
-
-        version = spec["contract"]
-        if version != SPEC_CONTRACT_VERSION:
-            raise SpecError(
-                f"{spec_path}: contract version {version}, but this build "
-                f"understands {SPEC_CONTRACT_VERSION}"
-            )
-
-        mode = spec["mode"]
-        if mode not in MODE_INPUTS:
-            raise SpecError(
-                f"{spec_path}: unknown mode {mode!r}; "
-                f"this build understands: {sorted(MODE_INPUTS)}"
-            )
-
-        inputs = spec["inputs"]
-        satisfied = [
-            shape
-            for shape in MODE_INPUTS[mode]
-            if all(inputs.get(key) for key in shape)
-        ]
-        if len(satisfied) != 1:
-            shapes = " or ".join(
-                "{" + ", ".join(shape) + "}" for shape in MODE_INPUTS[mode]
-            )
-            problem = "matches more than one of" if satisfied else "fills none of"
-            raise SpecError(
-                f"{spec_path}: mode {mode!r} {problem} its input sets: {shapes}"
-            )
-
-        # type(cls), not type: the subclass must keep the metaclass that makes
-        config = type(cls)("GuiRunConfig", (cls,), {"SPEC_PATH": spec_path})
-        config.MODE = mode
-        config.PATHS = inputs
-        config.BASE_OUTPUT_PATH = spec["output_dir"]
-        if inputs.get("datasets_dir"):
-            config.DATASETS = [
-                DatasetId(name) for name in discover_datasets(inputs["datasets_dir"])
-            ]
-        else:
-            config.DATASETS = [DatasetId(spec["run_name"])]
-
-        for key, value in spec["params"].items():
-            if key in _TUPLE_PARAMS and isinstance(value, list):
-                value = tuple(value)
-            setattr(config, key, value)
-
-        config._apply_output_formats()
-        config._apply_snapshots()
-
-        logger.info(
-            f"Run-spec loaded: mode={config.MODE} "
-            f"output_dir={config.BASE_OUTPUT_PATH} "
-            f"params={sorted(spec['params'])}"
-        )
-        return config
-
-    @classmethod
-    def _apply_output_formats(cls) -> None:
-        for group, formats in (("network", NETWORK_FORMATS), ("plot", PLOT_FORMATS)):
-            named = [
-                name for name in formats if hasattr(cls, format_param(group, name))
-            ]
-            if not named:
-                continue
-
-            chosen = [name for name in named if getattr(cls, format_param(group, name))]
-
-            for attribute, directory, detail in _FORMATTED_OUTPUTS[group]:
-                setattr(
-                    cls,
-                    attribute,
-                    tuple(
-                        SaveSpec(directory, detail, name, formats[name])
-                        for name in chosen
-                    ),
-                )
-            if chosen:
-                logger.info(f"{group} outputs will be written as: {', '.join(chosen)}")
-            else:
-                logger.info(f"No {group} files will be written: every format is off.")
-
-    @classmethod
-    def _apply_snapshots(cls) -> None:
-        if hasattr(cls, "WRITE_SNAPSHOTS") and not cls.WRITE_SNAPSHOTS:
-            cls.SNAPSHOT_INTERVAL = 0
-
-    @classmethod
-    def initialize(cls) -> None:
-        super().initialize()
-        cls.OUTPUT_DENOTE = f"gui_{cls.MODE}"
-
-    _sgt_source = False
-
-    @classmethod
-    def load_original_network(cls, dataset_id: DatasetId) -> SynthGraph:
+    def load_original_network(self, dataset_id: DatasetId) -> SynthGraph:
         from networksynth.utils import orient_positions
 
-        GuiConfig._sgt_source = False
-        directory = cls.PATHS.get("datasets_dir")
-        if directory:
-            graph, form = load_network(directory, str(dataset_id))
-            GuiConfig._sgt_source = form == SGT_EDGE_SUFFIX
-        elif cls.PATHS.get("network_graphml"):
-            graph = load_network_file(cls.PATHS["network_graphml"])
-        elif cls.PATHS.get("adjacency"):
-            graph = load_npy_pair(cls.PATHS["positions_npy"], cls.PATHS["adjacency"])
-        else:
-            graph = load_csv_pair(cls.PATHS["edge_list"], cls.PATHS["positions"])
-            GuiConfig._sgt_source = cls.PATHS["positions"].endswith(
-                SGT_POSITIONS_SUFFIX
-            )
-
-        orient_positions(graph, cls.INPUT_ORIENTATION)
-
-        if not cls.FRAME_SIZE and not cls._has_background(dataset_id):
-            # No image to take the window from, so the network's own extent is all
-            # there is. It understates the window when nodes stop short of an edge,
-            # which is why an image is preferred when one exists.
-            import math
-
-            positions = graph.positions()
-            cls.FRAME_SIZE = (
-                max(1, math.ceil(positions[:, 0].max())),
-                max(1, math.ceil(positions[:, 1].max())),
-            )
-            if not cls.SYNTHETIC_FRAME_SIZE:
-                cls.SYNTHETIC_FRAME_SIZE = cls.FRAME_SIZE
-
+        graph = _load_network(self.PATHS, dataset_id)
+        orient_positions(graph, self.INPUT_ORIENTATION)
         return graph
 
-    @classmethod
-    def _has_background(cls, dataset_id: DatasetId) -> bool:
-        directory = cls.PATHS.get("datasets_dir")
-        if directory:
-            return os.path.exists(
-                os.path.join(directory, f"{dataset_id}{IMAGE_SUFFIX}")
-            )
-        return bool(cls.PATHS.get("image"))
-
-    @classmethod
-    def load_original_image(cls, dataset_id: DatasetId) -> Optional[ndarray]:
-        directory = cls.PATHS.get("datasets_dir")
-        if directory:
-            candidate = os.path.join(directory, f"{dataset_id}{IMAGE_SUFFIX}")
-            path = candidate if os.path.exists(candidate) else None
-        else:
-            path = cls.PATHS.get("image")
+    def load_original_image(self, dataset_id: DatasetId) -> Optional[ndarray]:
+        path = _image_path(self.PATHS, dataset_id)
         if not path:
             return None
         if not os.path.exists(path):
-            logger.warning(f"Image named in the run-spec is missing: {path}")
+            if not self.PATHS.get("datasets_dir"):
+                logger.warning(f"Image named in the run-spec is missing: {path}")
             return None
 
         import cv2
@@ -309,21 +184,128 @@ class GuiConfig(BaseConfig, metaclass=_SpecConfigMeta):
         if image is None:
             logger.warning(f"Image could not be read: {path}")
             return None
+        return resize_image(image, self.FRAME_SIZE)
 
-        cls.IMAGE_SIZE = (image.shape[0], image.shape[1])
-        if not cls.FRAME_SIZE and cls._sgt_source:
-            height, width = image.shape[:2]
-            longest = max(height, width)
-            scale = _SGT_MAX_SIDE / longest if longest > _SGT_MAX_SIDE else 1.0
-            cls.FRAME_SIZE = (round(width * scale), round(height * scale))
-            if not cls.SYNTHETIC_FRAME_SIZE:
-                cls.SYNTHETIC_FRAME_SIZE = cls.FRAME_SIZE
-        if not cls.FRAME_SIZE:
-            # Node coordinates are in the source image's pixels, so its own size is
-            # the coordinate window. Left unset, that is the answer, and the image
-            # needs no scaling to match it.
-            cls.FRAME_SIZE = (image.shape[1], image.shape[0])
-            if not cls.SYNTHETIC_FRAME_SIZE:
-                cls.SYNTHETIC_FRAME_SIZE = cls.FRAME_SIZE
-            return image
-        return resize_image(image, cls.FRAME_SIZE)
+
+@dataclass(frozen=True, kw_only=True)
+class GuiGenerateConfig(_SpecInputs, GenerateConfig):
+    pass
+
+
+@dataclass(frozen=True, kw_only=True)
+class GuiHybridConfig(_SpecInputs, HybridConfig):
+    pass
+
+
+@dataclass(frozen=True, kw_only=True)
+class GuiSweepConfig(_SpecInputs, SweepConfig):
+    pass
+
+
+GUI_CONFIG_CLASSES = {
+    cls.MODE: cls for cls in (GuiGenerateConfig, GuiHybridConfig, GuiSweepConfig)
+}
+
+
+def _output_formats(params: Dict[str, Any]) -> Dict[str, tuple]:
+    """SAVE_* fields from the WRITE_* switches, which are popped off params."""
+    fields = {}
+    for group, formats in (("network", NETWORK_FORMATS), ("plot", PLOT_FORMATS)):
+        switches = {
+            name: params.pop(format_param(group, name))
+            for name in formats
+            if format_param(group, name) in params
+        }
+        if not switches:
+            continue
+        chosen = [name for name, on in switches.items() if on]
+        for attribute, directory, detail in _FORMATTED_OUTPUTS[group]:
+            fields[attribute] = tuple(
+                SaveSpec(directory, detail, name, formats[name]) for name in chosen
+            )
+        if chosen:
+            logger.info(f"{group} outputs will be written as: {', '.join(chosen)}")
+        else:
+            logger.info(f"No {group} files will be written: every format is off.")
+    return fields
+
+
+def from_spec(spec_path: str) -> BaseConfig:
+    if not os.path.exists(spec_path):
+        raise SpecError(f"run-spec not found: {spec_path}")
+    try:
+        with open(spec_path) as handle:
+            spec = json.load(handle)
+    except json.JSONDecodeError as exc:
+        raise SpecError(f"{spec_path}: not valid JSON ({exc})") from exc
+
+    missing = [k for k in _REQUIRED_KEYS if k not in spec]
+    if missing:
+        raise SpecError(f"{spec_path}: missing required key(s): {missing}")
+
+    version = spec["contract"]
+    if version != SPEC_CONTRACT_VERSION:
+        raise SpecError(
+            f"{spec_path}: contract version {version}, but this build "
+            f"understands {SPEC_CONTRACT_VERSION}"
+        )
+
+    mode = spec["mode"]
+    if mode not in MODE_INPUTS:
+        raise SpecError(
+            f"{spec_path}: unknown mode {mode!r}; "
+            f"this build understands: {sorted(MODE_INPUTS)}"
+        )
+
+    inputs = spec["inputs"]
+    satisfied = [
+        shape for shape in MODE_INPUTS[mode] if all(inputs.get(key) for key in shape)
+    ]
+    if len(satisfied) != 1:
+        shapes = " or ".join(
+            "{" + ", ".join(shape) + "}" for shape in MODE_INPUTS[mode]
+        )
+        problem = "matches more than one of" if satisfied else "fills none of"
+        raise SpecError(
+            f"{spec_path}: mode {mode!r} {problem} its input sets: {shapes}"
+        )
+
+    if inputs.get("datasets_dir"):
+        datasets = [
+            DatasetId(name) for name in discover_datasets(inputs["datasets_dir"])
+        ]
+    else:
+        datasets = [DatasetId(spec["run_name"])]
+
+    # JSON has no tuples, so every list came from one.
+    params = {
+        key: tuple(value) if isinstance(value, list) else value
+        for key, value in spec["params"].items()
+    }
+    params.update(_output_formats(params))
+    if params.pop("WRITE_SNAPSHOTS", True) is False:
+        params["SNAPSHOT_INTERVAL"] = 0
+
+    if not params.get("FRAME_SIZE"):
+        params["FRAME_SIZE"] = _frame_from_inputs(
+            inputs, params.get("INPUT_ORIENTATION", "none"), datasets[0]
+        )
+    if not params.get("SYNTHETIC_FRAME_SIZE"):
+        params["SYNTHETIC_FRAME_SIZE"] = params["FRAME_SIZE"]
+
+    try:
+        config = GUI_CONFIG_CLASSES[mode](
+            DATASETS=datasets,
+            PATHS=inputs,
+            BASE_OUTPUT_PATH=spec["output_dir"],
+            OUTPUT_DENOTE=f"gui_{mode}",
+            **params,
+        )
+    except (TypeError, ValueError) as exc:
+        raise SpecError(f"{spec_path}: {exc}") from exc
+
+    logger.info(
+        f"Run-spec loaded: mode={mode} output_dir={config.BASE_OUTPUT_PATH} "
+        f"params={sorted(spec['params'])}"
+    )
+    return config

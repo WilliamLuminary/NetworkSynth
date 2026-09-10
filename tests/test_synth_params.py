@@ -1,40 +1,26 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import pytest
 
-from networksynth.configs import BaseConfig, SynthParams
+from networksynth.configs import GenerateConfig, SynthParams
 
 pytestmark = pytest.mark.unit
 
 
-@pytest.fixture
-def base_config_values():
-    saved = {
-        name: getattr(BaseConfig, name, None)
-        for name in (
-            "SYNTHETIC_FRAME_SIZE",
-            "CLOSED_NODES_FACTOR",
-            "CLOSED_EDGES_FACTOR",
-            "MAX_ATTEMPTS",
-            "SEED",
-        )
-    }
-    BaseConfig.SYNTHETIC_FRAME_SIZE = (512, 512)
-    BaseConfig.CLOSED_NODES_FACTOR = 1.2
-    BaseConfig.CLOSED_EDGES_FACTOR = 0.8
-    BaseConfig.MAX_ATTEMPTS = 7
-    BaseConfig.SEED = None
-    yield
-    for name, value in saved.items():
-        if value is None:
-            if hasattr(BaseConfig, name):
-                delattr(BaseConfig, name)
-        else:
-            setattr(BaseConfig, name, value)
+def _config():
+    return GenerateConfig(
+        DATASETS=[],
+        FRAME_SIZE=(512, 512),
+        SYNTHETIC_FRAME_SIZE=(512, 512),
+        CLOSED_NODES_FACTOR=1.2,
+        CLOSED_EDGES_FACTOR=0.8,
+        MAX_ATTEMPTS=7,
+        MEASURE_WEIGHTED=False,
+    )
 
 
 class TestFromConfig:
-    def test_reads_all_fields(self, base_config_values):
-        params = SynthParams.from_config(BaseConfig)
+    def test_reads_all_fields(self):
+        params = SynthParams.from_config(_config())
 
         assert params.synthetic_frame_size == (512, 512)
         assert params.closed_nodes_factor == 1.2
@@ -73,9 +59,9 @@ class TestImmutability:
         assert pickle.loads(pickle.dumps(params)) == params
 
 
-class TestParamsWinOverBaseConfig:
+class TestGenerationReadsParamsNotAConfig:
 
-    def test_graph_node_uses_params_not_base_config(self, base_config_values):
+    def test_graph_node_uses_params_not_base_config(self):
         from networksynth.graphs._graph_node import GraphNode
 
         class Attrs:
@@ -97,7 +83,7 @@ class TestParamsWinOverBaseConfig:
         assert GraphNode._rules.closed_nodes_thr_sq == (10.0 * 5.0) ** 2
         assert GraphNode._rules.closed_edges_thr_sq == (10.0 * 4.0) ** 2
 
-    def test_generator_uses_params_frame_size(self, base_config_values):
+    def test_generator_uses_params_frame_size(self):
         from networksynth.graphs.graph_generator import GraphGenerator
 
         class Attrs:

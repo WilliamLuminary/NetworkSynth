@@ -121,21 +121,20 @@ class TestRunLog:
 
 
 class TestConfigNoLongerOwnsLogging:
-    def test_initialize_sets_run_id_without_a_file_handler(self, tmp_path):
-        from tests.fixture_config import FixtureConfig as SampleConfig
+    def test_a_config_gets_a_run_id_without_a_file_handler(self, tmp_path):
+        from dataclasses import replace
 
-        config = type("LogTestCfg", (SampleConfig,), {})
-        config.BASE_OUTPUT_PATH = str(tmp_path)
-        config.RUN_ID = ""
-        config.initialize()
+        from tests.fixture_config import FIXTURE
 
-        assert config.RUN_ID, "initialize() must set RUN_ID"
+        config = replace(FIXTURE, BASE_OUTPUT_PATH=str(tmp_path), RUN_ID="")
+
+        assert config.RUN_ID, "a config must carry a RUN_ID"
         run_logs = [
             h
             for h in logging.getLogger().handlers
             if getattr(h, "_networksynth_run_log", False)
         ]
-        assert not run_logs, "initialize() must not attach a run log"
+        assert not run_logs, "building a config must not attach a run log"
 
     def test_no_latch_attribute_remains(self):
         from networksynth.configs.base_config import BaseConfig

@@ -6,7 +6,7 @@ import re
 import sys
 from dataclasses import replace
 
-from networksynth.configs.gui_config import GuiConfig
+from networksynth.configs.gui_config import from_spec
 from networksynth.configs.loaders import (
     EDGE_SUFFIX,
     IMAGE_SUFFIX,
@@ -93,11 +93,11 @@ def _background_figure(image, frame_size, style):
 
 
 def preview_original(config, out_dir: str) -> dict:
-    datasets = config.get_datasets()
+    datasets = config.DATASETS
     dataset_id = datasets[0]
 
-    graph = config.ORIGINAL_NETWORK_FUNC(dataset_id)
-    image = config.ORIGINAL_IMAGE_FUNC(dataset_id)
+    graph = config.load_original_network(dataset_id)
+    image = config.load_original_image(dataset_id)
     attributes = AttributesCalculator().analyze(graph)
     style = _preview_style(config, "original_graph")
 
@@ -213,7 +213,7 @@ def save_edited(config, out_dir: str) -> dict:
 
     from networksynth.configs.file_definitions import save_network_csv
 
-    datasets = config.get_datasets()
+    datasets = config.DATASETS
     source_dir, _ = _source(config, datasets[0])
     target_dir = os.path.join(source_dir, "edited")
     os.makedirs(target_dir, exist_ok=True)
@@ -222,7 +222,7 @@ def save_edited(config, out_dir: str) -> dict:
     for dataset_id in datasets:
         _, name = _source(config, dataset_id)
         base = f"{name}_edited"
-        graph = config.ORIGINAL_NETWORK_FUNC(dataset_id)
+        graph = config.load_original_network(dataset_id)
         save_network_csv(graph, os.path.join(target_dir, f"{base}.csv"))
         written.append(base)
 
@@ -268,8 +268,7 @@ def main(argv=None) -> int:
     spec_path, kind, out_dir = argv[1], argv[2], argv[3]
     os.makedirs(out_dir, exist_ok=True)
 
-    config = GuiConfig.from_spec(spec_path)
-    config.initialize()
+    config = from_spec(spec_path)
 
     if kind == "original":
         info = preview_original(config, out_dir)

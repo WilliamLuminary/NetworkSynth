@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import logging
 import os
+from dataclasses import replace
 
 import pytest
 
@@ -14,18 +15,19 @@ SAMPLE_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "input", "sam
 
 class TestGenerateMode:
     def test_load_original_and_save(self, tmp_path):
-        from tests.fixture_config import FixtureConfig
+        from tests.fixture_config import FIXTURE
 
-        SampleConfig = type("IntegrationCfg", (FixtureConfig,), {})
-        SampleConfig.SYNTHETIC_NETWORK_NUMBER = 0
-        SampleConfig.SYNTHETIC_GRAPH_NUMBER = 0
-        SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
-        SampleConfig.initialize()
+        SampleConfig = replace(
+            FIXTURE,
+            SYNTHETIC_NETWORK_NUMBER=0,
+            SYNTHETIC_GRAPH_NUMBER=0,
+            BASE_OUTPUT_PATH=str(tmp_path),
+        )
 
         from networksynth.handlers import GenerationRun, create_run_paths
 
         run_paths = create_run_paths(SampleConfig)
-        dataset_id = SampleConfig.get_datasets()[0]
+        dataset_id = SampleConfig.DATASETS[0]
         agent = GenerationRun(SampleConfig, run_paths, dataset_id)
 
         agent.save_original()
@@ -39,13 +41,14 @@ class TestGenerateMode:
         logger.info(f"Generate (originals): {len(files)} files in {out}")
 
     def test_generate_one_network(self, tmp_path):
-        from tests.fixture_config import FixtureConfig
+        from tests.fixture_config import FIXTURE
 
-        SampleConfig = type("IntegrationCfg", (FixtureConfig,), {})
-        SampleConfig.SYNTHETIC_NETWORK_NUMBER = 1
-        SampleConfig.SYNTHETIC_GRAPH_NUMBER = 1
-        SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
-        SampleConfig.initialize()
+        SampleConfig = replace(
+            FIXTURE,
+            SYNTHETIC_NETWORK_NUMBER=1,
+            SYNTHETIC_GRAPH_NUMBER=1,
+            BASE_OUTPUT_PATH=str(tmp_path),
+        )
 
         from networksynth.configs import SynthParams
         from networksynth.graphs import GraphGenerator
@@ -53,7 +56,7 @@ class TestGenerateMode:
         from networksynth.utils import trim_graph
 
         run_paths = create_run_paths(SampleConfig)
-        dataset_id = SampleConfig.get_datasets()[0]
+        dataset_id = SampleConfig.DATASETS[0]
         agent = GenerationRun(SampleConfig, run_paths, dataset_id)
 
         generator = GraphGenerator(
@@ -84,19 +87,20 @@ class TestGenerateMode:
 
 class TestAnalyzeMode:
     def test_analyze_graph(self, tmp_path):
-        from tests.fixture_config import FixtureConfig
+        from tests.fixture_config import FIXTURE
 
-        SampleConfig = type("IntegrationCfg", (FixtureConfig,), {})
-        SampleConfig.SYNTHETIC_NETWORK_NUMBER = 0
-        SampleConfig.SYNTHETIC_GRAPH_NUMBER = 0
-        SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
-        SampleConfig.initialize()
+        SampleConfig = replace(
+            FIXTURE,
+            SYNTHETIC_NETWORK_NUMBER=0,
+            SYNTHETIC_GRAPH_NUMBER=0,
+            BASE_OUTPUT_PATH=str(tmp_path),
+        )
 
         from networksynth.analysis import MultifractalAnalyzer
         from networksynth.handlers import GenerationRun, create_run_paths
 
         run_paths = create_run_paths(SampleConfig)
-        dataset_id = SampleConfig.get_datasets()[0]
+        dataset_id = SampleConfig.DATASETS[0]
         agent = GenerationRun(SampleConfig, run_paths, dataset_id)
 
         original = agent.original
@@ -118,17 +122,15 @@ class TestAnalyzeMode:
 
 class TestSnapshotMode:
     def test_generate_with_snapshots(self, tmp_path):
-        from tests.fixture_config import FixtureSnapshotConfig
+        from tests.fixture_config import FIXTURE_SNAPSHOT
 
-        Snapshot1x1Config = type("IntegrationSnapCfg", (FixtureSnapshotConfig,), {})
-        Snapshot1x1Config.BASE_OUTPUT_PATH = str(tmp_path)
-        Snapshot1x1Config.initialize()
+        Snapshot1x1Config = replace(FIXTURE_SNAPSHOT, BASE_OUTPUT_PATH=str(tmp_path))
 
         from networksynth.configs import SynthParams
         from networksynth.handlers import GenerationRun, create_run_paths
 
         run_paths = create_run_paths(Snapshot1x1Config)
-        dataset_id = Snapshot1x1Config.get_datasets()[0]
+        dataset_id = Snapshot1x1Config.DATASETS[0]
         agent = GenerationRun(Snapshot1x1Config, run_paths, dataset_id)
 
         from networksynth.graphs import GraphGenerator
@@ -136,8 +138,6 @@ class TestSnapshotMode:
 
         snapshot_dir = os.path.join(agent.saver.output_dir, "snapshots")
         os.makedirs(snapshot_dir, exist_ok=True)
-
-        from dataclasses import replace
 
         style = replace(Snapshot1x1Config.render("bfs_snapshot"), dpi=72)
         recorded_calls = []
@@ -171,19 +171,20 @@ class TestSnapshotMode:
         )
 
     def test_compute_and_rank_metrics(self, tmp_path):
-        from tests.fixture_config import FixtureConfig
+        from tests.fixture_config import FIXTURE
 
-        SampleConfig = type("IntegrationCfg", (FixtureConfig,), {})
-        SampleConfig.SYNTHETIC_NETWORK_NUMBER = 0
-        SampleConfig.SYNTHETIC_GRAPH_NUMBER = 0
-        SampleConfig.BASE_OUTPUT_PATH = str(tmp_path)
-        SampleConfig.initialize()
+        SampleConfig = replace(
+            FIXTURE,
+            SYNTHETIC_NETWORK_NUMBER=0,
+            SYNTHETIC_GRAPH_NUMBER=0,
+            BASE_OUTPUT_PATH=str(tmp_path),
+        )
 
         from networksynth.handlers import GenerationRun, create_run_paths
         from networksynth.utils import compute_network_metrics, metric_distance
 
         run_paths = create_run_paths(SampleConfig)
-        dataset_id = SampleConfig.get_datasets()[0]
+        dataset_id = SampleConfig.DATASETS[0]
         agent = GenerationRun(SampleConfig, run_paths, dataset_id)
 
         original = agent.original

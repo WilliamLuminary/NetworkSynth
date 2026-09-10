@@ -4,7 +4,7 @@ from dataclasses import replace
 
 import pytest
 
-from networksynth.configs import BaseConfig
+from networksynth.configs import RenderStyle
 
 pytestmark = [pytest.mark.integration, pytest.mark.requires_fixture_data]
 
@@ -17,24 +17,23 @@ def _outputs(saver_dir: str) -> list:
 
 
 def _tune(base, tmp_path, **overrides):
-    config = type(f"Smoke{base.__name__}", (base,), {})
-    config.BASE_OUTPUT_PATH = str(tmp_path)
-    config.ERROR_CHECKER = "none"
-    config.MAX_ATTEMPTS = 2
-    config.LOG_MEMORY = False
-    config.SEED = 1234
-    for key, value in overrides.items():
-        setattr(config, key, value)
-    config.initialize()
-    return config
+    return replace(
+        base,
+        BASE_OUTPUT_PATH=str(tmp_path),
+        ERROR_CHECKER="none",
+        MAX_ATTEMPTS=2,
+        LOG_MEMORY=False,
+        SEED=1234,
+        **overrides,
+    )
 
 
 class TestHybridPipeline:
     @staticmethod
     def _config(tmp_path):
-        from tests.fixture_config import FixtureHybridConfig
+        from tests.fixture_config import FIXTURE_HYBRID
 
-        return _tune(FixtureHybridConfig, tmp_path)
+        return _tune(FIXTURE_HYBRID, tmp_path)
 
     def test_run_hybrid_for_dataset(self, tmp_path):
         from networksynth.handlers import create_run_paths
@@ -43,7 +42,7 @@ class TestHybridPipeline:
         config = self._config(tmp_path)
         run_paths = create_run_paths(config)
 
-        run_hybrid_for_dataset(config.get_datasets()[0], config, run_paths)
+        run_hybrid_for_dataset(config.DATASETS[0], config, run_paths)
 
         assert _outputs(str(tmp_path)), "hybrid produced no output files"
 
@@ -61,9 +60,10 @@ class TestHybridPipeline:
         from networksynth.configs import SynthParams
         from networksynth.pipelines.hybrid import _apply_dataset_factors
 
-        config = self._config(tmp_path)
-        dataset_id = config.get_datasets()[0]
-        config.DATASET_FACTORS = {dataset_id[0]: (1.9, 2.4)}
+        dataset_id = self._config(tmp_path).DATASETS[0]
+        config = replace(
+            self._config(tmp_path), DATASET_FACTORS={dataset_id[0]: (1.9, 2.4)}
+        )
         before = config.CLOSED_NODES_FACTOR
 
         params = _apply_dataset_factors(
@@ -78,14 +78,10 @@ class TestHybridPipeline:
         from networksynth.configs import SynthParams
         from networksynth.pipelines.hybrid import _apply_dataset_factors
 
-        config = self._config(tmp_path)
-        config.DATASET_FACTORS = {}
+        config = replace(self._config(tmp_path), DATASET_FACTORS={})
         original = SynthParams.from_config(config)
 
-        assert (
-            _apply_dataset_factors(config.get_datasets()[0], config, original)
-            is original
-        )
+        assert _apply_dataset_factors(config.DATASETS[0], config, original) is original
 
 
 class TestHybridSnapshots:
@@ -93,18 +89,18 @@ class TestHybridSnapshots:
     def test_hybrid_writes_snapshots_when_the_config_asks_for_them(self, tmp_path):
         from networksynth.handlers import create_run_paths
         from networksynth.pipelines.hybrid import run_hybrid_for_dataset
-        from tests.fixture_config import FixtureHybridConfig
+        from tests.fixture_config import FIXTURE_HYBRID
 
         config = _tune(
-            FixtureHybridConfig,
+            FIXTURE_HYBRID,
             tmp_path,
             PHASE2_MAX_ROUNDS=6,
             SNAPSHOT_INTERVAL=100,
-            RENDER_HYBRID_SNAPSHOT=replace(BaseConfig.RENDER_HYBRID_SNAPSHOT, dpi=72),
+            RENDER_HYBRID_SNAPSHOT=RenderStyle(dpi=72),
         )
         run_paths = create_run_paths(config)
 
-        run_hybrid_for_dataset(config.get_datasets()[0], config, run_paths)
+        run_hybrid_for_dataset(config.DATASETS[0], config, run_paths)
 
         outputs = _outputs(str(tmp_path))
         assert outputs, "hybrid produced no output files"
@@ -118,18 +114,16 @@ class TestSweepPipeline:
         from networksynth.analysis.error_checker import NullErrorChecker
         from networksynth.handlers import GenerationRun, create_run_paths
         from networksynth.pipelines.sweep import generate_networks
-        from tests.fixture_config import FixtureSweepConfig
+        from tests.fixture_config import FIXTURE_SWEEP
 
-        config = _tune(FixtureSweepConfig, tmp_path, SYNTHETIC_NETWORK_NUMBER=2)
+        config = _tune(FIXTURE_SWEEP, tmp_path, SYNTHETIC_NETWORK_NUMBER=2)
         run_paths = create_run_paths(config)
 
-        agent = GenerationRun(config, run_paths, config.get_datasets()[0])
+        agent = GenerationRun(config, run_paths, config.DATASETS[0])
 
-        nodes_before = config.CLOSED_NODES_FACTOR
         avg_error, success_rate = generate_networks(
             agent, NullErrorChecker(), 1.7, 2.2, config
         )
 
         assert 0.0 <= success_rate <= 1.0
         assert avg_error is not None
-        assert config.CLOSED_NODES_FACTOR == nodes_before

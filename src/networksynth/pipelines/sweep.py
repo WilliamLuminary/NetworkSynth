@@ -32,12 +32,11 @@ from networksynth.utils import (
 
 
 def _init_config():
-    from networksynth.configs.sweep_mode.config_sample import SampleConfig as cfg
+    from dataclasses import replace
 
-    cfg.initialize()
-    cfg.SYNTHETIC_NETWORK_NUMBER = 100
-    cfg.SYNTHETIC_GRAPH_NUMBER = 0
-    return cfg
+    from networksynth.configs.sweep_mode.config_sample import CONFIG
+
+    return replace(CONFIG, SYNTHETIC_NETWORK_NUMBER=100)
 
 
 EXPERIMENT_PROJECT_NAME = "hyperparam-tuning"
@@ -90,16 +89,16 @@ def _generate_with_factors(
 
 
 def generate_networks(run: GenerationRun, error_checker: ErrorChecker, nf, ef, config):
-    from dataclasses import replace
-
     num_network = config.SYNTHETIC_NETWORK_NUMBER
     exit_event = spawn_context().Manager().Event()
     max_workers = config.get_max_workers(num_network)
 
-    trial_params = replace(
-        SynthParams.from_config(config),
+    trial_params = SynthParams(
+        synthetic_frame_size=config.SYNTHETIC_FRAME_SIZE,
         closed_nodes_factor=nf,
         closed_edges_factor=ef,
+        max_attempts=config.MAX_ATTEMPTS,
+        seed=config.SEED,
     )
 
     errors = []
@@ -211,10 +210,8 @@ def run_for_dataset(
     logger.info(f"Sweep report written for {len(results)} trial(s).")
 
 
-def main(config_cls=None):
-    cfg = _init_config() if config_cls is None else config_cls
-    if config_cls is not None:
-        cfg.initialize()
+def main(config=None):
+    cfg = _init_config() if config is None else config
 
     nf_lo, nf_hi = cfg.NF_RANGE
     ef_lo, ef_hi = cfg.EF_RANGE
@@ -233,7 +230,7 @@ def main(config_cls=None):
             wandb.login(
                 key=os.environ.get("WANDB_API_KEY") or os.environ.get("WANDB_KEY")
             )
-        for dataset_id in cfg.get_datasets():
+        for dataset_id in cfg.DATASETS:
             run_for_dataset(dataset_id, node_factors, edge_factors, cfg, run_paths)
     except KeyboardInterrupt:
         status = STATUS_CANCELLED

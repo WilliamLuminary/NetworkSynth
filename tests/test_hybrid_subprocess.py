@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import pickle
+from dataclasses import replace
 
 import pytest
 
-from networksynth.configs import BaseConfig, DatasetId
+from networksynth.configs import DatasetId
 from networksynth.handlers.run_logging import reset_logging
 from networksynth.handlers.run_paths import RunPaths
 
@@ -12,18 +13,9 @@ pytestmark = pytest.mark.unit
 
 @pytest.fixture
 def config(tmp_path):
-    class Config(BaseConfig):
-        MODE = "hybrid"
-        BASE_OUTPUT_PATH = str(tmp_path)
-        DATASETS = [DatasetId("ds")]
-        initialised = False
+    from tests.fixture_config import FIXTURE_HYBRID
 
-        @classmethod
-        def initialize(cls):
-            super().initialize()
-            cls.initialised = True
-
-    return Config
+    return replace(FIXTURE_HYBRID, BASE_OUTPUT_PATH=str(tmp_path), RUN_ID="abc123")
 
 
 @pytest.fixture(autouse=True)
@@ -45,7 +37,7 @@ class TestDatasetIdCrossesProcesses:
 
 
 class TestTheChildSetsItselfUp:
-    def test_it_initializes_the_config_it_receives(self, tmp_path, config, monkeypatch):
+    def test_it_runs_the_dataset_it_is_given(self, tmp_path, config, monkeypatch):
         import networksynth.pipelines.hybrid as hybrid
 
         ran = []
@@ -53,21 +45,16 @@ class TestTheChildSetsItselfUp:
             hybrid, "run_hybrid_for_dataset", lambda *a: ran.append(a[0])
         )
 
-        hybrid._subprocess_target(
-            DatasetId("ds"), config, RunPaths(root=str(tmp_path)), "abc123"
-        )
+        hybrid._subprocess_target(DatasetId("ds"), config, RunPaths(root=str(tmp_path)))
 
-        assert config.initialised, "the pipeline ran with an uninitialised config"
-        assert ran, "the pipeline never ran"
+        assert ran == [DatasetId("ds")]
 
     def test_it_logs_under_the_parents_run_id(self, tmp_path, config, monkeypatch):
         import networksynth.pipelines.hybrid as hybrid
 
         monkeypatch.setattr(hybrid, "run_hybrid_for_dataset", lambda *a: None)
 
-        hybrid._subprocess_target(
-            DatasetId("ds"), config, RunPaths(root=str(tmp_path)), "abc123"
-        )
+        hybrid._subprocess_target(DatasetId("ds"), config, RunPaths(root=str(tmp_path)))
 
         assert config.RUN_ID == "abc123"
         assert (tmp_path / "run.jsonl").exists()

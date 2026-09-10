@@ -3,6 +3,7 @@ import multiprocessing as mp
 import os
 import sys
 import tempfile
+from dataclasses import replace
 
 _ROOT = os.path.join(os.path.dirname(__file__), "..")
 sys.path.insert(0, os.path.join(_ROOT, "src"))
@@ -14,21 +15,22 @@ def main() -> int:
 
     from networksynth.handlers import create_run_paths
     from networksynth.pipelines.generate import run_for_dataset
-    from tests.fixture_config import FixtureConfig as SampleConfig
+    from tests.fixture_config import FIXTURE
 
     out_dir = tempfile.mkdtemp(prefix="spawn_safety_")
-    config = type("SpawnSampleConfig", (SampleConfig,), {})
-    config.BASE_OUTPUT_PATH = out_dir
-    config.ERROR_CHECKER = "none"
-    config.MAX_ATTEMPTS = 2
-    config.LOG_MEMORY = False
-    config.SEED = 4321
-    config.SYNTHETIC_NETWORK_NUMBER = 2
-    config.SYNTHETIC_GRAPH_NUMBER = 1
-    config.SNAPSHOT_INTERVAL = 0
-    config.initialize()
+    config = replace(
+        FIXTURE,
+        BASE_OUTPUT_PATH=out_dir,
+        ERROR_CHECKER="none",
+        MAX_ATTEMPTS=2,
+        LOG_MEMORY=False,
+        SEED=4321,
+        SYNTHETIC_NETWORK_NUMBER=2,
+        SYNTHETIC_GRAPH_NUMBER=1,
+        SNAPSHOT_INTERVAL=0,
+    )
 
-    run_for_dataset(config.get_datasets()[0], config, create_run_paths(config))
+    run_for_dataset(config.DATASETS[0], config, create_run_paths(config))
 
     written = sum(len(names) for _, _, names in os.walk(out_dir))
     print(f"files_written={written}")

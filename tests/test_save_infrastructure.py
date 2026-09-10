@@ -2,13 +2,13 @@
 import csv
 import os
 import pickle
+from dataclasses import fields, replace
 
 import numpy as np
 import pytest
 
 pytestmark = pytest.mark.unit
 
-from networksynth.configs import BaseConfig
 from networksynth.configs.file_definitions import (
     SaveSpec,
 )
@@ -18,6 +18,7 @@ from networksynth.configs.file_definitions import (
 )
 from networksynth.configs.file_definitions import save_pickle as _save_pickle
 from networksynth.handlers.saver import Saver
+from tests.fixture_config import FIXTURE, FIXTURE_COMPARE, FIXTURE_HYBRID
 
 
 class FakeGraph:
@@ -44,19 +45,19 @@ class FakeGraph:
 
 class TestDispatcher:
     def test_known_identifier(self):
-        specs = BaseConfig.save("original_image")
+        specs = FIXTURE.save("original_image")
         assert len(specs) >= 1
         assert specs[0].extension == "webp"
 
     def test_missing_identifier_raises(self):
         with pytest.raises(AttributeError, match="SAVE_THIS_DOES_NOT_EXIST"):
-            BaseConfig.save("this_does_not_exist")
+            FIXTURE.save("this_does_not_exist")
 
     def test_every_declared_spec_is_valid(self):
-        names = [n for n in dir(BaseConfig) if n.startswith("SAVE_")]
-        assert names, "BaseConfig declares no SAVE_* specs"
+        names = [f.name for f in fields(FIXTURE) if f.name.startswith("SAVE_")]
+        assert names, "the config declares no SAVE_* specs"
         for name in names:
-            specs = getattr(BaseConfig, name)
+            specs = getattr(FIXTURE, name)
             assert specs, f"{name} is empty"
             for spec in specs:
                 assert isinstance(spec, SaveSpec), f"{name} holds {type(spec)}"
@@ -66,35 +67,33 @@ class TestDispatcher:
 
 class TestSpecs:
     def test_original_network_formats(self):
-        specs = BaseConfig.save("original_network")
+        specs = FIXTURE.save("original_network")
         exts = {s.extension for s in specs}
         assert exts == {"csv"}
 
     def test_synthetic_network_formats(self):
-        specs = BaseConfig.save("synthetic_network")
+        specs = FIXTURE.save("synthetic_network")
         exts = {s.extension for s in specs}
         assert exts == {"csv"}
 
     def test_synthetic_graph_default_webp(self):
-        specs = BaseConfig.save("synthetic_graph")
+        specs = FIXTURE.save("synthetic_graph")
         assert len(specs) == 1
         assert specs[0].extension == "webp"
 
     def test_analysis_data_no_timestamp(self):
-        specs = BaseConfig.save("analysis_data")
+        specs = FIXTURE.save("analysis_data")
         assert specs[0].use_timestamp is False
 
     def test_analysis_figure_has_timestamp(self):
-        specs = BaseConfig.save("analysis_figure")
+        specs = FIXTURE.save("analysis_figure")
         assert specs[0].use_timestamp is True
 
 
 class TestModeOverrides:
 
     def test_a_mode_config_can_add_a_second_format(self):
-        from tests.fixture_config import FixtureHybridConfig
-
-        specs = FixtureHybridConfig.save("synthetic_graph")
+        specs = FIXTURE_HYBRID.save("synthetic_graph")
         exts = [s.extension for s in specs]
         assert "webp" in exts
         assert "png" in exts
@@ -103,28 +102,22 @@ class TestModeOverrides:
     def test_override_resolves_on_the_defining_config(self):
         from networksynth.configs.file_definitions import save_pickle
 
-        class CustomConfig(BaseConfig):
+        class CustomConfig(type(FIXTURE)):
             SAVE_TEST_CUSTOM = (
                 SaveSpec("custom_dir", "test_detail", "pkl", save_pickle),
             )
 
-        specs = CustomConfig.save("test_custom")
+        config = CustomConfig(
+            **{f.name: getattr(FIXTURE, f.name) for f in fields(FIXTURE)}
+        )
+        specs = config.save("test_custom")
         assert specs[0].relative_dir == "custom_dir"
         assert specs[0].detail == "test_detail"
 
-    def test_override_does_not_leak_to_other_configs(self):
-        from tests.fixture_config import FixtureHybridConfig
-
-        FixtureHybridConfig.save("synthetic_graph")
-
-        assert len(BaseConfig.save("synthetic_graph")) == 1
-
     def test_a_mode_config_inherits_the_analysis_specs(self):
-        from tests.fixture_config import FixtureCompareConfig
-
-        specs = FixtureCompareConfig.save("analysis_data")
+        specs = FIXTURE_COMPARE.save("analysis_data")
         assert specs[0].use_timestamp is False
-        specs = FixtureCompareConfig.save("analysis_figure")
+        specs = FIXTURE_COMPARE.save("analysis_figure")
         assert specs[0].extension == "webp"
 
 
@@ -132,7 +125,7 @@ class TestModeOverrides:
 def saver_in_tmpdir(tmp_path):
     saver = object.__new__(Saver)
     saver.output_dir = str(tmp_path)
-    saver._save_func = BaseConfig.save
+    saver._save_func = FIXTURE.save
     saver._batch_timestamp = None
     return saver
 
@@ -145,14 +138,13 @@ class TestSaverPaths:
         def fake_save_fn(content, path):
             recorded.append(path)
 
-        original = BaseConfig.SAVE_ORIGINAL_IMAGE
-        BaseConfig.SAVE_ORIGINAL_IMAGE = (
-            SaveSpec("original", "original_image", "png", fake_save_fn),
-        )
-        try:
-            saver.save("img_data", "original_image", "pfx_")
-        finally:
-            BaseConfig.SAVE_ORIGINAL_IMAGE = original
+        saver._save_func = replace(
+            FIXTURE,
+            SAVE_ORIGINAL_IMAGE=(
+                SaveSpec("original", "original_image", "png", fake_save_fn),
+            ),
+        ).save
+        saver.save("img_data", "original_image", "pfx_")
 
         assert len(recorded) == 1
         p = recorded[0]
@@ -166,14 +158,13 @@ class TestSaverPaths:
         def fake_save_fn(content, path):
             recorded.append(path)
 
-        original = BaseConfig.SAVE_ANALYSIS_DATA
-        BaseConfig.SAVE_ANALYSIS_DATA = (
-            SaveSpec("", "analysis_data", "pkl", fake_save_fn, use_timestamp=False),
-        )
-        try:
-            saver.save("data", "analysis_data", "")
-        finally:
-            BaseConfig.SAVE_ANALYSIS_DATA = original
+        saver._save_func = replace(
+            FIXTURE,
+            SAVE_ANALYSIS_DATA=(
+                SaveSpec("", "analysis_data", "pkl", fake_save_fn, use_timestamp=False),
+            ),
+        ).save
+        saver.save("data", "analysis_data", "")
 
         assert len(recorded) == 1
         assert recorded[0].endswith("analysis_data.pkl")
@@ -185,18 +176,17 @@ class TestSaverPaths:
         def fake_save_fn(content, path):
             recorded.append(path)
 
-        original = BaseConfig.SAVE_SYNTHETIC_NETWORK
-        BaseConfig.SAVE_SYNTHETIC_NETWORK = (
-            SaveSpec("synthetic", "net", "csv", fake_save_fn),
-            SaveSpec("synthetic", "net", "graphml.gz", fake_save_fn),
-        )
-        try:
-            saver.begin_batch()
-            ts = saver._batch_timestamp
-            saver.save("graph", "synthetic_network", "b_")
-            saver.end_batch()
-        finally:
-            BaseConfig.SAVE_SYNTHETIC_NETWORK = original
+        saver._save_func = replace(
+            FIXTURE,
+            SAVE_SYNTHETIC_NETWORK=(
+                SaveSpec("synthetic", "net", "csv", fake_save_fn),
+                SaveSpec("synthetic", "net", "graphml.gz", fake_save_fn),
+            ),
+        ).save
+        saver.begin_batch()
+        ts = saver._batch_timestamp
+        saver.save("graph", "synthetic_network", "b_")
+        saver.end_batch()
 
         assert len(recorded) == 2
         for p in recorded:
@@ -226,14 +216,13 @@ class TestSaverPaths:
         def fake_save_fn(content, path):
             recorded.append(path)
 
-        original = BaseConfig.SAVE_SYNTHETIC_NETWORK
-        BaseConfig.SAVE_SYNTHETIC_NETWORK = (
-            SaveSpec("sub/deep", "detail", "csv", fake_save_fn),
-        )
-        try:
-            saver.save("data", "synthetic_network", "")
-        finally:
-            BaseConfig.SAVE_SYNTHETIC_NETWORK = original
+        saver._save_func = replace(
+            FIXTURE,
+            SAVE_SYNTHETIC_NETWORK=(
+                SaveSpec("sub/deep", "detail", "csv", fake_save_fn),
+            ),
+        ).save
+        saver.save("data", "synthetic_network", "")
 
         assert len(recorded) == 1
         parent = os.path.dirname(recorded[0])
@@ -300,7 +289,7 @@ class TestEndToEnd:
 
         saver = object.__new__(Saver)
         saver.output_dir = str(tmp_path)
-        saver._save_func = BaseConfig.save
+        saver._save_func = FIXTURE.save
         saver._batch_timestamp = None
 
         data = {"hello": "world"}
@@ -314,19 +303,18 @@ class TestEndToEnd:
     def test_csv_export_via_saver(self, tmp_path):
         saver = object.__new__(Saver)
         saver.output_dir = str(tmp_path)
-        saver._save_func = BaseConfig.save
+        saver._save_func = FIXTURE.save
         saver._batch_timestamp = "20250101_000000"
 
         graph = FakeGraph(n_nodes=5)
 
-        original = BaseConfig.SAVE_SYNTHETIC_NETWORK
-        BaseConfig.SAVE_SYNTHETIC_NETWORK = (
-            SaveSpec("synthetic", "synthetic_network", "csv", save_network_csv),
-        )
-        try:
-            saver.save(graph, "synthetic_network", "exp_")
-        finally:
-            BaseConfig.SAVE_SYNTHETIC_NETWORK = original
+        saver._save_func = replace(
+            FIXTURE,
+            SAVE_SYNTHETIC_NETWORK=(
+                SaveSpec("synthetic", "synthetic_network", "csv", save_network_csv),
+            ),
+        ).save
+        saver.save(graph, "synthetic_network", "exp_")
 
         csv_files = sorted(tmp_path.rglob("*.csv"))
         assert len(csv_files) == 2
@@ -339,27 +327,15 @@ class TestEndToEnd:
 class TestDisabledSaving:
 
     def test_a_saver_that_exists_always_writes(self, tmp_path):
-
-        class Disabled(BaseConfig):
-            DISABLE_SAVING = True
-
-        saver = Saver(Disabled, str(tmp_path))
+        saver = Saver(replace(FIXTURE, DISABLE_SAVING=True), str(tmp_path))
 
         assert isinstance(saver, Saver)
-
-    def test_the_flag_is_never_set_on_base_config(self):
-
-        class Disabled(BaseConfig):
-            DISABLE_SAVING = True
-
-        assert Disabled.DISABLE_SAVING is True
-        assert BaseConfig.DISABLE_SAVING is False
 
 
 class TestBatchTimestampIsPerInstance:
     def test_two_savers_do_not_share_a_batch(self, tmp_path):
-        first = Saver(BaseConfig, str(tmp_path / "one"))
-        second = Saver(BaseConfig, str(tmp_path / "two"))
+        first = Saver(FIXTURE, str(tmp_path / "one"))
+        second = Saver(FIXTURE, str(tmp_path / "two"))
 
         first.begin_batch()
 
@@ -367,8 +343,8 @@ class TestBatchTimestampIsPerInstance:
         assert second._batch_timestamp is None
 
     def test_end_batch_clears_only_its_own(self, tmp_path):
-        first = Saver(BaseConfig, str(tmp_path / "one"))
-        second = Saver(BaseConfig, str(tmp_path / "two"))
+        first = Saver(FIXTURE, str(tmp_path / "one"))
+        second = Saver(FIXTURE, str(tmp_path / "two"))
         first.begin_batch()
         second.begin_batch()
 
