@@ -22,7 +22,7 @@ from .plotting import (
     save_hybrid_snapshot,
 )
 from .run_log import JsonFormatter, progress, tagged
-from .runtime import apply_seed, log_memory, spawn_context, timer
+from .runtime import apply_seed, log_memory, spawn_context, timer, worker_count
 
 __all__ = [
     "trim_image",
@@ -52,4 +52,5 @@ __all__ = [
     "tagged",
     "timer",
     "trim_graph",
+    "worker_count",
 ]

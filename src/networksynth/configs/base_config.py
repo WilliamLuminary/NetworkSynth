@@ -136,11 +136,9 @@ class BaseConfig:
 
     @classmethod
     def get_max_workers(cls, num_tasks: int = None) -> int:
-        cpu_count = os.cpu_count() or 1
-        max_workers = min(max(1, cpu_count // 2), cls.MAX_WORKERS)
-        if num_tasks is not None:
-            max_workers = min(max_workers, num_tasks)
-        return max_workers
+        from networksynth.utils import worker_count
+
+        return worker_count(num_tasks, ceiling=cls.MAX_WORKERS)
 
     @classmethod
     def snapshot_formats(cls) -> tuple:
@@ -148,8 +146,9 @@ class BaseConfig:
 
     @classmethod
     def get_snapshot_plot_workers(cls) -> int:
-        cpu_count = os.cpu_count() or 1
-        return min(max(1, cpu_count // 2), cls.SNAPSHOT_PLOT_WORKERS)
+        from networksynth.utils import worker_count
+
+        return worker_count(ceiling=cls.SNAPSHOT_PLOT_WORKERS)
 
     @classmethod
     def initialize(cls) -> None:
