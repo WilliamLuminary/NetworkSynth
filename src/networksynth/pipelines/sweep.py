@@ -8,7 +8,6 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from networksynth.analysis.error_checker import ErrorChecker, create_error_checker
 from networksynth.configs import DatasetId, SynthParams
-from networksynth.graphs import GraphGenerator, Traversal
 from networksynth.handlers import (
     STATUS_CANCELLED,
     STATUS_FAILED,
@@ -18,13 +17,8 @@ from networksynth.handlers import (
     create_run_paths,
     write_manifest,
 )
-from networksynth.pipelines.generate import compute_average_error
-from networksynth.utils import (
-    build_graph,
-    spawn_context,
-    tagged,
-    trim_graph,
-)
+from networksynth.pipelines.generate import compute_average_error, generate_candidate
+from networksynth.utils import spawn_context, tagged
 
 
 def _init_config():
@@ -52,42 +46,6 @@ def _build_factors(lo, hi, step):
 logger = logging.getLogger(__name__)
 
 
-def _generate_with_factors(
-    exit_event, error_checker: ErrorChecker, attributes, mapper, params
-):
-
-    if exit_event.is_set():
-        return None, float("inf")
-
-    rng = params.rng()
-    for attempt in range(params.max_attempts):
-        try:
-            inner_nodes, inner_edges, *_ = GraphGenerator.bfs_with_frontier(
-                Traversal.build(attributes, params, rng), params.synthetic_frame_size
-            )
-
-            if not inner_nodes or len(inner_nodes) < 100:
-                continue
-
-            graph = build_graph(inner_nodes, inner_edges, arg_type="graph_node")
-            graph = trim_graph(graph, attributes.average_degree)
-            mapper.assign_weights(graph, rng)
-
-            if exit_event.is_set():
-                return None, float("inf")
-
-            passed, error = error_checker.check(graph)
-            if passed:
-                return graph, error
-        except KeyboardInterrupt:
-            raise
-        except Exception as exc:
-            logger.warning(f"Attempt {attempt + 1} failed: {exc!r}")
-            continue
-
-    return None, float("inf")
-
-
 def generate_networks(run: GenerationRun, error_checker: ErrorChecker, nf, ef, config):
     num_network = config.SYNTHETIC_NETWORK_NUMBER
     exit_event = spawn_context().Manager().Event()
@@ -109,7 +67,7 @@ def generate_networks(run: GenerationRun, error_checker: ErrorChecker, nf, ef, c
         ) as executor:
             futures = [
                 executor.submit(
-                    _generate_with_factors,
+                    generate_candidate,
                     exit_event,
                     error_checker,
                     run.attributes,
@@ -120,8 +78,8 @@ def generate_networks(run: GenerationRun, error_checker: ErrorChecker, nf, ef, c
             ]
             next_log = 10
             for idx, future in enumerate(as_completed(futures), start=1):
-                synthetic_graph, error = future.result()
-                if not synthetic_graph:
+                synthetic_graph, error, _ = future.result()
+                if synthetic_graph is None:
                     continue
 
                 progress = round(idx / num_network * 100, 2)
