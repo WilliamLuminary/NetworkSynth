@@ -10,16 +10,6 @@ import numpy as np
 
 
 def worker_count(num_tasks: int | None = None, ceiling: int | None = None) -> int:
-    """How many processes to run at once.
-
-    Physical cores, not half the logical count: a machine without SMT would
-    otherwise sit half idle. Never more than this process is allowed to use,
-    which is not what the machine has under a cgroup quota or an affinity mask.
-
-    Bounded by memory too. A spawned worker re-imports everything, so this
-    process's own footprint is the floor each one starts from, which makes the
-    bound bind exactly when the parent is already large.
-    """
     import psutil
 
     usable = os.process_cpu_count() or os.cpu_count() or 1
