@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-pytestmark = pytest.mark.requires_fixture_data
+pytestmark = [pytest.mark.integration, pytest.mark.requires_fixture_data]
 
 from networksynth.analysis.multifractal_analyzer import MultifractalAnalyzer
 from tests.fixture_config import FIXTURE_COMPARE as CompareConfig

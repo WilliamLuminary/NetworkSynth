@@ -542,11 +542,7 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
     log_memory(f"After Phase 1 ({dataset_id})", config.LOG_MEMORY)
 
     if not tile_results:
-        logger.error(
-            "No tiles generated. Aborting.",
-            extra=tagged("PHASE1", dataset=str(dataset_id)),
-        )
-        return
+        raise RuntimeError(f"dataset {dataset_id}: every seed tile failed")
 
     snapshot_interval = config.SNAPSHOT_INTERVAL
     snapshot_dir = (
@@ -639,6 +635,7 @@ def _subprocess_target(dataset_id, config, run_paths):
         run_hybrid_for_dataset(dataset_id, config, run_paths)
     except KeyboardInterrupt:
         logger.info(SIGINT_INFO)
+        raise SystemExit(130)
 
 
 def _run_dataset_in_subprocess(dataset_id, config, run_paths):

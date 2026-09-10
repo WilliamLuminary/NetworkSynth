@@ -131,6 +131,7 @@ FIXTURE_SWEEP = FixtureSweepConfig(
     SEED=1234,
     DISABLE_SAVING=True,
     DISABLE_SAVING_NOTE="Fixture sweep",
+    USE_WANDB=False,
 )
 
 FIXTURE_COMPARE = CompareConfig(

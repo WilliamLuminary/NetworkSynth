@@ -6,7 +6,7 @@ import pytest
 
 from networksynth.handlers.attributes_calculator import AttributesCalculator
 
-pytestmark = pytest.mark.requires_fixture_data
+pytestmark = [pytest.mark.integration, pytest.mark.requires_fixture_data]
 
 
 def compare_dicts_of_floats(

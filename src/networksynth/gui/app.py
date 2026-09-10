@@ -65,10 +65,15 @@ def _file_url(path: Optional[str]) -> str:
     return QUrl.fromLocalFile(path).toString() if path else ""
 
 
+def _tail(path: str, count: int = 20) -> List[str]:
+    with open(path, encoding="utf-8", errors="replace") as handle:
+        lines = [line.rstrip() for line in handle if line.strip()]
+    return lines[-count:]
+
+
 def _last_line(path: str) -> str:
-    with open(path) as handle:
-        lines = [line.strip() for line in handle if line.strip()]
-    return lines[-1][:200] if lines else "no output"
+    lines = _tail(path, 1)
+    return lines[0][:200] if lines else "no output"
 
 
 class SynthesisController(QObject):
@@ -100,6 +105,7 @@ class SynthesisController(QObject):
         self._log_path: Optional[str] = None
         self._log_offset = 0
         self._run_root: Optional[str] = None
+        self._run_stderr: Optional[Any] = None
 
         self._cancel_at: Optional[float] = None
         self._poll = QTimer(self)
@@ -663,10 +669,13 @@ class SynthesisController(QObject):
         self._run_root = None
         self._before = self._existing_run_dirs()
 
+        self._run_stderr = open(
+            os.path.join(self._scratch_dir(), "run_stderr.txt"), "w"
+        )
         self._process = subprocess.Popen(
             [sys.executable, *_GUI_RUN, spec_path],
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stderr=self._run_stderr,
             stdin=subprocess.DEVNULL,
             start_new_session=_PROCESS_GROUPS,
             **_NEW_GROUP,
@@ -767,6 +776,7 @@ class SynthesisController(QObject):
             self._process = None
             self._cancel_at = None
             self._poll.stop()
+            self._run_stderr.close()
             self._drain_log()
             self._finish(code)
         elif (
@@ -810,6 +820,13 @@ class SynthesisController(QObject):
 
     def _finish(self, code: int) -> None:
         message = _EXIT_MEANING.get(code, f"Exited with code {code}.")
+        if code not in (0, 130):
+            # The run log only exists once the run directory does, so an early
+            # failure has nowhere else to have said what went wrong.
+            self._log.extend(
+                f"{'STDERR':<8}{line}" for line in _tail(self._run_stderr.name)
+            )
+            self.logChanged.emit()
         manifest = self._read_manifest()
         if manifest:
             message += f"  {manifest['file_count']} files in {self._run_root}"

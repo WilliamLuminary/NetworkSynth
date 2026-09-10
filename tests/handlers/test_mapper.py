@@ -12,7 +12,11 @@ from scipy.stats import pearsonr
 
 from networksynth.handlers import Mapper
 
-pytestmark = [pytest.mark.requires_fixture_data, pytest.mark.slow]
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.requires_fixture_data,
+    pytest.mark.slow,
+]
 
 
 def profile_mapper_time(mapper, graph, iterations=10):

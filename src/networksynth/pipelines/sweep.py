@@ -6,8 +6,6 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-import wandb
-
 from networksynth.analysis.error_checker import ErrorChecker, create_error_checker
 from networksynth.configs import DatasetId, SynthParams
 from networksynth.graphs import GraphGenerator
@@ -40,6 +38,12 @@ def _init_config():
 
 
 EXPERIMENT_PROJECT_NAME = "hyperparam-tuning"
+
+
+def _wandb():
+    import wandb
+
+    return wandb
 
 
 def _build_factors(lo, hi, step):
@@ -82,7 +86,8 @@ def _generate_with_factors(
                     return graph, error
             except KeyboardInterrupt:
                 raise
-            except Exception:
+            except Exception as exc:
+                logger.warning(f"Attempt {attempt + 1} failed: {exc!r}")
                 continue
 
         return None, float("inf")
@@ -190,6 +195,7 @@ def run_for_dataset(
         return error, success_rate
 
     if config.USE_WANDB:
+        wandb = _wandb()
 
         def trial():
             with wandb.init():
@@ -227,7 +233,7 @@ def main(config=None):
             cfg.SYNTHETIC_NETWORK_NUMBER != 0
         ), "Sweeping experiments require synthetic networks."
         if cfg.USE_WANDB:
-            wandb.login(
+            _wandb().login(
                 key=os.environ.get("WANDB_API_KEY") or os.environ.get("WANDB_KEY")
             )
         for dataset_id in cfg.DATASETS:
