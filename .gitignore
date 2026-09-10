@@ -9,6 +9,10 @@ __pycache__/
 # Distribution / packaging
 .Python
 target/
+build/
+# python -m build writes here; unrelated to the dist branch.
+dist/
+*.whl
 
 # Installer logs
 pip-log.txt

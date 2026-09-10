@@ -1,20 +1,20 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """What version this is, and how to move it forward.
 
-A checkout on a normal branch pulls. A `dist` checkout, which is what another
-project carries as a submodule, has no upstream to pull from and is moved by
-fetching the branch and resetting onto it.
+A `dist` checkout has no upstream to pull from, so it is moved by fetching the
+branch and resetting onto it.
 """
 
 import os
 import subprocess
 from typing import List, Tuple
 
+from networksynth import __version__
+
 _TIMEOUT = 30
 
 
 def repo_root() -> str:
-    """The checkout holding this package, whether that is the repository or a submodule."""
     return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 
@@ -38,13 +38,24 @@ def in_checkout() -> bool:
 
 
 def version() -> str:
-    """The tag on this exact commit, or nothing.
+    """The tag on this commit, or the number release_dist.sh stamped.
 
-    Anything between tags is an untagged state, and inventing a number for it
-    would say more than is known.
+    A shallow submodule fetches a commit, not the tags naming it, so git cannot
+    answer there. Where git does have tags, an untagged commit reports nothing
+    rather than borrowing the last release's number.
     """
     code, tag = _git("describe", "--tags", "--exact-match")
-    return tag if code == 0 else ""
+    if code == 0:
+        return tag
+    if _has_tags():
+        return ""
+    return __version__
+
+
+def _has_tags() -> bool:
+    """Whether git has any tag to describe with; _git folds stderr in, so test the code."""
+    code, listed = _git("tag", "-l")
+    return code == 0 and bool(listed)
 
 
 def _branch() -> str:
