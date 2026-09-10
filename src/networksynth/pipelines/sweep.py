@@ -8,8 +8,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from networksynth.analysis.error_checker import ErrorChecker, create_error_checker
 from networksynth.configs import DatasetId, SynthParams
-from networksynth.graphs import GraphGenerator
-from networksynth.graphs._graph_node import GraphNode
+from networksynth.graphs import GraphGenerator, Traversal
 from networksynth.handlers import (
     STATUS_CANCELLED,
     STATUS_FAILED,
@@ -61,36 +60,34 @@ def _generate_with_factors(
     if exit_event.is_set():
         return None, float("inf")
 
-    with GraphNode.traversal(attributes, params):
-        for attempt in range(params.max_attempts):
-            apply_seed(None if params.seed is None else params.seed + attempt)
+    for attempt in range(params.max_attempts):
+        apply_seed(None if params.seed is None else params.seed + attempt)
 
-            try:
-                result = GraphGenerator._bfs_network_with_frontier(
-                    params.synthetic_frame_size
-                )
-                inner_nodes, inner_edges, *_ = result
+        try:
+            inner_nodes, inner_edges, *_ = GraphGenerator.bfs_with_frontier(
+                Traversal.build(attributes, params), params.synthetic_frame_size
+            )
 
-                if not inner_nodes or len(inner_nodes) < 100:
-                    continue
-
-                graph = build_graph(inner_nodes, inner_edges, arg_type="graph_node")
-                graph = trim_graph(graph, attributes.average_degree)
-                mapper.assign_weights(graph)
-
-                if exit_event.is_set():
-                    return None, float("inf")
-
-                passed, error = error_checker.check(graph)
-                if passed:
-                    return graph, error
-            except KeyboardInterrupt:
-                raise
-            except Exception as exc:
-                logger.warning(f"Attempt {attempt + 1} failed: {exc!r}")
+            if not inner_nodes or len(inner_nodes) < 100:
                 continue
 
-        return None, float("inf")
+            graph = build_graph(inner_nodes, inner_edges, arg_type="graph_node")
+            graph = trim_graph(graph, attributes.average_degree)
+            mapper.assign_weights(graph)
+
+            if exit_event.is_set():
+                return None, float("inf")
+
+            passed, error = error_checker.check(graph)
+            if passed:
+                return graph, error
+        except KeyboardInterrupt:
+            raise
+        except Exception as exc:
+            logger.warning(f"Attempt {attempt + 1} failed: {exc!r}")
+            continue
+
+    return None, float("inf")
 
 
 def generate_networks(run: GenerationRun, error_checker: ErrorChecker, nf, ef, config):

@@ -61,8 +61,8 @@ class TestImmutability:
 
 class TestGenerationReadsParamsNotAConfig:
 
-    def test_graph_node_uses_params_not_base_config(self):
-        from networksynth.graphs._graph_node import GraphNode
+    def test_the_traversal_rules_come_from_params(self):
+        from networksynth.graphs._graph_node import Traversal
 
         class Attrs:
             degree_distribution = {2: 1.0}
@@ -78,10 +78,10 @@ class TestGenerationReadsParamsNotAConfig:
             max_attempts=1,
             seed=None,
         )
-        GraphNode.initialize(Attrs(), params)
+        rules = Traversal.build(Attrs(), params).rules
 
-        assert GraphNode._rules.closed_nodes_thr_sq == (10.0 * 5.0) ** 2
-        assert GraphNode._rules.closed_edges_thr_sq == (10.0 * 4.0) ** 2
+        assert rules.closed_nodes_thr_sq == (10.0 * 5.0) ** 2
+        assert rules.closed_edges_thr_sq == (10.0 * 4.0) ** 2
 
     def test_generator_uses_params_frame_size(self):
         from networksynth.graphs.graph_generator import GraphGenerator

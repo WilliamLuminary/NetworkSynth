@@ -1,15 +1,16 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-import itertools
 import math
 import random
 from collections import defaultdict
-from contextlib import contextmanager
-from dataclasses import dataclass
-from typing import Dict, List, Optional, Set, Tuple
+from dataclasses import dataclass, field
+from typing import Dict, List, Set, Tuple
 
 import numpy as np
 
 from networksynth.configs import SynthParams
+
+Position = Tuple[float, float]
+Edge = Tuple[Position, Position]
 
 
 @dataclass(frozen=True)
@@ -54,103 +55,104 @@ class PlacementCounts:
         return f"merged={self.merged:,}, aborted={self.aborted:,}"
 
 
-class GraphNode:
+@dataclass
+class Traversal:
+    """Everything one growth pass records: its rules, the spatial grids that
+    answer "what is near here", and the ids and counters it hands out. It is
+    built for one pass and dropped with it, so nothing survives into the next."""
 
-    id_counter = None
-    _created: int
-    node_grid: Dict[tuple[float, float], set]
-    edge_grid: Dict[
-        Tuple[int, int], Set[Tuple[Tuple[float, float], Tuple[float, float]]]
-    ]
-    _aborted_edge: int
-    _merged_edge: int
-
-    _rules: Optional[TraversalRules] = None
-
-    _traversal_active = False
-
-    @classmethod
-    @contextmanager
-    def traversal(cls, attrs, params: SynthParams):
-        assert not cls._traversal_active, (
-            "a traversal is already open: the record is class-level, so two "
-            "cannot be interleaved in one process"
-        )
-        cls.initialize(attrs, params)
-        cls._traversal_active = True
-        try:
-            yield
-        finally:
-            cls._traversal_active = False
-            cls.reset()
+    rules: TraversalRules
+    node_grid: Dict[Tuple[int, int], Set["GraphNode"]] = field(
+        default_factory=lambda: defaultdict(set)
+    )
+    edge_grid: Dict[Tuple[int, int], Set[Edge]] = field(
+        default_factory=lambda: defaultdict(set)
+    )
+    created: int = 0
+    merged: int = 0
+    aborted: int = 0
 
     @classmethod
-    def initialize(cls, attrs, params: SynthParams):
-        cls._rules = TraversalRules.build(attrs, params)
-        cls.reset()
+    def build(cls, attrs, params: SynthParams) -> "Traversal":
+        return cls(TraversalRules.build(attrs, params))
 
-    @classmethod
-    def reset(cls):
-        cls.id_counter = itertools.count()
-        cls._created = 0
-        cls.node_grid = defaultdict(set)
-        cls.edge_grid = defaultdict(set)
-        cls._aborted_edge = 0
-        cls._merged_edge = 0
+    def next_id(self) -> int:
+        self.created += 1
+        return self.created - 1
 
-    @classmethod
-    def next_id(cls) -> int:
-        cls._created += 1
-        return next(cls.id_counter)
+    def nodes_created(self) -> int:
+        """Nodes made so far. The grid cannot say: a node is filed under its
+        children's cells too, so cell sizes over-count."""
+        return self.created
 
-    @classmethod
-    def nodes_created(cls) -> int:
-        """Nodes made so far. The grid cannot say: _add_to_grid files a node
-        under its children's cells too, so cell sizes over-count."""
-        return cls._created
+    def counts(self) -> PlacementCounts:
+        return PlacementCounts(merged=self.merged, aborted=self.aborted)
 
-    @classmethod
-    def counts(cls) -> PlacementCounts:
-        return PlacementCounts(merged=cls._merged_edge, aborted=cls._aborted_edge)
+    def cell(self, position: Position) -> Tuple[int, int]:
+        grid_size = self.rules.grid_size
+        return int(position[0] // grid_size), int(position[1] // grid_size)
 
-    @classmethod
-    def create_interior_node(cls, position):
-        node = object.__new__(cls)
-        node.id = cls.next_id()
+    def cells_of(self, p1: Position, p2: Position) -> Set[Tuple[int, int]]:
+        gs = self.rules.grid_size
+        gx1 = int(p1[0] // gs)
+        gx2 = int(p2[0] // gs)
+        gy1 = int(p1[1] // gs)
+        gy2 = int(p2[1] // gs)
+        if gx1 > gx2:
+            gx1, gx2 = gx2, gx1
+        if gy1 > gy2:
+            gy1, gy2 = gy2, gy1
+        return {(x, y) for x in range(gx1, gx2 + 1) for y in range(gy1, gy2 + 1)}
+
+    def file_node(self, node: "GraphNode", position: Position) -> None:
+        self.node_grid[self.cell(position)].add(node)
+
+    def register_edge(self, edge: Edge) -> None:
+        for key in self.cells_of(*edge):
+            self.edge_grid[key].add(edge)
+
+    def all_nodes(self) -> Set["GraphNode"]:
+        return {node for cell in self.node_grid.values() for node in cell}
+
+    def all_edges(self) -> Set[Edge]:
+        return {edge for cell in self.edge_grid.values() for edge in cell}
+
+    def create_interior_node(self, position: Position) -> "GraphNode":
+        node = object.__new__(GraphNode)
+        node._t = self
+        node.id = self.next_id()
         node.position = position
         node.degree = 2
         node.children = [None, None]
         node.parent = None
         node.clockwise = False
         node.base_angle = 0.0
-        key = cls._spatial_hash(position)
-        cls.node_grid[key].add(node)
+        self.file_node(node, position)
         return node
 
-    @classmethod
-    def create_frontier_node(cls, position, degree, base_angle, clockwise, parent_node):
-        node = object.__new__(cls)
-        node.id = cls.next_id()
+    def create_frontier_node(
+        self, position, degree, base_angle, clockwise, parent_node
+    ) -> "GraphNode":
+        node = object.__new__(GraphNode)
+        node._t = self
+        node.id = self.next_id()
         node.position = position
         node.degree = degree
         node.base_angle = base_angle
         node.clockwise = clockwise
         node.parent = parent_node
         node.children = [parent_node]
-        key = cls._spatial_hash(position)
-        cls.node_grid[key].add(node)
+        self.file_node(node, position)
         return node
 
-    @classmethod
-    def register_edge(cls, edge):
-        keys = cls._edge_spatial_hash(*edge)
-        for key in keys:
-            cls.edge_grid[key].add(edge)
 
-    def __init__(self, position, parent=None, parent_angle=None):
-        self.id: int = GraphNode.next_id()
+class GraphNode:
 
-        self.position: Tuple[float, float] = position
+    def __init__(self, traversal: Traversal, position, parent=None, parent_angle=None):
+        self._t = traversal
+        self.id: int = traversal.next_id()
+
+        self.position: Position = position
         self.clockwise: bool = random.choice([True, False])
         self.parent: GraphNode = parent
         self.children: List[GraphNode] = []
@@ -167,45 +169,34 @@ class GraphNode:
                 "Parent and parent_angle must be provided together or not at all."
             )
 
-    @staticmethod
-    def _choose_degree_by_parent(parent_degree) -> int:
-        transitions = GraphNode._rules.degree_trans_probs[parent_degree]
+    def _choose_degree_by_parent(self, parent_degree) -> int:
+        transitions = self._t.rules.degree_trans_probs[parent_degree]
         degrees = list(transitions.keys())
         probabilities = list(transitions.values())
         return np.random.choice(degrees, p=probabilities)
 
-    @staticmethod
-    def _choose_degree_random() -> int:
-        degrees = list(GraphNode._rules.degree_dist.keys())
-        probabilities = list(GraphNode._rules.degree_dist.values())
+    def _choose_degree_random(self) -> int:
+        degrees = list(self._t.rules.degree_dist.keys())
+        probabilities = list(self._t.rules.degree_dist.values())
         return np.random.choice(degrees, p=probabilities)
 
     def _initialize_root_node(self) -> None:
-        length = random.choice(GraphNode._rules.degree_lengths[self.degree])
+        length = random.choice(self._t.rules.degree_lengths[self.degree])
         child_position = self._polar_to_cartesian([length], [self.base_angle])[0]
-        child = GraphNode(child_position, parent=self, parent_angle=self.base_angle)
+        child = GraphNode(
+            self._t, child_position, parent=self, parent_angle=self.base_angle
+        )
         self._add_child(child)
-        self._add_to_grid(self.position)
-        self._add_to_grid(child.position)
-        self._add_edge_to_grid((self.position, child_position))
+        self._t.file_node(self, self.position)
+        self._t.file_node(self, child.position)
+        self._t.register_edge((self.position, child_position))
 
     def _add_child(self, child) -> None:
         assert (
             len(self.children) < self.degree
         ), f"{self} cannot have more than {self.degree} children."
         self.children.append(child)
-        self._add_to_grid(child.position)
-
-    def _add_to_grid(self, position) -> None:
-        key = self._spatial_hash(position)
-        GraphNode.node_grid[key].add(self)
-
-    def _add_edge_to_grid(
-        self, edge: Tuple[Tuple[float, float], Tuple[float, float]]
-    ) -> None:
-        keys = self._edge_spatial_hash(*edge)
-        for key in keys:
-            GraphNode.edge_grid[key].add(edge)
+        self._t.file_node(self, child.position)
 
     def generate_children(self) -> bool:
         if len(self.children) > 1 or self.degree == 1:
@@ -225,22 +216,24 @@ class GraphNode:
             new_edge = (self.position, close_node.position)
             if not self._check_intersection(new_edge):
                 self._add_child(close_node)
-                self._add_edge_to_grid(new_edge)
-                GraphNode._merged_edge += 1
+                self._t.register_edge(new_edge)
+                self._t.merged += 1
             else:
-                GraphNode._aborted_edge += 1
+                self._t.aborted += 1
             return
         if self._any_close_edge(child_position):
-            GraphNode._aborted_edge += 1
+            self._t.aborted += 1
             return
         new_edge = (self.position, child_position)
         if not self._check_intersection(new_edge):
-            child_node = GraphNode(child_position, parent=self, parent_angle=angle)
+            child_node = GraphNode(
+                self._t, child_position, parent=self, parent_angle=angle
+            )
             self._add_child(child_node)
-            self._add_edge_to_grid(new_edge)
-            self._add_to_grid(child_node.position)
+            self._t.register_edge(new_edge)
+            self._t.file_node(self, child_node.position)
         else:
-            GraphNode._aborted_edge += 1
+            self._t.aborted += 1
 
     def _get_closest_valid_node(self, position):
         close_nodes_with_distances = self._find_close_node(position)
@@ -249,15 +242,16 @@ class GraphNode:
         return None
 
     def _find_close_node(self, position):
-        key = self._spatial_hash(position)
+        key = self._t.cell(position)
         px, py = position
-        rules = GraphNode._rules
+        rules = self._t.rules
         thr_sq = rules.closed_nodes_thr_sq
         r = rules.node_search_radius
+        node_grid = self._t.node_grid
         close_nodes_with_distances = []
         for dx in range(-r, r + 1):
             for dy in range(-r, r + 1):
-                for node in GraphNode.node_grid.get((key[0] + dx, key[1] + dy), ()):
+                for node in node_grid.get((key[0] + dx, key[1] + dy), ()):
                     if node != self and node not in self.children:
                         ddx = node.position[0] - px
                         ddy = node.position[1] - py
@@ -267,11 +261,12 @@ class GraphNode:
         return close_nodes_with_distances
 
     def _any_close_edge(self, position) -> bool:
-        key = self._spatial_hash(position)
-        r = GraphNode._rules.edge_search_radius
+        key = self._t.cell(position)
+        r = self._t.rules.edge_search_radius
+        edge_grid = self._t.edge_grid
         for dx in range(-r, r + 1):
             for dy in range(-r, r + 1):
-                for edge in GraphNode.edge_grid.get((key[0] + dx, key[1] + dy), ()):
+                for edge in edge_grid.get((key[0] + dx, key[1] + dy), ()):
                     if self._is_interfering_edge(edge, position):
                         return True
         return False
@@ -280,7 +275,7 @@ class GraphNode:
         if self.parent and (self.parent.position in edge or self.position in edge):
             return False
         p1, p2 = edge
-        thr_sq = GraphNode._rules.closed_edges_thr_sq
+        thr_sq = self._t.rules.closed_edges_thr_sq
         dx1 = position[0] - p1[0]
         dy1 = position[1] - p1[1]
         if dx1 * dx1 + dy1 * dy1 < thr_sq:
@@ -292,9 +287,8 @@ class GraphNode:
     def _generate_angles_and_lengths(self) -> Tuple[list[float], ...]:
         if self.degree == 1:
             return [], []
-        raw = random.choices(
-            GraphNode._rules.degree_angles[self.degree], k=self.degree - 1
-        )
+        rules = self._t.rules
+        raw = random.choices(rules.degree_angles[self.degree], k=self.degree - 1)
         sign = 1 if self.clockwise else -1
         base = self.base_angle
         acc = 0.0
@@ -302,14 +296,12 @@ class GraphNode:
         for a in raw:
             acc += sign * a
             angles.append(acc + base)
-        lengths = random.choices(
-            GraphNode._rules.degree_lengths[self.degree], k=self.degree - 1
-        )
+        lengths = random.choices(rules.degree_lengths[self.degree], k=self.degree - 1)
         return angles, lengths
 
     def _polar_to_cartesian(
         self, lengths: List[float], angles: List[float]
-    ) -> List[Tuple[float, float]]:
+    ) -> List[Position]:
         x, y = self.position
         result = []
         for length, angle in zip(lengths, angles):
@@ -322,38 +314,15 @@ class GraphNode:
             )
         return result
 
-    @staticmethod
-    def _check_intersection(
-        new_edge: Tuple[Tuple[float, float], Tuple[float, float]],
-    ) -> bool:
-        edge_fractions = GraphNode._edge_spatial_hash(*new_edge)
-        for edge_frac in edge_fractions:
-            for edge in GraphNode.edge_grid.get(edge_frac, ()):
+    def _check_intersection(self, new_edge: Edge) -> bool:
+        edge_grid = self._t.edge_grid
+        for cell in self._t.cells_of(*new_edge):
+            for edge in edge_grid.get(cell, ()):
                 if new_edge[0] in edge or new_edge[1] in edge:
                     continue
                 if _do_intersect(new_edge[0], new_edge[1], edge[0], edge[1]):
                     return True
         return False
-
-    @staticmethod
-    def _spatial_hash(position: Tuple[float, float]) -> Tuple[int, int]:
-        grid_size = GraphNode._rules.grid_size
-        return int(position[0] // grid_size), int(position[1] // grid_size)
-
-    @staticmethod
-    def _edge_spatial_hash(
-        p1: Tuple[float, float], p2: Tuple[float, float]
-    ) -> Set[Tuple[int, int]]:
-        gs = GraphNode._rules.grid_size
-        gx1 = int(p1[0] // gs)
-        gx2 = int(p2[0] // gs)
-        gy1 = int(p1[1] // gs)
-        gy2 = int(p2[1] // gs)
-        if gx1 > gx2:
-            gx1, gx2 = gx2, gx1
-        if gy1 > gy2:
-            gy1, gy2 = gy2, gy1
-        return {(x, y) for x in range(gx1, gx2 + 1) for y in range(gy1, gy2 + 1)}
 
     def __repr__(self):
         return f"GraphNode(id_counter={self.id})"
@@ -362,12 +331,7 @@ class GraphNode:
         return f"Node No. {self.id}"
 
 
-def _do_intersect(
-    p1: Tuple[float, float],
-    q1: Tuple[float, float],
-    p2: Tuple[float, float],
-    q2: Tuple[float, float],
-) -> bool:
+def _do_intersect(p1: Position, q1: Position, p2: Position, q2: Position) -> bool:
     def _orientation(p, q, r):
         val = (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1])
         return 0 if val == 0 else 1 if val > 0 else 2
