@@ -5,7 +5,7 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 import csv
 import logging
-from typing import List
+from typing import List, Optional, Tuple
 
 import numpy as np
 
@@ -16,6 +16,7 @@ from networksynth.analysis.error_checker import (
 )
 from networksynth.configs import DatasetId, SynthParams
 from networksynth.graphs import GraphGenerator
+from networksynth.graphs.synth_graph import SynthGraph
 from networksynth.handlers import (
     STATUS_CANCELLED,
     STATUS_FAILED,
@@ -28,7 +29,6 @@ from networksynth.handlers import (
     write_manifest,
 )
 from networksynth.utils import (
-    apply_seed,
     compute_network_metrics,
     metric_distance,
     save_bfs_snapshot,
@@ -63,150 +63,84 @@ def _should_exit(exit_event) -> bool:
     return False
 
 
-def generate_synthetic_network(
+def generate_candidate(
     exit_event,
     error_checker: ErrorChecker,
     attributes: AttributesCalculator,
     mapper: Mapper,
     params: SynthParams,
-):
+    *,
+    snapshot_interval: int = 0,
+    early_check_node_count: int = 0,
+) -> Tuple[Optional[SynthGraph], float, list]:
+    """One worker's job: grow, trim, weight and check a network, up to
+    params.max_attempts times, until one passes the error checker.
 
+    Returns the network, its error and the snapshots taken while growing it
+    (empty unless snapshot_interval is set); (None, inf, []) when every attempt
+    fell short. With early_check_node_count set, a candidate is checked as soon
+    as it has that many nodes and abandoned early when it already fails.
+    """
+    failed = (None, float("inf"), [])
     if _should_exit(exit_event):
-        return None, float("inf")
+        return failed
 
-    apply_seed(params.seed)
     generator = GraphGenerator(attributes, params)
     for attempt in range(params.max_attempts):
-        try:
-            synthetic_graph = generator.generate_network()
-            synthetic_graph = trim_graph(synthetic_graph, attributes.average_degree)
-            mapper.assign_weights(synthetic_graph)
-
-            if _should_exit(exit_event):
-                return None, float("inf")
-
-            passed, error_ = error_checker.check(synthetic_graph)
-            if passed:
-                return synthetic_graph, error_
-
-        except KeyboardInterrupt:
-            logger.info(SIGINT_INFO)
-            raise
-        except Exception as exc:
-            logger.error(f"Exception occurred: {exc}. Retrying...", exc_info=True)
-
-    logger.warning("Max attempts reached. Aborting!")
-    return None, float("inf")
-
-
-def _generate_single_network(
-    exit_event,
-    error_checker: ErrorChecker,
-    attributes: AttributesCalculator,
-    mapper: Mapper,
-    params: SynthParams,
-):
-
-    if exit_event.is_set():
-        return None, float("inf")
-
-    apply_seed(params.seed)
-    generator = GraphGenerator(attributes, params)
-    for attempt in range(params.max_attempts):
-        try:
-            graph = generator.generate_network()
-            graph = trim_graph(graph, attributes.average_degree)
-            mapper.assign_weights(graph)
-
-            if exit_event.is_set():
-                return None, float("inf")
-
-            passed, error = error_checker.check(graph)
-            if passed:
-                return graph, error
-
-            logger.debug(f"Attempt {attempt + 1}: error {error:.4f}")
-        except KeyboardInterrupt:
-            raise
-        except Exception as exc:
-            logger.error(f"Attempt {attempt + 1} failed: {exc}", exc_info=True)
-
-    logger.warning("Max attempts reached. Returning None.")
-    return None, float("inf")
-
-
-def _generate_single_network_collecting_snapshots(
-    exit_event,
-    error_checker: ErrorChecker,
-    attributes: AttributesCalculator,
-    mapper: Mapper,
-    snapshot_interval: int,
-    early_check_node_count: int,
-    params: SynthParams,
-):
-
-    if exit_event.is_set():
-        return None, float("inf"), []
-
-    apply_seed(params.seed)
-    avg_degree = attributes.average_degree
-    generator = GraphGenerator(attributes, params)
-    for attempt in range(params.max_attempts):
-        snapshots = []
+        snapshots: list = []
         early_aborted = False
         early_checked = False
 
+        def on_snapshot(positions, edges, frame, step_idx):
+            nonlocal early_aborted, early_checked
+            snapshots.append((positions, edges, frame, step_idx))
+            if (
+                early_check_node_count > 0
+                and not early_checked
+                and len(positions) >= early_check_node_count
+            ):
+                early_checked = True
+                temp_graph = _build_temp_graph(positions, edges)
+                temp_graph = trim_graph(temp_graph, attributes.average_degree)
+                mapper.assign_weights(temp_graph, generator.rng)
+                passed, error = error_checker.check(temp_graph)
+                if not passed:
+                    logger.debug(
+                        f"Attempt {attempt + 1}: early pre-check failed at "
+                        f"{len(positions)} nodes (error {error:.4f})"
+                    )
+                    early_aborted = True
+                    return False
+
         try:
-
-            def on_snapshot(positions, edges, frame, step_idx):
-                nonlocal early_aborted, early_checked
-                snapshots.append((positions, edges, frame, step_idx))
-
-                if (
-                    early_check_node_count > 0
-                    and not early_checked
-                    and len(positions) >= early_check_node_count
-                ):
-                    early_checked = True
-                    temp_graph = _build_temp_graph(positions, edges)
-                    temp_graph = trim_graph(temp_graph, avg_degree)
-                    mapper.assign_weights(temp_graph)
-                    passed, error = error_checker.check(temp_graph)
-                    if not passed:
-                        logger.debug(
-                            f"Attempt {attempt + 1}: early pre-check "
-                            f"failed at {len(positions)} nodes "
-                            f"(error {error:.4f})"
-                        )
-                        early_aborted = True
-                        return False
-
-            graph = generator.generate_network_with_snapshots(
-                snapshot_callback=on_snapshot,
-                snapshot_round_interval=snapshot_interval,
-            )
-
-            if early_aborted:
-                continue
+            if snapshot_interval > 0:
+                graph = generator.generate_network(
+                    snapshot_callback=on_snapshot,
+                    snapshot_round_interval=snapshot_interval,
+                )
+                if early_aborted:
+                    continue
+            else:
+                graph = generator.generate_network()
 
             graph = trim_graph(graph, attributes.average_degree)
-            mapper.assign_weights(graph)
+            mapper.assign_weights(graph, generator.rng)
 
-            if exit_event.is_set():
-                return None, float("inf"), []
+            if _should_exit(exit_event):
+                return failed
 
             passed, error = error_checker.check(graph)
             if passed:
                 return graph, error, snapshots
-
             logger.debug(f"Attempt {attempt + 1}: error {error:.4f}")
         except KeyboardInterrupt:
+            logger.info(SIGINT_INFO)
             raise
         except Exception as exc:
             logger.error(f"Attempt {attempt + 1} failed: {exc}", exc_info=True)
 
-    logger.warning("Max attempts reached. Returning None.")
-    return None, float("inf"), []
+    logger.warning(f"Max attempts ({params.max_attempts}) reached. Returning None.")
+    return failed
 
 
 def compute_average_error(errors: List) -> float:
@@ -248,7 +182,7 @@ def generate_with_multiprocessing(run: GenerationRun, config):
         ) as executor:
             futures = [
                 executor.submit(
-                    generate_synthetic_network,
+                    generate_candidate,
                     exit_event,
                     error_checker,
                     run.attributes,
@@ -259,7 +193,7 @@ def generate_with_multiprocessing(run: GenerationRun, config):
             ]
             next_log = 10
             for idx, future in enumerate(as_completed(futures), start=1):
-                synthetic_graph, error = future.result()
+                synthetic_graph, error, _ = future.result()
                 if synthetic_graph is None:
                     continue
 
@@ -319,14 +253,13 @@ def generate_with_snapshots(run: GenerationRun, config):
         plot_futures.append(fut)
 
     params = SynthParams.from_config(config)
-    apply_seed(params.seed)
     generator = GraphGenerator(run.attributes, params)
     synthetic_graph = generator.generate_network_with_snapshots(
         snapshot_callback=on_snapshot,
         snapshot_round_interval=interval,
     )
     synthetic_graph = trim_graph(synthetic_graph, run.attributes.average_degree)
-    run.mapper.assign_weights(synthetic_graph)
+    run.mapper.assign_weights(synthetic_graph, generator.rng)
 
     for fut in plot_futures:
         fut.result()
@@ -491,36 +424,22 @@ def generate_and_select(run: GenerationRun, config):
         ) as executor:
             future_to_idx = {}
             for i in range(num_network):
-                if use_snapshots:
-                    future = executor.submit(
-                        _generate_single_network_collecting_snapshots,
-                        exit_event,
-                        error_checker,
-                        run.attributes,
-                        run.mapper,
-                        snapshot_interval,
-                        early_node_count,
-                        params.for_worker(i),
-                    )
-                else:
-                    future = executor.submit(
-                        _generate_single_network,
-                        exit_event,
-                        error_checker,
-                        run.attributes,
-                        run.mapper,
-                        params.for_worker(i),
-                    )
+                future = executor.submit(
+                    generate_candidate,
+                    exit_event,
+                    error_checker,
+                    run.attributes,
+                    run.mapper,
+                    params.for_worker(i),
+                    snapshot_interval=snapshot_interval if use_snapshots else 0,
+                    early_check_node_count=early_node_count,
+                )
                 future_to_idx[future] = i
                 futures.append(future)
 
             for done_count, future in enumerate(as_completed(futures), start=1):
                 original_idx = future_to_idx[future]
-                if use_snapshots:
-                    graph, mf_error, snaps = future.result()
-                else:
-                    graph, mf_error = future.result()
-                    snaps = []
+                graph, mf_error, snaps = future.result()
                 if graph is not None:
                     graphs.append((original_idx, graph, mf_error, snaps))
                 else:

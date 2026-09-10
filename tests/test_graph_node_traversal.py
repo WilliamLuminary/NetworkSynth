@@ -2,7 +2,7 @@
 import pytest
 
 from networksynth.configs import SynthParams
-from networksynth.graphs._graph_node import GraphNode, PlacementCounts
+from networksynth.graphs._graph_node import GraphNode, PlacementCounts, Traversal
 
 pytestmark = pytest.mark.unit
 
@@ -25,86 +25,79 @@ def params():
     )
 
 
-@pytest.fixture(autouse=True)
-def _no_traversal_left_open():
-    yield
-    GraphNode._traversal_active = False
+class TestATraversalOwnsItsRecord:
+    def test_the_rules_come_from_the_attributes(self, attributes, params):
+        traversal = Traversal.build(attributes, params, params.rng())
 
-
-class TestTheRecordIsScoped:
-    def test_the_parameters_are_installed_inside(self, attributes, params):
-        with GraphNode.traversal(attributes, params):
-            assert GraphNode._rules.degree_dist is attributes.degree_distribution
-            assert GraphNode._rules.grid_size == attributes.average_length
-
-    def test_the_grids_are_dropped_on_the_way_out(self, attributes, params):
-        with GraphNode.traversal(attributes, params):
-            GraphNode((0.0, 0.0))
-            assert GraphNode.node_grid, "the traversal recorded nothing"
-
-        assert not GraphNode.node_grid
-        assert not GraphNode.edge_grid
-
-    def test_the_grids_are_dropped_when_the_body_raises(self, attributes, params):
-        with pytest.raises(RuntimeError):
-            with GraphNode.traversal(attributes, params):
-                GraphNode((0.0, 0.0))
-                raise RuntimeError("generation failed")
-
-        assert not GraphNode.node_grid
-
-
-class TestTwoTraversalsCannotInterleave:
-    def test_nesting_is_refused(self, attributes, params):
-        with GraphNode.traversal(attributes, params):
-            with pytest.raises(AssertionError, match="already open"):
-                with GraphNode.traversal(attributes, params):
-                    pass
-
-    def test_a_failed_traversal_does_not_block_the_next_one(self, attributes, params):
-        with pytest.raises(RuntimeError):
-            with GraphNode.traversal(attributes, params):
-                raise RuntimeError("generation failed")
-
-        with GraphNode.traversal(attributes, params):
-            assert GraphNode._traversal_active
-
-
-class TestTheRulesAreSeparateFromTheRecord:
-    def test_a_reset_keeps_the_rules(self, attributes, params):
-        with GraphNode.traversal(attributes, params):
-            rules = GraphNode._rules
-            GraphNode((0.0, 0.0))
-
-            GraphNode.reset()
-
-            assert GraphNode._rules is rules
-            assert not GraphNode.node_grid
+        assert traversal.rules.degree_dist is attributes.degree_distribution
+        assert traversal.rules.grid_size == attributes.average_length
 
     def test_the_rules_are_immutable(self, attributes, params):
-        with GraphNode.traversal(attributes, params):
-            with pytest.raises(Exception):
-                GraphNode._rules.grid_size = 1.0
+        with pytest.raises(Exception):
+            Traversal.build(attributes, params, params.rng()).rules.grid_size = 1.0
+
+    def test_a_node_is_filed_in_the_traversal_it_was_grown_in(self, attributes, params):
+        traversal = Traversal.build(attributes, params, params.rng())
+
+        GraphNode(traversal, (0.0, 0.0))
+
+        assert traversal.node_grid, "the traversal recorded nothing"
+        assert traversal.edge_grid
+
+    def test_two_traversals_do_not_share_a_grid(self, attributes, params):
+        first = Traversal.build(attributes, params, params.rng())
+        second = Traversal.build(attributes, params, params.rng())
+
+        GraphNode(first, (0.0, 0.0))
+
+        assert not second.node_grid
+        assert not second.edge_grid
+        assert second.nodes_created() == 0
+
+    def test_ids_count_from_zero_per_traversal(self, attributes, params):
+        first = Traversal.build(attributes, params, params.rng())
+        second = Traversal.build(attributes, params, params.rng())
+
+        assert [first.next_id(), first.next_id()] == [0, 1]
+        assert second.next_id() == 0
+        assert first.nodes_created() == 2
 
 
 class TestPlacementCountsAreAResult:
     def test_they_start_at_zero_and_read_back(self, attributes, params):
-        with GraphNode.traversal(attributes, params):
-            assert GraphNode.counts() == PlacementCounts(merged=0, aborted=0)
+        traversal = Traversal.build(attributes, params, params.rng())
+        assert traversal.counts() == PlacementCounts(merged=0, aborted=0)
 
-            GraphNode._merged_edge = 3
-            GraphNode._aborted_edge = 4
+        traversal.merged = 3
+        traversal.aborted = 4
 
-            assert GraphNode.counts() == PlacementCounts(merged=3, aborted=4)
+        assert traversal.counts() == PlacementCounts(merged=3, aborted=4)
 
     def test_they_format_themselves_for_a_log_line(self):
         assert str(PlacementCounts(merged=1234, aborted=56)) == (
             "merged=1,234, aborted=56"
         )
 
-    def test_a_reset_clears_them(self, attributes, params):
-        with GraphNode.traversal(attributes, params):
-            GraphNode._merged_edge = 9
-            GraphNode.reset()
 
-            assert GraphNode.counts().merged == 0
+class TestGenerationLeavesNothingBehind:
+    def test_a_generator_holds_no_grid_after_generating(self, attributes, params):
+        from networksynth.graphs import GraphGenerator
+
+        generator = GraphGenerator(attributes, params)
+        generator.generate_network()
+
+        assert not any(
+            isinstance(value, Traversal) for value in vars(generator).values()
+        )
+        assert not hasattr(GraphNode, "node_grid")
+
+    def test_two_generators_keep_their_own_rules(self, attributes, params):
+        from dataclasses import replace
+
+        from networksynth.graphs import GraphGenerator
+
+        loose = GraphGenerator(attributes, replace(params, closed_nodes_factor=5.0))
+        tight = GraphGenerator(attributes, params)
+
+        assert loose._params.closed_nodes_factor == 5.0
+        assert tight._params.closed_nodes_factor == 1.2

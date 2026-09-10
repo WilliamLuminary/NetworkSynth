@@ -23,9 +23,7 @@ from networksynth.analysis.error_checker import (
     create_error_checker,
 )
 from networksynth.configs import SynthParams
-from networksynth.graphs import GraphGenerator
-from networksynth.graphs._graph_node import GraphNode
-from networksynth.graphs.graph_generator import FrontierDescriptor
+from networksynth.graphs import FrontierDescriptor, GraphGenerator, Traversal
 from networksynth.graphs.synth_graph import SynthGraph
 from networksynth.handlers import (
     STATUS_CANCELLED,
@@ -40,7 +38,6 @@ from networksynth.handlers import (
     write_manifest,
 )
 from networksynth.utils import (
-    apply_seed,
     build_graph,
     log_memory,
     progress,
@@ -67,7 +64,7 @@ def generate_random_centers(
     rng_seed: Optional[int] = None,
     max_rejections: int = 50_000,
 ) -> List[Tuple[float, float]]:
-    gen = np.random.RandomState(rng_seed)
+    gen = np.random.default_rng(rng_seed)
     centers: List[Tuple[float, float]] = []
     consecutive_rejects = 0
 
@@ -143,73 +140,72 @@ def _generate_tile_worker(args):
         min_tile_nodes,
     ) = args
 
-    apply_seed(params.seed)
-
     if exit_event.is_set():
         return tile_idx, None
 
+    rng = params.rng()
     try:
-        with GraphNode.traversal(attributes, params):
-            best_error = float("inf")
-            best_result = None
+        best_error = float("inf")
+        best_result = None
 
-            for attempt in range(params.max_attempts):
-                if exit_event.is_set():
-                    break
+        for attempt in range(params.max_attempts):
+            if exit_event.is_set():
+                break
 
-                result = GraphGenerator._bfs_network_with_frontier(frame_range)
-                (
-                    inner_nodes,
-                    inner_edges,
-                    frontier_descs,
-                    all_positions,
-                    all_edge_tuples,
-                ) = result
+            (
+                inner_nodes,
+                inner_edges,
+                frontier_descs,
+                all_positions,
+                all_edge_tuples,
+            ) = GraphGenerator.bfs_with_frontier(
+                Traversal.build(attributes, params, rng), frame_range
+            )
 
-                if not inner_nodes or len(inner_nodes) < min_tile_nodes:
-                    continue
+            if not inner_nodes or len(inner_nodes) < min_tile_nodes:
+                continue
 
-                if isinstance(error_checker, NullErrorChecker):
-                    return tile_idx, {
-                        "error": 0.0,
-                        "positions": all_positions,
-                        "edges": all_edge_tuples,
-                        "frontier": frontier_descs,
-                    }
-
-                graph = build_graph(inner_nodes, inner_edges, arg_type="graph_node")
-                graph = trim_graph(graph, attributes.average_degree)
-                mapper.assign_weights(graph)
-
-                passed, error = error_checker.check(graph)
-
-                tile_payload = {
-                    "error": error,
+            if isinstance(error_checker, NullErrorChecker):
+                return tile_idx, {
+                    "error": 0.0,
                     "positions": all_positions,
                     "edges": all_edge_tuples,
                     "frontier": frontier_descs,
                 }
 
-                if passed:
-                    return tile_idx, tile_payload
+            graph = build_graph(inner_nodes, inner_edges, arg_type="graph_node")
+            graph = trim_graph(graph, attributes.average_degree)
+            mapper.assign_weights(graph, rng)
 
-                if error < best_error:
-                    best_error = error
-                    best_result = tile_payload
+            passed, error = error_checker.check(graph)
 
-            if best_result is not None:
-                logger.warning(
-                    f"Tile {tile_idx}: max attempts reached "
-                    f"(best error={best_error:.4f})",
-                    extra=tagged("TILE"),
-                )
-                return tile_idx, best_result
+            tile_payload = {
+                "error": error,
+                "positions": all_positions,
+                "edges": all_edge_tuples,
+                "frontier": frontier_descs,
+            }
 
-            logger.error(
-                f"Tile {tile_idx}: all attempts produced <{min_tile_nodes} nodes",
+            if passed:
+                return tile_idx, tile_payload
+
+            if error < best_error:
+                best_error = error
+                best_result = tile_payload
+
+        if best_result is not None:
+            logger.warning(
+                f"Tile {tile_idx}: max attempts reached "
+                f"(best error={best_error:.4f})",
                 extra=tagged("TILE"),
             )
-            return tile_idx, None
+            return tile_idx, best_result
+
+        logger.error(
+            f"Tile {tile_idx}: all attempts produced <{min_tile_nodes} nodes",
+            extra=tagged("TILE"),
+        )
+        return tile_idx, None
 
     except Exception as exc:
         logger.error(
@@ -316,6 +312,7 @@ def run_phase2(
     max_rounds: int,
     config,
     params: SynthParams,
+    rng: np.random.Generator,
     snapshot_dir: str | None = None,
     snapshot_round_interval: int = 0,
     expected_nodes: int = 0,
@@ -345,8 +342,15 @@ def run_phase2(
         extra=tagged("PHASE2"),
     )
 
+    # Tiles arrive in completion order. A seeded run assembles them by index so
+    # it replays; an unseeded one takes them as they come.
+    tiles = (
+        sorted(tile_results.items())
+        if params.seed is not None
+        else tile_results.items()
+    )
     tile_data_list: List[dict] = []
-    for tile_idx, data in tile_results.items():
+    for tile_idx, data in tiles:
         cx, cy = centers[tile_idx]
 
         offset_positions = [(x + cx, y + cy) for x, y in data["positions"]]
@@ -375,8 +379,6 @@ def run_phase2(
                 "frontier": offset_frontier,
             }
         )
-
-    apply_seed(params.seed)
 
     if take_snapshots:
         os.makedirs(snapshot_dir, exist_ok=True)
@@ -416,15 +418,15 @@ def run_phase2(
                 extra=tagged("SNAPSHOT"),
             )
 
-        with GraphNode.traversal(attributes, params):
-            graph = GraphGenerator.assemble_and_continue(
-                tile_data_list,
-                global_frame,
-                max_rounds,
-                snapshot_callback=on_snapshot,
-                snapshot_round_interval=snapshot_round_interval,
-                expected_nodes=expected_nodes,
-            )
+        graph = GraphGenerator.assemble_and_continue(
+            Traversal.build(attributes, params, rng),
+            tile_data_list,
+            global_frame,
+            max_rounds,
+            snapshot_callback=on_snapshot,
+            snapshot_round_interval=snapshot_round_interval,
+            expected_nodes=expected_nodes,
+        )
 
         remaining = sum(1 for f in pending if not f.done())
         if remaining:
@@ -442,13 +444,13 @@ def run_phase2(
             extra=tagged("SNAPSHOT"),
         )
     else:
-        with GraphNode.traversal(attributes, params):
-            graph = GraphGenerator.assemble_and_continue(
-                tile_data_list,
-                global_frame,
-                max_rounds,
-                expected_nodes=expected_nodes,
-            )
+        graph = GraphGenerator.assemble_and_continue(
+            Traversal.build(attributes, params, rng),
+            tile_data_list,
+            global_frame,
+            max_rounds,
+            expected_nodes=expected_nodes,
+        )
 
     return graph
 
@@ -553,6 +555,8 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
 
     log_memory(f"Before Phase 2 ({dataset_id})", config.LOG_MEMORY)
     t1 = time.time()
+    # Phase 2 and the weights it ends with draw from one stream.
+    rng = base_params.rng()
     hybrid_graph = run_phase2(
         tile_results,
         attributes,
@@ -562,6 +566,7 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
         max_rounds,
         config,
         base_params,
+        rng,
         snapshot_dir=snapshot_dir,
         snapshot_round_interval=snapshot_interval,
         expected_nodes=expected_nodes,
@@ -587,7 +592,7 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
         extra=tagged("STATS", dataset=str(dataset_id)),
     )
 
-    mapper.assign_weights(hybrid_graph)
+    mapper.assign_weights(hybrid_graph, rng)
 
     run.save_original()
 

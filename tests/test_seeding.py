@@ -2,7 +2,6 @@
 import pytest
 
 from networksynth.configs import SynthParams
-from networksynth.utils import apply_seed
 
 pytestmark = pytest.mark.unit
 
@@ -17,36 +16,6 @@ BASE = dict(
 
 def _params(seed):
     return SynthParams(seed=seed, **BASE)
-
-
-class TestApplySeed:
-    def test_seeds_both_generators(self):
-        import random
-
-        import numpy as np
-
-        apply_seed(1234)
-        first = (random.random(), float(np.random.random()))
-        apply_seed(1234)
-        second = (random.random(), float(np.random.random()))
-
-        assert first == second
-
-    def test_none_is_a_no_op(self):
-        import random
-
-        apply_seed(5)
-        expected = (random.random(), random.random())
-
-        apply_seed(5)
-        first = random.random()
-        apply_seed(None)
-        second = random.random()
-
-        assert (first, second) == expected
-
-    def test_accepts_large_seeds(self):
-        apply_seed(2**40 + 7)
 
 
 class TestForWorker:
@@ -86,25 +55,31 @@ class TestGenerationIsReproducible:
 
     @staticmethod
     def _generate(seed, attrs):
+        """A worker's whole product: the grown network with its weights, both
+        drawn from the one Generator the seed opens."""
         from networksynth.graphs.graph_generator import GraphGenerator
 
-        apply_seed(seed)
-        return GraphGenerator(attrs, _params(seed)).generate_network()
+        _, attributes, mapper = attrs
+        generator = GraphGenerator(attributes, _params(seed))
+        graph = generator.generate_network()
+        mapper.assign_weights(graph, generator.rng)
+        return graph
 
     @staticmethod
     def _fingerprint(graph):
         return (
             graph.number_of_nodes(),
             graph.number_of_edges(),
-            tuple(sorted(graph.edges())),
+            tuple(sorted(graph.edges_with_weights())),
             graph.positions().round(6).tobytes(),
         )
 
     @pytest.fixture
-    def attrs(self, load_unweighted_test_synth_graph):
-        from networksynth.handlers.attributes_calculator import AttributesCalculator
+    def attrs(self, load_weighted_test_synth_graph):
+        from networksynth.handlers import AttributesCalculator, Mapper
 
-        return AttributesCalculator().analyze(load_unweighted_test_synth_graph)
+        graph = load_weighted_test_synth_graph
+        return graph, AttributesCalculator().analyze(graph), Mapper(graph)
 
     def test_same_seed_gives_an_identical_network(self, attrs):
         a = self._generate(4242, attrs)
