@@ -594,7 +594,7 @@ def generate_and_select(run: GenerationRun, config):
 
 def run_for_dataset(dataset_id: DatasetId, config, run_paths):
     logger.info(f"Processing dataset: {dataset_id}")
-    logger.info(config())
+    logger.info(config)
     run = GenerationRun(config, run_paths, dataset_id)
     run.save_original()
     run.save(run.original_report(), "original_report")
@@ -609,19 +609,16 @@ def run_for_dataset(dataset_id: DatasetId, config, run_paths):
         generate_with_multiprocessing(run, config)
 
 
-def main(config_cls=None):
-    if config_cls is None:
-        from networksynth.configs.generate_mode.config_snapshot import SnapshotConfig
+def main(config=None):
+    if config is None:
+        from networksynth.configs.generate_mode.config_snapshot import CONFIG as config
 
-        config_cls = SnapshotConfig
-    config_cls.initialize()
-
-    run_paths = create_run_paths(config_cls)
-    attach_run_log(run_paths.root, config_cls.RUN_ID)
+    run_paths = create_run_paths(config)
+    attach_run_log(run_paths.root, config.RUN_ID)
     status, error = STATUS_OK, None
     try:
-        for dataset_id in config_cls.get_datasets():
-            run_for_dataset(dataset_id, config_cls, run_paths)
+        for dataset_id in config.DATASETS:
+            run_for_dataset(dataset_id, config, run_paths)
     except KeyboardInterrupt:
         status = STATUS_CANCELLED
         logger.critical("MAIN PROCESS: Forcing immediate shutdown!")
@@ -631,7 +628,7 @@ def main(config_cls=None):
         error = f"{type(exc).__name__}: {exc}"
         raise
     finally:
-        if not config_cls.DISABLE_SAVING:
+        if not config.DISABLE_SAVING:
             write_manifest(run_paths, status=status, error=error)
 
 

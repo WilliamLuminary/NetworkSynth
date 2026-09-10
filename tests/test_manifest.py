@@ -138,20 +138,25 @@ class TestWriteManifest:
 @pytest.mark.requires_fixture_data
 class TestManifestFromARealRun:
     def test_generate_writes_a_manifest_listing_its_outputs(self, tmp_path):
+        from dataclasses import replace
+
         from networksynth.pipelines.generate import main
-        from tests.fixture_config import FixtureConfig as SampleConfig
+        from tests.fixture_config import FIXTURE
 
-        config = type("ManifestCfg", (SampleConfig,), {})
-        config.BASE_OUTPUT_PATH = str(tmp_path)
-        config.ERROR_CHECKER = "none"
-        config.MAX_ATTEMPTS = 2
-        config.SEED = 99
-        config.SYNTHETIC_NETWORK_NUMBER = 1
-        config.SYNTHETIC_GRAPH_NUMBER = 1
-        config.SNAPSHOT_INTERVAL = 0
-        config.DATASETS = SampleConfig.DATASETS[:1]
+        config = replace(
+            FIXTURE,
+            BASE_OUTPUT_PATH=str(tmp_path),
+            OUTPUT_DENOTE="ManifestCfg",
+            ERROR_CHECKER="none",
+            MAX_ATTEMPTS=2,
+            SEED=99,
+            SYNTHETIC_NETWORK_NUMBER=1,
+            SYNTHETIC_GRAPH_NUMBER=1,
+            SNAPSHOT_INTERVAL=0,
+            DATASETS=FIXTURE.DATASETS[:1],
+        )
 
-        main(config_cls=config)
+        main(config=config)
 
         roots = [
             os.path.join(str(tmp_path), d)

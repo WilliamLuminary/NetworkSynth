@@ -11,9 +11,6 @@ from matplotlib import pyplot as plt
 from scipy.stats import pearsonr
 
 from networksynth.handlers import Mapper
-from tests.fixture_config import FixtureConfig
-
-FixtureConfig.initialize()
 
 pytestmark = [pytest.mark.requires_fixture_data, pytest.mark.slow]
 

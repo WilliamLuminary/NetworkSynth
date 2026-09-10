@@ -24,7 +24,7 @@ from PySide6.QtGui import QGuiApplication, QIcon
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 
-from networksynth.configs import BaseConfig
+from networksynth.configs.base_config import DEFAULT_OUTPUT_PATH
 from networksynth.gui import spec_builder, updater
 
 _QML = os.path.join(os.path.dirname(__file__), "qml", "SynthesisWindow.qml")
@@ -91,7 +91,7 @@ class SynthesisController(QObject):
         self._values: Dict[str, Any] = spec_builder.default_values(mode)
         self._shape = 0
         self._inputs: Dict[str, str] = spec_builder.default_inputs(mode)
-        self._output_dir = output_dir or BaseConfig.BASE_OUTPUT_PATH
+        self._output_dir = output_dir or DEFAULT_OUTPUT_PATH
         self._status = "Choose this mode's inputs, then Run."
         self._failed = False
         self._percent = 0.0

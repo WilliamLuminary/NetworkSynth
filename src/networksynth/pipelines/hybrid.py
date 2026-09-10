@@ -35,6 +35,7 @@ from networksynth.handlers import (
     GenerationRun,
     Mapper,
     attach_run_log,
+    configure_console,
     create_run_paths,
     write_manifest,
 )
@@ -483,7 +484,7 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
     base_params = _apply_dataset_factors(
         dataset_id, config, SynthParams.from_config(config)
     )
-    logger.info(config())
+    logger.info(config)
 
     run = GenerationRun(config, run_paths, dataset_id)
     attributes = run.attributes
@@ -631,10 +632,9 @@ def run_hybrid_for_dataset(dataset_id, config, run_paths):
     )
 
 
-def _subprocess_target(dataset_id, config, run_paths, run_id):
-    config.RUN_ID = run_id
-    config.initialize()
-    attach_run_log(run_paths.root, run_id)
+def _subprocess_target(dataset_id, config, run_paths):
+    configure_console()
+    attach_run_log(run_paths.root, config.RUN_ID)
     try:
         run_hybrid_for_dataset(dataset_id, config, run_paths)
     except KeyboardInterrupt:
@@ -644,7 +644,7 @@ def _subprocess_target(dataset_id, config, run_paths, run_id):
 def _run_dataset_in_subprocess(dataset_id, config, run_paths):
     proc = spawn_context().Process(
         target=_subprocess_target,
-        args=(dataset_id, config, run_paths, config.RUN_ID),
+        args=(dataset_id, config, run_paths),
         name=f"hybrid-{dataset_id}",
     )
     proc.start()
@@ -679,21 +679,16 @@ def _run_dataset_in_subprocess(dataset_id, config, run_paths):
     log_memory(f"Main process after {dataset_id} subprocess", config.LOG_MEMORY)
 
 
-def main(config_cls=None):
-    if config_cls is None:
-        from networksynth.configs.hybrid_mode.config_sample import (
-            SampleConfig as HybridConfig,
-        )
+def main(config=None):
+    if config is None:
+        from networksynth.configs.hybrid_mode.config_sample import CONFIG as config
 
-        config_cls = HybridConfig
-    config_cls.initialize()
-
-    run_paths = create_run_paths(config_cls)
-    attach_run_log(run_paths.root, config_cls.RUN_ID)
+    run_paths = create_run_paths(config)
+    attach_run_log(run_paths.root, config.RUN_ID)
     status, error = STATUS_OK, None
     try:
-        for dataset_id in config_cls.get_datasets():
-            _run_dataset_in_subprocess(dataset_id, config_cls, run_paths)
+        for dataset_id in config.DATASETS:
+            _run_dataset_in_subprocess(dataset_id, config, run_paths)
     except KeyboardInterrupt:
         status = STATUS_CANCELLED
         logger.info("Shutdown complete.")
@@ -703,7 +698,7 @@ def main(config_cls=None):
         error = f"{type(exc).__name__}: {exc}"
         raise
     finally:
-        if not config_cls.DISABLE_SAVING:
+        if not config.DISABLE_SAVING:
             write_manifest(run_paths, status=status, error=error)
 
 

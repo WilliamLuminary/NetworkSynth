@@ -6,9 +6,6 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 import logging
 
 from networksynth.configs import DatasetId
-from networksynth.configs.compare_mode.config_sample import (
-    SampleConfig as CompareConfig,
-)
 from networksynth.handlers import (
     STATUS_CANCELLED,
     STATUS_FAILED,
@@ -30,14 +27,16 @@ def run_for_dataset(dataset_id: DatasetId, config, run_paths) -> None:
     run.save_analysis()
 
 
-def main(config_cls=CompareConfig):
-    config_cls.initialize()
-    run_paths = create_run_paths(config_cls)
-    attach_run_log(run_paths.root, config_cls.RUN_ID)
+def main(config=None):
+    if config is None:
+        from networksynth.configs.compare_mode.config_sample import CONFIG as config
+
+    run_paths = create_run_paths(config)
+    attach_run_log(run_paths.root, config.RUN_ID)
     status, error = STATUS_OK, None
     try:
-        for dataset_id in config_cls.get_datasets():
-            run_for_dataset(dataset_id, config_cls, run_paths)
+        for dataset_id in config.DATASETS:
+            run_for_dataset(dataset_id, config, run_paths)
     except KeyboardInterrupt:
         status = STATUS_CANCELLED
         logger.critical("MAIN PROCESS: Forcing immediate shutdown!")
@@ -47,7 +46,7 @@ def main(config_cls=CompareConfig):
         error = f"{type(exc).__name__}: {exc}"
         raise
     finally:
-        if not config_cls.DISABLE_SAVING:
+        if not config.DISABLE_SAVING:
             write_manifest(run_paths, status=status, error=error)
 
 

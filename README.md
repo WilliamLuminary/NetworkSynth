@@ -40,7 +40,7 @@ sample_1_image.tif    # background image, optional
 Every run writes one directory under `data/output/`, and points `data/output/latest_result` at it:
 
 ```
-generate_mode_SampleConfig_results_20260824_130049_c6a6a6ec/
+generate_mode_config_sample_results_20260824_130049_c6a6a6ec/
 ├── manifest.json      # what the run produced, and how it ended
 ├── run.jsonl          # this run's log, one JSON object per line
 └── sample_1/
@@ -56,46 +56,46 @@ Networks are saved as a CSV pair, `*_edgelist.csv` plus `*_positions.csv`. Graph
 
 A run takes one config file and nothing else. `networksynth-cli` with no argument lists them all.
 
-Each file holds exactly one class with a `DATASETS` attribute. Its `MODE` picks the pipeline: `generate`, `hybrid`, `sweep` or `compare`. Nothing needs registering, the file is the name.
+Each file binds `CONFIG` to an instance of the class for its pipeline: `GenerateConfig`, `HybridConfig`, `SweepConfig` or `CompareConfig`. The class is what picks the pipeline. Nothing needs registering, the file is the name.
 
 ### Writing one
 
 ```python
-from ..base_config import BaseConfig
-from ..dataset_id import DatasetId
+from networksynth.configs import DatasetId, GenerateConfig
 
-
-class ConfigMydata(BaseConfig):
-    MODE = "generate"
-    DATASETS = [DatasetId("set_1"), DatasetId("set_2")]
-
-    IMAGE_SIZE = (1024, 1024)
-    FRAME_SIZE = (512, 512)
-    SYNTHETIC_FRAME_SIZE = (1536, 1536)
-
-    CLOSED_NODES_FACTOR = 1.2
-    CLOSED_EDGES_FACTOR = 0.8
-    SYNTHETIC_NETWORK_NUMBER = 10
-    SYNTHETIC_GRAPH_NUMBER = 3
-    ERROR_TOLERANCE = 0.15
-    MEASURE_WEIGHTED = True
-
-    @classmethod
-    def initialize(cls):
-        super().initialize()
-        cls.ORIGINAL_NETWORK_FUNC = cls.load_original_network
-        cls.ORIGINAL_IMAGE_FUNC = cls.load_original_image
-
-    @staticmethod
-    def load_original_network(dataset_id: DatasetId):
-        ...   # return a SynthGraph, usually via build_graph(positions, matrix)
-
-    @staticmethod
-    def load_original_image(dataset_id: DatasetId):
-        ...   # return a grayscale numpy array, or None
+CONFIG = GenerateConfig(
+    DATASETS=[DatasetId("set_1"), DatasetId("set_2")],
+    FRAME_SIZE=(512, 512),
+    SYNTHETIC_FRAME_SIZE=(1536, 1536),
+    CLOSED_NODES_FACTOR=1.2,
+    CLOSED_EDGES_FACTOR=0.8,
+    SYNTHETIC_NETWORK_NUMBER=10,
+    SYNTHETIC_GRAPH_NUMBER=3,
+    ERROR_TOLERANCE=0.15,
+    MEASURE_WEIGHTED=True,
+)
 ```
 
-`MEASURE_WEIGHTED` has no default on purpose. Measuring a weighted network as plain topology is a real choice, so it cannot be guessed from the data, and asking for widths a network does not carry raises immediately.
+Each class is a frozen dataclass, so its fields are the whole vocabulary: a field with no default has to be given, and a name the pipeline does not read is refused when the file loads. `MEASURE_WEIGHTED` has no default on purpose. Measuring a weighted network as plain topology is a real choice, so it cannot be guessed from the data, and asking for widths a network does not carry raises immediately. A variant of an existing config is a `dataclasses.replace` of it, which is how the shipped `config_fast` and `config_snapshot_1x1` are written.
+
+By default a dataset is read from `BASE_INPUT_PATH` in any of the forms listed under inputs. A config that has to read something else subclasses and overrides the two loaders:
+
+```python
+from networksynth.configs import DatasetId, GenerateConfig
+
+
+class MyDataConfig(GenerateConfig):
+    def load_original_network(self, dataset_id: DatasetId):
+        ...  # return a SynthGraph, usually via build_graph(positions, matrix)
+
+    def load_original_image(self, dataset_id: DatasetId):
+        ...  # return a grayscale numpy array, or None
+
+
+CONFIG = MyDataConfig(...)
+```
+
+A subclass that adds fields of its own is decorated with `@dataclass(frozen=True, kw_only=True)`, as `tests/fixture_config.py` shows.
 
 A `DatasetId` names one dataset and can have levels:
 
@@ -256,7 +256,7 @@ Nothing in the spec records what an edge weight means. A `Weight` column may hol
 
 **Generation keeps failing.** Raise `CLOSED_NODES_FACTOR` to allow more merging, raise `ERROR_TOLERANCE` to accept less similar networks, or raise `MAX_ATTEMPTS`.
 
-**A config will not load.** Each file needs exactly one class with `DATASETS`, found by that attribute rather than by name. The class must set `MODE`, or no pipeline claims it. And `SNAPSHOT_INTERVAL` needs saving on, since snapshots bypass the `Saver`, so pairing it with `DISABLE_SAVING` raises.
+**A config will not load.** Each file needs a `CONFIG` bound to one of the four config classes. A missing required field or an unknown field name is a `TypeError` naming it. And `SNAPSHOT_INTERVAL` needs saving on, since snapshots bypass the `Saver`, so pairing it with `DISABLE_SAVING` raises.
 
 ## The `dist` branch
 

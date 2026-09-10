@@ -1,9 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+from dataclasses import replace
+
 import igraph as ig
 import numpy as np
 import pytest
 
-from networksynth.configs import BaseConfig, DatasetId
+from networksynth.configs import DatasetId
 from networksynth.graphs.synth_graph import SynthGraph
 
 pytestmark = pytest.mark.unit
@@ -90,17 +92,14 @@ class TestAnalyzeReadsEveryFormatWeWrite:
 
 class TestComparisonLoadsTheTwoSetsItIsGiven:
     def _config(self, tmp_path, original, synthetic):
-        from tests.fixture_config import FixtureCompareConfig
+        from tests.fixture_config import FIXTURE_COMPARE
 
-        class TinyConfig(FixtureCompareConfig):
-            BASE_OUTPUT_PATH = str(tmp_path / "out")
-            MEASURE_WEIGHTED = False
-            FULL_Q_BAND = False
-            ORIGINAL_NETWORKS_PATH = str(original)
-            SYNTHETIC_NETWORKS_PATH = str(synthetic)
-
-        TinyConfig.initialize()
-        return TinyConfig
+        return replace(
+            FIXTURE_COMPARE,
+            BASE_OUTPUT_PATH=str(tmp_path / "out"),
+            ORIGINAL_NETWORKS_PATH=str(original),
+            SYNTHETIC_NETWORKS_PATH=str(synthetic),
+        )
 
     def _run(self, config):
         from networksynth.handlers import ComparisonRun, create_run_paths
@@ -163,9 +162,3 @@ class TestComparisonLoadsTheTwoSetsItIsGiven:
         written = list((tmp_path / "out").rglob("*"))
         assert any(f.name.endswith("analysis_data.json") for f in written), written
         assert any("analysis_figure" in f.name for f in written), written
-
-
-def test_base_config_is_untouched_by_these_runs():
-    assert BaseConfig.DISABLE_SAVING is False
-    assert BaseConfig.ERROR_CHECKER == "multifractal", "a subclass overwrote it"
-    assert BaseConfig.SYNTHETIC_NETWORK_NUMBER != 1, "a subclass overwrote it"

@@ -5,9 +5,7 @@ import pytest
 pytestmark = pytest.mark.requires_fixture_data
 
 from networksynth.analysis.multifractal_analyzer import MultifractalAnalyzer
-from tests.fixture_config import FixtureCompareConfig as CompareConfig
-
-CompareConfig.initialize()
+from tests.fixture_config import FIXTURE_COMPARE as CompareConfig
 
 
 def test_calculate_multifractal_taus(load_unweighted_test_synth_graph):
