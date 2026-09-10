@@ -24,10 +24,10 @@ def _classify(relative_path: str) -> str:
 
     if lowered.endswith("_edgelist.csv"):
         return "edge_lists"
-    if lowered.endswith("_positions.csv") or lowered.endswith("_positions.npy"):
-        return "positions"
     if "snapshots" in parts:
         return "snapshots"
+    if lowered.endswith("_positions.csv") or lowered.endswith("_positions.npy"):
+        return "positions"
     if "analysis" in lowered:
         return "analysis"
     if lowered.endswith(_IMAGE_SUFFIXES):

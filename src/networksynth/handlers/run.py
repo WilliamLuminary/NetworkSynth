@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, List
+from typing import Any, Dict, List
 
 from networksynth.configs import DatasetId
 from networksynth.graphs.synth_graph import SynthGraph
@@ -55,8 +55,8 @@ class GenerationRun(Run):
 
     def __init__(self, config, run_paths: RunPaths, dataset_id: DatasetId):
         super().__init__(config, run_paths, dataset_id)
-        self.original: SynthGraph = config.ORIGINAL_NETWORK_FUNC(dataset_id)
-        self.original_image = config.ORIGINAL_IMAGE_FUNC(dataset_id)
+        self.original: SynthGraph = config.load_original_network(dataset_id)
+        self.original_image = config.load_original_image(dataset_id)
 
         from .attributes_calculator import AttributesCalculator
         from .mapper import Mapper
@@ -124,32 +124,38 @@ class ComparisonRun(Run):
         synthetic_path: str,
     ):
         super().__init__(config, run_paths, dataset_id)
-        self.original = config.NETWORKS_FUNC(original_path)
-        self.synthetic = config.NETWORKS_FUNC(synthetic_path)
-
-        from networksynth.analysis import MultifractalBatchProcessor
-
-        self._processor = MultifractalBatchProcessor(
-            self.original,
-            self.synthetic,
-            measure_weighted=config.MEASURE_WEIGHTED,
-            full_q_band=config.FULL_Q_BAND,
-        )
+        self.original = config.load_networks(original_path)
+        self.synthetic = config.load_networks(synthetic_path)
+        self._measure_weighted = config.MEASURE_WEIGHTED
+        self._full_q_band = config.FULL_Q_BAND
+        self._results: Dict[str, list] = {}
 
     def analyse(self) -> None:
-        self._processor.process().plot()
+        from networksynth.analysis import MultifractalProcessor
+
+        # Synthetic first: it is drawn first, so the originals sit on top.
+        for label, graphs in (
+            ("synthetic", self.synthetic),
+            ("original", self.original),
+        ):
+            processor = MultifractalProcessor(
+                graphs, self._measure_weighted, self._full_q_band
+            )
+            processor.analyze()
+            self._results[label] = processor.get_summary_data()
 
     def save_analysis(self) -> None:
+        from networksynth.analysis.spectra_plot import plot_dimensions, plot_spectra
+
         self.save(
             {
-                "original_multifractal_analysis_results": (
-                    self._processor.get_original_data()
-                ),
-                "synthetic_multifractal_analysis_results": (
-                    self._processor.get_synthetic_data()
-                ),
+                "original_multifractal_analysis_results": self._results["original"],
+                "synthetic_multifractal_analysis_results": self._results["synthetic"],
             },
             "analysis_data",
         )
-        for name, image in self._processor.get_images().items():
-            self.save(image, "analysis_figure", f"{name}_")
+        for name, figure in (
+            ("spectra", plot_spectra(self._results)),
+            ("dimensions", plot_dimensions(self._results)),
+        ):
+            self.save(figure, "analysis_figure", f"{name}_")

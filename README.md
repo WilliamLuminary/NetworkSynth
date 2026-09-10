@@ -44,11 +44,11 @@ A network is a pair of files sharing a prefix, or a single GraphML file:
 | --- | --- |
 | `<prefix>_edgelist.csv` + `<prefix>_positions.csv` | a CSV pair |
 | `<prefix>_EdgeList.csv` + `<prefix>_NodePositions.csv` | a StructuralGT export |
-| `<prefix>_adjacency.npy` + `<prefix>_positions.npy` | a NumPy pair |
+| `<prefix>_adjacency.npy` + `<prefix>_positions.npy` | a NumPy pair; the older `_mat.npy` + `_pos.npy` names are read too |
 | `<prefix>_network.graphml` | one network, positions included (`.graphml.gz` too) |
 | `<prefix>_image.tif` | the background for that prefix, optional |
 
-Point a run at a folder of these and it reads one dataset per prefix, in name order, writing a subdirectory each under one run root. A half-named dataset stops the run and names it rather than being passed over.
+Point a run at a folder of these and it reads one dataset per prefix, in name order, writing a subdirectory each under one run root. Every network is reduced to its largest connected component as it is read, since the analyses take all-pairs distances. A half-named dataset stops the run and names it rather than being passed over.
 
 A StructuralGT export is read to its own conventions: its positions are `(row, col)` under headers `x,y`, so they are swapped, and its network is traced on a copy scaled to 1024 on the longest side, so that copy is taken as the coordinate window rather than the image file.
 
@@ -56,7 +56,7 @@ Edge lists are read tolerantly: `Source,Target` columns (with `Weight,Length,Wid
 
 ## Output
 
-One directory per run, `{MODE}_{ConfigClass}_results_{timestamp}_{run_id}`, holding the original and synthetic networks as edge-list pairs and rendered images, plus a per-dataset `report.txt`. GraphML is offered as an output format but is not written by default. `manifest.json` at the run root groups every file written by kind and records whether the run ended `ok`, `failed` or `cancelled`.
+One directory per run, `{mode}_mode_{config file}_results_{timestamp}_{run_id}`, holding the original and synthetic networks as edge-list pairs and rendered images, plus a per-dataset `report.txt`. GraphML is offered as an output format but is not written by default. `manifest.json` at the run root groups every file written by kind and records whether the run ended `ok`, `failed` or `cancelled`.
 
 ## Full documentation
 

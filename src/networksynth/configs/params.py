@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Optional, Tuple
 
+import numpy as np
+
 
 @dataclass(frozen=True)
 class SynthParams:
@@ -22,6 +24,10 @@ class SynthParams:
             max_attempts=config.MAX_ATTEMPTS,
             seed=config.SEED,
         )
+
+    def rng(self) -> np.random.Generator:
+        """The one stream a worker draws from; unseeded when seed is None."""
+        return np.random.default_rng(self.seed)
 
     def for_worker(self, index: int) -> "SynthParams":
         if self.seed is None:
