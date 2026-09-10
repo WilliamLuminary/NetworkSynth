@@ -168,9 +168,12 @@ class GraphGenerator:
                         edge_set.add((current_node.position, child.position))
                         node_queue.append(child)
 
+        # In id order: a set of nodes iterates by address, which would make the
+        # frontier's order, and so Phase 2's growth, differ from run to run.
+        nodes = sorted(node_set, key=lambda n: n.id)
         inner_nodes: set = set()
         frontier_descriptors: list = []
-        for node in node_set:
+        for node in nodes:
             if _within_frame(node.position, frame):
                 inner_nodes.add(node)
             elif node.degree > 1 and len(node.children) <= 1:
@@ -189,8 +192,8 @@ class GraphGenerator:
             for e in edge_set
             if _within_frame(e[0], frame) and _within_frame(e[1], frame)
         }
-        all_positions = [node.position for node in node_set]
-        all_edge_tuples = list(edge_set)
+        all_positions = [node.position for node in nodes]
+        all_edge_tuples = sorted(edge_set)
 
         return (
             inner_nodes,

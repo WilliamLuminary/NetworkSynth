@@ -245,7 +245,7 @@ class GraphNode:
     def _get_closest_valid_node(self, position):
         close_nodes_with_distances = self._find_close_node(position)
         if close_nodes_with_distances:
-            return min(close_nodes_with_distances, key=lambda x: x[1])[0]
+            return min(close_nodes_with_distances, key=lambda x: (x[1], x[0].id))[0]
         return None
 
     def _find_close_node(self, position):
