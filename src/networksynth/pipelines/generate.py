@@ -260,8 +260,8 @@ def generate_with_multiprocessing(run: GenerationRun, config):
             next_log = 10
             for idx, future in enumerate(as_completed(futures), start=1):
                 synthetic_graph, error = future.result()
-                if not synthetic_graph:
-                    break
+                if synthetic_graph is None:
+                    continue
 
                 progress = round(idx / num_network * 100, 2)
                 if progress >= next_log:

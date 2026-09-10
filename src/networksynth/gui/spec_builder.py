@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 from __future__ import annotations
 
+import functools
 import json
 import os
 from dataclasses import asdict, dataclass, field, fields, replace
@@ -841,14 +842,26 @@ def graphml_shape_index(mode: str) -> Optional[int]:
 STRUCTURALGT_SIDE = 1024
 
 
-def _longest_side(image_path: Optional[str]) -> Optional[int]:
-    if not image_path or not os.path.exists(image_path):
-        return None
-
+@functools.lru_cache(maxsize=16)
+def _decoded_shape(image_path: str, stamp: tuple) -> Optional[Tuple[int, int]]:
     import cv2
 
     image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-    return None if image is None else max(image.shape[:2])
+    return None if image is None else tuple(image.shape[:2])
+
+
+def _image_shape(image_path: Optional[str]) -> Optional[Tuple[int, int]]:
+    """(height, width), decoded once per file version: the window asks on every
+    property notify, and a full image decode there stalls it."""
+    if not image_path or not os.path.exists(image_path):
+        return None
+    stat = os.stat(image_path)
+    return _decoded_shape(image_path, (stat.st_mtime_ns, stat.st_size))
+
+
+def _longest_side(image_path: Optional[str]) -> Optional[int]:
+    shape = _image_shape(image_path)
+    return None if shape is None else max(shape)
 
 
 def structuralgt_sides(image_path: Optional[str]) -> List[int]:
@@ -870,15 +883,10 @@ def structuralgt_frame(
     image_path: Optional[str], side: int = STRUCTURALGT_SIDE
 ) -> Optional[list]:
     """The coordinate window a StructuralGT network is in, given the image it came from."""
-    if not image_path or not os.path.exists(image_path):
+    shape = _image_shape(image_path)
+    if shape is None:
         return None
-
-    import cv2
-
-    image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-    if image is None:
-        return None
-    height, width = image.shape[:2]
+    height, width = shape
     longest = max(height, width)
     scale = side / longest if longest > side else 1.0
     return [round(width * scale), round(height * scale)]

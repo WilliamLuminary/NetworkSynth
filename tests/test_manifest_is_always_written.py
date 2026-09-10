@@ -16,16 +16,8 @@ CHECKED_PIPELINES = [
 ]
 
 
-class _NoWandb:
-
-    def login(self, *args, **kwargs):
-        return True
-
-
 def _prepare(module, runner, replacement, monkeypatch):
     monkeypatch.setattr(module, runner, replacement)
-    if hasattr(module, "wandb"):
-        monkeypatch.setattr(module, "wandb", _NoWandb())
 
 
 def _config(tmp_path, name):
