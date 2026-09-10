@@ -156,13 +156,13 @@ The GUI can read a whole folder, one dataset per prefix, and a folder may hold a
 | --- | --- |
 | `<prefix>_edgelist.csv` + `<prefix>_positions.csv` | a CSV pair |
 | `<prefix>_EdgeList.csv` + `<prefix>_NodePositions.csv` | a StructuralGT export, read as it comes |
-| `<prefix>_adjacency.npy` + `<prefix>_positions.npy` | a NumPy pair, positions transposed on load |
+| `<prefix>_adjacency.npy` + `<prefix>_positions.npy` | a NumPy pair, positions transposed on load; the older `_mat.npy` + `_pos.npy` names are read too |
 | `<prefix>_network.graphml` or `.graphml.gz` | one file, positions inside it |
 | `<prefix>_image.tif` | the background for that prefix, optional |
 
-A half named dataset stops the run instead of being skipped: an edge list with no positions, an adjacency with no coordinates, or one prefix claimed by two formats. Datasets are read in name order and share one run root and one manifest.
+Every network is reduced to its largest connected component as it is read, since the analyses take all-pairs distances. A half named dataset stops the run instead of being skipped: an edge list with no positions, an adjacency with no coordinates, or one prefix claimed by two formats. Datasets are read in name order and share one run root and one manifest.
 
-Two things this does not cover. The npy files in `data/input/samples/` keep older `_mat.npy` and `_pos.npy` names that CLI configs load directly, so those folders are not discoverable this way. And `networksynth-analyse` reads a directory by its own rule, every GraphML file or else every CSV pair.
+One thing this does not cover: `networksynth-analyse` reads a directory by its own rule, every GraphML file or else every CSV pair.
 
 The form is a deliberate subset of what a config can express. Only the CLI can run `compare`, set per dataset factors, fix tile frame sizes, ask for log spaced snapshots, or write SVG from a hybrid run. Going the other way, `INPUT_ORIENTATION` rotates the input as it is read and exists only in the form.
 

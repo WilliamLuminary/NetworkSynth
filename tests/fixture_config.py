@@ -136,13 +136,3 @@ class FixtureCompareConfig(FixtureConfig):
 
     ORIGINAL_NETWORKS_PATH = ""
     SYNTHETIC_NETWORKS_PATH = ""
-
-    @classmethod
-    def initialize(cls) -> None:
-        super().initialize()
-        # The real loader, not a stand-in: a comparison test that faked this
-        # would stop exercising the format handling it means to cover. What the
-        # fixture replaces is the config's *values*, not the code it wires up.
-        from networksynth.configs.compare_mode.config_sample import _load_networks
-
-        cls.NETWORKS_FUNC = staticmethod(_load_networks)

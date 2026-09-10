@@ -37,6 +37,3 @@ class SampleConfig(GenerateSampleConfig):
         "samples",
         "hybrid_mode",
     )
-    POSITION_DATA_DIR = BASE_INPUT_PATH
-    ADJ_MATRIX_DATA_DIR = BASE_INPUT_PATH
-    IMAGES_DIR = BASE_INPUT_PATH

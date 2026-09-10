@@ -49,21 +49,21 @@ class TestGenerationDoesNotAnalyse:
 
 class TestAnalyzeReadsEveryFormatWeWrite:
     def test_reads_a_csv_pair_when_nothing_is_pickled(self, tmp_path):
-        from networksynth.configs.compare_mode.config_sample import _load_networks
         from networksynth.configs.file_definitions import save_network_csv
+        from networksynth.graphs import load_graphs
 
         folder = tmp_path / "original"
         folder.mkdir()
         save_network_csv(_small_graph(), str(folder / "original_network.csv"))
 
-        loaded = _load_networks(str(folder))
+        loaded = load_graphs(str(folder))
 
         assert len(loaded) == 1
         assert loaded[0].number_of_nodes() == 64
 
     def test_graphml_wins_over_the_csv_pair(self, tmp_path):
-        from networksynth.configs.compare_mode.config_sample import _load_networks
         from networksynth.configs.file_definitions import save_network_csv
+        from networksynth.graphs import load_graphs
         from networksynth.graphs.graphml_io import write_graph_graphml
 
         folder = tmp_path / "synthetic"
@@ -75,17 +75,17 @@ class TestAnalyzeReadsEveryFormatWeWrite:
                 str(folder / f"synthetic_network_n{index}.graphml"),
             )
 
-        assert len(_load_networks(str(folder))) == 2
+        assert len(load_graphs(str(folder))) == 2
 
     def test_an_edge_list_without_its_positions_stops_the_run(self, tmp_path):
-        from networksynth.configs.compare_mode.config_sample import _load_networks
+        from networksynth.graphs import load_graphs
 
         folder = tmp_path / "original"
         folder.mkdir()
         (folder / "orphan_edgelist.csv").write_text("source_index,target_index\n0,1\n")
 
         with pytest.raises(AssertionError, match="no positions file"):
-            _load_networks(str(folder))
+            load_graphs(str(folder))
 
 
 class TestComparisonLoadsTheTwoSetsItIsGiven:

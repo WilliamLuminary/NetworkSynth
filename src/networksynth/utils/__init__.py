@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-from .files import find_file_with_pattern
 from .graph_ops import (
     build_graph,
     calculate_frame,
@@ -8,7 +7,7 @@ from .graph_ops import (
     transpose_positions,
     trim_graph,
 )
-from .images import resize_image, trim_image
+from .images import resize_image
 from .metrics import compute_network_metrics, metric_distance
 from .plotting import (
     figure_to_ndarray,
@@ -25,11 +24,9 @@ from .run_log import JsonFormatter, progress, tagged
 from .runtime import apply_seed, log_memory, spawn_context, timer, worker_count
 
 __all__ = [
-    "trim_image",
     "transpose_positions",
     "orient_positions",
     "resize_image",
-    "find_file_with_pattern",
     "apply_seed",
     "build_graph",
     "calculate_frame",

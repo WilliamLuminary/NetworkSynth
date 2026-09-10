@@ -24,13 +24,15 @@ _GRAPHML_SUFFIXES = (".graphml", ".graphml.gz", ".graphmlz")
 
 
 def load_graphs(path: str) -> List[SynthGraph]:
+    # Always the largest connected component: the analyses take all-pairs
+    # distances, which are infinite across components.
     if os.path.isdir(path):
         graphs = _load_dir(path)
         assert graphs, f"no networks found in {path}"
-        return graphs
-
-    assert os.path.isfile(path), f"not a file or directory: {path}"
-    return _load_file(path)
+    else:
+        assert os.path.isfile(path), f"not a file or directory: {path}"
+        graphs = _load_file(path)
+    return [graph.largest_connected_component() for graph in graphs]
 
 
 def _load_dir(folder: str) -> List[SynthGraph]:
