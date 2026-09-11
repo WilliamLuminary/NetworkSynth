@@ -155,8 +155,8 @@ class SynthGraph:
 
     @classmethod
     def from_graph_nodes(cls, nodes: set, edges: set) -> SynthGraph:
-        position_map = {node.position: node for node in nodes}
         sorted_nodes = sorted(nodes, key=lambda x: x.id)
+        position_map = {node.position: node for node in sorted_nodes}
         n = len(sorted_nodes)
         positions = np.zeros((n, 2), dtype=np.float64)
         id_map = {}

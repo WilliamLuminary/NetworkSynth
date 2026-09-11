@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import logging
-import os
 from typing import Dict, List, Optional, Union
 
 import numpy as np
@@ -17,7 +16,9 @@ def _worker_count(requested: Optional[int], num_jobs: int) -> int:
         return 1
     if requested is not None:
         return max(1, min(requested, num_jobs))
-    return max(1, min((os.cpu_count() or 1) // 2, num_jobs))
+    from networksynth.utils import worker_count
+
+    return worker_count(num_jobs)
 
 
 def _analyze_one(job) -> Dict:

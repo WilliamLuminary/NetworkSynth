@@ -1,5 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-from .base_config import BaseConfig
+from .base_config import (
+    CONFIG_CLASSES,
+    BaseConfig,
+    CompareConfig,
+    GenerateConfig,
+    HybridConfig,
+    SweepConfig,
+    SynthesisConfig,
+)
 from .dataset_id import DatasetId
 from .enums import AnalysisMode
 from .file_definitions import (

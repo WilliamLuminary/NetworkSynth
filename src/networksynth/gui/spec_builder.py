@@ -1,12 +1,19 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 from __future__ import annotations
 
+import functools
 import json
 import os
-from dataclasses import asdict, dataclass, field, replace
+from dataclasses import asdict, dataclass, field, fields, replace
 from typing import Any, Dict, List, Optional, Tuple
 
-from networksynth.configs.base_config import BaseConfig
+from networksynth.configs.base_config import (
+    DEFAULT_INPUT_PATH,
+    PROJECT_ROOT,
+    GenerateConfig,
+    HybridConfig,
+    SweepConfig,
+)
 from networksynth.configs.gui_config import (
     NETWORK_FORMATS,
     PLOT_FORMATS,
@@ -74,6 +81,11 @@ SECTION_NOTES = {
 }
 
 ALIGN_GROUP = "Align"
+
+
+def _cli_default(config_class, name: str) -> Any:
+    """The value a config file gets when it leaves this field out."""
+    return next(f.default for f in fields(config_class) if f.name == name)
 
 
 @dataclass(frozen=True)
@@ -319,7 +331,7 @@ def _common_fields(vector_plots: bool = True) -> List[Field]:
             Field(
                 "ERROR_CHECKER",
                 "Measured by",
-                "multifractal",
+                _cli_default(GenerateConfig, "ERROR_CHECKER"),
                 kind="choice",
                 options=_CHECKER_NAMES,
                 labels=_CHECKER_LABELS,
@@ -333,7 +345,7 @@ def _common_fields(vector_plots: bool = True) -> List[Field]:
             Field(
                 "ERROR_TOLERANCE",
                 "Tolerance",
-                0.15,
+                _cli_default(GenerateConfig, "ERROR_TOLERANCE"),
                 minimum=0.0,
                 maximum=1.0,
                 step=0.01,
@@ -344,7 +356,7 @@ def _common_fields(vector_plots: bool = True) -> List[Field]:
             Field(
                 "MAX_ATTEMPTS",
                 "Max attempts",
-                10,
+                _cli_default(GenerateConfig, "MAX_ATTEMPTS"),
                 kind="integer",
                 minimum=1,
                 maximum=100,
@@ -368,7 +380,7 @@ def _common_fields(vector_plots: bool = True) -> List[Field]:
             Field(
                 "FULL_Q_BAND",
                 "Moment range",
-                False,
+                _cli_default(GenerateConfig, "FULL_Q_BAND"),
                 kind="choice",
                 options=(False, True),
                 labels=("Narrow", "Wide"),
@@ -416,7 +428,7 @@ def _common_fields(vector_plots: bool = True) -> List[Field]:
                 10,
                 kind="integer",
                 minimum=1,
-                maximum=BaseConfig.PHASE2_MAX_ROUNDS,
+                maximum=_cli_default(HybridConfig, "PHASE2_MAX_ROUNDS"),
                 step=1,
                 unit="rounds apart",
                 group=OUTPUT_GROUP,
@@ -670,7 +682,7 @@ def _sweep_fields() -> List[Field]:
         Field(
             "USE_WANDB",
             "Log to wandb",
-            True,
+            _cli_default(SweepConfig, "USE_WANDB"),
             kind="bool",
             group="Tracking",
             help=(
@@ -708,7 +720,7 @@ def _sweep_fields() -> List[Field]:
         Field(
             "SWEEP_STEP",
             "Step",
-            0.1,
+            _cli_default(SweepConfig, "SWEEP_STEP"),
             minimum=0.01,
             maximum=1.0,
             step=0.01,
@@ -766,7 +778,7 @@ def shape_for(mode: str, inputs: Dict[str, str]) -> InputShape:
     )
 
 
-_SAMPLES = os.path.join(BaseConfig.BASE_INPUT_PATH, "samples")
+_SAMPLES = os.path.join(DEFAULT_INPUT_PATH, "samples")
 
 _SAMPLE_INPUTS = {
     "edge_list": os.path.join(_SAMPLES, "gui_mode", "sample_1_edgelist.csv"),
@@ -777,9 +789,6 @@ _SAMPLE_INPUTS = {
     "positions_npy": os.path.join(_SAMPLES, "generate_mode", "sample_1_pos.npy"),
     "network_graphml": os.path.join(_SAMPLES, "sample_1_network.graphml"),
 }
-
-
-PROJECT_ROOT = BaseConfig.PROJECT_ROOT
 
 
 def display_path(path: str) -> str:
@@ -833,14 +842,26 @@ def graphml_shape_index(mode: str) -> Optional[int]:
 STRUCTURALGT_SIDE = 1024
 
 
-def _longest_side(image_path: Optional[str]) -> Optional[int]:
-    if not image_path or not os.path.exists(image_path):
-        return None
-
+@functools.lru_cache(maxsize=16)
+def _decoded_shape(image_path: str, stamp: tuple) -> Optional[Tuple[int, int]]:
     import cv2
 
     image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-    return None if image is None else max(image.shape[:2])
+    return None if image is None else tuple(image.shape[:2])
+
+
+def _image_shape(image_path: Optional[str]) -> Optional[Tuple[int, int]]:
+    """(height, width), decoded once per file version: the window asks on every
+    property notify, and a full image decode there stalls it."""
+    if not image_path or not os.path.exists(image_path):
+        return None
+    stat = os.stat(image_path)
+    return _decoded_shape(image_path, (stat.st_mtime_ns, stat.st_size))
+
+
+def _longest_side(image_path: Optional[str]) -> Optional[int]:
+    shape = _image_shape(image_path)
+    return None if shape is None else max(shape)
 
 
 def structuralgt_sides(image_path: Optional[str]) -> List[int]:
@@ -862,15 +883,10 @@ def structuralgt_frame(
     image_path: Optional[str], side: int = STRUCTURALGT_SIDE
 ) -> Optional[list]:
     """The coordinate window a StructuralGT network is in, given the image it came from."""
-    if not image_path or not os.path.exists(image_path):
+    shape = _image_shape(image_path)
+    if shape is None:
         return None
-
-    import cv2
-
-    image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-    if image is None:
-        return None
-    height, width = image.shape[:2]
+    height, width = shape
     longest = max(height, width)
     scale = side / longest if longest > side else 1.0
     return [round(width * scale), round(height * scale)]
@@ -966,10 +982,6 @@ def build_spec(
     frame = params.get("SYNTHETIC_FRAME_SIZE")
     if frame is not None:
         params.setdefault("FRAME_SIZE", frame)
-
-    if "NF_RANGE" in params:
-        params.setdefault("CLOSED_NODES_FACTOR", params["NF_RANGE"][0])
-        params.setdefault("CLOSED_EDGES_FACTOR", params["EF_RANGE"][0])
 
     params = {
         key: list(value) if isinstance(value, tuple) else value

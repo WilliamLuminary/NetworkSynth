@@ -100,7 +100,7 @@ def _create_plot(
 
         ax.set_xlabel(x_label, fontweight="bold")
         ax.set_ylabel(y_label, fontweight="bold")
-        ax.legend(handles=legend, loc="upper right", frameon=False)
+        ax.legend(handles=legend, loc="best", frameon=False)
 
     return finalize_plot(fig)
 

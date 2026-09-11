@@ -6,12 +6,8 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-import wandb
-
 from networksynth.analysis.error_checker import ErrorChecker, create_error_checker
 from networksynth.configs import DatasetId, SynthParams
-from networksynth.graphs import GraphGenerator
-from networksynth.graphs._graph_node import GraphNode
 from networksynth.handlers import (
     STATUS_CANCELLED,
     STATUS_FAILED,
@@ -21,26 +17,25 @@ from networksynth.handlers import (
     create_run_paths,
     write_manifest,
 )
-from networksynth.pipelines.generate import compute_average_error
-from networksynth.utils import (
-    apply_seed,
-    build_graph,
-    spawn_context,
-    tagged,
-    trim_graph,
-)
+from networksynth.pipelines.generate import compute_average_error, generate_candidate
+from networksynth.utils import spawn_context, tagged
 
 
 def _init_config():
-    from networksynth.configs.sweep_mode.config_sample import SampleConfig as cfg
+    from dataclasses import replace
 
-    cfg.initialize()
-    cfg.SYNTHETIC_NETWORK_NUMBER = 100
-    cfg.SYNTHETIC_GRAPH_NUMBER = 0
-    return cfg
+    from networksynth.configs.sweep_mode.config_sample import CONFIG
+
+    return replace(CONFIG, SYNTHETIC_NETWORK_NUMBER=100)
 
 
 EXPERIMENT_PROJECT_NAME = "hyperparam-tuning"
+
+
+def _wandb():
+    import wandb
+
+    return wandb
 
 
 def _build_factors(lo, hi, step):
@@ -51,55 +46,17 @@ def _build_factors(lo, hi, step):
 logger = logging.getLogger(__name__)
 
 
-def _generate_with_factors(
-    exit_event, error_checker: ErrorChecker, attributes, mapper, params
-):
-
-    if exit_event.is_set():
-        return None, float("inf")
-
-    with GraphNode.traversal(attributes, params):
-        for attempt in range(params.max_attempts):
-            apply_seed(None if params.seed is None else params.seed + attempt)
-
-            try:
-                result = GraphGenerator._bfs_network_with_frontier(
-                    params.synthetic_frame_size
-                )
-                inner_nodes, inner_edges, *_ = result
-
-                if not inner_nodes or len(inner_nodes) < 100:
-                    continue
-
-                graph = build_graph(inner_nodes, inner_edges, arg_type="graph_node")
-                graph = trim_graph(graph, attributes.average_degree)
-                mapper.assign_weights(graph)
-
-                if exit_event.is_set():
-                    return None, float("inf")
-
-                passed, error = error_checker.check(graph)
-                if passed:
-                    return graph, error
-            except KeyboardInterrupt:
-                raise
-            except Exception:
-                continue
-
-        return None, float("inf")
-
-
 def generate_networks(run: GenerationRun, error_checker: ErrorChecker, nf, ef, config):
-    from dataclasses import replace
-
     num_network = config.SYNTHETIC_NETWORK_NUMBER
     exit_event = spawn_context().Manager().Event()
     max_workers = config.get_max_workers(num_network)
 
-    trial_params = replace(
-        SynthParams.from_config(config),
+    trial_params = SynthParams(
+        synthetic_frame_size=config.SYNTHETIC_FRAME_SIZE,
         closed_nodes_factor=nf,
         closed_edges_factor=ef,
+        max_attempts=config.MAX_ATTEMPTS,
+        seed=config.SEED,
     )
 
     errors = []
@@ -110,7 +67,7 @@ def generate_networks(run: GenerationRun, error_checker: ErrorChecker, nf, ef, c
         ) as executor:
             futures = [
                 executor.submit(
-                    _generate_with_factors,
+                    generate_candidate,
                     exit_event,
                     error_checker,
                     run.attributes,
@@ -121,8 +78,8 @@ def generate_networks(run: GenerationRun, error_checker: ErrorChecker, nf, ef, c
             ]
             next_log = 10
             for idx, future in enumerate(as_completed(futures), start=1):
-                synthetic_graph, error = future.result()
-                if not synthetic_graph:
+                synthetic_graph, error, _ = future.result()
+                if synthetic_graph is None:
                     continue
 
                 progress = round(idx / num_network * 100, 2)
@@ -191,6 +148,7 @@ def run_for_dataset(
         return error, success_rate
 
     if config.USE_WANDB:
+        wandb = _wandb()
 
         def trial():
             with wandb.init():
@@ -211,10 +169,8 @@ def run_for_dataset(
     logger.info(f"Sweep report written for {len(results)} trial(s).")
 
 
-def main(config_cls=None):
-    cfg = _init_config() if config_cls is None else config_cls
-    if config_cls is not None:
-        cfg.initialize()
+def main(config=None):
+    cfg = _init_config() if config is None else config
 
     nf_lo, nf_hi = cfg.NF_RANGE
     ef_lo, ef_hi = cfg.EF_RANGE
@@ -230,10 +186,10 @@ def main(config_cls=None):
             cfg.SYNTHETIC_NETWORK_NUMBER != 0
         ), "Sweeping experiments require synthetic networks."
         if cfg.USE_WANDB:
-            wandb.login(
+            _wandb().login(
                 key=os.environ.get("WANDB_API_KEY") or os.environ.get("WANDB_KEY")
             )
-        for dataset_id in cfg.get_datasets():
+        for dataset_id in cfg.DATASETS:
             run_for_dataset(dataset_id, node_factors, edge_factors, cfg, run_paths)
     except KeyboardInterrupt:
         status = STATUS_CANCELLED

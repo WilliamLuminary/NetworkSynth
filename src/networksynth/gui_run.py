@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 
-from networksynth.configs.gui_config import GuiConfig, SpecError
+from networksynth.configs.gui_config import SpecError, from_spec
 from networksynth.handlers import configure_console
 from networksynth.pipelines import load_pipeline
 
@@ -35,7 +35,7 @@ def main(argv=None) -> int:
 
     try:
         spec_path = _resolve_spec_path(argv)
-        config = GuiConfig.from_spec(spec_path)
+        config = from_spec(spec_path)
         if config.MODE not in _GUI_MODES:
             raise SpecError(
                 f"mode {config.MODE!r} is not available; "
@@ -48,7 +48,7 @@ def main(argv=None) -> int:
     pipeline = load_pipeline(config.MODE)
 
     try:
-        pipeline.main(config_cls=config)
+        pipeline.main(config=config)
     except KeyboardInterrupt:
         logger.critical("Interrupted — exiting.")
         return EXIT_INTERRUPTED

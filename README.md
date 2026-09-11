@@ -2,7 +2,7 @@
 
 Generates synthetic networks modelled on a real one: it measures an input network's structure, grows candidates that match it, and keeps the ones that pass a quality gate.
 
-This is the **`dist` branch** — a generated, code-only copy of [NetworkSynth](https://github.com/WilliamLuminary/NetworkSynth) meant to be checked out as a submodule inside another project. It carries the package and what it needs to install, and nothing else. Nothing here should be edited: every commit on this branch is built from the main repository by `scripts/publish_dist.sh`, so a change made here is lost at the next publish. Fix things in the main repository instead.
+This is the **`dist` branch** — a generated, code-only copy of [NetworkSynth](https://github.com/WilliamLuminary/NetworkSynth) meant to be checked out as a submodule inside another project. It carries the package and what it needs to install, and nothing else. Nothing here should be edited: every commit on this branch is built from the main repository by `scripts/release_dist.sh`, so a change made here is lost at the next publish. Fix things in the main repository instead.
 
 ## Setup
 
@@ -44,11 +44,11 @@ A network is a pair of files sharing a prefix, or a single GraphML file:
 | --- | --- |
 | `<prefix>_edgelist.csv` + `<prefix>_positions.csv` | a CSV pair |
 | `<prefix>_EdgeList.csv` + `<prefix>_NodePositions.csv` | a StructuralGT export |
-| `<prefix>_adjacency.npy` + `<prefix>_positions.npy` | a NumPy pair |
+| `<prefix>_adjacency.npy` + `<prefix>_positions.npy` | a NumPy pair; the older `_mat.npy` + `_pos.npy` names are read too |
 | `<prefix>_network.graphml` | one network, positions included (`.graphml.gz` too) |
 | `<prefix>_image.tif` | the background for that prefix, optional |
 
-Point a run at a folder of these and it reads one dataset per prefix, in name order, writing a subdirectory each under one run root. A half-named dataset stops the run and names it rather than being passed over.
+Point a run at a folder of these and it reads one dataset per prefix, in name order, writing a subdirectory each under one run root. Every network is reduced to its largest connected component as it is read, since the analyses take all-pairs distances. A half-named dataset stops the run and names it rather than being passed over.
 
 A StructuralGT export is read to its own conventions: its positions are `(row, col)` under headers `x,y`, so they are swapped, and its network is traced on a copy scaled to 1024 on the longest side, so that copy is taken as the coordinate window rather than the image file.
 
@@ -56,7 +56,7 @@ Edge lists are read tolerantly: `Source,Target` columns (with `Weight,Length,Wid
 
 ## Output
 
-One directory per run, `{MODE}_{ConfigClass}_results_{timestamp}_{run_id}`, holding the original and synthetic networks as edge-list pairs and rendered images, plus a per-dataset `report.txt`. GraphML is offered as an output format but is not written by default. `manifest.json` at the run root groups every file written by kind and records whether the run ended `ok`, `failed` or `cancelled`.
+One directory per run, `{mode}_mode_{config file}_results_{timestamp}_{run_id}`, holding the original and synthetic networks as edge-list pairs and rendered images, plus a per-dataset `report.txt`. GraphML is offered as an output format but is not written by default. `manifest.json` at the run root groups every file written by kind and records whether the run ended `ok`, `failed` or `cancelled`.
 
 ## Full documentation
 

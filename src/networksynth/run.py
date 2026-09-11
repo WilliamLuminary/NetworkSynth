@@ -39,13 +39,13 @@ def main(argv=None) -> int:
     try:
         config = load_config(argv[1])
         pipeline = load_pipeline(config.MODE)
-    except (FileNotFoundError, ValueError, AttributeError) as exc:
+    except (FileNotFoundError, ValueError, AttributeError, TypeError) as exc:
         logger.error(f"{exc}")
         return EXIT_BAD_ARGS
 
-    logger.info(f"Running {config.__name__} ({config.MODE})")
+    logger.info(f"Running {config.OUTPUT_DENOTE} ({config.MODE})")
     try:
-        pipeline.main(config_cls=config)
+        pipeline.main(config=config)
     except KeyboardInterrupt:
         logger.critical("Interrupted — exiting.")
         return EXIT_INTERRUPTED
