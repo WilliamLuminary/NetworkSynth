@@ -474,8 +474,7 @@ ApplicationWindow {
 
                     CheckBox {
                         visible: shared.modelData.kind === "bool"
-                        text: shared.modelData.label === formLine.line.row
-                            ? "" : shared.modelData.label
+                        text: shared.modelData.label === formLine.line.row ? "" : shared.modelData.label
                         checked: shared.modelData.current === true
                         onToggled: controller.setValue(shared.modelData.id, checked)
                     }
@@ -484,10 +483,8 @@ ApplicationWindow {
                         visible: shared.modelData.kind !== "bool"
                         field: shared.modelData
                         value: shared.modelData.current
-                        onEdited: (newValue) => controller.setValue(
-                            shared.modelData.id, newValue)
-                        onSized: (index, newValue) => controller.setSize(
-                            shared.modelData.id, index, newValue)
+                        onEdited: newValue => controller.setValue(shared.modelData.id, newValue)
+                        onSized: (index, newValue) => controller.setSize(shared.modelData.id, index, newValue)
                     }
                 }
             }
@@ -658,6 +655,7 @@ ApplicationWindow {
         spacing: 0
 
         Rectangle {
+            id: rail
             Layout.preferredWidth: 196
             Layout.fillHeight: true
             color: root.railColor
@@ -724,10 +722,23 @@ ApplicationWindow {
             Layout.margins: 18
             spacing: 2
 
-            Label {
-                text: controller.modeLabels[controller.modes.indexOf(controller.mode)]
-                font.pixelSize: 22
-                font.bold: true
+            RowLayout {
+                spacing: 10
+
+                ToolButton {
+                    text: "\u2630"
+                    font.pixelSize: 16
+                    implicitWidth: 30
+                    implicitHeight: 30
+                    ToolTip.text: rail.visible ? "Hide the mode bar" : "Show the mode bar"
+                    ToolTip.visible: hovered
+                    onClicked: rail.visible = !rail.visible
+                }
+                Label {
+                    text: controller.modeLabels[controller.modes.indexOf(controller.mode)]
+                    font.pixelSize: 22
+                    font.bold: true
+                }
             }
             Label {
                 Layout.fillWidth: true
@@ -742,10 +753,24 @@ ApplicationWindow {
                 Layout.fillHeight: true
                 orientation: Qt.Horizontal
 
+                // Only the grab area around the line. The gutter to either side is the
+                // panes' padding, so the line stays centred between the cards and the
+                // scrollbars, which appear on hover, surface inside the padding.
+                handle: Item {
+                    implicitWidth: 8
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: 2
+                        height: parent.height
+                        color: root.lineColor
+                    }
+                }
+
                 ScrollView {
                     SplitView.preferredWidth: 500
                     SplitView.minimumWidth: 420
                     contentWidth: availableWidth
+                    rightPadding: 12
 
                     ColumnLayout {
                         width: parent.width
@@ -967,6 +992,8 @@ ApplicationWindow {
                     SplitView.fillWidth: true
                     SplitView.minimumWidth: 470
                     contentWidth: availableWidth
+                    leftPadding: 12
+                    rightPadding: 12
 
                     ColumnLayout {
                         width: parent.width
@@ -974,7 +1001,6 @@ ApplicationWindow {
 
                         Card {
                             title: "Output"
-                            Layout.leftMargin: 14
 
                             RowLayout {
                                 Layout.fillWidth: true
@@ -1108,7 +1134,6 @@ ApplicationWindow {
 
                         Card {
                             title: "Preview"
-                            Layout.leftMargin: 14
                             visible: controller.canPreview
 
                             RowLayout {
@@ -1218,7 +1243,6 @@ ApplicationWindow {
 
                         Card {
                             title: "Log"
-                            Layout.leftMargin: 14
 
                             ScrollView {
                                 Layout.fillWidth: true
@@ -1240,5 +1264,4 @@ ApplicationWindow {
             }
         }
     }
-
 }
