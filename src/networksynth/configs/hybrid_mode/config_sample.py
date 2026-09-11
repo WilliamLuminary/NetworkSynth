@@ -3,7 +3,6 @@ import os
 
 from ..base_config import DEFAULT_INPUT_PATH, HybridConfig
 from ..dataset_id import DatasetId
-from ..file_definitions import SYNTHETIC_DIR, SaveSpec, save_png, save_webp
 
 CONFIG = HybridConfig(
     DATASETS=[
@@ -30,8 +29,4 @@ CONFIG = HybridConfig(
     },
     MAX_ATTEMPTS=50,
     MEASURE_WEIGHTED=True,
-    SAVE_SYNTHETIC_GRAPH=(
-        SaveSpec(SYNTHETIC_DIR, "synthetic_graph", "webp", save_webp),
-        SaveSpec(SYNTHETIC_DIR, "synthetic_graph", "png", save_png),
-    ),
 )
